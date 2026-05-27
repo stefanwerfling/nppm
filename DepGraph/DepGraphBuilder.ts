@@ -1,0 +1,244 @@
+import {JsonCache} from '../Cache/JsonCache.js';
+import {OsvVulnerability} from '../Security/OsvClient.js';
+import {Lockfile, LockedPackage} from '../Project/Lockfile.js';
+import {Project} from '../Project/Project.js';
+import {Registry} from '../Registry/Registry.js';
+
+/**
+ * Per-package status the UI colours nodes by.
+ *  - `cve`:      OSV-cache reports at least one known vulnerability
+ *  - `outdated`: registry has a newer `latest`
+ *  - `aligned`:  on or above latest, no known CVEs
+ *  - `unknown`:  registry has no info (and no CVEs cached either)
+ */
+export type DepGraphStatus = 'cve'|'outdated'|'aligned'|'unknown';
+
+/**
+ * One node in the flat dep-graph response. `deps` are already
+ * resolved to concrete `name@version` keys the frontend can look up
+ * in the `packages` map; that means an entry doesn't have to re-do
+ * the npm hoisting walk client-side.
+ *
+ * `deps` may include a synthetic `null` entry when a declared
+ * dependency couldn't be resolved (rare — usually means it's a
+ * peer/optional that isn't actually installed). We keep it as `name`
+ * with `version: ''` so the UI can still render a placeholder.
+ */
+export type DepGraphNode = {
+    name: string;
+    version: string;
+    status: DepGraphStatus;
+    vulnCount: number;
+    latestVersion: string|null;
+    deps: {name: string; version: string}[];
+};
+
+export type DepGraphResponse = {
+    project: {
+        unid: string;
+        name: string;
+        type: string;
+    };
+    /** Top-level deps declared by the project root. Frontend uses this as the tree's root children. */
+    rootDeps: {name: string; version: string}[];
+    /** All resolved packages, keyed by `<name>@<version>`. */
+    packages: Record<string, DepGraphNode>;
+};
+
+/**
+ * Build a flat dependency graph from a project's lockfile. The graph
+ * is delivered as a `Map<name@version, node>` rather than a recursive
+ * tree because trees with thousands of nodes (kavula has ~1700)
+ * explode in size — flat lookup keeps the response under a megabyte
+ * even for the worst cases.
+ *
+ * Resolution: npm's hoisting algorithm. For a dep declared at
+ * `node_modules/a/node_modules/b/package.json`, we walk path
+ * segments from the dependent's path upward looking for
+ * `node_modules/<dep>` until we hit the project root. First match wins.
+ *
+ * Status:
+ *  - reads the *single-query* OSV cache (`osv_<name>@<version>`) for
+ *    vuln counts — no network call from inside this path
+ *  - reads the registry cache for `latest`
+ *  - everything stays best-effort: missing data = `unknown`
+ */
+export async function buildDepGraph(
+    projectUnid: string,
+    project: Project,
+    registry: Registry,
+    osvCache: JsonCache
+): Promise<DepGraphResponse|null> {
+    const lockfile = await project.loadLockfile();
+    if (!lockfile) {
+        return null;
+    }
+
+    const byPath = new Map<string, LockedPackage>();
+    for (const pkg of lockfile.packages) {
+        byPath.set(pkg.path, pkg);
+    }
+
+    const resolveDep = (
+        dependentPath: string,
+        depName: string
+    ): LockedPackage|null => {
+        // Walk upward from the dependent's directory, looking for
+        // `node_modules/<depName>` at each level — the same algorithm
+        // npm uses at install time.
+        let cursor = dependentPath;
+        while (true) {
+            const probe = joinNodeModules(cursor, depName);
+            const hit = byPath.get(probe);
+            if (hit) {
+                return hit;
+            }
+            const parent = stripLastSegment(cursor);
+            if (parent === cursor) {
+                return null; // already at the root
+            }
+            cursor = parent;
+        }
+    };
+
+    // Pre-resolve a name→pkg map for top-level lookups (used by root
+    // deps and by the upward walk when it bottoms out).
+    const topLevel = new Map<string, LockedPackage>();
+    for (const pkg of lockfile.packages) {
+        if (isTopLevelPath(pkg.path)) {
+            topLevel.set(pkg.name, pkg);
+        }
+    }
+
+    // For each lockfile package, build its `deps` array resolved to
+    // concrete `name@version` keys.
+    const packages: Record<string, DepGraphNode> = {};
+
+    for (const pkg of lockfile.packages) {
+        const key = `${pkg.name}@${pkg.version}`;
+        if (packages[key]) {
+            // Same `name@version` can appear multiple times (nested
+            // installs at different paths). Keep the first; deps are
+            // package-identity properties, not path-dependent.
+            continue;
+        }
+
+        const resolvedDeps: {name: string; version: string}[] = [];
+        const allDeps = {...pkg.deps, ...pkg.peerDeps, ...pkg.optionalDeps};
+
+        for (const depName of Object.keys(allDeps)) {
+            const target = resolveDep(pkg.path, depName)
+                ?? topLevel.get(depName)
+                ?? null;
+            if (target) {
+                resolvedDeps.push({name: target.name, version: target.version});
+            } else {
+                // Unresolved peer / optional / missing — record as a
+                // version-less placeholder so the UI can flag it.
+                resolvedDeps.push({name: depName, version: ''});
+            }
+        }
+
+        const vulnCount = readVulnCount(osvCache, pkg.name, pkg.version);
+        const regHit = await registry.fetchOne(pkg.name);
+        const latest = regHit?.latest ?? null;
+
+        packages[key] = {
+            name: pkg.name,
+            version: pkg.version,
+            status: deriveStatus(pkg.version, latest, vulnCount),
+            vulnCount,
+            latestVersion: latest,
+            deps: resolvedDeps
+        };
+    }
+
+    // Root deps come from the project root manifest, not from the
+    // lockfile (the lockfile's root entry only knows what was at
+    // install time, but the manifest is the canonical "what does the
+    // project declare").
+    const manifests = await project.loadManifests();
+    const rootManifest = manifests.find((m) => m.workspace === undefined);
+    const rootDeps: {name: string; version: string}[] = [];
+
+    if (rootManifest) {
+        const seen = new Set<string>();
+        for (const dep of rootManifest.dependencies) {
+            if (seen.has(dep.name)) {
+                continue;
+            }
+            seen.add(dep.name);
+
+            const target = topLevel.get(dep.name);
+            if (target) {
+                rootDeps.push({name: target.name, version: target.version});
+            } else {
+                rootDeps.push({name: dep.name, version: ''});
+            }
+        }
+    }
+
+    return {
+        project: {
+            unid: projectUnid,
+            name: project.getName(),
+            type: project.getType()
+        },
+        rootDeps,
+        packages
+    };
+}
+
+function isTopLevelPath(path: string): boolean {
+    // `node_modules/foo` or `node_modules/@scope/foo` — no further
+    // `node_modules/` segments.
+    const segments = path.split('/');
+    let nm = 0;
+    for (const s of segments) {
+        if (s === 'node_modules') {
+            nm++;
+        }
+    }
+    return nm === 1;
+}
+
+function joinNodeModules(basePath: string, depName: string): string {
+    // `basePath` is the dependent's path; we want the *directory*
+    // it lives in plus `/node_modules/<depName>`. For
+    // `node_modules/a/node_modules/b` that's `node_modules/a/node_modules/<depName>`.
+    if (basePath === '') {
+        return `node_modules/${depName}`;
+    }
+    return `${basePath}/node_modules/${depName}`;
+}
+
+function stripLastSegment(path: string): string {
+    // `node_modules/a/node_modules/b` → `node_modules/a` so the next
+    // upward probe lands at `node_modules/a/node_modules/<dep>`.
+    // For a top-level `node_modules/a` (or `@scope/a`), strip back to
+    // empty so the next probe is `node_modules/<dep>` (i.e. hoisted).
+    const nmIdx = path.lastIndexOf('/node_modules/');
+    if (nmIdx === -1) {
+        return ''; // top-level — next walk hits the root
+    }
+    return path.slice(0, nmIdx);
+}
+
+function readVulnCount(cache: JsonCache, name: string, version: string): number {
+    type Wrap = {data: OsvVulnerability[]|null};
+    const hit = cache.get<Wrap>(`osv_${name}@${version}`);
+    if (!hit || hit.data === null) {
+        return 0;
+    }
+    return hit.data.length;
+}
+
+function deriveStatus(current: string, latest: string|null, vulnCount: number): DepGraphStatus {
+    if (vulnCount > 0) {
+        return 'cve';
+    }
+    if (latest === null) {
+        return 'unknown';
+    }
+    return current === latest ? 'aligned' : 'outdated';
+}

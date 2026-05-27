@@ -1,0 +1,145 @@
+# CLAUDE.md — architecture reference
+
+This file orients a fresh Claude Code session (or a human) to the nppm
+codebase. It is *not* user-facing documentation — that lives in
+`README.md` and `doc/manual_*.md`.
+
+## What nppm is
+
+A Vite-hosted dev tool. Backend = Express middleware mounted inside
+`vite.config.ts`. Frontend = plain TypeScript + DOM, no framework, no
+build other than what Vite does. Mirrors the architecture of `vtseditor`
+in the sibling repo.
+
+## Top-level layout
+
+```
+nppm/
+├── cli/dev.js              CLI shim: writes default config, starts Vite
+├── index.html              entry, contains topbar + main panes
+├── main.ts                 mounts language picker + boots Nppm
+├── main.css                all styling
+├── vite.config.ts          Express middleware + every API route
+│
+├── Api/ApiTypes.ts         wire types shared between backend & frontend
+├── Config/Config.ts        VTS schemas for nppm.json
+├── Cache/JsonCache.ts      one-file-per-key disk cache (TTL or permanent)
+│
+├── Project/                project sources (local + remote bases)
+│   ├── Project.ts          common interface (loadManifests, loadLockfile, getKey, …)
+│   ├── ProjectLocal.ts     local-dir reader, includes workspace expansion
+│   ├── ProjectRemote.ts    abstract base for GitHub/Gitea
+│   ├── ProjectGithub.ts    contents API
+│   ├── ProjectGitea.ts     contents API (different URL shape, token format)
+│   ├── PackageManifest.ts  flat DependencyType + PackageDependency types
+│   └── Lockfile.ts         parsePackageLock v2/v3, scanNodeModules fallback
+│
+├── Registry/Registry.ts    npm-registry client with batched concurrency
+│
+├── Matrix/                 two matrix variants
+│   ├── MatrixBuilder.ts    cross-project (rows = pkgs, cols = projects)
+│   └── ProjectMatrixBuilder.ts  per-project (rows = pkgs, cols = workspaces)
+│
+├── Fingerprint/            tarball-level scanning
+│   ├── TarballParser.ts    zlib + manual 512-byte tar walk (no `tar` dep)
+│   ├── Fingerprint.ts      File / Package / Diff types
+│   ├── FingerprintBuilder.ts  fetch+gunzip+hash, content cache for JS files
+│   ├── FingerprintDiff.ts  added/removed/modified
+│   └── GitResolver.ts      git URLs → codeload/gitlab/bitbucket tarball URLs
+│
+├── Security/               heuristic + CVE scanners
+│   ├── OsvClient.ts        OSV.dev (single + batch), envelope-cached
+│   ├── ScriptScanner.ts    lifecycle-script heuristic
+│   ├── PatternScanner.ts   eval/Function/child_process/base64 regex
+│   ├── ChurnScanner.ts     diff prev stable vs current, threshold by bump
+│   ├── BinaryScanner.ts    extension- + bin/-path classification
+│   └── SecurityScanner.ts  aggregator + batched matrix-heuristics
+│
+├── Releases/               npm registry + GitHub Releases merge
+│   ├── Releases.ts
+│   └── ReleasesFetcher.ts
+│
+├── DepGraph/DepGraphBuilder.ts  flat-graph walker, npm hoisting algorithm
+├── History/                per-project change log
+│   ├── History.ts
+│   └── HistoryStore.ts     atomic-write JSON in .nppm-history/
+│
+├── Frontend/               every browser-side module
+│   ├── Nppm.ts             top-level orchestrator (panes, routing)
+│   ├── Matrix.ts           global matrix view
+│   ├── ProjectMatrixView.ts  per-project matrix
+│   ├── PackageList.ts      declared-deps table
+│   ├── InstalledView.ts    lockfile/node_modules table + analyze bar
+│   ├── HistoryView.ts      timeline cards
+│   ├── DepTreeView.ts      D3-collapsible tree
+│   ├── GlobalScanView.ts   SSE-driven global scan results
+│   ├── PackageDetailPanel.ts  modal w/ 5 tabs (Files/Deps/Diff/Releases/Security)
+│   ├── Treeview.ts         left-pane project list
+│   ├── Resizer.ts          splitter logic
+│   ├── Api.ts              `fetch()` wrapper
+│   ├── I18n.ts             public i18n API + LANGUAGES + LOCALES registry
+│   ├── Locales/en.ts       English translations (source-of-truth identity map)
+│   ├── Locales/de.ts       German translations
+│   ├── Version.ts          shared cleanRange helper
+│   └── logo.svg            32×32 brand mark
+│
+├── tests/                  vitest, all unit, no network
+└── doc/                    user-facing manuals + screenshot script
+```
+
+## API routes (in `vite.config.ts`)
+
+| Method | Path                                                  | Purpose |
+|--------|-------------------------------------------------------|---------|
+| GET    | `/api/projects`                                       | list configured projects + counts |
+| GET    | `/api/projects/:id/packages`                          | flat manifest list of one project |
+| GET    | `/api/projects/:id/lockfile`                          | parsed lockfile (or `node_modules` fallback) |
+| GET    | `/api/projects/:id/lockfile/analyze`                  | SSE per-project OSV scan |
+| GET    | `/api/projects/:id/history`                           | per-project change log |
+| GET    | `/api/projects/:id/matrix`                            | per-project matrix |
+| GET    | `/api/projects/:id/depgraph`                          | flat resolved dep graph |
+| GET    | `/api/matrix`                                         | cross-project matrix |
+| POST   | `/api/matrix/security`                                | batched CVE lookup |
+| POST   | `/api/matrix/heuristics`                              | batched scripts + patterns + binaries |
+| GET    | `/api/lockfile/analyze-all`                           | SSE global scan |
+| GET    | `/api/fingerprint`                                    | one `pkg@version` fingerprint |
+| GET    | `/api/fingerprint/diff`                               | file-level diff between two versions |
+| GET    | `/api/security`                                       | aggregated SecurityReport for one `pkg@version` |
+| GET    | `/api/releases`                                       | registry + GitHub-merged release list |
+
+## Storage
+
+- `.nppm-cache/` — TTL caches (registry, remote, security, releases) and a
+  permanent fingerprint cache. Safe to delete; auto-rebuilt.
+- `.nppm-history/` — append-only per-project history JSON. **Do not** put
+  in `.nppm-cache/` because the user wants to keep / commit it.
+
+## Conventions Claude should not break
+
+- **Vts.or unions** don't narrow on a discriminator in TS — always cast
+  inside an `if (entry.type === ...)` branch in `vite.config.ts`'s project
+  loop.
+- **`{data: ...}` envelope** in caches that can legitimately store
+  `null`. A bare `null` from `JsonCache.get` means "miss", an envelope's
+  `data: null` means "we asked, got nothing".
+- **Permanent fingerprint cache** — versions are immutable on npm. Bump
+  the cache-key prefix (`fp_v4_*` → `fp_v5_*`) when the cached shape
+  changes.
+- **i18n** — every user-visible string in the frontend goes through
+  `t()`. Add new strings to `Frontend/Locales/en.ts` AND `de.ts` (or
+  rely on the en-fallback for a while).
+- **No new framework dependency.** D3 is the only client lib; everything
+  else is hand-rolled DOM.
+
+## Tests
+
+`vitest`. Tarballs are built in-memory with synthetic tar blocks (see
+`tests/TarballParser.test.ts` for the builder). No fixture files live in
+the repo, no network mocks via msw/nock — fetch is stubbed via DI
+(`TarballFetcher`, `OsvFetcher`, `GithubReleasesFetcher`).
+
+## Phases (historical)
+
+The roadmap in `~/.claude/projects/.../memory/project_roadmap.md`
+captures the sequence of work that built the system; this file replaces
+that as the durable reference once the project ships.

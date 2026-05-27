@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="nppm logo">
+  <title>nppm</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2b2d30"/>
+      <stop offset="100%" stop-color="#1e1f22"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="12" ry="12" fill="url(#bg)" stroke="#3574f0" stroke-width="2"/>
+  <!-- 2x2 status matrix: aligned / outdated / drift / unknown -->
+  <rect x="14" y="14" width="14" height="14" rx="2" fill="#4caf50"/>
+  <rect x="36" y="14" width="14" height="14" rx="2" fill="#f0b400"/>
+  <rect x="14" y="36" width="14" height="14" rx="2" fill="#e85a5a"/>
+  <rect x="36" y="36" width="14" height="14" rx="2" fill="#8a8a8a"/>
+  <!-- accent dot at the bottom-right matrix cell to suggest "drill-down" -->
+  <circle cx="50" cy="50" r="3" fill="#1e1f22"/>
+</svg>

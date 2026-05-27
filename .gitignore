@@ -1,0 +1,7 @@
+.idea/
+.nppm-cache
+.nppm-history
+node_modules/
+nppm.json
+package-lock.json
+/doc/todo.txt

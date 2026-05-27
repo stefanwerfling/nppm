@@ -1,0 +1,95 @@
+import {PackageFingerprintManifest} from '../Fingerprint/Fingerprint.js';
+
+/**
+ * Outcome of a script-heuristic match. Severity is a fixed 3-level
+ * ladder; consumers (UI badges, scoring) can map it to colours.
+ *
+ *  - info:  hook exists but nothing suspicious in the body
+ *  - warn:  install-time hook (preinstall/install/postinstall) — any
+ *           install-time code is worth flagging by default
+ *  - risk:  hook body matches a network / dynamic-exec pattern
+ */
+export enum ScriptSeverity {
+    info = 'info',
+    warn = 'warn',
+    risk = 'risk'
+}
+
+export type ScriptFinding = {
+    hook: string;
+    severity: ScriptSeverity;
+    script: string;
+    reason: string;
+};
+
+/**
+ * Hooks npm/yarn/pnpm fire during `install`. We do *not* flag the
+ * publish-time hooks (`prepublishOnly`, `publish`) — they don't run on
+ * a consumer's machine.
+ *
+ * The set is split into "install-time" (default-warn) and "build-time"
+ * (default-info): a `prepare` script runs on `npm install` too in the
+ * git-dependency case, but for a normally-installed package it's
+ * developer-only.
+ */
+const INSTALL_HOOKS = new Set(['preinstall', 'install', 'postinstall']);
+const BUILD_HOOKS = new Set(['prepare', 'prepublish']);
+
+/**
+ * Patterns that escalate a finding from `warn` to `risk`. Each entry is
+ * a (regex, human reason) pair. Kept terse on purpose — over-broad
+ * patterns yield false positives that train the user to ignore the
+ * badge.
+ */
+const RISK_PATTERNS: {pattern: RegExp; reason: string}[] = [
+    {pattern: /\b(curl|wget)\b/i, reason: 'lädt remote via curl/wget'},
+    {pattern: /\bnc\s+-/, reason: 'öffnet Netzwerk-Verbindung via netcat'},
+    {pattern: /\bnode\s+(-e|--eval)\b/, reason: 'führt Code via `node -e`'},
+    {pattern: /\beval\s*\(/, reason: 'ruft eval auf'},
+    {pattern: /\b(base64\s+(-d|--decode)|atob\s*\()/i, reason: 'dekodiert base64 zur Laufzeit'},
+    {pattern: /\b(bash|sh)\s+-c\b/, reason: 'pipt String an Shell'},
+    {pattern: /\|\s*(bash|sh)\b/, reason: 'pipt Output an Shell'},
+    {pattern: /\bnpm\s+i(nstall)?\b/, reason: 'installiert weitere Pakete zur Install-Zeit'}
+];
+
+/**
+ * Walk the manifest's lifecycle hooks and emit a finding per hook
+ * present. Returns an empty list when no lifecycle hooks are declared
+ * (the common, boring case).
+ */
+export function scanScripts(manifest: PackageFingerprintManifest|null): ScriptFinding[] {
+    if (!manifest || !manifest.scripts) {
+        return [];
+    }
+
+    const findings: ScriptFinding[] = [];
+
+    for (const [hook, script] of Object.entries(manifest.scripts)) {
+        const isInstall = INSTALL_HOOKS.has(hook);
+        const isBuild = BUILD_HOOKS.has(hook);
+
+        if (!isInstall && !isBuild) {
+            continue;
+        }
+
+        const risk = RISK_PATTERNS.find((r) => r.pattern.test(script));
+        const severity = risk
+            ? ScriptSeverity.risk
+            : isInstall
+                ? ScriptSeverity.warn
+                : ScriptSeverity.info;
+
+        findings.push({
+            hook,
+            severity,
+            script,
+            reason: risk
+                ? risk.reason
+                : isInstall
+                    ? 'Install-Hook führt Code beim `npm install` aus'
+                    : 'Build-Hook (läuft bei `npm install` für Git-Dependencies)'
+        });
+    }
+
+    return findings;
+}

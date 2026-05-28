@@ -146,7 +146,8 @@ export class ReleasesFetcher {
 
         const releases: Release[] = reg.versions.map((v) => ({
             version: v,
-            publishedAt: reg.time?.[v] ?? null
+            publishedAt: reg.time?.[v] ?? null,
+            publisher: reg.publishers?.[v]?.name
         }));
 
         // Enrich with GitHub release notes where possible.

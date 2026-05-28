@@ -52,4 +52,19 @@ describe('Config schema', () => {
 
         expect(SchemaConfig.validate(cfg, [])).toBe(true);
     });
+
+    it('accepts an optional security.maintainer section', () => {
+        const cfg = {
+            projects: [],
+            security: {
+                maintainer: {
+                    quickHandoverDays: 14,
+                    suspiciousGapDays: 90,
+                    matureVersions: 5,
+                    trustWindow: 30
+                }
+            }
+        };
+        expect(SchemaConfig.validate(cfg, [])).toBe(true);
+    });
 });

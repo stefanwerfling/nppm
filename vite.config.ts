@@ -87,6 +87,12 @@ function expressMiddleware(): Plugin {
             let registryAuth: string|undefined;
             let cacheDir = path.resolve(projectRoot, '.nppm-cache');
             let cacheTtlMinutes = 60;
+            let maintainerOpts: {
+                quickHandoverDays?: number;
+                suspiciousGapDays?: number;
+                matureVersions?: number;
+                trustWindow?: number;
+            } = {};
 
             // Two-pass: first parse the config to fix cache/registry
             // settings, then build cache instances, then construct
@@ -115,6 +121,10 @@ function expressMiddleware(): Plugin {
                         }
                     }
 
+                    if (raw.security?.maintainer) {
+                        maintainerOpts = raw.security.maintainer;
+                    }
+
                     rawProjects = raw.projects;
                 }
             }
@@ -140,7 +150,12 @@ function expressMiddleware(): Plugin {
             // against an old version any time. Plain TTL cache.
             const securityCache = new JsonCache(path.join(cacheDir, 'security'), cacheTtlMinutes);
             const osvClient = new OsvClient(securityCache);
-            const securityScanner = new SecurityScanner(osvClient, fingerprintBuilder, registry);
+            const securityScanner = new SecurityScanner(
+                osvClient,
+                fingerprintBuilder,
+                registry,
+                {maintainer: maintainerOpts}
+            );
 
             // Releases cache pocket. GitHub rate-limits anonymous
             // requests to 60/hour — without caching, a busy user

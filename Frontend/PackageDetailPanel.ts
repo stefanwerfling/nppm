@@ -7,6 +7,7 @@ import {
 import {Release, ReleasesResponse} from '../Releases/Releases.js';
 import {BinaryFinding, BinarySeverity} from '../Security/BinaryScanner.js';
 import {ChurnFinding, ChurnSeverity} from '../Security/ChurnScanner.js';
+import {MaintainerFinding, MaintainerSeverity} from '../Security/MaintainerScanner.js';
 import {OsvVulnerability} from '../Security/OsvClient.js';
 import {PatternFinding, PatternSeverity} from '../Security/PatternScanner.js';
 import {ScriptFinding, ScriptSeverity} from '../Security/ScriptScanner.js';
@@ -278,7 +279,8 @@ export class PackageDetailPanel {
         const p = this._securityReport.patternFindings.length;
         const b = this._securityReport.binaryFindings.length;
         const c = this._securityReport.churn && this._securityReport.churn.severity !== ChurnSeverity.info ? 1 : 0;
-        const n = v + s + p + b + c;
+        const m = this._securityReport.maintainer && this._securityReport.maintainer.severity !== MaintainerSeverity.info ? 1 : 0;
+        const n = v + s + p + b + c + m;
         return n > 0 ? `${t('Security')} (${n})` : t('Security');
     }
 
@@ -478,6 +480,13 @@ export class PackageDetailPanel {
             head.appendChild(when);
         }
 
+        if (r.publisher) {
+            const by = document.createElement('span');
+            by.className = 'pdp-release-publisher';
+            by.textContent = `by ${r.publisher}`;
+            head.appendChild(by);
+        }
+
         if (r.url) {
             const link = document.createElement('a');
             link.className = 'pdp-release-link';
@@ -586,9 +595,18 @@ export class PackageDetailPanel {
         const patternCount = report.patternFindings.length;
         const binaryCount = report.binaryFindings.length;
         const interestingChurn = report.churn && report.churn.severity !== ChurnSeverity.info;
+        const interestingMaintainer = report.maintainer && report.maintainer.severity !== MaintainerSeverity.info;
+
+        // Combined-signal banner: a fresh publisher *and* an outsized
+        // diff in the same release is the textbook account-takeover
+        // pattern (event-stream, ua-parser-js, @solana/web3.js, …).
+        const supplyChainBanner = PackageDetailPanel._supplyChainRisk(report.maintainer, report.churn);
+        if (supplyChainBanner) {
+            wrap.appendChild(supplyChainBanner);
+        }
 
         if (vulnCount === 0 && scriptCount === 0 && patternCount === 0 && binaryCount === 0
-            && !interestingChurn && report.vulns !== null) {
+            && !interestingChurn && !interestingMaintainer && report.vulns !== null) {
             const ok = document.createElement('div');
             ok.className = 'pdp-placeholder';
             ok.textContent = t('No known CVEs (OSV.dev), no suspicious install scripts, no notable file churn, no known code patterns and no binary files.');
@@ -601,7 +619,96 @@ export class PackageDetailPanel {
         wrap.appendChild(this._renderPatternsSection(report.patternFindings));
         wrap.appendChild(this._renderBinariesSection(report.binaryFindings));
         wrap.appendChild(this._renderChurnSection(report.churn));
+        wrap.appendChild(this._renderMaintainerSection(report.maintainer));
         return wrap;
+    }
+
+    private static _supplyChainRisk(
+        maintainer: MaintainerFinding|null,
+        churn: ChurnFinding|null
+    ): HTMLElement|null {
+        if (!maintainer || maintainer.severity !== MaintainerSeverity.risk) {
+            return null;
+        }
+        if (!churn || churn.severity === ChurnSeverity.info) {
+            return null;
+        }
+        const banner = document.createElement('div');
+        banner.className = 'pdp-supply-chain';
+        banner.textContent = t(
+            'Possible supply-chain attack: new publisher ({publisher}) + unusual file churn in the same release.',
+            {publisher: maintainer.currentPublisher?.name ?? '?'}
+        );
+        return banner;
+    }
+
+    private _renderMaintainerSection(finding: MaintainerFinding|null): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdp-section';
+
+        const heading = document.createElement('div');
+        heading.className = 'pdp-section-head';
+        heading.textContent = t('Maintainer / Publisher');
+        wrap.appendChild(heading);
+
+        if (!finding) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-placeholder';
+            empty.textContent = t('No registry record — git install or unknown package.');
+            wrap.appendChild(empty);
+            return wrap;
+        }
+
+        const card = document.createElement('div');
+        card.className = `pdp-script pdp-script-${finding.severity}`;
+
+        const head = document.createElement('div');
+        head.className = 'pdp-script-head';
+
+        const sev = document.createElement('span');
+        sev.className = `pdp-sev pdp-sev-${finding.severity}`;
+        sev.textContent = PackageDetailPanel._maintainerSeverityLabel(finding.severity);
+        head.appendChild(sev);
+
+        const publisher = document.createElement('span');
+        publisher.className = 'pdp-script-hook';
+        publisher.textContent = finding.currentPublisher?.name ?? '—';
+        if (finding.currentPublisher?.email) {
+            publisher.title = finding.currentPublisher.email;
+        }
+        head.appendChild(publisher);
+
+        if (finding.gapDays !== null) {
+            const gap = document.createElement('span');
+            gap.className = 'pdp-script-reason';
+            gap.textContent = t('{n} days since predecessor', {n: finding.gapDays});
+            head.appendChild(gap);
+        }
+
+        card.appendChild(head);
+
+        const reason = document.createElement('div');
+        reason.className = 'pdp-script-reason';
+        reason.textContent = finding.reason;
+        card.appendChild(reason);
+
+        if (finding.trustedPublishers.length > 0) {
+            const trust = document.createElement('code');
+            trust.className = 'pdp-script-body';
+            trust.textContent = t('Trust set: {names}', {names: finding.trustedPublishers.join(', ')});
+            card.appendChild(trust);
+        }
+
+        wrap.appendChild(card);
+        return wrap;
+    }
+
+    private static _maintainerSeverityLabel(s: MaintainerSeverity): string {
+        switch (s) {
+            case MaintainerSeverity.info: return 'OK';
+            case MaintainerSeverity.warn: return 'WARN';
+            case MaintainerSeverity.risk: return 'RISK';
+        }
     }
 
     private _renderBinariesSection(findings: BinaryFinding[]): HTMLElement {

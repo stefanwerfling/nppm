@@ -8,6 +8,12 @@ import {
     summariseBinaries
 } from './BinaryScanner.js';
 import {ChurnFinding, ChurnScanner} from './ChurnScanner.js';
+import {
+    MaintainerFinding,
+    MaintainerScanner,
+    MaintainerScannerOptions,
+    MaintainerSummary
+} from './MaintainerScanner.js';
 import {OsvClient, OsvVulnerability} from './OsvClient.js';
 import {PatternFinding, PatternSeverity, scanPatterns} from './PatternScanner.js';
 import {scanScripts, ScriptFinding, ScriptSeverity} from './ScriptScanner.js';
@@ -26,6 +32,7 @@ export type SecurityReport = {
     churn: ChurnFinding|null;
     patternFindings: PatternFinding[];
     binaryFindings: BinaryFinding[];
+    maintainer: MaintainerFinding|null;
 };
 
 /**
@@ -59,6 +66,7 @@ export type HeuristicsBatchEntry = {
     scripts: ScriptSummary;
     patterns: PatternSummary;
     binaries: BinarySummary;
+    maintainer: MaintainerSummary;
 };
 
 /**
@@ -89,29 +97,46 @@ export class SecurityScanner {
     private readonly _osv: OsvClient;
     private readonly _fingerprint: FingerprintBuilder;
     private readonly _churn: ChurnScanner;
+    private readonly _maintainer: MaintainerScanner;
 
-    constructor(osv: OsvClient, fingerprint: FingerprintBuilder, registry: Registry) {
+    constructor(
+        osv: OsvClient,
+        fingerprint: FingerprintBuilder,
+        registry: Registry,
+        opts: {maintainer?: MaintainerScannerOptions} = {}
+    ) {
         this._osv = osv;
         this._fingerprint = fingerprint;
         this._churn = new ChurnScanner(registry, fingerprint);
+        this._maintainer = new MaintainerScanner(registry, opts.maintainer);
     }
 
     public async scan(name: string, version: string): Promise<SecurityReport> {
-        // OSV, fingerprint, and churn all hit independent caches/network
-        // endpoints — fire them in parallel. ChurnScanner internally
-        // hits the fingerprint cache twice (previous + current) but
-        // both share the same cache pocket so warm runs are cheap.
-        const [vulns, fingerprint, churn] = await Promise.all([
+        // OSV, fingerprint, churn, and maintainer all hit independent
+        // caches/network endpoints — fire them in parallel. The
+        // maintainer scan reuses the same registry packument cache as
+        // churn, so warm runs are essentially free.
+        const [vulns, fingerprint, churn, maintainer] = await Promise.all([
             this._osv.query(name, version),
             this._fingerprint.build(name, version),
-            this._churn.scan(name, version)
+            this._churn.scan(name, version),
+            this._maintainer.scan(name, version)
         ]);
 
         const scriptFindings = scanScripts(fingerprint?.manifest ?? null);
         const patternFindings = fingerprint ? scanPatterns(fingerprint.files) : [];
         const binaryFindings = fingerprint ? scanBinaries(fingerprint.files) : [];
 
-        return {name, version, vulns, scriptFindings, churn, patternFindings, binaryFindings};
+        return {
+            name,
+            version,
+            vulns,
+            scriptFindings,
+            churn,
+            patternFindings,
+            binaryFindings,
+            maintainer
+        };
     }
 
     /**
@@ -140,7 +165,14 @@ export class SecurityScanner {
                     return;
                 }
                 const pkg = packages[i];
-                const fingerprint = await this._fingerprint.build(pkg.name, pkg.version);
+                // Fingerprint download (slow on cold start) and the
+                // maintainer registry lookup (cached after the first
+                // packument fetch) run in parallel — the latter does
+                // not need the tarball.
+                const [fingerprint, maintainer] = await Promise.all([
+                    this._fingerprint.build(pkg.name, pkg.version),
+                    this._maintainer.scan(pkg.name, pkg.version)
+                ]);
 
                 const scriptFindings = scanScripts(fingerprint?.manifest ?? null);
                 const patternFindings = fingerprint ? scanPatterns(fingerprint.files) : [];
@@ -168,6 +200,12 @@ export class SecurityScanner {
                         maxSeverity: binSummary.maxSeverity,
                         riskCount: binSummary.riskCount,
                         totalCount: binSummary.totalCount
+                    },
+                    maintainer: {
+                        name: pkg.name,
+                        version: pkg.version,
+                        severity: maintainer ? maintainer.severity : null,
+                        publisher: maintainer?.currentPublisher?.name ?? null
                     }
                 };
             }

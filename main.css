@@ -858,6 +858,18 @@ html, body {
     background: rgba(232, 90, 90, 0.6);
 }
 
+.matrix-badge-maintainer {
+    background: rgba(255, 80, 130, 0.45);
+    color: #ffdfe7;
+    border: 1px solid rgba(255, 80, 130, 0.85);
+    margin-left: 6px;
+    cursor: pointer;
+}
+
+.matrix-badge-maintainer:hover {
+    background: rgba(255, 80, 130, 0.65);
+}
+
 .matrix-cell-latest {
     color: var(--c-muted);
     font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -942,6 +954,16 @@ html, body {
 
 .pdp-error {
     color: var(--c-error);
+}
+
+.pdp-supply-chain {
+    margin: 0 0 12px;
+    padding: 10px 14px;
+    background: rgba(232, 90, 90, 0.18);
+    border: 1px solid rgba(232, 90, 90, 0.7);
+    border-radius: var(--radius-sm);
+    color: #ffaaaa;
+    font-weight: 600;
 }
 
 .pdp-tabs {
@@ -1082,6 +1104,12 @@ html, body {
 .pdp-release-when {
     color: var(--c-muted);
     font-size: 11px;
+}
+
+.pdp-release-publisher {
+    color: var(--c-muted);
+    font-size: 11px;
+    font-style: italic;
 }
 
 .pdp-release-link {

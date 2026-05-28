@@ -83,6 +83,33 @@ export const SchemaConfigCache = Vts.object({
 });
 
 /**
+ * Maintainer-scanner tuning. All values are days. Defaults reflect the
+ * empirical attack patterns (event-stream/ua-parser-js/coa had short
+ * handover gaps; long silence + new publisher is *usually* a legitimate
+ * community takeover of an abandoned package). Override per project
+ * when you know better — e.g. a security-sensitive monorepo may want
+ * `quickHandoverDays: 90` to also flag medium-length handovers as risk.
+ *
+ *  - `quickHandoverDays`  → ≤ this gap on a mature package = risk
+ *  - `suspiciousGapDays`  → ≤ this gap (but > quickHandover) = warn
+ *  - anything above is treated as a community takeover (info + note)
+ *  - `matureVersions`     → minimum predecessor count for risk/warn;
+ *                           young packages always soften to warn/info
+ *  - `trustWindow`        → number of recent versions inspected for the
+ *                           trust set
+ */
+export const SchemaConfigSecurityMaintainer = Vts.object({
+    quickHandoverDays: Vts.optional(Vts.number()),
+    suspiciousGapDays: Vts.optional(Vts.number()),
+    matureVersions: Vts.optional(Vts.number()),
+    trustWindow: Vts.optional(Vts.number())
+});
+
+export const SchemaConfigSecurity = Vts.object({
+    maintainer: Vts.optional(SchemaConfigSecurityMaintainer)
+});
+
+/**
  * Top-level nppm.json schema.
  */
 export const SchemaConfig = Vts.object({
@@ -90,7 +117,8 @@ export const SchemaConfig = Vts.object({
     server: Vts.optional(SchemaConfigServer),
     browser: Vts.optional(SchemaConfigBrowser),
     registry: Vts.optional(SchemaConfigRegistry),
-    cache: Vts.optional(SchemaConfigCache)
+    cache: Vts.optional(SchemaConfigCache),
+    security: Vts.optional(SchemaConfigSecurity)
 });
 
 export type Config = ExtractSchemaResultType<typeof SchemaConfig>;

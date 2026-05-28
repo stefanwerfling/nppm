@@ -111,6 +111,46 @@ describe('Registry', () => {
         expect(result.get('b')!.latest).toBe('2.0.0');
     });
 
+    it('extracts per-version `_npmUser` into the publishers map', async () => {
+        vi.stubGlobal('fetch', makeFetch({
+            'https://registry.example/foo': {
+                name: 'foo',
+                'dist-tags': {latest: '1.0.1'},
+                versions: {
+                    '1.0.0': {_npmUser: {name: 'alice', email: 'a@x'}},
+                    '1.0.1': {_npmUser: {name: 'bob'}},
+                    // No `_npmUser` — should be omitted from the map.
+                    '0.9.0': {}
+                }
+            }
+        }));
+
+        const cache = new JsonCache(dir, 60);
+        const r = new Registry('https://registry.example', cache);
+        const pkg = await r.fetchOne('foo');
+
+        expect(pkg!.publishers).toBeDefined();
+        expect(pkg!.publishers!['1.0.0']).toEqual({name: 'alice', email: 'a@x'});
+        expect(pkg!.publishers!['1.0.1']).toEqual({name: 'bob'});
+        expect(pkg!.publishers!['0.9.0']).toBeUndefined();
+    });
+
+    it('omits the publishers field when no version has `_npmUser`', async () => {
+        vi.stubGlobal('fetch', makeFetch({
+            'https://registry.example/old': {
+                name: 'old',
+                'dist-tags': {latest: '1.0.0'},
+                versions: {'1.0.0': {}}
+            }
+        }));
+
+        const cache = new JsonCache(dir, 60);
+        const r = new Registry('https://registry.example', cache);
+        const pkg = await r.fetchOne('old');
+
+        expect(pkg!.publishers).toBeUndefined();
+    });
+
     it('sends Authorization header when configured', async () => {
         const fetchMock = vi.fn(async () => ({
             ok: true,

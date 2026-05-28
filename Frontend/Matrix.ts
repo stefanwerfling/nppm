@@ -1,6 +1,7 @@
 import {DependencyType} from '../Project/PackageManifest.js';
 import {MatrixResponse, MatrixRow, MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
 import {BinarySeverity, BinarySummary} from '../Security/BinaryScanner.js';
+import {MaintainerSeverity, MaintainerSummary} from '../Security/MaintainerScanner.js';
 import {PatternSeverity} from '../Security/PatternScanner.js';
 import {ScriptSeverity} from '../Security/ScriptScanner.js';
 import {PatternSummary, ScriptSummary} from '../Security/SecurityScanner.js';
@@ -71,11 +72,18 @@ const BINARY_WEIGHT: Record<BinarySeverity, number> = {
     [BinarySeverity.risk]: 20
 };
 
+const MAINTAINER_WEIGHT: Record<MaintainerSeverity, number> = {
+    [MaintainerSeverity.info]: 0,
+    [MaintainerSeverity.warn]: 5,
+    [MaintainerSeverity.risk]: 25
+};
+
 function severityScore(
     vulnIds: string[]|null|undefined,
     scripts: ScriptSummary|undefined,
     patterns: PatternSummary|undefined,
-    binaries: BinarySummary|undefined
+    binaries: BinarySummary|undefined,
+    maintainer: MaintainerSummary|undefined
 ): number {
     let score = 0;
     if (vulnIds && vulnIds.length > 0) {
@@ -93,6 +101,9 @@ function severityScore(
     }
     if (binaries && binaries.maxSeverity !== null) {
         score += BINARY_WEIGHT[binaries.maxSeverity];
+    }
+    if (maintainer && maintainer.severity !== null) {
+        score += MAINTAINER_WEIGHT[maintainer.severity];
     }
     return score;
 }
@@ -151,6 +162,7 @@ export class Matrix {
     private _scriptsByName: Map<string, ScriptSummary> = new Map();
     private _patternsByName: Map<string, PatternSummary> = new Map();
     private _binariesByName: Map<string, BinarySummary> = new Map();
+    private _maintainersByName: Map<string, MaintainerSummary> = new Map();
     // Generation counter so a late security response from a previous
     // `setData` call cannot overwrite a newer matrix.
     private _securityGen: number = 0;
@@ -204,6 +216,7 @@ export class Matrix {
         this._scriptsByName = new Map();
         this._patternsByName = new Map();
         this._binariesByName = new Map();
+        this._maintainersByName = new Map();
         this._render();
 
         const gen = ++this._securityGen;
@@ -267,9 +280,12 @@ export class Matrix {
                 this._scriptsByName.set(entry.name, entry.scripts);
                 this._patternsByName.set(entry.name, entry.patterns);
                 this._binariesByName.set(entry.name, entry.binaries);
+                this._maintainersByName.set(entry.name, entry.maintainer);
                 if (entry.scripts.maxSeverity !== null
                     || entry.patterns.maxSeverity !== null
-                    || entry.binaries.maxSeverity !== null) {
+                    || entry.binaries.maxSeverity !== null
+                    || (entry.maintainer.severity !== null
+                        && entry.maintainer.severity !== MaintainerSeverity.info)) {
                     anyHit = true;
                 }
             }
@@ -541,6 +557,24 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
+        // Maintainer badge only for risk-tier — first-time publishers
+        // alone (`warn`) are common when a project moves to CI; we'd
+        // train the user to ignore the badge.
+        const maintainer = this._maintainersByName.get(row.name);
+        if (maintainer && maintainer.severity === MaintainerSeverity.risk) {
+            const badge = document.createElement('span');
+            badge.className = 'matrix-badge matrix-badge-maintainer';
+            badge.textContent = 'OWNER!';
+            badge.title = t('New publisher ({publisher}) after long silence — possible account takeover', {publisher: maintainer.publisher ?? '?'});
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (row.latest) {
+                    this._onSecurityClick?.(row.name, row.latest);
+                }
+            });
+            nameCell.appendChild(badge);
+        }
+
         tr.appendChild(nameCell);
 
         for (const project of this._data!.projects) {
@@ -615,7 +649,8 @@ export class Matrix {
             this._vulnsByName.get(row.name),
             this._scriptsByName.get(row.name),
             this._patternsByName.get(row.name),
-            this._binariesByName.get(row.name)
+            this._binariesByName.get(row.name),
+            this._maintainersByName.get(row.name)
         );
     }
 

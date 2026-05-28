@@ -53,6 +53,7 @@ nppm/
 │   ├── PatternScanner.ts   eval/Function/child_process/base64 regex
 │   ├── ChurnScanner.ts     diff prev stable vs current, threshold by bump
 │   ├── BinaryScanner.ts    extension- + bin/-path classification
+│   ├── MaintainerScanner.ts  _npmUser handover detection, gap-based severity
 │   └── SecurityScanner.ts  aggregator + batched matrix-heuristics
 │
 ├── Releases/               npm registry + GitHub Releases merge
@@ -125,6 +126,14 @@ nppm/
 - **Permanent fingerprint cache** — versions are immutable on npm. Bump
   the cache-key prefix (`fp_v4_*` → `fp_v5_*`) when the cached shape
   changes.
+- **Maintainer-handover severity is gap-INVERSE.** Short gap + new
+  publisher on a mature package = `risk` (event-stream / ua-parser-js
+  profile). Long gap = usually a legitimate community takeover and
+  drops to `info`. Don't "fix" this back to "long-silence-is-scary"
+  without re-reading the incident reports — the empirical pattern is
+  the other way round. Thresholds are tunable via
+  `security.maintainer.{quickHandoverDays,suspiciousGapDays}` in
+  `nppm.json`.
 - **i18n** — every user-visible string in the frontend goes through
   `t()`. Add new strings to `Frontend/Locales/en.ts` AND `de.ts` (or
   rely on the en-fallback for a while).

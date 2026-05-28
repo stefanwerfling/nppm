@@ -8,6 +8,43 @@ import {JsonCache} from '../Cache/JsonCache.js';
  *   - `'git+https://...'` (bare URL)
  * Everything else collapses to `undefined`.
  */
+/**
+ * Pull `_npmUser` out of each version object in the packument. The
+ * registry's packument is shaped as `{versions: {[v]: {_npmUser: {name,
+ * email}, ...}}}`. Versions without `_npmUser` (very old releases) are
+ * skipped; the resulting map only contains versions we actually have a
+ * publisher for. Returns `undefined` when nothing usable was found, so
+ * the field stays absent in the cached envelope.
+ */
+function extractPublishers(versions: unknown): Record<string, RegistryPublisher>|undefined {
+    if (!versions || typeof versions !== 'object') {
+        return undefined;
+    }
+
+    const out: Record<string, RegistryPublisher> = {};
+    let any = false;
+
+    for (const [version, entry] of Object.entries(versions as Record<string, unknown>)) {
+        if (!entry || typeof entry !== 'object') {
+            continue;
+        }
+        const user = (entry as {_npmUser?: unknown})._npmUser;
+        if (!user || typeof user !== 'object') {
+            continue;
+        }
+        const u = user as {name?: unknown; email?: unknown};
+        if (typeof u.name !== 'string' || u.name.length === 0) {
+            continue;
+        }
+        out[version] = typeof u.email === 'string'
+            ? {name: u.name, email: u.email}
+            : {name: u.name};
+        any = true;
+    }
+
+    return any ? out : undefined;
+}
+
 function extractRepository(raw: unknown): string|undefined {
     if (typeof raw === 'string') {
         return raw;
@@ -20,6 +57,18 @@ function extractRepository(raw: unknown): string|undefined {
     }
     return undefined;
 }
+
+/**
+ * Per-version publisher record. `name` is the npm username from
+ * `_npmUser`; `email` is best-effort and frequently absent on old
+ * versions. Missing for very old packages (pre-2014) where the
+ * registry never recorded `_npmUser` — those entries are simply
+ * omitted from the map.
+ */
+export type RegistryPublisher = {
+    name: string;
+    email?: string;
+};
 
 /**
  * Just the bits of the npm registry metadata response we actually
@@ -42,6 +91,14 @@ export type RegistryPackage = {
     repository?: string;
     description?: string;
     homepage?: string;
+    /**
+     * Per-version publisher (`_npmUser`), keyed by version string.
+     * Used by `MaintainerScanner` to detect account-takeover patterns.
+     * Optional: old cache entries lack the field until they age out of
+     * the TTL window; versions without a recorded publisher are simply
+     * absent from the map.
+     */
+    publishers?: Record<string, RegistryPublisher>;
 };
 
 /**
@@ -100,7 +157,8 @@ export class Registry {
                 time: raw.time,
                 repository: extractRepository(raw.repository),
                 description: typeof raw.description === 'string' ? raw.description : undefined,
-                homepage: typeof raw.homepage === 'string' ? raw.homepage : undefined
+                homepage: typeof raw.homepage === 'string' ? raw.homepage : undefined,
+                publishers: extractPublishers(raw.versions)
             };
 
             this._cache.set(name, pkg);

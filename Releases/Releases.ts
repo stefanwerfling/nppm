@@ -12,6 +12,8 @@ export type Release = {
     name?: string;
     body?: string;
     url?: string;
+    /** `_npmUser.name` of the publisher of this version, when the registry recorded one. */
+    publisher?: string;
 };
 
 export type ReleasesResponse = {

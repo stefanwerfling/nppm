@@ -20,13 +20,15 @@ time the UI changes.
    - [Per-project matrix](#23-per-project-matrix)
    - [Dependency tree](#24-dependency-tree)
    - [History](#25-history)
+   - [Unused dependencies](#26-unused-dependencies)
 3. [Package detail panel](#3-package-detail-panel)
    - [Files](#31-files)
    - [Dependencies](#32-dependencies)
    - [Releases](#33-releases)
    - [Security](#34-security)
 4. [Global CVE scan](#4-global-cve-scan)
-5. [Switching language](#5-switching-language)
+5. [Headless CI mode](#5-headless-ci-mode)
+6. [Switching language](#6-switching-language)
 
 ---
 
@@ -74,10 +76,10 @@ Clicking a project column header drills into that project.
 
 ## 2. Drilling into one project
 
-Picking a project in the left treeview lands you in a five-tab project
-view: **Declared / Installed / History / Matrix / Tree**. The toggle is
-the same in every tab so navigation is one click away regardless of
-where you are.
+Picking a project in the left treeview lands you in a six-tab project
+view: **Declared / Installed / History / Matrix / Tree / Unused**. The
+toggle is the same in every tab so navigation is one click away
+regardless of where you are.
 
 ### 2.1 Declared dependencies
 
@@ -130,6 +132,37 @@ the outgoing version had known vulnerabilities in the OSV cache.
 
 History files live in `.nppm-history/` next to your `nppm.json` — safe
 to commit if you want long-term audit trails.
+
+### 2.6 Unused dependencies
+
+A depcheck-style hygiene scan of the project's source tree. The tab
+groups findings into three lists:
+
+- **Unused** — declared in `package.json` but nothing under `src/`
+  imports them. Severity is `risk` for genuine candidates and `info`
+  for entries the scanner deliberately spared (allowlist / `scripts:`
+  reference / `@types/X` whose `X` is imported).
+- **Misplaced** — imported only from dev paths (`*.test.*`,
+  `*.spec.*`, `tests/`, `*.config.*`) but listed in `dependencies`
+  instead of `devDependencies`. Fix is a `package.json` edit.
+- **Missing** — imported from source but not declared anywhere.
+  Usually a transitive leak, sometimes a forgotten peer dep.
+
+The scanner is regex-based (no AST parse). Dynamic specs like
+`import(varName)` cannot be resolved; affected files are listed
+separately so the unused list isn't mistaken for authoritative there.
+
+A default allowlist covers the bin-tools that nearly every npm
+project keeps in `devDependencies` (`vite`, `vitest`, `tsx`,
+`typescript`, `eslint`, `prettier`, `husky`, `rimraf`, `cross-env`, …)
+plus the well-known `tsc → typescript` bin alias. Add your project's
+extras via `security.unused.allowlist` in `nppm.json` — the default
+list is *unioned*, not replaced, so a one-line override doesn't
+re-introduce a wall of false positives.
+
+Remote projects (GitHub / Gitea) currently show "not supported here"
+because the contents-API per-file fetch would blow the rate-limit
+budget in v1.
 
 ---
 
@@ -267,7 +300,64 @@ cache — only new entries cost a network round-trip.
 
 ---
 
-## 5. Switching language
+## 5. Headless CI mode
+
+`nppm scan` is the same set of scanners as the dev server but
+non-interactive — designed to drop into a CI pipeline.
+
+```sh
+nppm scan                              # everything, fail on risk
+nppm scan --project=alpha --json       # one project, machine-readable
+nppm scan --fail-on=warn               # tighter gate
+nppm scan --no-osv --no-heuristics     # offline / lockfile-free
+```
+
+What the run does for each configured project (or the `--project=…`
+subset):
+
+1. Reads the lockfile and deduplicates `name@version`.
+2. Hits OSV.dev for CVE IDs (unless `--no-osv`).
+3. Walks the heuristic batch — scripts / patterns / binaries /
+   maintainer / license — over the same fingerprint cache the dev
+   server populates (unless `--no-heuristics`).
+4. Runs the unused-deps detector (unless `--no-unused`).
+
+Every per-scanner severity collapses onto an `info / warn / risk`
+ladder; `--fail-on=<level>` sets the threshold for a non-zero exit.
+License classifications fold in: `permissive` is silent, weak-copyleft
+and unknown surface as `info`, strong-copyleft as `warn`, proprietary
+as `risk`. OSV vulnerabilities are uniformly `risk` (matches `npm
+audit --audit-level=high`).
+
+Output is human-readable text by default; pass `--json` for a
+machine-readable payload or `--sarif` for a SARIF 2.1.0 envelope that
+GitHub Code Scanning ingests directly (`actions/upload-sarif`). The
+CLI reuses `.nppm-cache/` and `.nppm-history/`, so a warm CI run is
+fast: warm OSV + warm fingerprint = no network for already-seen
+packages.
+
+Exit codes:
+
+- `0` — clean, or all findings below `--fail-on`
+- `1` — at least one finding at or above `--fail-on`
+- `2` — usage / config error (bad flag, missing `nppm.json`)
+
+Example GitHub Actions step:
+
+```yaml
+- run: npx nppm scan --fail-on=risk --json > nppm-report.json
+```
+
+For Code-Scanning ingest:
+
+```yaml
+- run: npx nppm scan --fail-on=none --sarif > nppm.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: nppm.sarif
+```
+
+## 6. Switching language
 
 The flags in the top-right corner switch the UI language. Default is
 English, German is shipped. Adding a third language is a three-step

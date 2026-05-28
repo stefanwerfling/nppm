@@ -81,4 +81,33 @@ describe('Config schema', () => {
         };
         expect(SchemaConfig.validate(cfg, [])).toBe(true);
     });
+
+    it('accepts an optional security.unused section', () => {
+        const cfg = {
+            projects: [],
+            security: {
+                unused: {
+                    allowlist: ['my-internal-bin'],
+                    devPathGlobs: ['**/cypress/**']
+                }
+            }
+        };
+        expect(SchemaConfig.validate(cfg, [])).toBe(true);
+    });
+
+    it('accepts security.unused with no fields', () => {
+        const cfg = {
+            projects: [],
+            security: {unused: {}}
+        };
+        expect(SchemaConfig.validate(cfg, [])).toBe(true);
+    });
+
+    it('rejects non-array allowlist in security.unused', () => {
+        const cfg = {
+            projects: [],
+            security: {unused: {allowlist: 'foo'}}
+        };
+        expect(SchemaConfig.validate(cfg, [])).toBe(false);
+    });
 });

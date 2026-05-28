@@ -12,7 +12,8 @@ import {
     ApiProjectMatrixResponse,
     ApiProjectsResponse,
     ApiReleasesResponse,
-    ApiSecurityResponse
+    ApiSecurityResponse,
+    ApiUnusedResponse
 } from '../Api/ApiTypes.js';
 import {MatrixResponse} from '../Matrix/MatrixBuilder.js';
 
@@ -44,6 +45,10 @@ export class Api {
 
     public static async depGraph(projectUnid: string): Promise<ApiDepGraphResponse> {
         return Api._json<ApiDepGraphResponse>(`/api/projects/${projectUnid}/depgraph`);
+    }
+
+    public static async unused(projectUnid: string): Promise<ApiUnusedResponse> {
+        return Api._json<ApiUnusedResponse>(`/api/projects/${projectUnid}/unused`);
     }
 
     public static async releases(name: string): Promise<ApiReleasesResponse> {

@@ -18,25 +18,19 @@ import {
     ApiProject,
     ApiProjectsResponse,
     ApiReleasesResponse,
-    ApiSecurityResponse
+    ApiSecurityResponse,
+    ApiUnusedResponse
 } from './Api/ApiTypes.js';
 import {JsonCache} from './Cache/JsonCache.js';
 import {ConfigProjectType, SchemaConfig} from './Config/Config.js';
-import {FingerprintBuilder} from './Fingerprint/FingerprintBuilder.js';
+import {buildLoadedConfig} from './Config/ConfigLoader.js';
 import {FingerprintDiffer} from './Fingerprint/FingerprintDiff.js';
 import {HistoryStore} from './History/HistoryStore.js';
 import {DepGraphBuilder} from './DepGraph/DepGraphBuilder.js';
 import {MatrixBuilder} from './Matrix/MatrixBuilder.js';
 import {ProjectMatrixBuilder} from './Matrix/ProjectMatrixBuilder.js';
 import {Project} from './Project/Project.js';
-import {ProjectGitea} from './Project/ProjectGitea.js';
-import {ProjectGithub} from './Project/ProjectGithub.js';
-import {ProjectLocal} from './Project/ProjectLocal.js';
-import {Registry} from './Registry/Registry.js';
 import {ReleasesFetcher} from './Releases/ReleasesFetcher.js';
-import {LicenseSeverity} from './Security/LicenseScanner.js';
-import {OsvClient} from './Security/OsvClient.js';
-import {SecurityScanner} from './Security/SecurityScanner.js';
 
 /**
  * Backend wiring for the Vite dev server. Exposes one public method
@@ -73,108 +67,48 @@ class Server {
             // The frontend only ever knows the UUID — restart = new IDs.
             const projects = new Map<string, Project>();
 
-            // Registry + cache defaults; overridden by nppm.json sections
-            // below.
-            let registryUrl = 'https://registry.npmjs.org';
-            let registryAuth: string|undefined;
-            let cacheDir = path.resolve(projectRoot, '.nppm-cache');
-            let cacheTtlMinutes = 60;
-            let maintainerOpts: {
-                quickHandoverDays?: number;
-                suspiciousGapDays?: number;
-                matureVersions?: number;
-                trustWindow?: number;
-            } = {};
-            let licenseOpts: {
-                allowlist?: string[];
-                denylist?: string[];
-                treatUnknownAs?: string;
-            } = {};
-
-            // Two-pass: first parse the config to fix cache/registry
-            // settings, then build cache instances, then construct
-            // projects (some of which need the remote cache).
-            let rawProjects: unknown[] = [];
-
+            // Parse + validate the config first; on failure log and
+            // fall through to an empty environment so the rest of the
+            // plugin can still wire its middleware (the user gets an
+            // empty project list rather than a crashing server).
+            let rawConfig: unknown = {projects: []};
             if (configFile && fs.existsSync(configFile)) {
                 const raw = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
                 const errors: SchemaErrors = [];
-
                 if (!SchemaConfig.validate(raw, errors)) {
                     console.log('nppm.json has an incorrect structure:');
                     console.log(errors);
                 } else {
-                    if (raw.registry) {
-                        registryUrl = raw.registry.url ?? registryUrl;
-                        registryAuth = raw.registry.auth;
-                    }
-
-                    if (raw.cache) {
-                        if (raw.cache.dir) {
-                            cacheDir = path.resolve(projectRoot, raw.cache.dir);
-                        }
-                        if (typeof raw.cache.ttlMinutes === 'number') {
-                            cacheTtlMinutes = raw.cache.ttlMinutes;
-                        }
-                    }
-
-                    if (raw.security?.maintainer) {
-                        maintainerOpts = raw.security.maintainer;
-                    }
-
-                    if (raw.security?.license) {
-                        licenseOpts = raw.security.license;
-                    }
-
-                    rawProjects = raw.projects;
+                    rawConfig = raw;
                 }
             }
 
-            const registryCache = new JsonCache(path.join(cacheDir, 'registry'), cacheTtlMinutes);
-            const registry = new Registry(registryUrl, registryCache, registryAuth);
-
-            // Remote project files (GitHub/Gitea contents API) get a
-            // dedicated cache pocket. Same TTL for now.
-            const remoteCache = new JsonCache(path.join(cacheDir, 'remote'), cacheTtlMinutes);
-
-            // Tarball fingerprints are *permanent*: a published
-            // `pkg@version` is immutable on npm, so the cached fingerprint
-            // never goes stale. The TTL on the constructor is ignored.
-            const fingerprintCache = new JsonCache(
-                path.join(cacheDir, 'fingerprint'),
-                cacheTtlMinutes,
-                {permanent: true}
-            );
-            const fingerprintBuilder = new FingerprintBuilder(fingerprintCache);
-
-            // OSV results are *not* permanent — a new CVE can be filed
-            // against an old version any time. Plain TTL cache.
-            const securityCache = new JsonCache(path.join(cacheDir, 'security'), cacheTtlMinutes);
-            const osvClient = new OsvClient(securityCache);
-            // `treatUnknownAs` arrives as a free-form string from the
-            // config (VTS schema can't constrain it to enum values
-            // without adding a custom validator), so validate against
-            // the enum here. Unknown values fall back to the scanner
-            // default by staying `undefined`.
-            const treatUnknownAsRaw = licenseOpts.treatUnknownAs;
-            const treatUnknownAs = Object.values(LicenseSeverity)
-                .includes(treatUnknownAsRaw as LicenseSeverity)
-                ? treatUnknownAsRaw as LicenseSeverity
-                : undefined;
-
-            const securityScanner = new SecurityScanner(
-                osvClient,
-                fingerprintBuilder,
-                registry,
-                {
-                    maintainer: maintainerOpts,
-                    license: {
-                        allowlist: licenseOpts.allowlist,
-                        denylist: licenseOpts.denylist,
-                        treatUnknownAs
+            const loaded = buildLoadedConfig(rawConfig, projectRoot, {
+                onProjectLoaded: (p) => {
+                    const kind = p.getType();
+                    if (kind === ConfigProjectType.local) {
+                        console.log(`📦 ${p.getName()} (local)`);
+                    } else {
+                        console.log(`📦 ${p.getName()} (${kind})`);
                     }
-                }
-            );
+                },
+                onSkip: (msg) => console.warn(`nppm: ${msg}`)
+            });
+
+            const {
+                cacheDir,
+                cacheTtlMinutes,
+                registry,
+                fingerprintBuilder,
+                osvClient,
+                securityCache,
+                securityScanner,
+                unusedDetector
+            } = loaded;
+
+            for (const project of loaded.projects) {
+                projects.set(crypto.randomUUID(), project);
+            }
 
             // Releases cache pocket. GitHub rate-limits anonymous
             // requests to 60/hour — without caching, a busy user
@@ -191,60 +125,6 @@ class Server {
             // `.nppm-cache` convention.
             const historyDir = path.join(projectRoot, '.nppm-history');
             const historyStore = new HistoryStore(historyDir);
-
-            for (const entry of rawProjects as Array<{type: ConfigProjectType}>) {
-                // VTS `Vts.or` does not yield a discriminated union in
-                // TS — branch by type and cast inside.
-                if (entry.type === ConfigProjectType.local) {
-                    const local = entry as {type: ConfigProjectType.local; path: string; name?: string};
-                    const absRoot = path.resolve(projectRoot, local.path);
-                    const project = new ProjectLocal(absRoot, local.name);
-
-                    projects.set(crypto.randomUUID(), project);
-                    console.log(`📦 ${project.getName()} (local) — ${absRoot}`);
-                } else if (entry.type === ConfigProjectType.github) {
-                    const gh = entry as {
-                        type: ConfigProjectType.github;
-                        repo: string;
-                        name?: string;
-                        ref?: string;
-                        token?: string;
-                    };
-                    const project = new ProjectGithub(
-                        gh.repo,
-                        gh.name ?? gh.repo,
-                        gh.ref,
-                        Server._expandEnv(gh.token),
-                        remoteCache
-                    );
-
-                    projects.set(crypto.randomUUID(), project);
-                    console.log(`📦 ${project.getName()} (github:${gh.repo}${gh.ref ? '@' + gh.ref : ''})`);
-                } else if (entry.type === ConfigProjectType.gitea) {
-                    const ge = entry as {
-                        type: ConfigProjectType.gitea;
-                        url: string;
-                        name?: string;
-                        ref?: string;
-                        token?: string;
-                    };
-
-                    try {
-                        const project = new ProjectGitea(
-                            ge.url,
-                            ge.name ?? ge.url,
-                            ge.ref,
-                            Server._expandEnv(ge.token),
-                            remoteCache
-                        );
-
-                        projects.set(crypto.randomUUID(), project);
-                        console.log(`📦 ${project.getName()} (gitea:${ge.url}${ge.ref ? '@' + ge.ref : ''})`);
-                    } catch (e) {
-                        console.warn(`nppm: gitea project skipped — ${(e as Error).message}`);
-                    }
-                }
-            }
 
             // -------------------------------------------------------------
             // GET /api/projects — one row per configured project, with a
@@ -422,6 +302,32 @@ class Server {
                         },
                         entries: [...file.entries].reverse()
                     };
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/projects/:id/unused — depcheck-style hygiene scan
+            // for one local project. Returns three buckets (unused /
+            // misplaced / missing) plus the list of files the regex
+            // scanner couldn't fully resolve (dynamic specs). Remote
+            // projects respond with `supported: false` rather than a
+            // 4xx, so the UI can render an info banner.
+            // -------------------------------------------------------------
+            app.get('/api/projects/:id/unused', async (req, res) => {
+                const project = projects.get(req.params.id);
+
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+
+                try {
+                    const report = await unusedDetector.scan(project);
+                    report.project.unid = req.params.id;
+                    const response: ApiUnusedResponse = report;
                     res.status(200).json(response);
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});
@@ -888,23 +794,6 @@ class Server {
         };
     }
 
-    /**
-     * Resolve a `"$VARNAME"` string into the corresponding env-var
-     * value; pass anything else through unchanged. Used for token
-     * fields so the config file never contains literal secrets.
-     */
-    private static _expandEnv(value: string|undefined): string|undefined {
-        if (!value) {
-            return value;
-        }
-
-        const match = /^\$([A-Z_][A-Z0-9_]*)$/i.exec(value);
-        if (!match) {
-            return value;
-        }
-
-        return process.env[match[1]];
-    }
 }
 
 export default defineConfig({

@@ -7,6 +7,7 @@ import {Lockfile} from '../Project/Lockfile.js';
 import {PackageDependency} from '../Project/PackageManifest.js';
 import {ReleasesResponse} from '../Releases/Releases.js';
 import {HeuristicsBatchEntry, SecurityReport} from '../Security/SecurityScanner.js';
+import {UnusedReport} from '../Unused/UnusedReport.js';
 
 /**
  * One project as returned by `GET /api/projects`. `error` is populated
@@ -196,3 +197,11 @@ export type ApiMatrixHeuristicsRequest = {
 export type ApiMatrixHeuristicsResponse = {
     results: HeuristicsBatchEntry[];
 };
+
+/**
+ * Response shape of `GET /api/projects/:id/unused`. Mirrors
+ * `UnusedReport` 1:1 — kept as its own type so the API surface stays
+ * explicit in `ApiTypes.ts`. `supported: false` is the sentinel for
+ * remote (GitHub/Gitea) projects which the v1 detector doesn't scan.
+ */
+export type ApiUnusedResponse = UnusedReport;

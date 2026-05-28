@@ -20,6 +20,7 @@ export class HistoryView {
     private _onShowInstalled: ((unid: string) => void)|null = null;
     private _onShowMatrix: ((unid: string) => void)|null = null;
     private _onShowTree: ((unid: string) => void)|null = null;
+    private _onShowUnused: ((unid: string) => void)|null = null;
     private _entries: HistoryEntry[] = [];
 
     constructor(root: HTMLElement) {
@@ -40,6 +41,10 @@ export class HistoryView {
 
     public onShowTree(handler: (unid: string) => void): void {
         this._onShowTree = handler;
+    }
+
+    public onShowUnused(handler: (unid: string) => void): void {
+        this._onShowUnused = handler;
     }
 
     public async show(unid: string, name: string): Promise<void> {
@@ -274,6 +279,16 @@ export class HistoryView {
             }
         });
         toggle.appendChild(tree);
+
+        const unused = document.createElement('button');
+        unused.className = 'installed-toggle-btn';
+        unused.textContent = I18n.t('Unused');
+        unused.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowUnused) {
+                this._onShowUnused(this._projectUnid);
+            }
+        });
+        toggle.appendChild(unused);
 
         header.appendChild(toggle);
         return header;

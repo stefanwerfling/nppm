@@ -22,6 +22,7 @@ export class ProjectMatrixView {
     private _onShowInstalled: ((unid: string) => void)|null = null;
     private _onShowHistory: ((unid: string) => void)|null = null;
     private _onShowTree: ((unid: string) => void)|null = null;
+    private _onShowUnused: ((unid: string) => void)|null = null;
     private _onCellClick: ((pkg: string, version: string, latest: string|null) => void)|null = null;
 
     constructor(root: HTMLElement) {
@@ -39,6 +40,9 @@ export class ProjectMatrixView {
     }
     public onShowTree(h: (unid: string) => void): void {
         this._onShowTree = h;
+    }
+    public onShowUnused(h: (unid: string) => void): void {
+        this._onShowUnused = h;
     }
     public onCellClick(h: (pkg: string, version: string, latest: string|null) => void): void {
         this._onCellClick = h;
@@ -261,6 +265,16 @@ export class ProjectMatrixView {
             }
         });
         toggle.appendChild(tree);
+
+        const unused = document.createElement('button');
+        unused.className = 'installed-toggle-btn';
+        unused.textContent = I18n.t('Unused');
+        unused.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowUnused) {
+                this._onShowUnused(this._projectUnid);
+            }
+        });
+        toggle.appendChild(unused);
 
         header.appendChild(toggle);
         return header;

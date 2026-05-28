@@ -43,6 +43,20 @@ Vite dev server, frontend is plain TypeScript + DOM (no framework).
     tab in the detail panel + `GPL` / `UNLIC` / `LIC?` matrix badges +
     a "Licenses" matrix filter. Compliance teams can plug in allow- /
     denylists via `security.license` in `nppm.json`.
+- **Headless CLI / CI mode** — `nppm scan` runs every scanner (OSV CVEs,
+  scripts, patterns, binaries, maintainer, license, unused-deps) over
+  every configured project, prints a compact text report or `--json`
+  for pipelines, and exits non-zero when any finding meets the
+  `--fail-on=info|warn|risk` threshold. Same caches as the dev server,
+  so a warm second run is fast.
+- **Unused-deps detector** — depcheck-style per-project hygiene scan.
+  Three buckets: unused (declared but never imported), misplaced
+  (imported only from dev paths but listed as a regular dep), missing
+  (imported but undeclared). Built-in allowlist covers the usual
+  bin-tools (`vite`, `vitest`, `tsx`, `typescript`, `eslint`, `prettier`,
+  `husky`, …); `scripts:` references are recognised too. Pure regex +
+  filesystem walk — no AST parse, no network. Remote projects are
+  not in scope for v1. Own `Unused` tab in every per-project view.
 - **History** per project — every lockfile call snapshots the package state
   and appends an entry for adds/removes/version changes (with CVE-hint
   reason when applicable). Stored next to `nppm.json` in `.nppm-history/`.
@@ -108,6 +122,10 @@ Create a `nppm.json` next to where you run `nppm`. Minimal example:
       "allowlist": ["MIT", "Apache-2.0", "BSD-*", "ISC"],
       "denylist": ["AGPL-*"],
       "treatUnknownAs": "unknown"
+    },
+    "unused": {
+      "allowlist": ["my-internal-cli"],
+      "devPathGlobs": ["**/cypress/**", "**/*.bench.*"]
     }
   }
 }
@@ -126,6 +144,14 @@ free-text → proprietary). Patterns support a trailing `*` wildcard;
 denylist wins over allowlist when both match. Set `treatUnknownAs:
 "proprietary"` to force a manual review for any package without a
 recognised license.
+
+The `security.unused` block is optional. `allowlist` is *added* to the
+built-in bin-tool list (vite/tsx/eslint/…), so you only need to name
+your project-specific extras — losing the defaults would re-introduce
+a wall of false positives. `devPathGlobs` *replaces* the default
+(`**/*.test.*`, `**/*.spec.*`, `**/tests/**`, `**/*.config.*`, …) when
+non-empty so opinionated teams can shrink the dev-path set; leave it
+out to keep the defaults.
 
 `$VAR_NAME` references are expanded from the environment / `.env` at load
 time, so secrets never live in the config file.
@@ -148,6 +174,23 @@ npm run dev
 
 Open the URL in a browser. The default port is `5190` (Vite's `5173`
 would collide with `vtseditor` running alongside).
+
+## CI mode
+
+```sh
+nppm scan                            # default: scan all, fail on risk
+nppm scan --project=kavula --json    # one project, machine-readable
+nppm scan --fail-on=warn             # tighter gate
+nppm scan --no-osv --no-heuristics   # offline / lockfile-free fast run
+nppm scan --sarif > nppm.sarif       # SARIF 2.1.0 for GitHub Code Scanning
+nppm scan --help                     # full flag list
+```
+
+`nppm scan` reuses the same `nppm.json` and `.nppm-cache/` as the dev
+server, so a warm CI run skips network calls that have already been
+made locally. Exit codes: `0` clean (or below threshold), `1` threshold
+breached, `2` usage error (bad flag, missing config). Drop it into any
+pipeline that understands non-zero exits.
 
 ## Usage
 

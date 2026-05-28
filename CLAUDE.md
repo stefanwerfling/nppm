@@ -15,7 +15,9 @@ in the sibling repo.
 
 ```
 nppm/
+├── cli/nppm.js             top-level subcommand router (dev | scan | --help)
 ├── cli/dev.js              CLI shim: writes default config, starts Vite
+├── cli/scan.js             CLI shim: uses Vite.ssrLoadModule to run Cli/Scan.ts
 ├── index.html              entry, contains topbar + main panes
 ├── main.ts                 mounts language picker + boots Nppm
 ├── main.css                all styling
@@ -23,6 +25,7 @@ nppm/
 │
 ├── Api/ApiTypes.ts         wire types shared between backend & frontend
 ├── Config/Config.ts        VTS schemas for nppm.json
+├── Config/ConfigLoader.ts  buildLoadedConfig() — shared bootstrap used by vite.config.ts + Cli/Scan.ts
 ├── Cache/JsonCache.ts      one-file-per-key disk cache (TTL or permanent)
 │
 ├── Project/                project sources (local + remote bases)
@@ -57,6 +60,17 @@ nppm/
 │   ├── LicenseScanner.ts   SPDX classifier (permissive/weak/strong/proprietary/unknown) + mini expr parser
 │   └── SecurityScanner.ts  aggregator + batched matrix-heuristics
 │
+├── Unused/                 depcheck-style per-project hygiene scan
+│   ├── UnusedReport.ts     UnusedFinding/Misplaced/Missing/ScanLimit + severity
+│   └── UnusedDetector.ts   regex-based file walk + bin-tool allowlist + scripts/`@types`/workspace heuristics
+│
+├── Cli/                    headless `nppm scan` (CI gate)
+│   ├── CliArgs.ts          argv parser + FailOnLevel ladder + HELP_TEXT
+│   ├── ScanReport.ts       per-scanner→unified severity mapping, ProjectScanReport builder
+│   ├── ScanFormat.ts       text + JSON + SARIF formatters, shouldFail threshold check
+│   ├── ScanSarif.ts        SARIF 2.1.0 converter (rules + results + partialFingerprints)
+│   └── Scan.ts             runScan() — config load + project loop + OSV/heuristics/unused orchestration
+│
 ├── Releases/               npm registry + GitHub Releases merge
 │   ├── Releases.ts
 │   └── ReleasesFetcher.ts
@@ -74,6 +88,7 @@ nppm/
 │   ├── InstalledView.ts    lockfile/node_modules table + analyze bar
 │   ├── HistoryView.ts      timeline cards
 │   ├── DepTreeView.ts      D3-collapsible tree
+│   ├── UnusedView.ts       per-project depcheck-style report (unused/misplaced/missing)
 │   ├── GlobalScanView.ts   SSE-driven global scan results
 │   ├── PackageDetailPanel.ts  modal w/ 5 tabs (Files/Deps/Diff/Releases/Security)
 │   ├── Treeview.ts         left-pane project list
@@ -100,6 +115,32 @@ nppm/
 | GET    | `/api/projects/:id/history`                           | per-project change log |
 | GET    | `/api/projects/:id/matrix`                            | per-project matrix |
 | GET    | `/api/projects/:id/depgraph`                          | flat resolved dep graph |
+| GET    | `/api/projects/:id/unused`                            | depcheck-style hygiene scan (unused / misplaced / missing) |
+
+## Headless CLI
+
+`nppm scan` reuses the same `nppm.json`, `.nppm-cache/`, and scanner
+classes as the dev server. It does *not* serve HTTP — `cli/scan.js`
+spins up a Vite dev server in `middlewareMode:true, appType:'custom'`
+purely to call `ssrLoadModule('./Cli/Scan.ts')`, then closes it. No
+new dependency: Vite is already a runtime dep.
+
+The runner pipeline per project:
+1. `Project.loadLockfile()` → flat package list, deduplicated by
+   `name@version`.
+2. `OsvClient.queryBatch(...)` for CVE IDs (skipped on `--no-osv`).
+3. `SecurityScanner.scanHeuristicsBatch(...)` for scripts / patterns /
+   binaries / maintainer / license (skipped on `--no-heuristics`).
+4. `UnusedDetector.scan(project)` for the depcheck-style buckets
+   (skipped on `--no-unused`).
+
+The per-scanner severity enums are mapped to a unified
+`UnifiedSeverity` (`info|warn|risk`) in `Cli/ScanReport.ts`. License
+classifications collapse via `licenseToUnified`: `permissive` drops
+out, `weak-copyleft`/`unknown` → info, `strong-copyleft` → warn,
+`proprietary` → risk. OSV vulns are uniformly risk (the batch endpoint
+returns IDs only, no per-vuln severity — matches `npm audit`'s
+`--audit-level=high` semantics).
 | GET    | `/api/matrix`                                         | cross-project matrix |
 | POST   | `/api/matrix/security`                                | batched CVE lookup |
 | POST   | `/api/matrix/heuristics`                              | batched scripts + patterns + binaries |

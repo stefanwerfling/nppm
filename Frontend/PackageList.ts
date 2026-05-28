@@ -16,6 +16,7 @@ export class PackageList {
     private _onShowHistory: ((unid: string) => void)|null = null;
     private _onShowMatrix: ((unid: string) => void)|null = null;
     private _onShowTree: ((unid: string) => void)|null = null;
+    private _onShowUnused: ((unid: string) => void)|null = null;
 
     constructor(root: HTMLElement) {
         this._root = root;
@@ -35,6 +36,10 @@ export class PackageList {
 
     public onShowTree(handler: (unid: string) => void): void {
         this._onShowTree = handler;
+    }
+
+    public onShowUnused(handler: (unid: string) => void): void {
+        this._onShowUnused = handler;
     }
 
     public clear(): void {
@@ -164,11 +169,21 @@ export class PackageList {
             }
         });
 
+        const unused = document.createElement('button');
+        unused.className = 'installed-toggle-btn';
+        unused.textContent = I18n.t('Unused');
+        unused.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowUnused) {
+                this._onShowUnused(this._projectUnid);
+            }
+        });
+
         toggle.appendChild(declared);
         toggle.appendChild(installed);
         toggle.appendChild(history);
         toggle.appendChild(matrix);
         toggle.appendChild(tree);
+        toggle.appendChild(unused);
         header.appendChild(toggle);
 
         return header;

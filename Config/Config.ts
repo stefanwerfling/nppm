@@ -124,9 +124,21 @@ export const SchemaConfigSecurityLicense = Vts.object({
     treatUnknownAs: Vts.optional(Vts.string())
 });
 
+/**
+ * Unused-deps detector policy. `allowlist` is *union*ed with the
+ * built-in default (vite/tsx/eslint/…), so users only need to add
+ * project-specific bin-tools. `devPathGlobs` *replaces* the default
+ * when non-empty so opinionated teams can shrink the dev-path set.
+ */
+export const SchemaConfigSecurityUnused = Vts.object({
+    allowlist: Vts.optional(Vts.array(Vts.string())),
+    devPathGlobs: Vts.optional(Vts.array(Vts.string()))
+});
+
 export const SchemaConfigSecurity = Vts.object({
     maintainer: Vts.optional(SchemaConfigSecurityMaintainer),
-    license: Vts.optional(SchemaConfigSecurityLicense)
+    license: Vts.optional(SchemaConfigSecurityLicense),
+    unused: Vts.optional(SchemaConfigSecurityUnused)
 });
 
 /**

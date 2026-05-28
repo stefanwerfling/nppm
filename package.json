@@ -1,7 +1,7 @@
 {
   "author": "Stefan Werfling",
   "bin": {
-    "nppm": "./cli/dev.js"
+    "nppm": "./cli/nppm.js"
   },
   "dependencies": {
     "d3-hierarchy": "^3.1.2",
@@ -40,6 +40,7 @@
   },
   "scripts": {
     "dev": "node ./cli/dev.js",
+    "scan": "node ./cli/scan.js",
     "docs:screenshots": "node ./doc/screenshots.mjs",
     "test": "vitest run",
     "test:watch": "vitest"

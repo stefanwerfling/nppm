@@ -20,6 +20,7 @@ Beispielprojekte.
    - [Projekt-Matrix](#23-projekt-matrix)
    - [Abhängigkeitsbaum](#24-abhängigkeitsbaum)
    - [History](#25-history)
+   - [Unbenutzte Abhängigkeiten](#26-unbenutzte-abhängigkeiten)
 3. [Paket-Detail-Panel](#3-paket-detail-panel)
    - [Dateien](#31-dateien)
    - [Abhängigkeiten](#32-abhängigkeiten)
@@ -27,7 +28,8 @@ Beispielprojekte.
    - [Sicherheit](#34-sicherheit)
    - [Lizenz](#36-lizenz)
 4. [Globaler CVE-Scan](#4-globaler-cve-scan)
-5. [Sprache wechseln](#5-sprache-wechseln)
+5. [Headless-CI-Modus](#5-headless-ci-modus)
+6. [Sprache wechseln](#6-sprache-wechseln)
 
 ---
 
@@ -78,9 +80,9 @@ Projekt-Spaltenkopf wechselt in das Projekt.
 ## 2. Ein Projekt im Detail
 
 Wählt man im linken Treeview ein Projekt aus, landet man in einer
-Fünf-Tab-Ansicht: **Deklariert / Installiert / History / Matrix /
-Tree**. Der Toggle ist in jedem Tab gleich — Navigation ist immer ein
-Klick weit weg.
+Sechs-Tab-Ansicht: **Deklariert / Installiert / History / Matrix /
+Tree / Unbenutzt**. Der Toggle ist in jedem Tab gleich — Navigation ist
+immer ein Klick weit weg.
 
 ### 2.1 Deklarierte Abhängigkeiten
 
@@ -137,6 +139,39 @@ Schwachstellen im OSV-Cache hatte.
 Die History-Dateien liegen in `.nppm-history/` neben deiner
 `nppm.json` — kannst du committen, wenn du langfristige Audit-Spuren
 willst.
+
+### 2.6 Unbenutzte Abhängigkeiten
+
+Ein depcheck-artiger Hygiene-Scan über den Quellbaum des Projekts.
+Der Tab gruppiert die Befunde in drei Listen:
+
+- **Unbenutzt** — in `package.json` deklariert, aber nirgends unter
+  `src/` importiert. Severity ist `risk` für echte Kandidaten und
+  `info` für Einträge, die der Scanner bewusst verschont (Allowlist /
+  `scripts:`-Referenz / `@types/X` deren `X` importiert wird).
+- **Falsch einsortiert** — nur aus Dev-Pfaden importiert (`*.test.*`,
+  `*.spec.*`, `tests/`, `*.config.*`), steht aber in `dependencies`
+  statt `devDependencies`. Fix ist ein `package.json`-Edit.
+- **Fehlend** — wird aus dem Quellcode importiert, ist aber nirgends
+  deklariert. Meist ein transitiv geleakter Import, manchmal eine
+  vergessene Peer-Dep.
+
+Der Scanner arbeitet rein per Regex (kein AST-Parse). Dynamische
+Specs wie `import(varName)` können nicht aufgelöst werden; betroffene
+Dateien werden separat aufgeführt, damit die Unused-Liste dort nicht
+als endgültig missverstanden wird.
+
+Eine Default-Allowlist deckt die Bin-Tools ab, die fast jedes
+npm-Projekt in `devDependencies` führt (`vite`, `vitest`, `tsx`,
+`typescript`, `eslint`, `prettier`, `husky`, `rimraf`, `cross-env`, …)
+plus den bekannten `tsc → typescript`-Bin-Alias. Eigene Extras
+ergänzt man über `security.unused.allowlist` in `nppm.json` — die
+Default-Liste wird *vereinigt*, nicht ersetzt, damit ein Ein-Zeilen-
+Override nicht eine Welle falscher Treffer zurückbringt.
+
+Remote-Projekte (GitHub / Gitea) zeigen aktuell "nicht unterstützt"
+an, weil der contents-API-Aufruf pro Datei in v1 das Rate-Limit-
+Budget sprengen würde.
 
 ---
 
@@ -276,7 +311,64 @@ OSV-Cache liegt — nur neue Einträge kosten Netzwerk.
 
 ---
 
-## 5. Sprache wechseln
+## 5. Headless-CI-Modus
+
+`nppm scan` ist das gleiche Set an Scannern wie der Dev-Server, nur
+nicht-interaktiv — zum Einklinken in eine CI-Pipeline.
+
+```sh
+nppm scan                              # alles, fail bei risk
+nppm scan --project=alpha --json       # ein Projekt, maschinenlesbar
+nppm scan --fail-on=warn               # strengeres Gate
+nppm scan --no-osv --no-heuristics     # offline / ohne Lockfile-Sicht
+```
+
+Was der Lauf pro Projekt (bzw. pro `--project=…`-Auswahl) macht:
+
+1. Lockfile lesen, `name@version` deduplizieren.
+2. CVE-IDs bei OSV.dev abrufen (außer `--no-osv`).
+3. Heuristik-Batch — Scripts / Patterns / Binaries / Maintainer /
+   Lizenz — über denselben Fingerprint-Cache laufen lassen, den auch
+   der Dev-Server befüllt (außer `--no-heuristics`).
+4. Unused-Deps-Detektor laufen lassen (außer `--no-unused`).
+
+Jede einzelne Scanner-Severity wird auf eine gemeinsame
+`info / warn / risk`-Skala abgebildet; `--fail-on=<level>` setzt die
+Schwelle für einen Non-Zero-Exit. Lizenzklassen falten dazu:
+`permissive` schweigt, `weak-copyleft` und `unknown` werden zu `info`,
+`strong-copyleft` zu `warn`, `proprietary` zu `risk`. OSV-Vulns sind
+einheitlich `risk` (entspricht `npm audit --audit-level=high`).
+
+Output ist standardmäßig Text; `--json` liefert maschinenlesbares
+JSON, `--sarif` ein SARIF-2.1.0-Envelope, das GitHub Code Scanning
+direkt frisst (`actions/upload-sarif`). Die CLI nutzt `.nppm-cache/`
+und `.nppm-history/` mit — ein warmer CI-Lauf ist schnell, weil OSV-
+und Fingerprint-Cache schon gefüllt sind.
+
+Exit-Codes:
+
+- `0` — sauber, oder alle Befunde unterhalb `--fail-on`
+- `1` — mindestens ein Befund erreicht/übersteigt `--fail-on`
+- `2` — Nutzungs- / Config-Fehler (falsches Flag, fehlende `nppm.json`)
+
+Beispiel-Step in GitHub Actions:
+
+```yaml
+- run: npx nppm scan --fail-on=risk --json > nppm-report.json
+```
+
+Für Code-Scanning-Ingest:
+
+```yaml
+- run: npx nppm scan --fail-on=none --sarif > nppm.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: nppm.sarif
+```
+
+---
+
+## 6. Sprache wechseln
 
 Die Flaggen oben rechts schalten die UI-Sprache. Default ist Englisch,
 Deutsch ist mitgeliefert. Eine dritte Sprache hinzufügen ist ein

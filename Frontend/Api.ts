@@ -11,9 +11,12 @@ import {
     ApiPackagesResponse,
     ApiProjectMatrixResponse,
     ApiProjectsResponse,
+    ApiLifecycleScriptsResponse,
     ApiReleasesResponse,
     ApiSecurityResponse,
-    ApiUnusedResponse
+    ApiUnusedResponse,
+    ApiUpgradePreviewResponse,
+    ApiUpgradeRequest
 } from '../Api/ApiTypes.js';
 import {MatrixResponse} from '../Matrix/MatrixBuilder.js';
 
@@ -49,6 +52,38 @@ export class Api {
 
     public static async unused(projectUnid: string): Promise<ApiUnusedResponse> {
         return Api._json<ApiUnusedResponse>(`/api/projects/${projectUnid}/unused`);
+    }
+
+    public static async upgradePreview(
+        projectUnid: string,
+        request: ApiUpgradeRequest
+    ): Promise<ApiUpgradePreviewResponse> {
+        const res = await fetch(`/api/projects/${projectUnid}/upgrade/preview`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(request)
+        });
+        if (!res.ok) {
+            throw new Error(`/upgrade/preview → ${res.status} ${res.statusText}`);
+        }
+        return (await res.json()) as ApiUpgradePreviewResponse;
+    }
+
+    public static async lifecycleScripts(projectUnid: string): Promise<ApiLifecycleScriptsResponse> {
+        return Api._json<ApiLifecycleScriptsResponse>(`/api/projects/${projectUnid}/lifecycle-scripts`);
+    }
+
+    /**
+     * URL helpers for SSE endpoints. The modal opens an `EventSource`
+     * directly so the streaming logic lives in the consumer; this
+     * keeps the URL shape in one place.
+     */
+    public static upgradeApplyUrl(projectUnid: string): string {
+        return `/api/projects/${projectUnid}/upgrade/apply`;
+    }
+
+    public static lifecycleRunUrl(projectUnid: string): string {
+        return `/api/projects/${projectUnid}/lifecycle-scripts/run`;
     }
 
     public static async releases(name: string): Promise<ApiReleasesResponse> {

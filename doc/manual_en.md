@@ -29,7 +29,8 @@ time the UI changes.
 4. [Global CVE scan](#4-global-cve-scan)
 5. [Headless CI mode](#5-headless-ci-mode)
 6. [SBOM export](#6-sbom-export)
-7. [Switching language](#7-switching-language)
+7. [Upgrading a dep (Upgrade modal)](#7-upgrading-a-dep-upgrade-modal)
+8. [Switching language](#8-switching-language)
 
 ---
 
@@ -400,7 +401,52 @@ tarball contents. A warm registry cache makes the run instant.
 
 ---
 
-## 7. Switching language
+## 7. Upgrading a dep (Upgrade modal)
+
+Outdated cells in the per-project matrix get a small `↑` button. Click
+it to open the Upgrade modal — a focused, per-cell flow:
+
+1. **Plan** — shows which workspace's `package.json` would change.
+2. **Target version** — the registry's `dist-tags.latest`. The button
+   pre-fills `^<latest>` so the lockfile picks up the new range.
+3. **Security heads-up** — one-liner with the worst signals from the
+   `SecurityScanner` on the *target* version: CVEs, install scripts,
+   maintainer handover, churn. Click through to the package detail
+   panel for the full breakdown.
+4. **Diff** — the planned `package.json` change with two lines of
+   context. Indentation and trailing newline are preserved.
+5. **Action**:
+   - **Apply edit only** (always available). Writes the file, takes a
+     backup to `.nppm-backups/<timestamp>/`, and reminds you to run
+     `npm install` by hand.
+   - **Apply edit + install (--ignore-scripts)**. Only shown when
+     `actions.allowInstall: true` in `nppm.json`. Streams the install
+     output live in the modal.
+
+After a successful install, the modal lists every install-time
+lifecycle hook found across `node_modules/*` — `preinstall`,
+`install`, `postinstall`, `prepare`. For each, you see the script
+body verbatim and a manual command (`npm rebuild <pkg>`). When the
+gate is open, a per-row **Run** button fires that command via SSE
+and streams the output back. Re-running is always explicit per
+package; nothing executes third-party code on its own.
+
+```json
+"actions": {
+  "allowInstall": true
+}
+```
+
+Security stance: scripts are always disabled by default. Opening the
+gate unlocks the *option* to install + re-fire hooks, but each
+script run is still a deliberate click. If you'd rather stay in
+edit-only mode forever, leave the flag off — nppm becomes a precise
+editor and surfaces a `npm install` command for the user to run by
+hand.
+
+---
+
+## 8. Switching language
 
 The flags in the top-right corner switch the UI language. Default is
 English, German is shipped. Adding a third language is a three-step

@@ -43,6 +43,17 @@ Vite dev server, frontend is plain TypeScript + DOM (no framework).
     tab in the detail panel + `GPL` / `UNLIC` / `LIC?` matrix badges +
     a "Licenses" matrix filter. Compliance teams can plug in allow- /
     denylists via `security.license` in `nppm.json`.
+- **One-click upgrade** — outdated cells in the per-project matrix
+  show a small `↑` button. The Upgrade modal previews the planned
+  `package.json` edit, surfaces a security heads-up on the target
+  version (CVEs, install scripts, maintainer switch, churn), and
+  offers two paths: "Edit only" (always available, just writes the
+  file + suggests a manual `npm install`) or "Edit + install
+  `--ignore-scripts`" (gated by `actions.allowInstall=true` in
+  `nppm.json`). After install, the modal lists every install
+  lifecycle hook in `node_modules` with a per-package "Run" button
+  (`npm rebuild <pkg>`) so the user can re-fire only the scripts
+  they've reviewed. Backups land in `.nppm-backups/<timestamp>/`.
 - **SBOM export** — `nppm sbom --format=cyclonedx|spdx` (or the
   `GET /api/projects/:id/sbom?format=…` endpoint) emits a Software
   Bill of Materials for one project. CycloneDX 1.6 and SPDX 2.3 JSON.
@@ -133,9 +144,20 @@ Create a `nppm.json` next to where you run `nppm`. Minimal example:
       "allowlist": ["my-internal-cli"],
       "devPathGlobs": ["**/cypress/**", "**/*.bench.*"]
     }
+  },
+  "actions": {
+    "allowInstall": false
   }
 }
 ```
+
+The `actions.allowInstall` flag is off by default; while off the
+Upgrade modal can only write `package.json` (a backup is taken first;
+`npm install` is left for the user to run by hand). Setting it to
+`true` unlocks both the "Edit + install (--ignore-scripts)" button
+and the per-package "Run" button on the lifecycle-scripts list.
+Always runs with `--ignore-scripts` — re-firing hooks is explicit and
+per-package, never automatic.
 
 The `security.maintainer` block is optional and tunes the publisher-
 handover detector. Defaults reflect the empirical attack patterns:

@@ -19,7 +19,11 @@ import {
     ApiProjectsResponse,
     ApiReleasesResponse,
     ApiSecurityResponse,
-    ApiUnusedResponse
+    ApiUnusedResponse,
+    ApiUpgradePreviewResponse,
+    ApiUpgradeRequest,
+    ApiLifecycleScriptsResponse,
+    ApiLifecycleRunRequest
 } from './Api/ApiTypes.js';
 import {JsonCache} from './Cache/JsonCache.js';
 import {ConfigProjectType, SchemaConfig} from './Config/Config.js';
@@ -34,6 +38,9 @@ import {ReleasesFetcher} from './Releases/ReleasesFetcher.js';
 import {CycloneDxBuilder} from './Sbom/CycloneDxBuilder.js';
 import {SbomCollector} from './Sbom/SbomCollector.js';
 import {SpdxBuilder} from './Sbom/SpdxBuilder.js';
+import {LifecycleScriptScanner} from './Upgrade/LifecycleScriptScanner.js';
+import {Upgrader} from './Upgrade/Upgrader.js';
+import {ProjectLocal} from './Project/ProjectLocal.js';
 
 /**
  * Backend wiring for the Vite dev server. Exposes one public method
@@ -106,7 +113,8 @@ class Server {
                 osvClient,
                 securityCache,
                 securityScanner,
-                unusedDetector
+                unusedDetector,
+                allowInstall
             } = loaded;
 
             for (const project of loaded.projects) {
@@ -376,6 +384,245 @@ class Server {
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});
                 }
+            });
+
+            // -------------------------------------------------------------
+            // POST /api/projects/:id/upgrade/preview — plan a single
+            // dep bump in one workspace's package.json. Returns the
+            // before/after file contents (for the diff) plus a
+            // SecurityScanner heads-up on the target version. Does
+            // not write to disk. Local projects only.
+            // -------------------------------------------------------------
+            app.post('/api/projects/:id/upgrade/preview', async (req, res) => {
+                const project = projects.get(req.params.id);
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+                if (!(project instanceof ProjectLocal)) {
+                    res.status(400).json({success: false, msg: 'Upgrade only supported for local projects'});
+                    return;
+                }
+
+                const request = req.body as ApiUpgradeRequest;
+                if (!request || !request.name || !request.depType || !request.toRange) {
+                    res.status(400).json({success: false, msg: 'name, depType and toRange are required'});
+                    return;
+                }
+
+                try {
+                    const upgrader = new Upgrader(project.getRoot());
+                    const {path: abs, rel, result} = upgrader.preview(request);
+
+                    // Resolve latest from the registry so the modal can
+                    // call out the concrete version even when the
+                    // requested range is `^X`. Used as the SecurityScanner
+                    // input too.
+                    let latestResolved: string|null = null;
+                    let heads = null;
+                    try {
+                        const pack = await registry.fetchOne(request.name);
+                        latestResolved = pack?.latest ?? null;
+                        if (latestResolved) {
+                            heads = await securityScanner.scan(request.name, latestResolved);
+                        }
+                    } catch {
+                        // Registry / scanner outages must not block the
+                        // preview — the user still sees the planned edit
+                        // and can decide.
+                    }
+
+                    const response: ApiUpgradePreviewResponse = {
+                        project: {unid: req.params.id, name: project.getName()},
+                        request,
+                        packageJsonPath: abs,
+                        packageJsonRel: rel,
+                        before: result.before,
+                        after: result.after,
+                        latestResolvedVersion: latestResolved,
+                        securityHeadsUp: heads,
+                        allowInstall
+                    };
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // POST /api/projects/:id/upgrade/apply — write the edit to
+            // disk (with a backup), then optionally stream
+            // `npm install --ignore-scripts` as SSE. `mode` is either
+            // `edit` (write only) or `install` (write + run). Install
+            // path is gated by `actions.allowInstall` in nppm.json.
+            // -------------------------------------------------------------
+            app.post('/api/projects/:id/upgrade/apply', async (req, res) => {
+                const project = projects.get(req.params.id);
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+                if (!(project instanceof ProjectLocal)) {
+                    res.status(400).json({success: false, msg: 'Upgrade only supported for local projects'});
+                    return;
+                }
+
+                const body = req.body as ApiUpgradeRequest & {mode?: 'edit'|'install'};
+                if (!body || !body.name || !body.depType || !body.toRange) {
+                    res.status(400).json({success: false, msg: 'name, depType and toRange are required'});
+                    return;
+                }
+                const mode = body.mode === 'install' ? 'install' : 'edit';
+                if (mode === 'install' && !allowInstall) {
+                    res.status(403).json({success: false, msg: 'Install path disabled — set actions.allowInstall=true in nppm.json'});
+                    return;
+                }
+
+                // SSE setup — the route always streams so the frontend
+                // can use one consumer for both modes. Edit-only ends
+                // immediately after the `edit-done` event.
+                res.set({
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'X-Accel-Buffering': 'no'
+                });
+                res.flushHeaders();
+
+                const send = (event: string, data: object): void => {
+                    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+                };
+
+                let editOut;
+                try {
+                    const upgrader = new Upgrader(project.getRoot());
+                    editOut = upgrader.applyEdit(body);
+                    send('edit-done', {
+                        path: editOut.path,
+                        rel: editOut.rel,
+                        backupDir: editOut.backup.dir,
+                        backupFiles: editOut.backup.files
+                    });
+                    if (mode === 'edit') {
+                        send('end', {exitCode: 0});
+                        res.end();
+                        return;
+                    }
+
+                    const sink = {
+                        onStart: (command: string, cwd: string) => send('start', {command, cwd}),
+                        onStdout: (chunk: string) => send('stdout', {chunk}),
+                        onStderr: (chunk: string) => send('stderr', {chunk}),
+                        onEnd: (exitCode: number|null) => {
+                            send('end', {exitCode});
+                            res.end();
+                        },
+                        onError: (msg: string) => send('error', {msg})
+                    };
+
+                    const child = upgrader.runInstall(sink);
+                    req.on('close', () => {
+                        try {
+                            child.kill();
+                        } catch {
+                            // child may already have exited — ignore
+                        }
+                    });
+                } catch (e) {
+                    send('error', {msg: (e as Error).message});
+                    send('end', {exitCode: null});
+                    res.end();
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/projects/:id/lifecycle-scripts — list every
+            // install-time hook (`preinstall`/`install`/`postinstall`/
+            // `prepare`) found across `node_modules/*` of one project.
+            // Read-only; available regardless of `actions.allowInstall`
+            // because the user always wants to *see* what was skipped.
+            // -------------------------------------------------------------
+            app.get('/api/projects/:id/lifecycle-scripts', async (req, res) => {
+                const project = projects.get(req.params.id);
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+                if (!(project instanceof ProjectLocal)) {
+                    res.status(400).json({success: false, msg: 'Lifecycle scripts only supported for local projects'});
+                    return;
+                }
+
+                try {
+                    const scanner = new LifecycleScriptScanner(project.getRoot());
+                    const response: ApiLifecycleScriptsResponse = {
+                        project: {unid: req.params.id, name: project.getName()},
+                        scripts: scanner.scan(),
+                        allowInstall
+                    };
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // POST /api/projects/:id/lifecycle-scripts/run — SSE stream
+            // for `npm rebuild <name>`. Gated by `actions.allowInstall`
+            // because it runs third-party code on the user's machine.
+            // -------------------------------------------------------------
+            app.post('/api/projects/:id/lifecycle-scripts/run', async (req, res) => {
+                const project = projects.get(req.params.id);
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+                if (!(project instanceof ProjectLocal)) {
+                    res.status(400).json({success: false, msg: 'Lifecycle scripts only supported for local projects'});
+                    return;
+                }
+                if (!allowInstall) {
+                    res.status(403).json({success: false, msg: 'Lifecycle script execution disabled — set actions.allowInstall=true in nppm.json'});
+                    return;
+                }
+                const body = req.body as ApiLifecycleRunRequest;
+                if (!body || !body.name) {
+                    res.status(400).json({success: false, msg: 'name is required'});
+                    return;
+                }
+
+                res.set({
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'X-Accel-Buffering': 'no'
+                });
+                res.flushHeaders();
+
+                const send = (event: string, data: object): void => {
+                    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+                };
+
+                const upgrader = new Upgrader(project.getRoot());
+                const sink = {
+                    onStart: (command: string, cwd: string) => send('start', {command, cwd}),
+                    onStdout: (chunk: string) => send('stdout', {chunk}),
+                    onStderr: (chunk: string) => send('stderr', {chunk}),
+                    onEnd: (exitCode: number|null) => {
+                        send('end', {exitCode});
+                        res.end();
+                    },
+                    onError: (msg: string) => send('error', {msg})
+                };
+
+                const child = upgrader.runRebuild(body.name, sink);
+                req.on('close', () => {
+                    try {
+                        child.kill();
+                    } catch {
+                        // already exited
+                    }
+                });
             });
 
             // -------------------------------------------------------------

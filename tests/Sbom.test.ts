@@ -57,6 +57,7 @@ function makeEnvironment(projects: Project[], cacheDir: string): LoadedConfig {
         securityCache,
         securityScanner,
         unusedDetector,
+        allowInstall: false,
         projects
     };
 }

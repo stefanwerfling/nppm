@@ -1,3 +1,4 @@
+import {MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
 import {ProjectMatrixResponse, ProjectMatrixRow} from '../Matrix/ProjectMatrixBuilder.js';
 import {DependencyType} from '../Project/PackageManifest.js';
 import {Api} from './Api.js';
@@ -24,6 +25,13 @@ export class ProjectMatrixView {
     private _onShowTree: ((unid: string) => void)|null = null;
     private _onShowUnused: ((unid: string) => void)|null = null;
     private _onCellClick: ((pkg: string, version: string, latest: string|null) => void)|null = null;
+    private _onUpgradeClick: ((seed: {
+        workspace: string;
+        name: string;
+        depType: 'dependency'|'dev'|'peer'|'optional';
+        fromRange: string;
+        toRange: string;
+    }) => void)|null = null;
 
     constructor(root: HTMLElement) {
         this._root = root;
@@ -46,6 +54,15 @@ export class ProjectMatrixView {
     }
     public onCellClick(h: (pkg: string, version: string, latest: string|null) => void): void {
         this._onCellClick = h;
+    }
+    public onUpgradeClick(h: (seed: {
+        workspace: string;
+        name: string;
+        depType: 'dependency'|'dev'|'peer'|'optional';
+        fromRange: string;
+        toRange: string;
+    }) => void): void {
+        this._onUpgradeClick = h;
     }
 
     public async show(unid: string, name: string): Promise<void> {
@@ -191,6 +208,32 @@ export class ProjectMatrixView {
                     tag.textContent = types;
                     td.appendChild(tag);
                 }
+
+                // Outdated cells get an Upgrade affordance. Skip git
+                // installs — the upgrader operates on registry ranges
+                // and a git URL has no `latest` to bump to.
+                if (
+                    row.status === MatrixRowStatus.outdated
+                    && row.latest
+                    && !cellData.installedVersion
+                ) {
+                    const up = document.createElement('button');
+                    up.className = 'matrix-cell-upgrade';
+                    up.textContent = '↑';
+                    up.title = I18n.t('Upgrade {name}', {name: row.name});
+                    up.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const seed = {
+                            workspace: ws.label === 'root' ? '' : ws.label,
+                            name: row.name,
+                            depType: ProjectMatrixView._toApiDepType(cellData.types[0]),
+                            fromRange: cellData.version,
+                            toRange: `^${row.latest}`
+                        };
+                        this._onUpgradeClick?.(seed);
+                    });
+                    td.appendChild(up);
+                }
             }
 
             tr.appendChild(td);
@@ -298,5 +341,14 @@ export class ProjectMatrixView {
             case DependencyType.optional:
                 return 'opt';
         }
+    }
+
+    /**
+     * `DependencyType` (string enum) → the literal union the Upgrade
+     * API request expects. Identity at runtime; the cast keeps the
+     * static types narrow for the route handler.
+     */
+    private static _toApiDepType(t: DependencyType): 'dependency'|'dev'|'peer'|'optional' {
+        return t as unknown as 'dependency'|'dev'|'peer'|'optional';
     }
 }

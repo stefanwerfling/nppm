@@ -30,7 +30,8 @@ Beispielprojekte.
 4. [Globaler CVE-Scan](#4-globaler-cve-scan)
 5. [Headless-CI-Modus](#5-headless-ci-modus)
 6. [SBOM-Export](#6-sbom-export)
-7. [Sprache wechseln](#7-sprache-wechseln)
+7. [Eine Abhängigkeit upgraden (Upgrade-Modal)](#7-eine-abhängigkeit-upgraden-upgrade-modal)
+8. [Sprache wechseln](#8-sprache-wechseln)
 
 ---
 
@@ -411,7 +412,53 @@ Tarball-Inhalt. Bei warmem Registry-Cache läuft das instant.
 
 ---
 
-## 7. Sprache wechseln
+## 7. Eine Abhängigkeit upgraden (Upgrade-Modal)
+
+Outdated-Cells in der Projekt-Matrix bekommen einen kleinen
+`↑`-Button. Klick öffnet das Upgrade-Modal — fokussierter Per-Cell-
+Flow:
+
+1. **Plan** — zeigt welche `package.json` (Workspace) geändert würde.
+2. **Zielversion** — `dist-tags.latest` aus der Registry. Der Button
+   füllt `^<latest>` vor, damit das Lockfile die neue Range aufnimmt.
+3. **Security-Heads-up** — Einzeiler mit den schlimmsten Signalen
+   des `SecurityScanner` auf die *Zielversion*: CVEs, Install-
+   Scripts, Maintainer-Wechsel, Churn. Für den vollen Bericht ins
+   Detail-Panel.
+4. **Diff** — geplante `package.json`-Änderung mit zwei Zeilen
+   Kontext. Indent und Tail-Newline bleiben erhalten.
+5. **Aktion**:
+   - **Nur package.json anpassen** (immer verfügbar). Schreibt die
+     Datei, legt ein Backup nach `.nppm-backups/<timestamp>/` und
+     erinnert dich daran, `npm install` von Hand zu starten.
+   - **Anpassen + Installieren (--ignore-scripts)**. Nur sichtbar bei
+     `actions.allowInstall: true` in `nppm.json`. Streamt das
+     Install-Output live im Modal.
+
+Nach erfolgreicher Installation listet das Modal jeden Install-Time-
+Lifecycle-Hook aus `node_modules/*` auf — `preinstall`, `install`,
+`postinstall`, `prepare`. Pro Eintrag siehst du den Script-Body und
+einen manuellen Befehl (`npm rebuild <pkg>`). Wenn das Gate offen
+ist, feuert ein Per-Zeilen **Ausführen**-Button den Befehl per SSE
+und streamt das Output zurück. Re-Run ist immer explizit pro Paket;
+nichts läuft von selbst los.
+
+```json
+"actions": {
+  "allowInstall": true
+}
+```
+
+Sicherheits-Haltung: Scripts sind per Default aus. Das Gate
+freischalten erlaubt die *Option* zu installieren + Hooks
+nachzufeuern, aber jeder Script-Lauf bleibt ein bewusster Klick.
+Wer dauerhaft im Edit-Only-Modus bleiben will, lässt die Flag aus —
+nppm wird ein präziser Editor und zeigt dir den `npm install`-Befehl
+zum manuellen Ausführen an.
+
+---
+
+## 8. Sprache wechseln
 
 Die Flaggen oben rechts schalten die UI-Sprache. Default ist Englisch,
 Deutsch ist mitgeliefert. Eine dritte Sprache hinzufügen ist ein

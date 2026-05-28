@@ -78,6 +78,12 @@ nppm/
 │   ├── CycloneDxBuilder.ts CycloneDX 1.6 JSON converter
 │   └── SpdxBuilder.ts      SPDX 2.3 JSON converter
 │
+├── Upgrade/                one-click dep upgrade pipeline
+│   ├── PackageJsonEditor.ts  surgical range bump, preserves indent + trailing-newline
+│   ├── BackupStore.ts        timestamped snapshots in .nppm-backups/
+│   ├── LifecycleScriptScanner.ts  walks node_modules/* for install hooks
+│   └── Upgrader.ts           orchestrator: preview / applyEdit / runInstall / runRebuild
+│
 ├── Releases/               npm registry + GitHub Releases merge
 │   ├── Releases.ts
 │   └── ReleasesFetcher.ts
@@ -96,6 +102,7 @@ nppm/
 │   ├── HistoryView.ts      timeline cards
 │   ├── DepTreeView.ts      D3-collapsible tree
 │   ├── UnusedView.ts       per-project depcheck-style report (unused/misplaced/missing)
+│   ├── UpgradeModal.ts     overlay: preview → edit/install → lifecycle-scripts list + Run buttons
 │   ├── GlobalScanView.ts   SSE-driven global scan results
 │   ├── PackageDetailPanel.ts  modal w/ 5 tabs (Files/Deps/Diff/Releases/Security)
 │   ├── Treeview.ts         left-pane project list
@@ -124,6 +131,10 @@ nppm/
 | GET    | `/api/projects/:id/depgraph`                          | flat resolved dep graph |
 | GET    | `/api/projects/:id/unused`                            | depcheck-style hygiene scan (unused / misplaced / missing) |
 | GET    | `/api/projects/:id/sbom?format=cyclonedx\|spdx`       | Software Bill of Materials (default: cyclonedx) |
+| POST   | `/api/projects/:id/upgrade/preview`                   | plan a single dep range bump (returns before/after + SecurityReport) |
+| POST   | `/api/projects/:id/upgrade/apply`                     | SSE: write backup + edit; if `mode=install`, also stream `npm install --ignore-scripts` |
+| GET    | `/api/projects/:id/lifecycle-scripts`                 | install/postinstall/prepare hooks across `node_modules/*` |
+| POST   | `/api/projects/:id/lifecycle-scripts/run`             | SSE: `npm rebuild <pkg>` — gated by `actions.allowInstall` |
 
 ## Headless CLI
 

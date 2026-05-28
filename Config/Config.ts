@@ -142,6 +142,19 @@ export const SchemaConfigSecurity = Vts.object({
 });
 
 /**
+ * Dashboard-side actions gate. Off by default — the dev server stays
+ * read-only unless the user explicitly opts in. Currently a single
+ * `allowInstall` flag covers both the package.json-edit-plus-install
+ * path and the per-package "Run lifecycle script" buttons in the
+ * Upgrade modal. Both involve running third-party code on the user's
+ * machine, so they share one gate; a "always edit, never run code"
+ * stance is the default.
+ */
+export const SchemaConfigActions = Vts.object({
+    allowInstall: Vts.optional(Vts.boolean())
+});
+
+/**
  * Top-level nppm.json schema.
  */
 export const SchemaConfig = Vts.object({
@@ -150,7 +163,8 @@ export const SchemaConfig = Vts.object({
     browser: Vts.optional(SchemaConfigBrowser),
     registry: Vts.optional(SchemaConfigRegistry),
     cache: Vts.optional(SchemaConfigCache),
-    security: Vts.optional(SchemaConfigSecurity)
+    security: Vts.optional(SchemaConfigSecurity),
+    actions: Vts.optional(SchemaConfigActions)
 });
 
 export type Config = ExtractSchemaResultType<typeof SchemaConfig>;

@@ -205,3 +205,106 @@ export type ApiMatrixHeuristicsResponse = {
  * remote (GitHub/Gitea) projects which the v1 detector doesn't scan.
  */
 export type ApiUnusedResponse = UnusedReport;
+
+/**
+ * One cell coordinate the Upgrade modal acts on. Identifies a single
+ * (`workspace` or root), single dep bump. The frontend passes back
+ * the dep type so the backend doesn't have to disambiguate when the
+ * same name lives in both `dependencies` and `devDependencies`.
+ */
+export type ApiUpgradeRequest = {
+    /** Workspace-relative path; empty string / undefined = root. */
+    workspace?: string;
+    name: string;
+    /** Which bucket to mutate. Matches `DependencyType` string values. */
+    depType: 'dependency'|'dev'|'peer'|'optional';
+    /** Current range as the workspace declares it (sanity check). */
+    fromRange: string;
+    /** Target range to write (typically `^<latest>`). */
+    toRange: string;
+};
+
+/**
+ * Response of `POST /api/projects/:id/upgrade/preview`. The body is
+ * the change-we-would-make, plus a security heads-up on the target
+ * `name@latestResolved` so the user sees CVEs / fresh maintainer /
+ * install scripts before clicking apply.
+ */
+export type ApiUpgradePreviewResponse = {
+    project: {unid: string; name: string};
+    /** Echoed back so the frontend can render the modal heading. */
+    request: ApiUpgradeRequest;
+    /**
+     * Absolute path of the `package.json` we would edit. Surfaced so
+     * the frontend can show it in the modal — and so a future "copy
+     * shell command" hint can be specific.
+     */
+    packageJsonPath: string;
+    /**
+     * Workspace-relative path of the `package.json` (e.g.
+     * `packages/api/package.json`). Empty for the root.
+     */
+    packageJsonRel: string;
+    /** Verbatim `package.json` before/after the surgical edit. */
+    before: string;
+    after: string;
+    /** Concrete version we resolved against `dist-tags.latest`. */
+    latestResolvedVersion: string|null;
+    /** Security report for the target version. `null` when registry data unavailable. */
+    securityHeadsUp: SecurityReport|null;
+    /** Mirrors `actions.allowInstall` so the modal can decide whether to render the install button. */
+    allowInstall: boolean;
+};
+
+/**
+ * SSE events for `POST /api/projects/:id/upgrade/apply` and
+ * `POST /api/projects/:id/lifecycle-scripts/run`. Both streams share
+ * the same shape so the frontend can use one consumer.
+ *
+ *   start (once) → stdout|stderr (many) → end | error
+ */
+export type ApiStreamStartEvent = {
+    /** Human-readable command label, e.g. `npm install --ignore-scripts`. */
+    command: string;
+    /** Working directory the command ran in. Useful for the UI log header. */
+    cwd: string;
+};
+
+export type ApiStreamChunkEvent = {
+    /** UTF-8 chunk of process output. May contain partial lines. */
+    chunk: string;
+};
+
+export type ApiStreamEndEvent = {
+    exitCode: number|null;
+};
+
+export type ApiStreamErrorEvent = {
+    msg: string;
+};
+
+/**
+ * One install-time lifecycle hook that *would* run on a normal `npm
+ * install`. Surfaced by `GET /api/projects/:id/lifecycle-scripts`
+ * so the user knows which scripts `--ignore-scripts` skipped.
+ */
+export type ApiLifecycleScript = {
+    name: string;
+    version: string;
+    /** preinstall | install | postinstall | prepare */
+    hook: string;
+    /** Verbatim script body so the user can decide whether it looks safe. */
+    script: string;
+};
+
+export type ApiLifecycleScriptsResponse = {
+    project: {unid: string; name: string};
+    /** All install-lifecycle hooks across `node_modules/*`. Empty when none. */
+    scripts: ApiLifecycleScript[];
+    /** Whether the per-script "Run" button is enabled (mirrors `actions.allowInstall`). */
+    allowInstall: boolean;
+};
+
+export type ApiLifecycleRunRequest = {
+    name: string;
+};

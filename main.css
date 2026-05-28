@@ -1270,3 +1270,190 @@ html, body {
     white-space: pre-wrap;
     word-break: break-all;
 }
+/* Upgrade-Modal */
+
+.umd-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 1000;
+    padding: 5vh 2vw;
+    overflow-y: auto;
+}
+
+.umd-panel {
+    background: var(--c-panel);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-md);
+    width: min(880px, 95vw);
+    max-width: 95vw;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.umd-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--c-border);
+    padding-bottom: 8px;
+}
+
+.umd-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+.umd-close {
+    background: transparent;
+    color: var(--c-muted);
+    border: none;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 6px;
+}
+
+.umd-close:hover {
+    color: var(--c-text);
+}
+
+.umd-loading,
+.umd-error,
+.umd-noop,
+.umd-note {
+    color: var(--c-muted);
+    font-size: 12px;
+}
+
+.umd-error {
+    color: #e85a5a;
+}
+
+.umd-plan,
+.umd-target {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--c-text);
+}
+
+.umd-section-head {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--c-muted);
+    margin-bottom: 6px;
+}
+
+.umd-heads,
+.umd-diff,
+.umd-lifecycle,
+.umd-log {
+    border-top: 1px solid var(--c-border);
+    padding-top: 10px;
+}
+
+.umd-heads-body {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--c-text);
+}
+
+.umd-diff-body,
+.umd-log-body,
+.umd-lifecycle-body {
+    display: block;
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 260px;
+    overflow: auto;
+}
+
+.umd-log-body {
+    max-height: 320px;
+}
+
+.umd-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.umd-btn {
+    background: var(--c-panel);
+    color: var(--c-text);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    padding: 6px 14px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.umd-btn:hover:not([disabled]) {
+    background: var(--c-row-hover);
+}
+
+.umd-btn[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.umd-btn-primary {
+    background: var(--c-accent);
+    border-color: var(--c-accent);
+    color: #fff;
+}
+
+.umd-btn-risky {
+    background: rgba(232, 90, 90, 0.15);
+    border-color: rgba(232, 90, 90, 0.5);
+    color: #f0b400;
+}
+
+.umd-lifecycle-row {
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    margin-top: 8px;
+    background: var(--c-bg);
+}
+
+.umd-lifecycle-head {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-weight: 600;
+    color: var(--c-text);
+    margin-bottom: 4px;
+}
+
+.matrix-cell-upgrade {
+    margin-left: 6px;
+    border: 1px solid var(--c-border);
+    background: var(--c-panel);
+    color: var(--c-accent);
+    border-radius: var(--radius-sm);
+    padding: 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 16px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.matrix-cell-upgrade:hover {
+    background: var(--c-accent);
+    color: #fff;
+}

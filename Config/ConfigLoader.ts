@@ -45,6 +45,13 @@ export type LoadedConfig = {
     securityScanner: SecurityScanner;
     unusedDetector: UnusedDetector;
     /**
+     * `actions.allowInstall` from the config. Defaults to `false`. The
+     * dev server's "Edit + install" + per-package "Run script" buttons
+     * are only exposed when this is true; the read-only paths
+     * (preview, edit-only apply) work either way.
+     */
+    allowInstall: boolean;
+    /**
      * Projects in *config order*. The Vite plugin re-keys them by UUID
      * for its API surface; the CLI iterates the array directly. Order
      * is preserved so both surfaces agree on `--project=<name>`
@@ -111,7 +118,11 @@ export class ConfigLoader {
                     devPathGlobs?: string[];
                 };
             };
+            actions?: {
+                allowInstall?: boolean;
+            };
         };
+        const allowInstall = cfg.actions?.allowInstall === true;
 
         const registryUrl = cfg.registry?.url ?? 'https://registry.npmjs.org';
         const registryAuth = cfg.registry?.auth;
@@ -228,6 +239,7 @@ export class ConfigLoader {
             securityCache,
             securityScanner,
             unusedDetector,
+            allowInstall,
             projects
         };
     }

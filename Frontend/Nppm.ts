@@ -11,6 +11,7 @@ import {ProjectMatrixView} from './ProjectMatrixView.js';
 import {Resizer} from './Resizer.js';
 import {Treeview} from './Treeview.js';
 import {UnusedView} from './UnusedView.js';
+import {UpgradeModal} from './UpgradeModal.js';
 
 /**
  * Active right-pane view. `packages` and `installed` are two flavours
@@ -46,6 +47,7 @@ export class Nppm {
     private readonly _unusedView: UnusedView;
     private readonly _globalScanView: GlobalScanView;
     private readonly _detailPanel: PackageDetailPanel;
+    private readonly _upgradeModal: UpgradeModal;
     private readonly _listRoot: HTMLElement;
     private _matrixHost: HTMLElement|null = null;
     private _packageHost: HTMLElement|null = null;
@@ -57,6 +59,14 @@ export class Nppm {
     private _globalHost: HTMLElement|null = null;
     private _view: View = View.matrix;
     private _projects: ApiProject[] = [];
+    /**
+     * unid of the most recently loaded per-project view (`packages`,
+     * `installed`, `history`, `projectMatrix`, `depTree`, `unused`).
+     * The Upgrade modal needs it on click to address the right
+     * project, since the originating view doesn't carry it back to
+     * Nppm in its callbacks.
+     */
+    private _currentProjectUnid: string|null = null;
 
     constructor() {
         const treeRoot = document.getElementById('treeview');
@@ -101,6 +111,7 @@ export class Nppm {
         this._globalScanView.onAnalysisStart(() => this._switchTo(View.global));
 
         this._detailPanel = new PackageDetailPanel();
+        this._upgradeModal = new UpgradeModal();
 
         new Resizer(resizer, controls);
 
@@ -172,6 +183,22 @@ export class Nppm {
         this._projectMatrixView.onShowUnused(wireUnused);
         this._projectMatrixView.onCellClick((pkg, version, latest) => {
             void this._detailPanel.open(pkg, version, latest);
+        });
+        this._projectMatrixView.onUpgradeClick((seed) => {
+            const unid = this._currentProjectUnid;
+            const proj = unid ? findProject(unid) : undefined;
+            if (!unid || !proj) {
+                return;
+            }
+            void this._upgradeModal.open({
+                projectUnid: unid,
+                projectName: proj.name,
+                workspace: seed.workspace,
+                name: seed.name,
+                depType: seed.depType,
+                fromRange: seed.fromRange,
+                toRange: seed.toRange
+            });
         });
 
         this._depTreeView.onShowDeclared(wireDeclared);
@@ -262,6 +289,7 @@ export class Nppm {
 
     private async _loadProjectMatrix(project: ApiProject): Promise<void> {
         this._switchTo(View.projectMatrix);
+        this._currentProjectUnid = project.unid;
         await this._projectMatrixView.show(project.unid, project.name);
     }
 

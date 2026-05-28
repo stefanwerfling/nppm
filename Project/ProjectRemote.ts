@@ -15,6 +15,7 @@ type RawPackageJson = {
     peerDependencies?: unknown;
     optionalDependencies?: unknown;
     workspaces?: unknown;
+    scripts?: unknown;
 };
 
 /**
@@ -119,7 +120,20 @@ export abstract class ProjectRemote implements Project {
             ...ProjectRemote._extractDeps(raw.optionalDependencies, DependencyType.optional, workspace)
         ];
 
-        return {name, version, workspace, dependencies};
+        return {name, version, workspace, dependencies, scripts: ProjectRemote._extractScripts(raw.scripts)};
+    }
+
+    private static _extractScripts(raw: unknown): Record<string, string> {
+        if (!raw || typeof raw !== 'object') {
+            return {};
+        }
+        const out: Record<string, string> = {};
+        for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+            if (typeof v === 'string') {
+                out[k] = v;
+            }
+        }
+        return out;
     }
 
     private static _extractDeps(

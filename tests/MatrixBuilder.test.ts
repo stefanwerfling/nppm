@@ -76,7 +76,8 @@ function manifest(
             version: v,
             type: DependencyType.dependency,
             workspace
-        }))
+        })),
+        scripts: {}
     };
 }
 

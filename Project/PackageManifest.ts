@@ -33,4 +33,13 @@ export type PackageManifest = {
     version: string;
     workspace?: string;
     dependencies: PackageDependency[];
+    /**
+     * Raw `scripts: {...}` map from the package.json (npm-run-script
+     * commands). Populated by the project loaders so the
+     * `UnusedDetector` can mark deps referenced from script bodies
+     * (e.g. `"build": "vite build"` → `vite` counts as used) without
+     * a second filesystem read. Empty for projects that don't declare
+     * any scripts.
+     */
+    scripts: Record<string, string>;
 };

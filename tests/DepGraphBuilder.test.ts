@@ -87,7 +87,8 @@ describe('DepGraphBuilder.build', () => {
                 version: '1.0.0',
                 dependencies: [
                     {name: 'foo', version: '^1', type: DependencyType.dependency, workspace: undefined}
-                ]
+                ],
+                scripts: {}
             }],
             {
                 lockfileVersion: 3,
@@ -103,7 +104,7 @@ describe('DepGraphBuilder.build', () => {
 
     it('uses nested node_modules when both nested and hoisted exist', async () => {
         const project = new FakeProject(
-            [{name: 'root', version: '1.0.0', dependencies: []}],
+            [{name: 'root', version: '1.0.0', dependencies: [], scripts: {}}],
             {
                 lockfileVersion: 3,
                 source: 'committed',
@@ -122,7 +123,7 @@ describe('DepGraphBuilder.build', () => {
 
     it('emits empty-version placeholders for unresolved deps', async () => {
         const project = new FakeProject(
-            [{name: 'root', version: '1.0.0', dependencies: []}],
+            [{name: 'root', version: '1.0.0', dependencies: [], scripts: {}}],
             {
                 lockfileVersion: 3,
                 source: 'committed',
@@ -136,7 +137,7 @@ describe('DepGraphBuilder.build', () => {
 
     it('marks status from CVE cache and registry latest', async () => {
         const project = new FakeProject(
-            [{name: 'root', version: '1.0.0', dependencies: []}],
+            [{name: 'root', version: '1.0.0', dependencies: [], scripts: {}}],
             {
                 lockfileVersion: 3,
                 source: 'committed',

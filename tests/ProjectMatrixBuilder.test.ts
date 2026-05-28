@@ -20,7 +20,8 @@ function manifest(name: string, deps: Record<string, string>, workspace?: string
             version: v,
             type: DependencyType.dependency,
             workspace
-        }))
+        })),
+        scripts: {}
     };
 }
 

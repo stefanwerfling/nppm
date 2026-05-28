@@ -18,6 +18,7 @@ type RawPackageJson = {
     peerDependencies?: unknown;
     optionalDependencies?: unknown;
     workspaces?: unknown;
+    scripts?: unknown;
 };
 
 /**
@@ -38,6 +39,15 @@ export class ProjectLocal implements Project {
 
     public getName(): string {
         return this._name;
+    }
+
+    /**
+     * Absolute on-disk root of the project. Exposed for tools that
+     * need to walk source files (UnusedDetector) — remote projects
+     * have no equivalent.
+     */
+    public getRoot(): string {
+        return this._root;
     }
 
     public getKey(): string {
@@ -130,7 +140,20 @@ export class ProjectLocal implements Project {
             ...ProjectLocal._extractDeps(raw.optionalDependencies, DependencyType.optional, workspace)
         ];
 
-        return {name, version, workspace, dependencies: deps};
+        return {name, version, workspace, dependencies: deps, scripts: ProjectLocal._extractScripts(raw.scripts)};
+    }
+
+    private static _extractScripts(raw: unknown): Record<string, string> {
+        if (!raw || typeof raw !== 'object') {
+            return {};
+        }
+        const out: Record<string, string> = {};
+        for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+            if (typeof v === 'string') {
+                out[k] = v;
+            }
+        }
+        return out;
     }
 
     private static _extractDeps(

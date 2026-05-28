@@ -119,7 +119,7 @@ describe('MaintainerScanner.scan', () => {
         const finding = await scanner.scan('pkg', '1.0.20');
 
         expect(finding!.severity).toBe(MaintainerSeverity.info);
-        expect(finding!.reason).toMatch(/Community-Übernahme/);
+        expect(finding!.reason).toMatch(/community takeover/);
     });
 
     it('softens to WARN when the package is young (few predecessors)', async () => {

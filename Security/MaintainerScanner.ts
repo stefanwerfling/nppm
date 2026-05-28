@@ -135,7 +135,7 @@ export class MaintainerScanner {
                 priorVersionsWithPublisher: 0,
                 gapDays,
                 severity: MaintainerSeverity.info,
-                reason: 'Keine Vorgänger mit Publisher-Info — kein Trust-Set bildbar'
+                reason: 'No predecessors with publisher info — cannot build a trust set'
             };
         }
 
@@ -148,7 +148,7 @@ export class MaintainerScanner {
                 priorVersionsWithPublisher: priorWithPub,
                 gapDays,
                 severity: MaintainerSeverity.info,
-                reason: 'Diese Version hat kein `_npmUser`-Feld im Registry'
+                reason: 'This version has no `_npmUser` field in the registry'
             };
         }
 
@@ -159,7 +159,7 @@ export class MaintainerScanner {
                 priorVersionsWithPublisher: priorWithPub,
                 gapDays,
                 severity: MaintainerSeverity.info,
-                reason: `Bekannter Publisher (${current.name})`
+                reason: `Known publisher (${current.name})`
             };
         }
 
@@ -178,9 +178,9 @@ export class MaintainerScanner {
                 priorVersionsWithPublisher: priorWithPub,
                 gapDays,
                 severity: MaintainerSeverity.risk,
-                reason: `Neuer Publisher (${current.name}) nach nur ${gapDays} Tagen — `
-                    + `aktives Paket (${priorWithPub} Vorgänger) wechselt blitzschnell den Owner, `
-                    + `typisches Account-Takeover-Muster (event-stream/ua-parser-js-Profil)`
+                reason: `New publisher (${current.name}) after only ${gapDays} days — `
+                    + `active package (${priorWithPub} predecessors) switched owner abruptly, `
+                    + `classic account-takeover pattern (event-stream / ua-parser-js profile)`
             };
         }
 
@@ -191,8 +191,8 @@ export class MaintainerScanner {
                 priorVersionsWithPublisher: priorWithPub,
                 gapDays,
                 severity: MaintainerSeverity.warn,
-                reason: `Neuer Publisher (${current.name}) nach ${gapDays} Tagen — `
-                    + `mittlere Lücke auf einem etablierten Paket, ein Blick lohnt sich`
+                reason: `New publisher (${current.name}) after ${gapDays} days — `
+                    + `mid-length gap on an established package, worth a look`
             };
         }
 
@@ -206,9 +206,9 @@ export class MaintainerScanner {
                 priorVersionsWithPublisher: priorWithPub,
                 gapDays,
                 severity: MaintainerSeverity.info,
-                reason: `Neuer Publisher (${current.name}) nach ${gapDays} Tagen Stille — `
-                    + `lange Pause spricht eher für eine legitime Community-Übernahme `
-                    + `eines verwaisten Pakets als für einen Angriff`
+                reason: `New publisher (${current.name}) after ${gapDays} days of silence — `
+                    + `long pause usually points to a legitimate community takeover `
+                    + `of an abandoned package rather than an attack`
             };
         }
 
@@ -221,8 +221,8 @@ export class MaintainerScanner {
                 priorVersionsWithPublisher: priorWithPub,
                 gapDays,
                 severity: MaintainerSeverity.warn,
-                reason: `Neuer Publisher (${current.name}) für ein etabliertes Paket `
-                    + `(${priorWithPub} Vorgänger), Veröffentlichungslücke unbekannt`
+                reason: `New publisher (${current.name}) on an established package `
+                    + `(${priorWithPub} predecessors), publish gap unknown`
             };
         }
 
@@ -232,8 +232,8 @@ export class MaintainerScanner {
             priorVersionsWithPublisher: priorWithPub,
             gapDays,
             severity: MaintainerSeverity.warn,
-            reason: `Neuer Publisher (${current.name}), aber Paket noch jung `
-                + `(${priorWithPub} Vorgänger) — könnte legitimer neuer Maintainer sein`
+            reason: `New publisher (${current.name}), but package is still young `
+                + `(${priorWithPub} predecessors) — could be a legitimate new maintainer`
         };
     }
 

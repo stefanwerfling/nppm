@@ -200,14 +200,14 @@ export class HistoryStore {
 
         if (cves && cves.length > 0) {
             const head = cves.slice(0, 3).join(', ');
-            const suffix = cves.length > 3 ? `, +${cves.length - 3} weitere` : '';
-            parts.push(`Alte Version hatte CVEs (${head}${suffix})`);
+            const suffix = cves.length > 3 ? `, +${cves.length - 3} more` : '';
+            parts.push(`Old version had CVEs (${head}${suffix})`);
         }
 
         if (bumpType === null) {
-            parts.push('Versions-Schema unbekannt');
+            parts.push('Version scheme unknown');
         } else if (bumpType === 'none') {
-            parts.push('Version unverändert');
+            parts.push('Version unchanged');
         } else {
             parts.push(`${bumpType}-bump`);
         }

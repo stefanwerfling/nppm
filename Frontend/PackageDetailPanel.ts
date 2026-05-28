@@ -28,8 +28,8 @@ enum Tab {
 
 /**
  * Modal-ish detail view for one `pkg@version` with three tabs:
- *  - Dateien: per-file SHA-256 + size of the tarball
- *  - Abhängigkeiten: dep/devDep/peer/optional declared by the package itself
+ *  - Files: per-file SHA-256 + size of the tarball
+ *  - Dependencies: dep/devDep/peer/optional declared by the package itself
  *  - Diff: vs another version (defaults to registry `latest`)
  *
  * Mounted into `document.body`; closes on backdrop click or ESC. Phase 5
@@ -444,7 +444,7 @@ export class PackageDetailPanel {
 
     private _securityTabLabel(): string {
         // Adds a count badge to the tab once the report has loaded —
-        // e.g. "Sicherheit (3)". The user can see "is there anything in
+        // e.g. "Security (3)". The user can see "is there anything in
         // there" without clicking. Churn counts when severity > info.
         if (!this._securityReport) {
             return I18n.t('Security');

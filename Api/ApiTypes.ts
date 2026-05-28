@@ -120,9 +120,9 @@ export type ApiAnalyzeResultEvent = {
 export type ApiAnalyzeProgressEvent = {
     current: number;
     total: number;
-    // Optional human-readable phase label ("Sammle Pakete von kavula
-    // …", "Prüfe CVEs …"). Used by the global scan, ignored by the
-    // per-project one.
+    // Optional human-readable phase label ("Collecting packages from
+    // kavula …", "Scanning CVEs …"). Used by the global scan, ignored
+    // by the per-project one.
     phase?: string;
 };
 

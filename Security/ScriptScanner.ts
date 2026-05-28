@@ -42,14 +42,14 @@ const BUILD_HOOKS = new Set(['prepare', 'prepublish']);
  * badge.
  */
 const RISK_PATTERNS: {pattern: RegExp; reason: string}[] = [
-    {pattern: /\b(curl|wget)\b/i, reason: 'lädt remote via curl/wget'},
-    {pattern: /\bnc\s+-/, reason: 'öffnet Netzwerk-Verbindung via netcat'},
-    {pattern: /\bnode\s+(-e|--eval)\b/, reason: 'führt Code via `node -e`'},
-    {pattern: /\beval\s*\(/, reason: 'ruft eval auf'},
-    {pattern: /\b(base64\s+(-d|--decode)|atob\s*\()/i, reason: 'dekodiert base64 zur Laufzeit'},
-    {pattern: /\b(bash|sh)\s+-c\b/, reason: 'pipt String an Shell'},
-    {pattern: /\|\s*(bash|sh)\b/, reason: 'pipt Output an Shell'},
-    {pattern: /\bnpm\s+i(nstall)?\b/, reason: 'installiert weitere Pakete zur Install-Zeit'}
+    {pattern: /\b(curl|wget)\b/i, reason: 'downloads remote payload via curl/wget'},
+    {pattern: /\bnc\s+-/, reason: 'opens network connection via netcat'},
+    {pattern: /\bnode\s+(-e|--eval)\b/, reason: 'runs code via `node -e`'},
+    {pattern: /\beval\s*\(/, reason: 'calls eval()'},
+    {pattern: /\b(base64\s+(-d|--decode)|atob\s*\()/i, reason: 'decodes base64 at runtime'},
+    {pattern: /\b(bash|sh)\s+-c\b/, reason: 'pipes string into shell'},
+    {pattern: /\|\s*(bash|sh)\b/, reason: 'pipes output into shell'},
+    {pattern: /\bnpm\s+i(nstall)?\b/, reason: 'installs additional packages at install time'}
 ];
 
 /**
@@ -94,8 +94,8 @@ export class ScriptScanner {
                 reason: risk
                     ? risk.reason
                     : isInstall
-                        ? 'Install-Hook führt Code beim `npm install` aus'
-                        : 'Build-Hook (läuft bei `npm install` für Git-Dependencies)'
+                        ? 'Install hook runs code during `npm install`'
+                        : 'Build hook (runs on `npm install` for git dependencies)'
             });
         }
 

@@ -447,7 +447,7 @@ class Server {
                         send('progress', {
                             current: 0,
                             total: byKey.size,
-                            phase: `Sammle Pakete (${collected}/${projectList.length} Projekte)`
+                            phase: `Collecting packages (${collected}/${projectList.length} projects)`
                         });
                     }
 
@@ -483,7 +483,7 @@ class Server {
                         send('progress', {
                             current: done,
                             total: queue.length,
-                            phase: 'Prüfe CVEs'
+                            phase: 'Scanning CVEs'
                         });
                     }
 

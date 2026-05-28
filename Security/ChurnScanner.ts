@@ -186,33 +186,33 @@ export class ChurnScanner {
             if (total > 30) {
                 return {
                     severity: ChurnSeverity.risk,
-                    reason: `${total} Dateien beim Patch-Bump (≥30 ist auffällig — Bugfix sollte klein sein)`
+                    reason: `${total} files for a patch bump (≥30 is unusual — bugfixes should be small)`
                 };
             }
             if (total > 10) {
                 return {
                     severity: ChurnSeverity.warn,
-                    reason: `${total} Dateien beim Patch-Bump (>10 ungewöhnlich)`
+                    reason: `${total} files for a patch bump (>10 is unusual)`
                 };
             }
         } else if (bump === 'minor') {
             if (total > 100) {
                 return {
                     severity: ChurnSeverity.risk,
-                    reason: `${total} Dateien beim Minor-Bump (≥100 ist auffällig)`
+                    reason: `${total} files for a minor bump (≥100 is unusual)`
                 };
             }
             if (total > 50) {
                 return {
                     severity: ChurnSeverity.warn,
-                    reason: `${total} Dateien beim Minor-Bump (>50 ungewöhnlich)`
+                    reason: `${total} files for a minor bump (>50 is unusual)`
                 };
             }
         }
 
         return {
             severity: ChurnSeverity.info,
-            reason: `Normale ${bump}-Bump-Größe`
+            reason: `Normal ${bump}-bump size`
         };
     }
 }

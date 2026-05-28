@@ -151,9 +151,9 @@ export class LicenseScanner {
                 severity: this._treatUnknownAs,
                 identifiers: [],
                 reason: this._treatUnknownAs === LicenseSeverity.unknown
-                    ? 'Kein `license`-Feld im Paket-Manifest'
-                    : 'Kein `license`-Feld — durch Config als '
-                        + `${this._treatUnknownAs} behandelt`,
+                    ? 'No `license` field in the package manifest'
+                    : 'No `license` field — treated as '
+                        + `${this._treatUnknownAs} via config`,
                 policyMatched: false
             };
         }
@@ -177,7 +177,7 @@ export class LicenseScanner {
                 spdx: raw,
                 severity: LicenseSeverity.proprietary,
                 identifiers: evaluated?.identifiers ?? [],
-                reason: `Lizenz "${raw}" auf der Denylist`,
+                reason: `License "${raw}" matched the denylist`,
                 policyMatched: true
             };
         }
@@ -187,7 +187,7 @@ export class LicenseScanner {
                 spdx: raw,
                 severity: LicenseSeverity.permissive,
                 identifiers: evaluated?.identifiers ?? [],
-                reason: `Lizenz "${raw}" auf der Allowlist`,
+                reason: `License "${raw}" matched the allowlist`,
                 policyMatched: true
             };
         }
@@ -217,18 +217,18 @@ export class LicenseScanner {
     }
 
     private _reasonFor(sev: LicenseSeverity, ids: string[], raw: string): string {
-        const head = ids.length > 1 ? `Ausdruck "${raw}"` : `Lizenz "${raw}"`;
+        const head = ids.length > 1 ? `Expression "${raw}"` : `License "${raw}"`;
         switch (sev) {
             case LicenseSeverity.permissive:
-                return `${head} ist permissiv — keine Compliance-Auflagen`;
+                return `${head} is permissive — no compliance obligations`;
             case LicenseSeverity.weakCopyleft:
-                return `${head} ist Weak-Copyleft (LGPL/MPL/EPL) — Datei-Grenze, meistens akzeptiert`;
+                return `${head} is weak-copyleft (LGPL/MPL/EPL) — file-level boundary, generally accepted`;
             case LicenseSeverity.strongCopyleft:
-                return `${head} ist Strong-Copyleft (GPL/AGPL) — viral, Code-Freigabe-Pflicht für Derivate`;
+                return `${head} is strong-copyleft (GPL/AGPL) — viral, derivatives must release source`;
             case LicenseSeverity.proprietary:
-                return `${head} ist proprietär — keine Weitergabe ohne Vertrag`;
+                return `${head} is proprietary — no redistribution without contract`;
             case LicenseSeverity.unknown:
-                return `${head} nicht im SPDX-Katalog wiedererkannt`;
+                return `${head} not recognised in the SPDX catalogue`;
         }
     }
 

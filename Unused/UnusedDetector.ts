@@ -167,7 +167,7 @@ export class UnusedDetector {
             return {
                 project: projectMeta,
                 supported: false,
-                unsupportedReason: 'Remote-Projekte (GitHub/Gitea) werden in v1 nicht gescannt — bitte lokal auschecken.',
+                unsupportedReason: 'Remote projects (GitHub/Gitea) are not scanned in v1 — please check out locally.',
                 unused: [],
                 misplaced: [],
                 missing: [],
@@ -231,7 +231,7 @@ export class UnusedDetector {
                 if (dynamicHits > 0) {
                     scanLimits.push({
                         file: relPath,
-                        reason: `${dynamicHits} dynamische(s) import()/require() — Spec-Variable, nicht auflösbar`
+                        reason: `${dynamicHits} dynamic import()/require() — variable spec, not resolvable`
                     });
                 }
 
@@ -286,7 +286,7 @@ export class UnusedDetector {
                         name,
                         declaredIn: info.bucket,
                         severity: UnusedSeverity.info,
-                        reason: 'Auf der Allowlist (Bin-Tool/Build-Step) — nicht zu entfernen'
+                        reason: 'On the allowlist (bin tool / build step) — not safe to remove'
                     });
                     continue;
                 }
@@ -295,7 +295,7 @@ export class UnusedDetector {
                         name,
                         declaredIn: info.bucket,
                         severity: UnusedSeverity.info,
-                        reason: 'In `scripts: {...}` referenziert — wird via CLI aufgerufen'
+                        reason: 'Referenced in `scripts: {...}` — invoked via CLI'
                     });
                     continue;
                 }
@@ -304,7 +304,7 @@ export class UnusedDetector {
                         name,
                         declaredIn: info.bucket,
                         severity: UnusedSeverity.info,
-                        reason: '`@types/X`-Paket — wird implizit vom Konsumenten X benutzt'
+                        reason: '`@types/X` package — implicitly used by consumer X'
                     });
                     continue;
                 }
@@ -312,7 +312,7 @@ export class UnusedDetector {
                     name,
                     declaredIn: info.bucket,
                     severity: UnusedSeverity.risk,
-                    reason: 'Nirgends importiert, nicht in `scripts:`, nicht auf der Allowlist'
+                    reason: 'Not imported anywhere, not in `scripts:`, not on the allowlist'
                 });
                 continue;
             }

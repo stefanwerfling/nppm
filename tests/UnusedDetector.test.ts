@@ -118,7 +118,7 @@ describe('UnusedDetector.scan', () => {
         const vite = report.unused.find((u) => u.name === 'vite')!;
         expect(vite).toBeDefined();
         expect(vite.severity).toBe(UnusedSeverity.info);
-        expect(vite.reason).toMatch(/Allowlist/);
+        expect(vite.reason).toMatch(/allowlist/);
     });
 
     it('suppresses a dep referenced from a `scripts:` body', async () => {

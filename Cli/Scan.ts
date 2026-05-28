@@ -3,15 +3,15 @@ import fs from 'fs';
 import path from 'path';
 import {SchemaErrors} from 'vts';
 import {SchemaConfig} from '../Config/Config.js';
-import {buildLoadedConfig, LoadedConfig} from '../Config/ConfigLoader.js';
+import {ConfigLoader, LoadedConfig} from '../Config/ConfigLoader.js';
 import {Lockfile} from '../Project/Lockfile.js';
 import {Project} from '../Project/Project.js';
 import {OsvBatchPackage, OsvClient} from '../Security/OsvClient.js';
 import {SecurityScanner} from '../Security/SecurityScanner.js';
 import {UnusedDetector} from '../Unused/UnusedDetector.js';
-import {CliArgs, CliArgsError, HELP_TEXT, parseCliArgs} from './CliArgs.js';
-import {formatJson, formatSarif, formatText, shouldFail} from './ScanFormat.js';
-import {buildProjectReport, ProjectScanReport, summariseReport} from './ScanReport.js';
+import {CliArgs, CliArgsError, CliArgsParser, HELP_TEXT} from './CliArgs.js';
+import {ScanFormatter} from './ScanFormat.js';
+import {ProjectScanReport, ScanReportBuilder} from './ScanReport.js';
 
 /**
  * Inputs the runner expects from the surrounding shell. Kept as a
@@ -46,7 +46,7 @@ export type RunScanIO = {
 export async function runScan(io: RunScanIO): Promise<number> {
     let args: CliArgs;
     try {
-        args = parseCliArgs(io.argv);
+        args = CliArgsParser.parse(io.argv);
     } catch (e) {
         if (e instanceof CliArgsError) {
             io.stderr(`nppm scan: ${e.message}\n\n`);
@@ -95,7 +95,7 @@ export async function runScan(io: RunScanIO): Promise<number> {
             dotenv.config({quiet: true, path: envPath});
         }
 
-        loaded = buildLoadedConfig(rawConfig, projectRoot, {
+        loaded = ConfigLoader.build(rawConfig, projectRoot, {
             onSkip: (msg) => io.stderr(`nppm scan: ${msg}\n`)
         });
     }
@@ -136,17 +136,17 @@ export async function runScan(io: RunScanIO): Promise<number> {
         projectReports.push(report);
     }
 
-    const report = summariseReport(projectReports);
+    const report = ScanReportBuilder.summarise(projectReports);
 
     if (args.sarif) {
-        io.stdout(formatSarif(report));
+        io.stdout(ScanFormatter.sarif(report));
     } else if (args.json) {
-        io.stdout(formatJson(report));
+        io.stdout(ScanFormatter.json(report));
     } else {
-        io.stdout(formatText(report, args.failOn));
+        io.stdout(ScanFormatter.text(report, args.failOn));
     }
 
-    return shouldFail(report, args.failOn) ? 1 : 0;
+    return ScanFormatter.shouldFail(report, args.failOn) ? 1 : 0;
 }
 
 /**
@@ -211,7 +211,7 @@ async function scanProject(
         }
     }
 
-    return buildProjectReport({
+    return ScanReportBuilder.buildProject({
         ...baseInput,
         packagesScanned: uniquePackages.length,
         vulnsByKey,

@@ -63,142 +63,146 @@ type SarifLog = {
     runs: SarifRun[];
 };
 
-const CATEGORY_DEFS: Record<string, {name: string; description: string; defaultLevel: SarifLevel}> = {
-    vuln: {
-        name: 'Known vulnerability',
-        description: 'OSV.dev recorded one or more CVEs against this package version.',
-        defaultLevel: 'error'
-    },
-    script: {
-        name: 'Lifecycle script',
-        description: 'Install/build hook with a body matching a known risk pattern.',
-        defaultLevel: 'warning'
-    },
-    pattern: {
-        name: 'Suspicious code pattern',
-        description: 'eval / new Function / child_process / base64 use detected in the tarball.',
-        defaultLevel: 'warning'
-    },
-    binary: {
-        name: 'Binary file in tarball',
-        description: 'Native binary (.exe/.dll/.so/…) shipped inside the package.',
-        defaultLevel: 'warning'
-    },
-    maintainer: {
-        name: 'Maintainer handover',
-        description: 'Publisher of the inspected version differs from the trust set.',
-        defaultLevel: 'warning'
-    },
-    license: {
-        name: 'License policy',
-        description: 'License classification breaches policy (proprietary / strong-copyleft).',
-        defaultLevel: 'warning'
-    },
-    unused: {
-        name: 'Unused dependency',
-        description: 'Declared in package.json but not imported anywhere.',
-        defaultLevel: 'note'
-    },
-    misplaced: {
-        name: 'Misplaced dependency',
-        description: 'Imported only from dev paths but listed as a runtime dependency.',
-        defaultLevel: 'warning'
-    },
-    missing: {
-        name: 'Missing dependency',
-        description: 'Imported from source but not declared in any bucket.',
-        defaultLevel: 'error'
-    }
-};
-
-function severityToLevel(s: UnifiedSeverity): SarifLevel {
-    switch (s) {
-        case UnifiedSeverity.info: return 'note';
-        case UnifiedSeverity.warn: return 'warning';
-        case UnifiedSeverity.risk: return 'error';
-    }
-}
-
-function ruleIdFor(category: string): string {
-    return `nppm/${category}`;
-}
-
-function locationFor(project: ProjectScanReport, f: ScanFinding): SarifResult['locations'][number] {
-    // SARIF requires *some* location. We don't have a per-finding
-    // source file in most cases (the finding is about a published
-    // package, not a checked-in source file), so we synthesise a
-    // URI that names the project + package — GitHub displays this
-    // verbatim and it's stable for fingerprinting.
-    const ver = f.version ? `@${f.version}` : '';
-    const uri = `nppm-project/${project.project.name}/${f.name}${ver}`;
-    return {physicalLocation: {artifactLocation: {uri}}};
-}
-
-function fingerprintFor(project: ProjectScanReport, f: ScanFinding): Record<string, string> {
-    return {
-        nppmCoord: `${project.project.name}|${f.category}|${f.name}${f.version ? '@' + f.version : ''}`
-    };
-}
-
 /**
- * Convert the runner's aggregated report into a SARIF 2.1.0 log.
- * Pure function — no I/O, no time-of-day reads — so the tests can
- * snapshot it deterministically.
+ * Static converter from the runner's aggregated report to a SARIF
+ * 2.1.0 log. Deterministic — no I/O, no time-of-day reads — so the
+ * tests can snapshot it cleanly. Methods stay static because no
+ * instance state is involved.
  */
-export function buildSarif(report: ScanReport, toolVersion: string): SarifLog {
-    const seenRules = new Set<string>();
-    const rules: SarifRule[] = [];
-    const results: SarifResult[] = [];
+export class SarifBuilder {
 
-    for (const project of report.projects) {
-        for (const f of project.findings) {
-            const ruleId = ruleIdFor(f.category);
-            if (!seenRules.has(ruleId)) {
-                const def = CATEGORY_DEFS[f.category];
-                if (def) {
-                    rules.push({
-                        id: ruleId,
-                        name: def.name,
-                        shortDescription: {text: def.name},
-                        fullDescription: {text: def.description},
-                        defaultConfiguration: {level: def.defaultLevel}
-                    });
-                    seenRules.add(ruleId);
+    private static readonly _CATEGORY_DEFS: Record<string, {name: string; description: string; defaultLevel: SarifLevel}> = {
+        vuln: {
+            name: 'Known vulnerability',
+            description: 'OSV.dev recorded one or more CVEs against this package version.',
+            defaultLevel: 'error'
+        },
+        script: {
+            name: 'Lifecycle script',
+            description: 'Install/build hook with a body matching a known risk pattern.',
+            defaultLevel: 'warning'
+        },
+        pattern: {
+            name: 'Suspicious code pattern',
+            description: 'eval / new Function / child_process / base64 use detected in the tarball.',
+            defaultLevel: 'warning'
+        },
+        binary: {
+            name: 'Binary file in tarball',
+            description: 'Native binary (.exe/.dll/.so/…) shipped inside the package.',
+            defaultLevel: 'warning'
+        },
+        maintainer: {
+            name: 'Maintainer handover',
+            description: 'Publisher of the inspected version differs from the trust set.',
+            defaultLevel: 'warning'
+        },
+        license: {
+            name: 'License policy',
+            description: 'License classification breaches policy (proprietary / strong-copyleft).',
+            defaultLevel: 'warning'
+        },
+        unused: {
+            name: 'Unused dependency',
+            description: 'Declared in package.json but not imported anywhere.',
+            defaultLevel: 'note'
+        },
+        misplaced: {
+            name: 'Misplaced dependency',
+            description: 'Imported only from dev paths but listed as a runtime dependency.',
+            defaultLevel: 'warning'
+        },
+        missing: {
+            name: 'Missing dependency',
+            description: 'Imported from source but not declared in any bucket.',
+            defaultLevel: 'error'
+        }
+    };
+
+    public static build(report: ScanReport, toolVersion: string): SarifLog {
+        const seenRules = new Set<string>();
+        const rules: SarifRule[] = [];
+        const results: SarifResult[] = [];
+
+        for (const project of report.projects) {
+            for (const f of project.findings) {
+                const ruleId = SarifBuilder._ruleIdFor(f.category);
+                if (!seenRules.has(ruleId)) {
+                    const def = SarifBuilder._CATEGORY_DEFS[f.category];
+                    if (def) {
+                        rules.push({
+                            id: ruleId,
+                            name: def.name,
+                            shortDescription: {text: def.name},
+                            fullDescription: {text: def.description},
+                            defaultConfiguration: {level: def.defaultLevel}
+                        });
+                        seenRules.add(ruleId);
+                    }
                 }
+
+                results.push({
+                    ruleId,
+                    level: SarifBuilder._severityToLevel(f.severity),
+                    message: {text: `${f.name}${f.version ? '@' + f.version : ''}: ${f.message}`},
+                    locations: [SarifBuilder._locationFor(project, f)],
+                    partialFingerprints: SarifBuilder._fingerprintFor(project, f),
+                    properties: {
+                        category: f.category,
+                        severity: f.severity,
+                        name: f.name,
+                        version: f.version
+                    }
+                });
             }
+        }
 
-            results.push({
-                ruleId,
-                level: severityToLevel(f.severity),
-                message: {text: `${f.name}${f.version ? '@' + f.version : ''}: ${f.message}`},
-                locations: [locationFor(project, f)],
-                partialFingerprints: fingerprintFor(project, f),
-                properties: {
-                    category: f.category,
-                    severity: f.severity,
-                    name: f.name,
-                    version: f.version
-                }
-            });
+        return {
+            $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json',
+            version: '2.1.0',
+            runs: [{
+                tool: {
+                    driver: {
+                        name: 'nppm',
+                        informationUri: 'https://github.com/stefanwerfling/nppm',
+                        version: toolVersion,
+                        rules
+                    }
+                },
+                results,
+                invocations: [{
+                    executionSuccessful: report.projects.every((p) => p.error === null)
+                }]
+            }]
+        };
+    }
+
+    private static _severityToLevel(s: UnifiedSeverity): SarifLevel {
+        switch (s) {
+            case UnifiedSeverity.info: return 'note';
+            case UnifiedSeverity.warn: return 'warning';
+            case UnifiedSeverity.risk: return 'error';
         }
     }
 
-    return {
-        $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json',
-        version: '2.1.0',
-        runs: [{
-            tool: {
-                driver: {
-                    name: 'nppm',
-                    informationUri: 'https://github.com/stefanwerfling/nppm',
-                    version: toolVersion,
-                    rules
-                }
-            },
-            results,
-            invocations: [{
-                executionSuccessful: report.projects.every((p) => p.error === null)
-            }]
-        }]
-    };
+    private static _ruleIdFor(category: string): string {
+        return `nppm/${category}`;
+    }
+
+    private static _locationFor(project: ProjectScanReport, f: ScanFinding): SarifResult['locations'][number] {
+        // SARIF requires *some* location. We don't have a per-finding
+        // source file in most cases (the finding is about a published
+        // package, not a checked-in source file), so we synthesise a
+        // URI that names the project + package — GitHub displays this
+        // verbatim and it's stable for fingerprinting.
+        const ver = f.version ? `@${f.version}` : '';
+        const uri = `nppm-project/${project.project.name}/${f.name}${ver}`;
+        return {physicalLocation: {artifactLocation: {uri}}};
+    }
+
+    private static _fingerprintFor(project: ProjectScanReport, f: ScanFinding): Record<string, string> {
+        return {
+            nppmCoord: `${project.project.name}|${f.category}|${f.name}${f.version ? '@' + f.version : ''}`
+        };
+    }
 }

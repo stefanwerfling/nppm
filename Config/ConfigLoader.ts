@@ -13,25 +13,6 @@ import {UnusedDetector} from '../Unused/UnusedDetector.js';
 import {ConfigProjectType} from './Config.js';
 
 /**
- * Resolve a `"$VARNAME"` string into the corresponding env-var value;
- * pass anything else through unchanged. Used for token fields so the
- * config file never contains literal secrets.
- *
- * Exported so both callers (Vite plugin, CLI) use the same regex and
- * environment-lookup semantics.
- */
-export function expandEnv(value: string|undefined): string|undefined {
-    if (!value) {
-        return value;
-    }
-    const match = /^\$([A-Z_][A-Z0-9_]*)$/i.exec(value);
-    if (!match) {
-        return value;
-    }
-    return process.env[match[1]];
-}
-
-/**
  * Optional hooks the caller can plug in. `onProjectLoaded` is the
  * place where the Vite plugin logs `📦 …` lines and the CLI stays
  * silent; `onSkip` is reserved for soft failures (e.g. a Gitea project
@@ -73,159 +54,181 @@ export type LoadedConfig = {
 };
 
 /**
- * Build the scanner/registry/project bundle from an *already
- * validated* config object. Callers run `SchemaConfig.validate(raw)`
- * first and decide what to do with errors (Vite logs them, CLI exits
- * with code 2) — the loader takes only the happy path.
- *
- * `raw` is typed as `unknown` because VTS's static inference is
- * intersection-of-Partial soup that does not narrow on the
- * discriminator. We branch on `entry.type` with explicit casts (the
- * "VTS union pitfall" — see decisions memory).
+ * Bootstrap builder shared by `vite.config.ts` and `Cli/Scan.ts`.
+ * `build()` takes an already-validated raw config object and the
+ * absolute project root; callers handle the validation step
+ * themselves (Vite logs errors, CLI exits with code 2) so the loader
+ * stays focused on the happy path.
  */
-export function buildLoadedConfig(
-    raw: unknown,
-    projectRoot: string,
-    hooks: LoadedConfigHooks = {}
-): LoadedConfig {
-    const cfg = raw as {
-        projects?: unknown[];
-        registry?: {url?: string; auth?: string};
-        cache?: {dir?: string; ttlMinutes?: number};
-        security?: {
-            maintainer?: {
-                quickHandoverDays?: number;
-                suspiciousGapDays?: number;
-                matureVersions?: number;
-                trustWindow?: number;
-            };
-            license?: {
-                allowlist?: string[];
-                denylist?: string[];
-                treatUnknownAs?: string;
-            };
-            unused?: {
-                allowlist?: string[];
-                devPathGlobs?: string[];
+export class ConfigLoader {
+
+    /**
+     * Resolve a `"$VARNAME"` string into the corresponding env-var
+     * value; pass anything else through unchanged. Used for token
+     * fields so the config file never contains literal secrets.
+     */
+    public static expandEnv(value: string|undefined): string|undefined {
+        if (!value) {
+            return value;
+        }
+        const match = /^\$([A-Z_][A-Z0-9_]*)$/i.exec(value);
+        if (!match) {
+            return value;
+        }
+        return process.env[match[1]];
+    }
+
+    /**
+     * Build the scanner/registry/project bundle from an *already
+     * validated* config object. `raw` is typed as `unknown` because
+     * VTS's static inference is intersection-of-Partial soup that
+     * does not narrow on the discriminator — we branch on
+     * `entry.type` with explicit casts (the "VTS union pitfall").
+     */
+    public static build(
+        raw: unknown,
+        projectRoot: string,
+        hooks: LoadedConfigHooks = {}
+    ): LoadedConfig {
+        const cfg = raw as {
+            projects?: unknown[];
+            registry?: {url?: string; auth?: string};
+            cache?: {dir?: string; ttlMinutes?: number};
+            security?: {
+                maintainer?: {
+                    quickHandoverDays?: number;
+                    suspiciousGapDays?: number;
+                    matureVersions?: number;
+                    trustWindow?: number;
+                };
+                license?: {
+                    allowlist?: string[];
+                    denylist?: string[];
+                    treatUnknownAs?: string;
+                };
+                unused?: {
+                    allowlist?: string[];
+                    devPathGlobs?: string[];
+                };
             };
         };
-    };
 
-    const registryUrl = cfg.registry?.url ?? 'https://registry.npmjs.org';
-    const registryAuth = cfg.registry?.auth;
-    const cacheDir = cfg.cache?.dir
-        ? path.resolve(projectRoot, cfg.cache.dir)
-        : path.resolve(projectRoot, '.nppm-cache');
-    const cacheTtlMinutes = typeof cfg.cache?.ttlMinutes === 'number' ? cfg.cache.ttlMinutes : 60;
+        const registryUrl = cfg.registry?.url ?? 'https://registry.npmjs.org';
+        const registryAuth = cfg.registry?.auth;
+        const cacheDir = cfg.cache?.dir
+            ? path.resolve(projectRoot, cfg.cache.dir)
+            : path.resolve(projectRoot, '.nppm-cache');
+        const cacheTtlMinutes = typeof cfg.cache?.ttlMinutes === 'number' ? cfg.cache.ttlMinutes : 60;
 
-    const registryCache = new JsonCache(path.join(cacheDir, 'registry'), cacheTtlMinutes);
-    const registry = new Registry(registryUrl, registryCache, registryAuth);
-    const remoteCache = new JsonCache(path.join(cacheDir, 'remote'), cacheTtlMinutes);
+        const registryCache = new JsonCache(path.join(cacheDir, 'registry'), cacheTtlMinutes);
+        const registry = new Registry(registryUrl, registryCache, registryAuth);
+        const remoteCache = new JsonCache(path.join(cacheDir, 'remote'), cacheTtlMinutes);
 
-    // Fingerprint cache is permanent — published `pkg@version` is
-    // immutable on npm. Bump the cache-key prefix in the builder
-    // (`fp_v4_*` → `fp_v5_*`) when the cached shape changes.
-    const fingerprintCache = new JsonCache(
-        path.join(cacheDir, 'fingerprint'),
-        cacheTtlMinutes,
-        {permanent: true}
-    );
-    const fingerprintBuilder = new FingerprintBuilder(fingerprintCache);
+        // Fingerprint cache is permanent — published `pkg@version` is
+        // immutable on npm. Bump the cache-key prefix in the builder
+        // (`fp_v4_*` → `fp_v5_*`) when the cached shape changes.
+        const fingerprintCache = new JsonCache(
+            path.join(cacheDir, 'fingerprint'),
+            cacheTtlMinutes,
+            {permanent: true}
+        );
+        const fingerprintBuilder = new FingerprintBuilder(fingerprintCache);
 
-    const securityCache = new JsonCache(path.join(cacheDir, 'security'), cacheTtlMinutes);
-    const osvClient = new OsvClient(securityCache);
+        const securityCache = new JsonCache(path.join(cacheDir, 'security'), cacheTtlMinutes);
+        const osvClient = new OsvClient(securityCache);
 
-    // `treatUnknownAs` arrives as a free-form string from the config
-    // (VTS schema can't constrain it to enum values without a custom
-    // validator). Unknown values fall back to the scanner default by
-    // staying `undefined`.
-    const treatUnknownAsRaw = cfg.security?.license?.treatUnknownAs;
-    const treatUnknownAs = Object.values(LicenseSeverity)
-        .includes(treatUnknownAsRaw as LicenseSeverity)
-        ? treatUnknownAsRaw as LicenseSeverity
-        : undefined;
+        // `treatUnknownAs` arrives as a free-form string from the
+        // config (VTS schema can't constrain it to enum values
+        // without a custom validator). Unknown values fall back to
+        // the scanner default by staying `undefined`.
+        const treatUnknownAsRaw = cfg.security?.license?.treatUnknownAs;
+        const treatUnknownAs = Object.values(LicenseSeverity)
+            .includes(treatUnknownAsRaw as LicenseSeverity)
+            ? treatUnknownAsRaw as LicenseSeverity
+            : undefined;
 
-    const securityScanner = new SecurityScanner(
-        osvClient,
-        fingerprintBuilder,
-        registry,
-        {
-            maintainer: cfg.security?.maintainer ?? {},
-            license: {
-                allowlist: cfg.security?.license?.allowlist,
-                denylist: cfg.security?.license?.denylist,
-                treatUnknownAs
+        const securityScanner = new SecurityScanner(
+            osvClient,
+            fingerprintBuilder,
+            registry,
+            {
+                maintainer: cfg.security?.maintainer ?? {},
+                license: {
+                    allowlist: cfg.security?.license?.allowlist,
+                    denylist: cfg.security?.license?.denylist,
+                    treatUnknownAs
+                }
             }
-        }
-    );
+        );
 
-    const unusedDetector = new UnusedDetector({
-        allowlist: cfg.security?.unused?.allowlist,
-        devPathGlobs: cfg.security?.unused?.devPathGlobs
-    });
+        const unusedDetector = new UnusedDetector({
+            allowlist: cfg.security?.unused?.allowlist,
+            devPathGlobs: cfg.security?.unused?.devPathGlobs
+        });
 
-    const projects: Project[] = [];
-    for (const entry of (cfg.projects ?? []) as Array<{type: ConfigProjectType}>) {
-        if (entry.type === ConfigProjectType.local) {
-            const local = entry as {type: ConfigProjectType.local; path: string; name?: string};
-            const absRoot = path.resolve(projectRoot, local.path);
-            const project = new ProjectLocal(absRoot, local.name);
-            projects.push(project);
-            hooks.onProjectLoaded?.(project);
-        } else if (entry.type === ConfigProjectType.github) {
-            const gh = entry as {
-                type: ConfigProjectType.github;
-                repo: string;
-                name?: string;
-                ref?: string;
-                token?: string;
-            };
-            const project = new ProjectGithub(
-                gh.repo,
-                gh.name ?? gh.repo,
-                gh.ref,
-                expandEnv(gh.token),
-                remoteCache
-            );
-            projects.push(project);
-            hooks.onProjectLoaded?.(project);
-        } else if (entry.type === ConfigProjectType.gitea) {
-            const ge = entry as {
-                type: ConfigProjectType.gitea;
-                url: string;
-                name?: string;
-                ref?: string;
-                token?: string;
-            };
-            try {
-                const project = new ProjectGitea(
-                    ge.url,
-                    ge.name ?? ge.url,
-                    ge.ref,
-                    expandEnv(ge.token),
+        const projects: Project[] = [];
+        for (const entry of (cfg.projects ?? []) as Array<{type: ConfigProjectType}>) {
+            if (entry.type === ConfigProjectType.local) {
+                const local = entry as {type: ConfigProjectType.local; path: string; name?: string};
+                const absRoot = path.resolve(projectRoot, local.path);
+                const project = new ProjectLocal(absRoot, local.name);
+                projects.push(project);
+                hooks.onProjectLoaded?.(project);
+            } else if (entry.type === ConfigProjectType.github) {
+                const gh = entry as {
+                    type: ConfigProjectType.github;
+                    repo: string;
+                    name?: string;
+                    ref?: string;
+                    token?: string;
+                };
+                const project = new ProjectGithub(
+                    gh.repo,
+                    gh.name ?? gh.repo,
+                    gh.ref,
+                    ConfigLoader.expandEnv(gh.token),
                     remoteCache
                 );
                 projects.push(project);
                 hooks.onProjectLoaded?.(project);
-            } catch (e) {
-                hooks.onSkip?.(`gitea project skipped — ${(e as Error).message}`);
+            } else if (entry.type === ConfigProjectType.gitea) {
+                const ge = entry as {
+                    type: ConfigProjectType.gitea;
+                    url: string;
+                    name?: string;
+                    ref?: string;
+                    token?: string;
+                };
+                try {
+                    const project = new ProjectGitea(
+                        ge.url,
+                        ge.name ?? ge.url,
+                        ge.ref,
+                        ConfigLoader.expandEnv(ge.token),
+                        remoteCache
+                    );
+                    projects.push(project);
+                    hooks.onProjectLoaded?.(project);
+                } catch (e) {
+                    hooks.onSkip?.(`gitea project skipped — ${(e as Error).message}`);
+                }
             }
         }
-    }
 
-    return {
-        projectRoot,
-        cacheDir,
-        cacheTtlMinutes,
-        registry,
-        registryCache,
-        remoteCache,
-        fingerprintCache,
-        fingerprintBuilder,
-        osvClient,
-        securityCache,
-        securityScanner,
-        unusedDetector,
-        projects
-    };
+        return {
+            projectRoot,
+            cacheDir,
+            cacheTtlMinutes,
+            registry,
+            registryCache,
+            remoteCache,
+            fingerprintCache,
+            fingerprintBuilder,
+            osvClient,
+            securityCache,
+            securityScanner,
+            unusedDetector,
+            projects
+        };
+    }
 }

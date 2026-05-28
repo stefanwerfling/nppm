@@ -43,6 +43,12 @@ Vite dev server, frontend is plain TypeScript + DOM (no framework).
     tab in the detail panel + `GPL` / `UNLIC` / `LIC?` matrix badges +
     a "Licenses" matrix filter. Compliance teams can plug in allow- /
     denylists via `security.license` in `nppm.json`.
+- **SBOM export** — `nppm sbom --format=cyclonedx|spdx` (or the
+  `GET /api/projects/:id/sbom?format=…` endpoint) emits a Software
+  Bill of Materials for one project. CycloneDX 1.6 and SPDX 2.3 JSON.
+  Walks the lockfile + registry for licenses/hashes — no fingerprint
+  downloads. Drops into Trivy, Dependency-Track, FOSSA, npm audit
+  signatures, anything that consumes the standards.
 - **Headless CLI / CI mode** — `nppm scan` runs every scanner (OSV CVEs,
   scripts, patterns, binaries, maintainer, license, unused-deps) over
   every configured project, prints a compact text report or `--json`
@@ -185,6 +191,20 @@ nppm scan --no-osv --no-heuristics   # offline / lockfile-free fast run
 nppm scan --sarif > nppm.sarif       # SARIF 2.1.0 for GitHub Code Scanning
 nppm scan --help                     # full flag list
 ```
+
+## SBOM export
+
+```sh
+nppm sbom --project=kavula                       # CycloneDX to stdout
+nppm sbom --project=kavula --format=spdx         # SPDX 2.3 JSON
+nppm sbom --project=kavula --output=bom.json     # write to file
+nppm sbom --help                                 # full flag list
+```
+
+Same data via REST:
+`GET /api/projects/:id/sbom?format=cyclonedx` (default) or `?format=spdx`.
+Content-Type is set to `application/vnd.cyclonedx+json` /
+`application/spdx+json` so MIME-aware tooling can route the payload.
 
 `nppm scan` reuses the same `nppm.json` and `.nppm-cache/` as the dev
 server, so a warm CI run skips network calls that have already been

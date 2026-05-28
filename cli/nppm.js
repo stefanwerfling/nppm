@@ -24,6 +24,7 @@ if (sub === '-h' || sub === '--help') {
         + '  nppm              Start the dev server (default)\n'
         + '  nppm dev          Start the dev server\n'
         + '  nppm scan [...]   Headless CI scan (see `nppm scan --help`)\n'
+        + '  nppm sbom [...]   Emit CycloneDX / SPDX SBOM (see `nppm sbom --help`)\n'
         + '  nppm --help       Show this help\n'
     );
     process.exit(0);
@@ -33,6 +34,9 @@ if (sub === 'scan') {
     // Drop the `scan` keyword so the scan module sees just its flags.
     process.argv.splice(2, 1);
     await import(path.resolve(__dirname, 'scan.js'));
+} else if (sub === 'sbom') {
+    process.argv.splice(2, 1);
+    await import(path.resolve(__dirname, 'sbom.js'));
 } else {
     if (sub === 'dev') {
         process.argv.splice(2, 1);

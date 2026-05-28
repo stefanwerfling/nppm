@@ -6,14 +6,9 @@ import {MaintainerSeverity} from '../Security/MaintainerScanner.js';
 import {PatternSeverity} from '../Security/PatternScanner.js';
 import {ScriptSeverity} from '../Security/ScriptScanner.js';
 import {HeuristicsBatchEntry} from '../Security/SecurityScanner.js';
-import {
-    buildProjectReport,
-    licenseToUnified,
-    summariseReport,
-    UnifiedSeverity
-} from '../Cli/ScanReport.js';
+import {ScanReportBuilder, UnifiedSeverity} from '../Cli/ScanReport.js';
 import {FailOnLevel} from '../Cli/CliArgs.js';
-import {formatJson, formatText, shouldFail} from '../Cli/ScanFormat.js';
+import {ScanFormatter} from '../Cli/ScanFormat.js';
 import {UnusedSeverity} from '../Unused/UnusedReport.js';
 
 function baseHeuristic(name: string, version: string): HeuristicsBatchEntry {
@@ -28,27 +23,27 @@ function baseHeuristic(name: string, version: string): HeuristicsBatchEntry {
     };
 }
 
-describe('licenseToUnified', () => {
+describe('ScanReportBuilder.licenseToUnified', () => {
     it('permissive maps to null', () => {
-        expect(licenseToUnified(LicenseSeverity.permissive)).toBeNull();
+        expect(ScanReportBuilder.licenseToUnified(LicenseSeverity.permissive)).toBeNull();
     });
     it('proprietary maps to risk', () => {
-        expect(licenseToUnified(LicenseSeverity.proprietary)).toBe(UnifiedSeverity.risk);
+        expect(ScanReportBuilder.licenseToUnified(LicenseSeverity.proprietary)).toBe(UnifiedSeverity.risk);
     });
     it('strong-copyleft maps to warn', () => {
-        expect(licenseToUnified(LicenseSeverity.strongCopyleft)).toBe(UnifiedSeverity.warn);
+        expect(ScanReportBuilder.licenseToUnified(LicenseSeverity.strongCopyleft)).toBe(UnifiedSeverity.warn);
     });
     it('weak-copyleft and unknown map to info', () => {
-        expect(licenseToUnified(LicenseSeverity.weakCopyleft)).toBe(UnifiedSeverity.info);
-        expect(licenseToUnified(LicenseSeverity.unknown)).toBe(UnifiedSeverity.info);
+        expect(ScanReportBuilder.licenseToUnified(LicenseSeverity.weakCopyleft)).toBe(UnifiedSeverity.info);
+        expect(ScanReportBuilder.licenseToUnified(LicenseSeverity.unknown)).toBe(UnifiedSeverity.info);
     });
 });
 
-describe('buildProjectReport', () => {
+describe('ScanReportBuilder.buildProject', () => {
     const projectMeta = {name: 'demo', type: ConfigProjectType.local};
 
     it('emits no findings on a clean project', () => {
-        const r = buildProjectReport({...projectMeta, packagesScanned: 0});
+        const r = ScanReportBuilder.buildProject({...projectMeta, packagesScanned: 0});
         expect(r.findings).toEqual([]);
         expect(r.maxSeverity).toBeNull();
     });
@@ -59,7 +54,7 @@ describe('buildProjectReport', () => {
             ['bar@2.0.0', []],
             ['baz@3.0.0', null]
         ]);
-        const r = buildProjectReport({...projectMeta, packagesScanned: 3, vulnsByKey});
+        const r = ScanReportBuilder.buildProject({...projectMeta, packagesScanned: 3, vulnsByKey});
         expect(r.findings).toHaveLength(1);
         expect(r.findings[0].category).toBe('vuln');
         expect(r.findings[0].severity).toBe(UnifiedSeverity.risk);
@@ -80,7 +75,7 @@ describe('buildProjectReport', () => {
         h.maintainer.severity = MaintainerSeverity.risk;
         h.maintainer.publisher = 'new-owner';
 
-        const r = buildProjectReport({
+        const r = ScanReportBuilder.buildProject({
             ...projectMeta,
             packagesScanned: 1,
             heuristics: [h]
@@ -98,7 +93,7 @@ describe('buildProjectReport', () => {
         b.license.spdx = 'UNLICENSED';
         b.license.severity = LicenseSeverity.proprietary;
 
-        const r = buildProjectReport({
+        const r = ScanReportBuilder.buildProject({
             ...projectMeta,
             packagesScanned: 2,
             heuristics: [a, b]
@@ -111,7 +106,7 @@ describe('buildProjectReport', () => {
     });
 
     it('emits unused/misplaced/missing buckets with the right defaults', () => {
-        const r = buildProjectReport({
+        const r = ScanReportBuilder.buildProject({
             ...projectMeta,
             packagesScanned: 0,
             unused: {
@@ -147,7 +142,7 @@ describe('buildProjectReport', () => {
         const h2 = baseHeuristic('b', '1');
         h2.scripts.maxSeverity = ScriptSeverity.risk;
         h2.scripts.count = 1;
-        const r = buildProjectReport({
+        const r = ScanReportBuilder.buildProject({
             ...projectMeta,
             packagesScanned: 2,
             heuristics: [h1, h2]
@@ -157,71 +152,71 @@ describe('buildProjectReport', () => {
     });
 });
 
-describe('summariseReport + shouldFail', () => {
+describe('ScanReportBuilder.summarise + ScanFormatter.shouldFail', () => {
     const projectMeta = {name: 'demo', type: ConfigProjectType.local};
 
-    it('shouldFail returns false on a clean report regardless of threshold', () => {
-        const empty = summariseReport([
-            buildProjectReport({...projectMeta, packagesScanned: 0})
+    it('ScanFormatter.shouldFail returns false on a clean report regardless of threshold', () => {
+        const empty = ScanReportBuilder.summarise([
+            ScanReportBuilder.buildProject({...projectMeta, packagesScanned: 0})
         ]);
-        expect(shouldFail(empty, FailOnLevel.info)).toBe(false);
-        expect(shouldFail(empty, FailOnLevel.risk)).toBe(false);
+        expect(ScanFormatter.shouldFail(empty, FailOnLevel.info)).toBe(false);
+        expect(ScanFormatter.shouldFail(empty, FailOnLevel.risk)).toBe(false);
     });
 
-    it('shouldFail honours the threshold ladder', () => {
+    it('ScanFormatter.shouldFail honours the threshold ladder', () => {
         const h = baseHeuristic('p', '1');
         h.scripts.maxSeverity = ScriptSeverity.warn;
         h.scripts.count = 1;
-        const report = summariseReport([
-            buildProjectReport({...projectMeta, packagesScanned: 1, heuristics: [h]})
+        const report = ScanReportBuilder.summarise([
+            ScanReportBuilder.buildProject({...projectMeta, packagesScanned: 1, heuristics: [h]})
         ]);
-        expect(shouldFail(report, FailOnLevel.info)).toBe(true);
-        expect(shouldFail(report, FailOnLevel.warn)).toBe(true);
-        expect(shouldFail(report, FailOnLevel.risk)).toBe(false);
-        expect(shouldFail(report, FailOnLevel.none)).toBe(false);
+        expect(ScanFormatter.shouldFail(report, FailOnLevel.info)).toBe(true);
+        expect(ScanFormatter.shouldFail(report, FailOnLevel.warn)).toBe(true);
+        expect(ScanFormatter.shouldFail(report, FailOnLevel.risk)).toBe(false);
+        expect(ScanFormatter.shouldFail(report, FailOnLevel.none)).toBe(false);
     });
 
     it('summary counts projects with findings and tracks the worst severity', () => {
-        const a = buildProjectReport({...projectMeta, name: 'a', packagesScanned: 0});
-        const b = buildProjectReport({
+        const a = ScanReportBuilder.buildProject({...projectMeta, name: 'a', packagesScanned: 0});
+        const b = ScanReportBuilder.buildProject({
             ...projectMeta,
             name: 'b',
             packagesScanned: 1,
             vulnsByKey: new Map([['x@1', ['CVE-X']]])
         });
-        const report = summariseReport([a, b]);
+        const report = ScanReportBuilder.summarise([a, b]);
         expect(report.summary.totalProjects).toBe(2);
         expect(report.summary.projectsWithFindings).toBe(1);
         expect(report.summary.maxSeverity).toBe(UnifiedSeverity.risk);
     });
 });
 
-describe('formatText / formatJson', () => {
+describe('ScanFormatter.text / ScanFormatter.json', () => {
     const projectMeta = {name: 'demo', type: ConfigProjectType.local};
 
     it('renders PASS + FAIL banners in the text formatter', () => {
-        const clean = summariseReport([
-            buildProjectReport({...projectMeta, packagesScanned: 0})
+        const clean = ScanReportBuilder.summarise([
+            ScanReportBuilder.buildProject({...projectMeta, packagesScanned: 0})
         ]);
-        const text = formatText(clean, FailOnLevel.risk);
+        const text = ScanFormatter.text(clean, FailOnLevel.risk);
         expect(text).toMatch(/no findings/);
         expect(text).toMatch(/Result: PASS/);
 
         const h = baseHeuristic('p', '1');
         h.scripts.maxSeverity = ScriptSeverity.risk;
         h.scripts.count = 1;
-        const dirty = summariseReport([
-            buildProjectReport({...projectMeta, packagesScanned: 1, heuristics: [h]})
+        const dirty = ScanReportBuilder.summarise([
+            ScanReportBuilder.buildProject({...projectMeta, packagesScanned: 1, heuristics: [h]})
         ]);
-        const fail = formatText(dirty, FailOnLevel.risk);
+        const fail = ScanFormatter.text(dirty, FailOnLevel.risk);
         expect(fail).toMatch(/Result: FAIL/);
     });
 
-    it('formatJson produces a parseable payload with stable top-level keys', () => {
-        const clean = summariseReport([
-            buildProjectReport({...projectMeta, packagesScanned: 0})
+    it('ScanFormatter.json produces a parseable payload with stable top-level keys', () => {
+        const clean = ScanReportBuilder.summarise([
+            ScanReportBuilder.buildProject({...projectMeta, packagesScanned: 0})
         ]);
-        const parsed = JSON.parse(formatJson(clean));
+        const parsed = JSON.parse(ScanFormatter.json(clean));
         expect(parsed.version).toBe('1');
         expect(parsed.summary.totalProjects).toBe(1);
         expect(parsed.projects[0].project.name).toBe('demo');

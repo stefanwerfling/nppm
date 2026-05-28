@@ -64,12 +64,19 @@ nppm/
 │   ├── UnusedReport.ts     UnusedFinding/Misplaced/Missing/ScanLimit + severity
 │   └── UnusedDetector.ts   regex-based file walk + bin-tool allowlist + scripts/`@types`/workspace heuristics
 │
-├── Cli/                    headless `nppm scan` (CI gate)
-│   ├── CliArgs.ts          argv parser + FailOnLevel ladder + HELP_TEXT
-│   ├── ScanReport.ts       per-scanner→unified severity mapping, ProjectScanReport builder
-│   ├── ScanFormat.ts       text + JSON + SARIF formatters, shouldFail threshold check
-│   ├── ScanSarif.ts        SARIF 2.1.0 converter (rules + results + partialFingerprints)
-│   └── Scan.ts             runScan() — config load + project loop + OSV/heuristics/unused orchestration
+├── Cli/                    headless `nppm scan` (CI gate) + `nppm sbom`
+│   ├── CliArgs.ts          CliArgsParser + FailOnLevel ladder + HELP_TEXT
+│   ├── ScanReport.ts       ScanReportBuilder — per-scanner→unified severity
+│   ├── ScanFormat.ts       ScanFormatter — text + JSON + SARIF + shouldFail
+│   ├── ScanSarif.ts        SarifBuilder — SARIF 2.1.0 (rules + results + partialFingerprints)
+│   ├── Scan.ts             runScan() orchestrator (OSV / heuristics / unused)
+│   └── Sbom.ts             SbomRunner + SbomCliArgsParser — CycloneDX/SPDX CLI
+│
+├── Sbom/                   format-agnostic SBOM emitters
+│   ├── Purl.ts             Purl.npm() — PURL encoder for npm packages
+│   ├── SbomCollector.ts    SbomCollector — lockfile + registry → SbomData
+│   ├── CycloneDxBuilder.ts CycloneDX 1.6 JSON converter
+│   └── SpdxBuilder.ts      SPDX 2.3 JSON converter
 │
 ├── Releases/               npm registry + GitHub Releases merge
 │   ├── Releases.ts
@@ -116,6 +123,7 @@ nppm/
 | GET    | `/api/projects/:id/matrix`                            | per-project matrix |
 | GET    | `/api/projects/:id/depgraph`                          | flat resolved dep graph |
 | GET    | `/api/projects/:id/unused`                            | depcheck-style hygiene scan (unused / misplaced / missing) |
+| GET    | `/api/projects/:id/sbom?format=cyclonedx\|spdx`       | Software Bill of Materials (default: cyclonedx) |
 
 ## Headless CLI
 

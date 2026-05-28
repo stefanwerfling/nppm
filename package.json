@@ -41,6 +41,7 @@
   "scripts": {
     "dev": "node ./cli/dev.js",
     "scan": "node ./cli/scan.js",
+    "sbom": "node ./cli/sbom.js",
     "docs:screenshots": "node ./doc/screenshots.mjs",
     "test": "vitest run",
     "test:watch": "vitest"

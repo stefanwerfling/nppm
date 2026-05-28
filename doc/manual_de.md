@@ -29,7 +29,8 @@ Beispielprojekte.
    - [Lizenz](#36-lizenz)
 4. [Globaler CVE-Scan](#4-globaler-cve-scan)
 5. [Headless-CI-Modus](#5-headless-ci-modus)
-6. [Sprache wechseln](#6-sprache-wechseln)
+6. [SBOM-Export](#6-sbom-export)
+7. [Sprache wechseln](#7-sprache-wechseln)
 
 ---
 
@@ -368,7 +369,49 @@ Für Code-Scanning-Ingest:
 
 ---
 
-## 6. Sprache wechseln
+## 6. SBOM-Export
+
+`nppm sbom` schreibt eine Software Bill of Materials für ein Projekt
+raus. Zwei Formate:
+
+- **CycloneDX 1.6** (Default) — OWASP-Standard, großes Security-Tool-
+  Ökosystem (Trivy, Dependency-Track, OSV-Scanner).
+- **SPDX 2.3** — Linux Foundation, Lizenz-/Compliance-zentriert
+  (FOSSA, Fossology, SPDX-tools).
+
+```sh
+nppm sbom --project=kavula                   # CycloneDX auf stdout
+nppm sbom --project=kavula --format=spdx     # SPDX 2.3 JSON
+nppm sbom --project=kavula --output=bom.json # in Datei schreiben
+```
+
+`--project` ist Pflicht sobald mehr als ein Projekt konfiguriert ist.
+Dieselben Daten via REST:
+
+- `GET /api/projects/:id/sbom?format=cyclonedx` — Default
+- `GET /api/projects/:id/sbom?format=spdx`
+
+Beide Endpoints setzen `Content-Type` passend
+(`application/vnd.cyclonedx+json` / `application/spdx+json`) damit
+ein Proxy / Tool nach Header routen kann.
+
+Datenquellen pro Paket:
+
+| Feld | Quelle |
+|------|--------|
+| `name`, `version` | Lockfile |
+| `purl` | aus name + version abgeleitet |
+| sha512-Hash | Lockfile-`integrity` (base64 → hex) |
+| Lizenz | Registry-Packument |
+| Repository | Registry-Packument |
+| `dependencies[]`-Kanten | Lockfile-`dependencies`-Map |
+
+Keine Fingerprint-Downloads — SBOM ist Identität + Provenance, nicht
+Tarball-Inhalt. Bei warmem Registry-Cache läuft das instant.
+
+---
+
+## 7. Sprache wechseln
 
 Die Flaggen oben rechts schalten die UI-Sprache. Default ist Englisch,
 Deutsch ist mitgeliefert. Eine dritte Sprache hinzufügen ist ein

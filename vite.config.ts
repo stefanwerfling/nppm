@@ -34,6 +34,7 @@ import {ProjectGithub} from './Project/ProjectGithub.js';
 import {ProjectLocal} from './Project/ProjectLocal.js';
 import {Registry} from './Registry/Registry.js';
 import {ReleasesFetcher} from './Releases/ReleasesFetcher.js';
+import {LicenseSeverity} from './Security/LicenseScanner.js';
 import {OsvClient} from './Security/OsvClient.js';
 import {SecurityScanner} from './Security/SecurityScanner.js';
 
@@ -93,6 +94,11 @@ function expressMiddleware(): Plugin {
                 matureVersions?: number;
                 trustWindow?: number;
             } = {};
+            let licenseOpts: {
+                allowlist?: string[];
+                denylist?: string[];
+                treatUnknownAs?: string;
+            } = {};
 
             // Two-pass: first parse the config to fix cache/registry
             // settings, then build cache instances, then construct
@@ -125,6 +131,10 @@ function expressMiddleware(): Plugin {
                         maintainerOpts = raw.security.maintainer;
                     }
 
+                    if (raw.security?.license) {
+                        licenseOpts = raw.security.license;
+                    }
+
                     rawProjects = raw.projects;
                 }
             }
@@ -150,11 +160,29 @@ function expressMiddleware(): Plugin {
             // against an old version any time. Plain TTL cache.
             const securityCache = new JsonCache(path.join(cacheDir, 'security'), cacheTtlMinutes);
             const osvClient = new OsvClient(securityCache);
+            // `treatUnknownAs` arrives as a free-form string from the
+            // config (VTS schema can't constrain it to enum values
+            // without adding a custom validator), so validate against
+            // the enum here. Unknown values fall back to the scanner
+            // default by staying `undefined`.
+            const treatUnknownAsRaw = licenseOpts.treatUnknownAs;
+            const treatUnknownAs = Object.values(LicenseSeverity)
+                .includes(treatUnknownAsRaw as LicenseSeverity)
+                ? treatUnknownAsRaw as LicenseSeverity
+                : undefined;
+
             const securityScanner = new SecurityScanner(
                 osvClient,
                 fingerprintBuilder,
                 registry,
-                {maintainer: maintainerOpts}
+                {
+                    maintainer: maintainerOpts,
+                    license: {
+                        allowlist: licenseOpts.allowlist,
+                        denylist: licenseOpts.denylist,
+                        treatUnknownAs
+                    }
+                }
             );
 
             // Releases cache pocket. GitHub rate-limits anonymous

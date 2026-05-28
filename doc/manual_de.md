@@ -25,6 +25,7 @@ Beispielprojekte.
    - [Abhängigkeiten](#32-abhängigkeiten)
    - [Releases](#33-releases)
    - [Sicherheit](#34-sicherheit)
+   - [Lizenz](#36-lizenz)
 4. [Globaler CVE-Scan](#4-globaler-cve-scan)
 5. [Sprache wechseln](#5-sprache-wechseln)
 
@@ -46,7 +47,9 @@ zeigt den Zeilenstatus:
 
 ![Projektübergreifende Matrix](screenshots/01_matrix_de.png)
 
-**Filter** oben links: `Alle / Probleme / Drift / Veraltet / Unsicher`.
+**Filter** oben links: `Alle / Probleme / Drift / Veraltet / Unsicher /
+Lizenzen` (letzterer zeigt nur Pakete mit Strong-Copyleft, proprietärer
+oder unbekannter Lizenz).
 Die **Suche** macht case-insensitive Substring-Matching auf den
 Paketnamen. **Sortierung:** Name, Status (am dringlichsten zuerst)
 oder aggregierter Security-Score.
@@ -59,6 +62,8 @@ oder aggregierter Security-Score.
 - `BIN N` — N native Binärdateien (`.exe / .dll / .so` …) im Tarball.
 - `OWNER!` — Schneller Owner-Wechsel auf einem etablierten Paket
   (klassisches Account-Takeover-Profil — siehe Maintainer-Scanner unten).
+- `GPL` / `UNLIC` / `LIC?` — Lizenz-Klassifikation: Strong-Copyleft /
+  proprietär / unbekannt (siehe Lizenz-Tab unten).
 - `WS` — Workspaces *innerhalb* eines Projekts sind uneinig.
 
 **Git-Dependencies** zeigen die *installierte* Version als Zellenwert
@@ -211,6 +216,46 @@ Registry-Versionen indiziert — die anderen Scanner laufen trotzdem
 normal.
 
 ![Detail: Sicherheit](screenshots/10_panel_security_de.png)
+
+### 3.6 Lizenz
+
+Eigener Tab für Compliance-Fragen. Klassifiziert das `license`-Feld des
+Pakets in fünf Buckets:
+
+| Bucket | Beispiele | Bedeutung |
+|--------|-----------|-----------|
+| `permissive` | MIT, Apache-2.0, BSD-*, ISC | Keine Auflagen |
+| `weak-copyleft` | LGPL-*, MPL-2.0, EPL-2.0 | Datei-Grenze, meist akzeptiert |
+| `strong-copyleft` | GPL-*, AGPL-* | Viral, Code-Freigabe für Derivate |
+| `proprietary` | `UNLICENSED`, `SEE LICENSE IN …` | Keine Weitergabe ohne Vertrag |
+| `unknown` | nicht im SPDX-Katalog | Nicht klassifizierbar — manueller Check |
+
+Ein Mini-SPDX-Parser handhabt Ausdrücke wie `(MIT OR Apache-2.0)` (bei
+OR gewinnt der erlaubteste Bucket — der Nutzer darf wählen) und
+`MIT AND GPL-3.0` (bei AND der restriktivste — alle Auflagen gelten).
+`WITH`-Klauseln (`Apache-2.0 WITH Classpath-exception-2.0`) ändern den
+Bucket nicht.
+
+Zusätzlich listet der Tab die **tatsächlich im Tarball mitgelieferten
+`LICENSE*` / `COPYING*`-Dateien** auf — ein Cross-Check gegen die
+Selbstauskunft im `package.json`.
+
+**Policy in `nppm.json`:**
+
+```json
+"security": {
+  "license": {
+    "allowlist": ["MIT", "Apache-2.0", "BSD-*", "ISC"],
+    "denylist": ["AGPL-*"],
+    "treatUnknownAs": "proprietary"
+  }
+}
+```
+
+`allowlist` überschreibt den Bucket auf `permissive`, `denylist` auf
+`proprietary` (denylist gewinnt bei Konflikt). `treatUnknownAs:
+"proprietary"` zwingt jedes Paket ohne erkannte Lizenz in den manuellen
+Review.
 
 ---
 

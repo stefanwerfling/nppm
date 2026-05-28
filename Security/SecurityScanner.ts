@@ -9,6 +9,12 @@ import {
 } from './BinaryScanner.js';
 import {ChurnFinding, ChurnScanner} from './ChurnScanner.js';
 import {
+    LicenseFinding,
+    LicenseScanner,
+    LicenseScannerOptions,
+    LicenseSummary
+} from './LicenseScanner.js';
+import {
     MaintainerFinding,
     MaintainerScanner,
     MaintainerScannerOptions,
@@ -33,6 +39,7 @@ export type SecurityReport = {
     patternFindings: PatternFinding[];
     binaryFindings: BinaryFinding[];
     maintainer: MaintainerFinding|null;
+    license: LicenseFinding;
 };
 
 /**
@@ -67,6 +74,7 @@ export type HeuristicsBatchEntry = {
     patterns: PatternSummary;
     binaries: BinarySummary;
     maintainer: MaintainerSummary;
+    license: LicenseSummary;
 };
 
 /**
@@ -96,36 +104,50 @@ export class SecurityScanner {
 
     private readonly _osv: OsvClient;
     private readonly _fingerprint: FingerprintBuilder;
+    private readonly _registry: Registry;
     private readonly _churn: ChurnScanner;
     private readonly _maintainer: MaintainerScanner;
+    private readonly _license: LicenseScanner;
 
     constructor(
         osv: OsvClient,
         fingerprint: FingerprintBuilder,
         registry: Registry,
-        opts: {maintainer?: MaintainerScannerOptions} = {}
+        opts: {
+            maintainer?: MaintainerScannerOptions;
+            license?: LicenseScannerOptions;
+        } = {}
     ) {
         this._osv = osv;
         this._fingerprint = fingerprint;
+        this._registry = registry;
         this._churn = new ChurnScanner(registry, fingerprint);
         this._maintainer = new MaintainerScanner(registry, opts.maintainer);
+        this._license = new LicenseScanner(opts.license);
     }
 
     public async scan(name: string, version: string): Promise<SecurityReport> {
-        // OSV, fingerprint, churn, and maintainer all hit independent
-        // caches/network endpoints — fire them in parallel. The
-        // maintainer scan reuses the same registry packument cache as
-        // churn, so warm runs are essentially free.
-        const [vulns, fingerprint, churn, maintainer] = await Promise.all([
+        // OSV, fingerprint, churn, maintainer, and the registry lookup
+        // for the license all hit independent caches/network endpoints
+        // — fire them in parallel. The registry, maintainer, and churn
+        // scans share one packument cache so warm runs are
+        // essentially free.
+        const [vulns, fingerprint, churn, maintainer, reg] = await Promise.all([
             this._osv.query(name, version),
             this._fingerprint.build(name, version),
             this._churn.scan(name, version),
-            this._maintainer.scan(name, version)
+            this._maintainer.scan(name, version),
+            this._registry.fetchOne(name)
         ]);
 
         const scriptFindings = scanScripts(fingerprint?.manifest ?? null);
         const patternFindings = fingerprint ? scanPatterns(fingerprint.files) : [];
         const binaryFindings = fingerprint ? scanBinaries(fingerprint.files) : [];
+
+        // Prefer the manifest license (per-version, can differ between
+        // releases) over the packument license (top-level, version-
+        // agnostic). Both fall back to `null` if neither is present.
+        const spdx = fingerprint?.manifest?.license ?? reg?.license ?? null;
 
         return {
             name,
@@ -135,7 +157,8 @@ export class SecurityScanner {
             churn,
             patternFindings,
             binaryFindings,
-            maintainer
+            maintainer,
+            license: this._license.classify(spdx)
         };
     }
 
@@ -166,13 +189,17 @@ export class SecurityScanner {
                 }
                 const pkg = packages[i];
                 // Fingerprint download (slow on cold start) and the
-                // maintainer registry lookup (cached after the first
-                // packument fetch) run in parallel — the latter does
-                // not need the tarball.
-                const [fingerprint, maintainer] = await Promise.all([
+                // registry-based scans (maintainer + license) all run
+                // in parallel. The latter two share the packument
+                // cache so warm runs are instant.
+                const [fingerprint, maintainer, reg] = await Promise.all([
                     this._fingerprint.build(pkg.name, pkg.version),
-                    this._maintainer.scan(pkg.name, pkg.version)
+                    this._maintainer.scan(pkg.name, pkg.version),
+                    this._registry.fetchOne(pkg.name)
                 ]);
+
+                const spdx = fingerprint?.manifest?.license ?? reg?.license ?? null;
+                const licenseFinding = this._license.classify(spdx);
 
                 const scriptFindings = scanScripts(fingerprint?.manifest ?? null);
                 const patternFindings = fingerprint ? scanPatterns(fingerprint.files) : [];
@@ -206,6 +233,12 @@ export class SecurityScanner {
                         version: pkg.version,
                         severity: maintainer ? maintainer.severity : null,
                         publisher: maintainer?.currentPublisher?.name ?? null
+                    },
+                    license: {
+                        name: pkg.name,
+                        version: pkg.version,
+                        spdx: licenseFinding.spdx,
+                        severity: licenseFinding.severity
                     }
                 };
             }

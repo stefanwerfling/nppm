@@ -54,6 +54,7 @@ nppm/
 │   ├── ChurnScanner.ts     diff prev stable vs current, threshold by bump
 │   ├── BinaryScanner.ts    extension- + bin/-path classification
 │   ├── MaintainerScanner.ts  _npmUser handover detection, gap-based severity
+│   ├── LicenseScanner.ts   SPDX classifier (permissive/weak/strong/proprietary/unknown) + mini expr parser
 │   └── SecurityScanner.ts  aggregator + batched matrix-heuristics
 │
 ├── Releases/               npm registry + GitHub Releases merge

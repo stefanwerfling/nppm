@@ -135,6 +135,48 @@ describe('Registry', () => {
         expect(pkg!.publishers!['0.9.0']).toBeUndefined();
     });
 
+    it('extracts modern bare-string license field', async () => {
+        vi.stubGlobal('fetch', makeFetch({
+            'https://registry.example/p': {
+                name: 'p',
+                'dist-tags': {latest: '1.0.0'},
+                versions: {'1.0.0': {}},
+                license: 'MIT'
+            }
+        }));
+        const r = new Registry('https://registry.example', new JsonCache(dir, 60));
+        const pkg = await r.fetchOne('p');
+        expect(pkg!.license).toBe('MIT');
+    });
+
+    it('extracts deprecated {type,url} license object', async () => {
+        vi.stubGlobal('fetch', makeFetch({
+            'https://registry.example/p': {
+                name: 'p',
+                'dist-tags': {latest: '1.0.0'},
+                versions: {'1.0.0': {}},
+                license: {type: 'Apache-2.0', url: 'https://…'}
+            }
+        }));
+        const r = new Registry('https://registry.example', new JsonCache(dir, 60));
+        const pkg = await r.fetchOne('p');
+        expect(pkg!.license).toBe('Apache-2.0');
+    });
+
+    it('joins legacy licenses[] array as an OR-expression', async () => {
+        vi.stubGlobal('fetch', makeFetch({
+            'https://registry.example/p': {
+                name: 'p',
+                'dist-tags': {latest: '1.0.0'},
+                versions: {'1.0.0': {}},
+                licenses: [{type: 'MIT'}, {type: 'Apache-2.0'}]
+            }
+        }));
+        const r = new Registry('https://registry.example', new JsonCache(dir, 60));
+        const pkg = await r.fetchOne('p');
+        expect(pkg!.license).toBe('(MIT OR Apache-2.0)');
+    });
+
     it('omits the publishers field when no version has `_npmUser`', async () => {
         vi.stubGlobal('fetch', makeFetch({
             'https://registry.example/old': {

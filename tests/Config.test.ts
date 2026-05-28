@@ -67,4 +67,18 @@ describe('Config schema', () => {
         };
         expect(SchemaConfig.validate(cfg, [])).toBe(true);
     });
+
+    it('accepts an optional security.license section', () => {
+        const cfg = {
+            projects: [],
+            security: {
+                license: {
+                    allowlist: ['MIT', 'Apache-2.0', 'BSD-*', 'ISC'],
+                    denylist: ['AGPL-*'],
+                    treatUnknownAs: 'proprietary'
+                }
+            }
+        };
+        expect(SchemaConfig.validate(cfg, [])).toBe(true);
+    });
 });

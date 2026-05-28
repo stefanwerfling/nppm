@@ -7,6 +7,7 @@ import {
 import {Release, ReleasesResponse} from '../Releases/Releases.js';
 import {BinaryFinding, BinarySeverity} from '../Security/BinaryScanner.js';
 import {ChurnFinding, ChurnSeverity} from '../Security/ChurnScanner.js';
+import {LicenseFinding, LicenseSeverity} from '../Security/LicenseScanner.js';
 import {MaintainerFinding, MaintainerSeverity} from '../Security/MaintainerScanner.js';
 import {OsvVulnerability} from '../Security/OsvClient.js';
 import {PatternFinding, PatternSeverity} from '../Security/PatternScanner.js';
@@ -31,7 +32,8 @@ enum Tab {
     deps = 'deps',
     diff = 'diff',
     releases = 'releases',
-    security = 'security'
+    security = 'security',
+    license = 'license'
 }
 
 /**
@@ -204,7 +206,8 @@ export class PackageDetailPanel {
                 ? t('Diff against {target}', {target: this._diffTarget})
                 : t('Diff')},
             {value: Tab.releases, label: t('Releases')},
-            {value: Tab.security, label: this._securityTabLabel()}
+            {value: Tab.security, label: this._securityTabLabel()},
+            {value: Tab.license, label: this._licenseTabLabel()}
         ];
 
         const bar = document.createElement('div');
@@ -264,6 +267,188 @@ export class PackageDetailPanel {
             case Tab.security:
                 this._renderSecurityTab();
                 return;
+            case Tab.license:
+                this._renderLicenseTab();
+                return;
+        }
+    }
+
+    private _licenseTabLabel(): string {
+        if (!this._securityReport) {
+            return t('License');
+        }
+        const sev = this._securityReport.license.severity;
+        if (sev === LicenseSeverity.strongCopyleft
+            || sev === LicenseSeverity.proprietary) {
+            return `${t('License')} !`;
+        }
+        return t('License');
+    }
+
+    private _renderLicenseTab(): void {
+        if (!this._tabPane || !this._fingerprint) {
+            return;
+        }
+
+        // The license arrives as part of the security report — if the
+        // report has not loaded yet, kick that fetch off so the user
+        // doesn't have to flip to the Security tab first. We still
+        // show a placeholder while we wait.
+        if (!this._securityReport) {
+            if (this._securityError) {
+                const err = document.createElement('div');
+                err.className = 'pdp-error';
+                err.textContent = this._securityError;
+                this._tabPane.appendChild(err);
+                return;
+            }
+            const loading = document.createElement('div');
+            loading.className = 'pdp-placeholder';
+            loading.textContent = t('Loading license info …');
+            this._tabPane.appendChild(loading);
+
+            if (!this._securityInflight) {
+                this._securityInflight = true;
+                const name = this._fingerprint.name;
+                const version = this._fingerprint.version;
+                void Api.security(name, version).then((report) => {
+                    this._securityInflight = false;
+                    this._securityReport = report;
+                    this._renderTabs();
+                    if (this._activeTab === Tab.license) {
+                        this._renderActiveTab();
+                    }
+                }).catch((e: Error) => {
+                    this._securityInflight = false;
+                    this._securityError = e.message;
+                    if (this._activeTab === Tab.license) {
+                        this._renderActiveTab();
+                    }
+                });
+            }
+            return;
+        }
+
+        this._tabPane.appendChild(this._renderLicenseBody(this._securityReport));
+    }
+
+    private _renderLicenseBody(report: SecurityReport): HTMLElement {
+        const wrap = document.createElement('div');
+
+        const finding = report.license;
+        const cardSeverity = PackageDetailPanel._licenseCardSeverity(finding.severity);
+
+        const card = document.createElement('div');
+        card.className = `pdp-script pdp-script-${cardSeverity}`;
+
+        const head = document.createElement('div');
+        head.className = 'pdp-script-head';
+
+        const sev = document.createElement('span');
+        sev.className = `pdp-sev pdp-sev-${cardSeverity}`;
+        sev.textContent = PackageDetailPanel._licenseSeverityLabel(finding.severity);
+        head.appendChild(sev);
+
+        const spdx = document.createElement('span');
+        spdx.className = 'pdp-script-hook';
+        spdx.textContent = finding.spdx ?? '—';
+        head.appendChild(spdx);
+
+        if (finding.policyMatched) {
+            const policy = document.createElement('span');
+            policy.className = 'pdp-script-reason';
+            policy.textContent = t('via nppm.json policy');
+            head.appendChild(policy);
+        }
+
+        card.appendChild(head);
+
+        const reason = document.createElement('div');
+        reason.className = 'pdp-script-reason';
+        reason.textContent = finding.reason;
+        card.appendChild(reason);
+
+        if (finding.identifiers.length > 1) {
+            const ids = document.createElement('code');
+            ids.className = 'pdp-script-body';
+            ids.textContent = t('Identifiers in expression: {ids}', {ids: finding.identifiers.join(', ')});
+            card.appendChild(ids);
+        }
+
+        wrap.appendChild(card);
+
+        // Cross-check: list LICENSE* files actually shipped in the
+        // tarball. Helps spot the "we declared MIT but ship a GPL
+        // LICENSE file" smell — a separate signal from the manifest's
+        // self-report.
+        const licenseFiles = this._fingerprint?.files
+            .filter((f) => /(^|\/)(LICEN[SC]E|COPYING|NOTICE)(\.[^/]+)?$/i.test(f.path));
+
+        const filesSection = document.createElement('div');
+        filesSection.className = 'pdp-section';
+
+        const filesHead = document.createElement('div');
+        filesHead.className = 'pdp-section-head';
+        filesHead.textContent = t('License files in tarball ({count})', {count: licenseFiles?.length ?? 0});
+        filesSection.appendChild(filesHead);
+
+        if (licenseFiles && licenseFiles.length > 0) {
+            const list = document.createElement('div');
+            list.className = 'pdp-list';
+            for (const f of licenseFiles) {
+                const row = document.createElement('div');
+                row.className = 'pdp-row';
+                const p = document.createElement('span');
+                p.className = 'pdp-row-path';
+                p.textContent = f.path;
+                const s = document.createElement('span');
+                s.className = 'pdp-row-size';
+                s.textContent = `${f.size} B`;
+                row.appendChild(p);
+                row.appendChild(s);
+                list.appendChild(row);
+            }
+            filesSection.appendChild(list);
+        } else {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-placeholder';
+            empty.textContent = t('No LICENSE/COPYING file shipped in the tarball.');
+            filesSection.appendChild(empty);
+        }
+
+        wrap.appendChild(filesSection);
+        return wrap;
+    }
+
+    /**
+     * Map a `LicenseSeverity` onto the three-tier `info/warn/risk`
+     * style classes the panel already uses for other findings.
+     */
+    private static _licenseCardSeverity(s: LicenseSeverity): 'info'|'warn'|'risk' {
+        switch (s) {
+            case LicenseSeverity.permissive:
+                return 'info';
+            case LicenseSeverity.weakCopyleft:
+            case LicenseSeverity.unknown:
+                return 'warn';
+            case LicenseSeverity.strongCopyleft:
+            case LicenseSeverity.proprietary:
+                return 'risk';
+        }
+    }
+
+    private static _licenseSeverityLabel(s: LicenseSeverity): string {
+        switch (s) {
+            case LicenseSeverity.permissive:
+                return 'PERMISSIVE';
+            case LicenseSeverity.weakCopyleft:
+                return 'WEAK-COPYLEFT';
+            case LicenseSeverity.strongCopyleft:
+                return 'STRONG-COPYLEFT';
+            case LicenseSeverity.proprietary:
+                return 'PROPRIETARY';
+            case LicenseSeverity.unknown:
+                return 'UNKNOWN';
         }
     }
 

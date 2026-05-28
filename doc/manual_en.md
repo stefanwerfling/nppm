@@ -45,7 +45,9 @@ Cell colour indicates the row status:
 
 ![Cross-project matrix](screenshots/01_matrix.png)
 
-**Filters** at the top-left: `All / Issues / Drift / Outdated / Unsafe`.
+**Filters** at the top-left: `All / Issues / Drift / Outdated / Unsafe /
+Licenses` (the last one shows only packages with strong-copyleft,
+proprietary, or unknown licenses).
 The **search box** does case-insensitive substring matching on the
 package name. **Sort:** by name, by status (most urgent first), or by
 aggregated security score.
@@ -58,6 +60,8 @@ aggregated security score.
 - `BIN N` — N native binaries (`.exe / .dll / .so` …) in the tarball.
 - `OWNER!` — quick owner handover on a mature package (classic
   account-takeover profile — see the maintainer scanner below).
+- `GPL` / `UNLIC` / `LIC?` — license classification: strong-copyleft /
+  proprietary / unknown (see the License tab below).
 - `WS` — workspaces within one project disagreed.
 
 **Git-pinned dependencies** show the *installed* version as the cell
@@ -171,7 +175,7 @@ limit.
 
 ### 3.5 Security
 
-Aggregates six scanners:
+Aggregates six scanners (license has its own tab — see 3.6):
 
 - **CVEs** from OSV.dev (single-version query, deep results)
 - **Install-scripts** — lifecycle hooks classified info/warn/risk
@@ -204,6 +208,45 @@ A "git package" note appears for git-installed dependencies because OSV
 only indexes registry versions — the other scanners still run normally.
 
 ![Detail: Security](screenshots/10_panel_security.png)
+
+### 3.6 License
+
+A dedicated tab for compliance questions. Classifies the package's
+`license` field into five buckets:
+
+| Bucket | Examples | Meaning |
+|--------|----------|---------|
+| `permissive` | MIT, Apache-2.0, BSD-*, ISC | No obligations |
+| `weak-copyleft` | LGPL-*, MPL-2.0, EPL-2.0 | File-level boundary, mostly accepted |
+| `strong-copyleft` | GPL-*, AGPL-* | Viral, derivatives must release source |
+| `proprietary` | `UNLICENSED`, `SEE LICENSE IN …` | No redistribution without contract |
+| `unknown` | not in the SPDX catalogue | Not classifiable — manual review |
+
+A mini SPDX-expression parser handles compound forms like
+`(MIT OR Apache-2.0)` (for OR the most permissive bucket wins — the
+user gets to pick) and `MIT AND GPL-3.0` (for AND the most restrictive
+— all obligations apply). `WITH` clauses
+(`Apache-2.0 WITH Classpath-exception-2.0`) don't change the bucket.
+
+The tab also lists the **actual `LICENSE*` / `COPYING*` files shipped
+in the tarball** — a cross-check against the manifest's self-report.
+
+**Policy in `nppm.json`:**
+
+```json
+"security": {
+  "license": {
+    "allowlist": ["MIT", "Apache-2.0", "BSD-*", "ISC"],
+    "denylist": ["AGPL-*"],
+    "treatUnknownAs": "proprietary"
+  }
+}
+```
+
+`allowlist` overrides the bucket to `permissive`, `denylist` to
+`proprietary` (denylist wins on conflict). `treatUnknownAs:
+"proprietary"` forces any package without a recognised license into
+manual review.
 
 ---
 

@@ -77,12 +77,45 @@ function extractManifest(entries: TarEntry[]): PackageFingerprintManifest|null {
             return out;
         };
 
+        // License is sometimes a bare string (modern), sometimes the
+        // deprecated `{type, url}` object, sometimes the legacy
+        // `licenses: [{type}]` array. Coerce to a single SPDX-style
+        // string here so `LicenseScanner` has only one shape to parse.
+        let license: string|undefined;
+        if (typeof parsed.license === 'string' && parsed.license.length > 0) {
+            license = parsed.license;
+        } else if (parsed.license && typeof parsed.license === 'object') {
+            const type = (parsed.license as {type?: unknown}).type;
+            if (typeof type === 'string' && type.length > 0) {
+                license = type;
+            }
+        } else if (Array.isArray(parsed.licenses)) {
+            const ids = parsed.licenses
+                .map((l) => {
+                    if (typeof l === 'string') {
+                        return l;
+                    }
+                    if (l && typeof l === 'object') {
+                        const t = (l as {type?: unknown}).type;
+                        return typeof t === 'string' ? t : null;
+                    }
+                    return null;
+                })
+                .filter((s): s is string => typeof s === 'string' && s.length > 0);
+            if (ids.length === 1) {
+                license = ids[0];
+            } else if (ids.length > 1) {
+                license = `(${ids.join(' OR ')})`;
+            }
+        }
+
         return {
             dependencies: asMap(parsed.dependencies),
             devDependencies: asMap(parsed.devDependencies),
             peerDependencies: asMap(parsed.peerDependencies),
             optionalDependencies: asMap(parsed.optionalDependencies),
-            scripts: asMap(parsed.scripts)
+            scripts: asMap(parsed.scripts),
+            license
         };
     } catch {
         return null;
@@ -229,6 +262,10 @@ export class FingerprintBuilder {
         //   v4 — FileFingerprint.content optionally carries the JS
         //        source for the Phase-5 pattern scanner. Old v3 entries
         //        lack it and would yield empty scans, so we re-fetch.
-        return `fp_v4_${name}@${version}`;
+        //   v5 — PackageFingerprintManifest carries a `license` field
+        //        (coerced from the legacy `{type, url}` / `licenses[]`
+        //        shapes). Old v4 entries would feed a `null` to the
+        //        LicenseScanner forever.
+        return `fp_v5_${name}@${version}`;
     }
 }

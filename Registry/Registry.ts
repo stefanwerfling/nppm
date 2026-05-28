@@ -9,6 +9,49 @@ import {JsonCache} from '../Cache/JsonCache.js';
  * Everything else collapses to `undefined`.
  */
 /**
+ * Coerce the npm packument's `license` field into a single SPDX-style
+ * string. npm allows three legacy shapes:
+ *   - `license: "MIT"` (modern, what we want)
+ *   - `license: {type: "MIT", url: "…"}` (deprecated object form)
+ *   - `licenses: [{type: "MIT"}, {type: "Apache-2.0"}]` (legacy array,
+ *     interpreted as a dual-license = SPDX OR expression)
+ * Returns `undefined` when none of the above yield a usable string —
+ * `LicenseScanner` treats that as `unknown`.
+ */
+function extractLicense(license: unknown, licenses: unknown): string|undefined {
+    if (typeof license === 'string' && license.length > 0) {
+        return license;
+    }
+    if (license && typeof license === 'object') {
+        const type = (license as {type?: unknown}).type;
+        if (typeof type === 'string' && type.length > 0) {
+            return type;
+        }
+    }
+    if (Array.isArray(licenses) && licenses.length > 0) {
+        const ids = licenses
+            .map((l) => {
+                if (typeof l === 'string') {
+                    return l;
+                }
+                if (l && typeof l === 'object') {
+                    const t = (l as {type?: unknown}).type;
+                    return typeof t === 'string' ? t : null;
+                }
+                return null;
+            })
+            .filter((s): s is string => typeof s === 'string' && s.length > 0);
+        if (ids.length === 1) {
+            return ids[0];
+        }
+        if (ids.length > 1) {
+            return `(${ids.join(' OR ')})`;
+        }
+    }
+    return undefined;
+}
+
+/**
  * Pull `_npmUser` out of each version object in the packument. The
  * registry's packument is shaped as `{versions: {[v]: {_npmUser: {name,
  * email}, ...}}}`. Versions without `_npmUser` (very old releases) are
@@ -92,6 +135,15 @@ export type RegistryPackage = {
     description?: string;
     homepage?: string;
     /**
+     * Top-level SPDX license string from the packument. Most npm
+     * packages declare a single SPDX identifier here (`MIT`, `Apache-2.0`,
+     * …); some use SPDX expressions (`(MIT OR Apache-2.0)`); proprietary
+     * packages typically carry `UNLICENSED` or `SEE LICENSE IN …`.
+     * Absent on very old packages where the license lived in
+     * `licenses[]` (legacy format) — the scanner handles that fallback.
+     */
+    license?: string;
+    /**
      * Per-version publisher (`_npmUser`), keyed by version string.
      * Used by `MaintainerScanner` to detect account-takeover patterns.
      * Optional: old cache entries lack the field until they age out of
@@ -148,6 +200,8 @@ export class Registry {
                 repository?: unknown;
                 description?: unknown;
                 homepage?: unknown;
+                license?: unknown;
+                licenses?: unknown;
             };
 
             const pkg: RegistryPackage = {
@@ -158,6 +212,7 @@ export class Registry {
                 repository: extractRepository(raw.repository),
                 description: typeof raw.description === 'string' ? raw.description : undefined,
                 homepage: typeof raw.homepage === 'string' ? raw.homepage : undefined,
+                license: extractLicense(raw.license, raw.licenses),
                 publishers: extractPublishers(raw.versions)
             };
 

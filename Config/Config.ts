@@ -105,8 +105,28 @@ export const SchemaConfigSecurityMaintainer = Vts.object({
     trustWindow: Vts.optional(Vts.number())
 });
 
+/**
+ * License-scanner policy. Defaults to the SPDX-built-in classification
+ * (no allow/deny, unknowns stay unknown). Compliance-strict teams can:
+ *  - widen `allowlist` to e.g. `["MIT", "Apache-2.0", "BSD-*", "ISC"]`
+ *    to force everything else into the non-permissive buckets,
+ *  - tighten `denylist` to e.g. `["AGPL-*", "GPL-3.0-only"]` to mark
+ *    those as proprietary even if they appear inside an OR-expression,
+ *  - set `treatUnknownAs` to `"proprietary"` so any package without a
+ *    recognised license forces a manual review.
+ *
+ * Patterns support a trailing `*` wildcard (`BSD-*` matches every
+ * BSD-* SPDX id) and exact matches; case sensitive (SPDX convention).
+ */
+export const SchemaConfigSecurityLicense = Vts.object({
+    allowlist: Vts.optional(Vts.array(Vts.string())),
+    denylist: Vts.optional(Vts.array(Vts.string())),
+    treatUnknownAs: Vts.optional(Vts.string())
+});
+
 export const SchemaConfigSecurity = Vts.object({
-    maintainer: Vts.optional(SchemaConfigSecurityMaintainer)
+    maintainer: Vts.optional(SchemaConfigSecurityMaintainer),
+    license: Vts.optional(SchemaConfigSecurityLicense)
 });
 
 /**

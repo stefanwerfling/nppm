@@ -1,6 +1,7 @@
 import {DependencyType} from '../Project/PackageManifest.js';
 import {MatrixResponse, MatrixRow, MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
 import {BinarySeverity, BinarySummary} from '../Security/BinaryScanner.js';
+import {LicenseSeverity, LicenseSummary} from '../Security/LicenseScanner.js';
 import {MaintainerSeverity, MaintainerSummary} from '../Security/MaintainerScanner.js';
 import {PatternSeverity} from '../Security/PatternScanner.js';
 import {ScriptSeverity} from '../Security/ScriptScanner.js';
@@ -22,7 +23,14 @@ export enum MatrixFilter {
     drift = 'drift',
     outdated = 'outdated',
     issues = 'issues',
-    insecure = 'insecure'
+    insecure = 'insecure',
+    /**
+     * Compliance filter: shows rows whose latest version's license is
+     * problematic for typical commercial use — strong copyleft (GPL/
+     * AGPL), proprietary, or unknown. Permissive + weak-copyleft are
+     * hidden because legal teams usually pre-approve those buckets.
+     */
+    licenseIssue = 'license-issue'
 }
 
 /**
@@ -163,6 +171,7 @@ export class Matrix {
     private _patternsByName: Map<string, PatternSummary> = new Map();
     private _binariesByName: Map<string, BinarySummary> = new Map();
     private _maintainersByName: Map<string, MaintainerSummary> = new Map();
+    private _licensesByName: Map<string, LicenseSummary> = new Map();
     // Generation counter so a late security response from a previous
     // `setData` call cannot overwrite a newer matrix.
     private _securityGen: number = 0;
@@ -217,6 +226,7 @@ export class Matrix {
         this._patternsByName = new Map();
         this._binariesByName = new Map();
         this._maintainersByName = new Map();
+        this._licensesByName = new Map();
         this._render();
 
         const gen = ++this._securityGen;
@@ -281,11 +291,13 @@ export class Matrix {
                 this._patternsByName.set(entry.name, entry.patterns);
                 this._binariesByName.set(entry.name, entry.binaries);
                 this._maintainersByName.set(entry.name, entry.maintainer);
+                this._licensesByName.set(entry.name, entry.license);
                 if (entry.scripts.maxSeverity !== null
                     || entry.patterns.maxSeverity !== null
                     || entry.binaries.maxSeverity !== null
                     || (entry.maintainer.severity !== null
-                        && entry.maintainer.severity !== MaintainerSeverity.info)) {
+                        && entry.maintainer.severity !== MaintainerSeverity.info)
+                    || Matrix._isLicenseNotable(entry.license.severity)) {
                     anyHit = true;
                 }
             }
@@ -326,7 +338,8 @@ export class Matrix {
             {value: MatrixFilter.issues, label: t('Issues')},
             {value: MatrixFilter.drift, label: t('Drift')},
             {value: MatrixFilter.outdated, label: t('Outdated')},
-            {value: MatrixFilter.insecure, label: t('Unsafe')}
+            {value: MatrixFilter.insecure, label: t('Unsafe')},
+            {value: MatrixFilter.licenseIssue, label: t('Licenses')}
         ];
 
         for (const opt of opts) {
@@ -575,6 +588,24 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
+        // License badge only for strong-copyleft and proprietary —
+        // weak-copyleft is too noisy (legal teams pre-approve LGPL /
+        // MPL in most shops). `unknown` packages get a smaller grey
+        // badge so they're noticeable without screaming.
+        const license = this._licensesByName.get(row.name);
+        if (license) {
+            const badge = Matrix._licenseBadge(license);
+            if (badge) {
+                badge.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (row.latest) {
+                        this._onSecurityClick?.(row.name, row.latest);
+                    }
+                });
+                nameCell.appendChild(badge);
+            }
+        }
+
         tr.appendChild(nameCell);
 
         for (const project of this._data!.projects) {
@@ -672,6 +703,10 @@ export class Matrix {
                     || row.status === MatrixRowStatus.outdated;
             case MatrixFilter.insecure:
                 return this._scoreFor(row) > 0;
+            case MatrixFilter.licenseIssue: {
+                const lic = this._licensesByName.get(row.name);
+                return lic !== undefined && Matrix._isLicenseNotable(lic.severity);
+            }
         }
     }
 
@@ -705,6 +740,43 @@ export class Matrix {
         th.className = cls;
         th.textContent = label;
         return th;
+    }
+
+    private static _isLicenseNotable(s: LicenseSeverity): boolean {
+        return s === LicenseSeverity.strongCopyleft
+            || s === LicenseSeverity.proprietary
+            || s === LicenseSeverity.unknown;
+    }
+
+    private static _licenseBadge(summary: LicenseSummary): HTMLElement|null {
+        const sev = summary.severity;
+        let label: string;
+        let cls: string;
+
+        switch (sev) {
+            case LicenseSeverity.strongCopyleft:
+                label = 'GPL';
+                cls = 'matrix-badge-license-strong';
+                break;
+            case LicenseSeverity.proprietary:
+                label = 'UNLIC';
+                cls = 'matrix-badge-license-proprietary';
+                break;
+            case LicenseSeverity.unknown:
+                label = 'LIC?';
+                cls = 'matrix-badge-license-unknown';
+                break;
+            default:
+                return null;
+        }
+
+        const badge = document.createElement('span');
+        badge.className = `matrix-badge matrix-badge-license ${cls}`;
+        badge.textContent = label;
+        badge.title = summary.spdx
+            ? t('License: {spdx}', {spdx: summary.spdx})
+            : t('No license declared');
+        return badge;
     }
 
     private static _scriptBadgeLabel(s: ScriptSeverity): string {

@@ -37,6 +37,12 @@ Vite dev server, frontend is plain TypeScript + DOM (no framework).
     ua-parser-js profile); long-silence handovers stay `info` (usually
     a legitimate community takeover). Risk + churn together surface a
     "possible supply-chain attack" banner.
+  - License classification — five-bucket SPDX classifier (permissive /
+    weak-copyleft / strong-copyleft / proprietary / unknown) with a
+    mini SPDX-expression parser (`OR` / `AND` / `WITH` / parens). Own
+    tab in the detail panel + `GPL` / `UNLIC` / `LIC?` matrix badges +
+    a "Licenses" matrix filter. Compliance teams can plug in allow- /
+    denylists via `security.license` in `nppm.json`.
 - **History** per project — every lockfile call snapshots the package state
   and appends an entry for adds/removes/version changes (with CVE-hint
   reason when applicable). Stored next to `nppm.json` in `.nppm-history/`.
@@ -97,6 +103,11 @@ Create a `nppm.json` next to where you run `nppm`. Minimal example:
       "suspiciousGapDays": 180,
       "matureVersions": 10,
       "trustWindow": 20
+    },
+    "license": {
+      "allowlist": ["MIT", "Apache-2.0", "BSD-*", "ISC"],
+      "denylist": ["AGPL-*"],
+      "treatUnknownAs": "unknown"
     }
   }
 }
@@ -107,6 +118,14 @@ handover detector. Defaults reflect the empirical attack patterns:
 handovers ≤ 30 d on a mature package land as `risk`, ≤ 180 d as
 `warn`, longer gaps as `info` (likely community takeover of an
 abandoned package). Strict projects can drop `quickHandoverDays`.
+
+The `security.license` block is also optional. Without it the scanner
+uses its built-in SPDX classification (MIT / Apache / BSD → permissive,
+LGPL / MPL → weak-copyleft, GPL / AGPL → strong-copyleft, UNLICENSED /
+free-text → proprietary). Patterns support a trailing `*` wildcard;
+denylist wins over allowlist when both match. Set `treatUnknownAs:
+"proprietary"` to force a manual review for any package without a
+recognised license.
 
 `$VAR_NAME` references are expanded from the environment / `.env` at load
 time, so secrets never live in the config file.

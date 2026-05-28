@@ -30,6 +30,14 @@ export type PackageFingerprintManifest = {
     peerDependencies: Record<string, string>;
     optionalDependencies: Record<string, string>;
     scripts: Record<string, string>;
+    /**
+     * SPDX-style license string as the package author declared it in
+     * `package.json`. Legacy shapes (`license: {type, url}` or the
+     * array form `licenses: [{type}]`) are coerced into a single
+     * string by `extractManifest`. Absent when the manifest carries
+     * no license info at all.
+     */
+    license?: string;
 };
 
 /**

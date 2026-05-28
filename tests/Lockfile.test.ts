@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {packageNameFromPath, parsePackageLock, scanNodeModules} from '../Project/Lockfile.js';
+import {LockfileReader} from '../Project/Lockfile.js';
 
 /**
  * In-memory fs-like adapter for `scanNodeModules`. Keys are absolute
@@ -32,30 +32,30 @@ function fakeFs(files: Record<string, string>) {
     };
 }
 
-describe('packageNameFromPath', () => {
+describe('LockfileReader.packageNameFromPath', () => {
     it('extracts simple top-level names', () => {
-        expect(packageNameFromPath('node_modules/foo')).toBe('foo');
+        expect(LockfileReader.packageNameFromPath('node_modules/foo')).toBe('foo');
     });
 
     it('extracts scoped names', () => {
-        expect(packageNameFromPath('node_modules/@scope/bar')).toBe('@scope/bar');
+        expect(LockfileReader.packageNameFromPath('node_modules/@scope/bar')).toBe('@scope/bar');
     });
 
     it('extracts the *inner* name from a nested install', () => {
-        expect(packageNameFromPath('node_modules/foo/node_modules/baz')).toBe('baz');
-        expect(packageNameFromPath('node_modules/foo/node_modules/@s/bar')).toBe('@s/bar');
+        expect(LockfileReader.packageNameFromPath('node_modules/foo/node_modules/baz')).toBe('baz');
+        expect(LockfileReader.packageNameFromPath('node_modules/foo/node_modules/@s/bar')).toBe('@s/bar');
     });
 
     it('returns null for malformed paths', () => {
-        expect(packageNameFromPath('node_modules')).toBeNull();
-        expect(packageNameFromPath('')).toBeNull();
-        expect(packageNameFromPath('some/other/path')).toBeNull();
+        expect(LockfileReader.packageNameFromPath('node_modules')).toBeNull();
+        expect(LockfileReader.packageNameFromPath('')).toBeNull();
+        expect(LockfileReader.packageNameFromPath('some/other/path')).toBeNull();
     });
 });
 
-describe('parsePackageLock', () => {
+describe('LockfileReader.parse', () => {
     it('parses a minimal v3 lockfile and skips the root entry', () => {
-        const lock = parsePackageLock(JSON.stringify({
+        const lock = LockfileReader.parse(JSON.stringify({
             name: 'project',
             version: '1.0.0',
             lockfileVersion: 3,
@@ -80,7 +80,7 @@ describe('parsePackageLock', () => {
     });
 
     it('respects dev/optional/peer flags', () => {
-        const lock = parsePackageLock(JSON.stringify({
+        const lock = LockfileReader.parse(JSON.stringify({
             lockfileVersion: 3,
             packages: {
                 '': {},
@@ -104,7 +104,7 @@ describe('parsePackageLock', () => {
     });
 
     it('captures nested installs (same package at two versions)', () => {
-        const lock = parsePackageLock(JSON.stringify({
+        const lock = LockfileReader.parse(JSON.stringify({
             lockfileVersion: 3,
             packages: {
                 '': {},
@@ -119,11 +119,11 @@ describe('parsePackageLock', () => {
     });
 
     it('rejects lockfileVersion 1', () => {
-        expect(() => parsePackageLock(JSON.stringify({lockfileVersion: 1}))).toThrow(/lockfileVersion/);
+        expect(() => LockfileReader.parse(JSON.stringify({lockfileVersion: 1}))).toThrow(/lockfileVersion/);
     });
 
     it('extracts the direct dependency map from each entry', () => {
-        const lock = parsePackageLock(JSON.stringify({
+        const lock = LockfileReader.parse(JSON.stringify({
             lockfileVersion: 3,
             packages: {
                 '': {},
@@ -145,7 +145,7 @@ describe('parsePackageLock', () => {
     });
 
     it('honours the explicit source label (used for the hidden lockfile)', () => {
-        const lock = parsePackageLock(
+        const lock = LockfileReader.parse(
             JSON.stringify({
                 lockfileVersion: 3,
                 packages: {
@@ -159,14 +159,14 @@ describe('parsePackageLock', () => {
     });
 
     it('throws on missing packages map', () => {
-        expect(() => parsePackageLock(JSON.stringify({lockfileVersion: 3}))).toThrow(/packages/);
+        expect(() => LockfileReader.parse(JSON.stringify({lockfileVersion: 3}))).toThrow(/packages/);
     });
 });
 
-describe('scanNodeModules', () => {
+describe('LockfileReader.scanNodeModules', () => {
     it('returns null when node_modules is missing', () => {
         const fs = fakeFs({});
-        expect(scanNodeModules('/proj', fs)).toBeNull();
+        expect(LockfileReader.scanNodeModules('/proj', fs)).toBeNull();
     });
 
     it('walks top-level packages and reads name/version from manifest', () => {
@@ -178,7 +178,7 @@ describe('scanNodeModules', () => {
             '/proj/node_modules/bar/package.json': JSON.stringify({name: 'bar', version: '0.9.0'})
         });
 
-        const lock = scanNodeModules('/proj', fs)!;
+        const lock = LockfileReader.scanNodeModules('/proj', fs)!;
         expect(lock.lockfileVersion).toBe(0);
         expect(lock.source).toBe('synthesized');
         expect(lock.packages.map((p) => `${p.name}@${p.version}`).sort()).toEqual([
@@ -195,7 +195,7 @@ describe('scanNodeModules', () => {
             '/proj/node_modules/@scope/pkg/package.json': JSON.stringify({version: '2.0.0'})
         });
 
-        const lock = scanNodeModules('/proj', fs)!;
+        const lock = LockfileReader.scanNodeModules('/proj', fs)!;
         expect(lock.packages).toHaveLength(1);
         expect(lock.packages[0].name).toBe('@scope/pkg');
         expect(lock.packages[0].path).toBe('node_modules/@scope/pkg');
@@ -210,7 +210,7 @@ describe('scanNodeModules', () => {
             '/proj/node_modules/foo/package.json': JSON.stringify({version: '1.0.0'})
         });
 
-        const lock = scanNodeModules('/proj', fs)!;
+        const lock = LockfileReader.scanNodeModules('/proj', fs)!;
         expect(lock.packages.map((p) => p.name)).toEqual(['foo']);
     });
 
@@ -223,7 +223,7 @@ describe('scanNodeModules', () => {
             '/proj/node_modules/ok/package.json': JSON.stringify({version: '1.0.0'})
         });
 
-        const lock = scanNodeModules('/proj', fs)!;
+        const lock = LockfileReader.scanNodeModules('/proj', fs)!;
         expect(lock.packages.map((p) => p.name)).toEqual(['ok']);
     });
 });

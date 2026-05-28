@@ -7,7 +7,7 @@ import {
 } from '../Api/ApiTypes.js';
 import {Lockfile, LockedPackage} from '../Project/Lockfile.js';
 import {Api} from './Api.js';
-import {t} from './I18n.js';
+import {I18n} from './I18n.js';
 
 /**
  * Active sub-view inside the project detail. Mirrors `PackageList`'s
@@ -103,7 +103,7 @@ export class InstalledView {
 
         const hint = document.createElement('div');
         hint.className = 'list-placeholder';
-        hint.textContent = t('Loading package-lock.json …');
+        hint.textContent = I18n.t('Loading package-lock.json …');
         this._root.appendChild(hint);
     }
 
@@ -124,7 +124,7 @@ export class InstalledView {
         if (!this._lockfile) {
             const empty = document.createElement('div');
             empty.className = 'list-placeholder';
-            empty.textContent = t('No package-lock.json in this project.');
+            empty.textContent = I18n.t('No package-lock.json in this project.');
             this._root.appendChild(empty);
             return;
         }
@@ -132,7 +132,7 @@ export class InstalledView {
         const meta = document.createElement('div');
         meta.className = 'installed-meta';
         meta.textContent =
-            t('{n} resolved packages', {n: this._lockfile.packages.length})
+            I18n.t('{n} resolved packages', {n: this._lockfile.packages.length})
             + ` (${InstalledView._sourceLabel(this._lockfile)})`;
         this._root.appendChild(meta);
 
@@ -144,10 +144,10 @@ export class InstalledView {
         const thead = document.createElement('thead');
         thead.innerHTML = `
             <tr>
-                <th>${t('Package')}</th>
-                <th>${t('Version')}</th>
-                <th>${t('Type')}</th>
-                <th>${t('Path')}</th>
+                <th>${I18n.t('Package')}</th>
+                <th>${I18n.t('Version')}</th>
+                <th>${I18n.t('Type')}</th>
+                <th>${I18n.t('Path')}</th>
                 <th>CVEs</th>
             </tr>
         `;
@@ -207,7 +207,7 @@ export class InstalledView {
 
         if (vulnIds === null) {
             td.textContent = '?';
-            td.title = t('OSV.dev unreachable for this package');
+            td.title = I18n.t('OSV.dev unreachable for this package');
             return td;
         }
 
@@ -236,7 +236,7 @@ export class InstalledView {
 
         const btn = document.createElement('button');
         btn.className = 'installed-analyze-btn';
-        btn.textContent = t('Start analysis');
+        btn.textContent = I18n.t('Start analysis');
         btn.addEventListener('click', () => {
             if (!this._projectUnid) {
                 return;
@@ -278,7 +278,7 @@ export class InstalledView {
 
         if (this._analyzeBtn) {
             this._analyzeBtn.disabled = true;
-            this._analyzeBtn.textContent = t('Analysing …');
+            this._analyzeBtn.textContent = I18n.t('Analysing …');
         }
 
         const wrap = this._progressBar?.parentElement;
@@ -310,7 +310,7 @@ export class InstalledView {
         es.addEventListener('end', (e) => {
             const data = JSON.parse((e as MessageEvent).data) as ApiAnalyzeEndEvent;
             this._updateProgress(data.total, data.total);
-            this._finishAnalysis(t('Analyse finished — {n} packages checked', {n: data.total}));
+            this._finishAnalysis(I18n.t('Analyse finished — {n} packages checked', {n: data.total}));
         });
 
         es.addEventListener('error', (e) => {
@@ -319,7 +319,7 @@ export class InstalledView {
             // by whether there's data.
             const msg = (e as MessageEvent).data
                 ? (JSON.parse((e as MessageEvent).data) as ApiAnalyzeErrorEvent).msg
-                : t('Connection to analyser lost');
+                : I18n.t('Connection to analyser lost');
             this._finishAnalysis(msg);
         });
     }
@@ -339,7 +339,7 @@ export class InstalledView {
         }
         if (this._analyzeBtn) {
             this._analyzeBtn.disabled = false;
-            this._analyzeBtn.textContent = t('Re-analyse');
+            this._analyzeBtn.textContent = I18n.t('Re-analyse');
         }
     }
 
@@ -351,7 +351,7 @@ export class InstalledView {
         this._progressBar.style.width = `${pct.toFixed(1)}%`;
         this._progressText.textContent = total > 0
             ? `${current} / ${total}`
-            : t('Starting …');
+            : I18n.t('Starting …');
     }
 
     /**
@@ -409,7 +409,7 @@ export class InstalledView {
 
         const declared = document.createElement('button');
         declared.className = 'installed-toggle-btn';
-        declared.textContent = t('Declared');
+        declared.textContent = I18n.t('Declared');
         declared.addEventListener('click', () => {
             if (this._projectUnid && this._onShowDeclared) {
                 this._onShowDeclared(this._projectUnid);
@@ -418,11 +418,11 @@ export class InstalledView {
 
         const installed = document.createElement('button');
         installed.className = 'installed-toggle-btn installed-toggle-btn-active';
-        installed.textContent = t('Installed');
+        installed.textContent = I18n.t('Installed');
 
         const history = document.createElement('button');
         history.className = 'installed-toggle-btn';
-        history.textContent = t('History');
+        history.textContent = I18n.t('History');
         history.addEventListener('click', () => {
             if (this._projectUnid && this._onShowHistory) {
                 this._onShowHistory(this._projectUnid);
@@ -431,7 +431,7 @@ export class InstalledView {
 
         const matrix = document.createElement('button');
         matrix.className = 'installed-toggle-btn';
-        matrix.textContent = t('Matrix');
+        matrix.textContent = I18n.t('Matrix');
         matrix.addEventListener('click', () => {
             if (this._projectUnid && this._onShowMatrix) {
                 this._onShowMatrix(this._projectUnid);
@@ -440,7 +440,7 @@ export class InstalledView {
 
         const tree = document.createElement('button');
         tree.className = 'installed-toggle-btn';
-        tree.textContent = t('Tree');
+        tree.textContent = I18n.t('Tree');
         tree.addEventListener('click', () => {
             if (this._projectUnid && this._onShowTree) {
                 this._onShowTree(this._projectUnid);
@@ -460,11 +460,11 @@ export class InstalledView {
     private static _sourceLabel(lock: Lockfile): string {
         switch (lock.source) {
             case 'committed':
-                return t('package-lock.json v{n}', {n: lock.lockfileVersion});
+                return I18n.t('package-lock.json v{n}', {n: lock.lockfileVersion});
             case 'hidden':
-                return t('node_modules/.package-lock.json v{n}', {n: lock.lockfileVersion});
+                return I18n.t('node_modules/.package-lock.json v{n}', {n: lock.lockfileVersion});
             case 'synthesized':
-                return t('Generated from node_modules (no dev/peer flags)');
+                return I18n.t('Generated from node_modules (no dev/peer flags)');
         }
     }
 

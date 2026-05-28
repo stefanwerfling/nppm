@@ -53,43 +53,52 @@ const RISK_PATTERNS: {pattern: RegExp; reason: string}[] = [
 ];
 
 /**
- * Walk the manifest's lifecycle hooks and emit a finding per hook
- * present. Returns an empty list when no lifecycle hooks are declared
- * (the common, boring case).
+ * Stateless scanner — every call is independent, so the public
+ * surface is a static method. Kept as a class for symmetry with the
+ * other scanners (`PatternScanner`, `BinaryScanner`, …) and so the
+ * regex/severity tables can be private statics later if needed.
  */
-export function scanScripts(manifest: PackageFingerprintManifest|null): ScriptFinding[] {
-    if (!manifest || !manifest.scripts) {
-        return [];
-    }
+export class ScriptScanner {
 
-    const findings: ScriptFinding[] = [];
-
-    for (const [hook, script] of Object.entries(manifest.scripts)) {
-        const isInstall = INSTALL_HOOKS.has(hook);
-        const isBuild = BUILD_HOOKS.has(hook);
-
-        if (!isInstall && !isBuild) {
-            continue;
+    /**
+     * Walk the manifest's lifecycle hooks and emit a finding per hook
+     * present. Returns an empty list when no lifecycle hooks are
+     * declared (the common, boring case).
+     */
+    public static scan(manifest: PackageFingerprintManifest|null): ScriptFinding[] {
+        if (!manifest || !manifest.scripts) {
+            return [];
         }
 
-        const risk = RISK_PATTERNS.find((r) => r.pattern.test(script));
-        const severity = risk
-            ? ScriptSeverity.risk
-            : isInstall
-                ? ScriptSeverity.warn
-                : ScriptSeverity.info;
+        const findings: ScriptFinding[] = [];
 
-        findings.push({
-            hook,
-            severity,
-            script,
-            reason: risk
-                ? risk.reason
+        for (const [hook, script] of Object.entries(manifest.scripts)) {
+            const isInstall = INSTALL_HOOKS.has(hook);
+            const isBuild = BUILD_HOOKS.has(hook);
+
+            if (!isInstall && !isBuild) {
+                continue;
+            }
+
+            const risk = RISK_PATTERNS.find((r) => r.pattern.test(script));
+            const severity = risk
+                ? ScriptSeverity.risk
                 : isInstall
-                    ? 'Install-Hook führt Code beim `npm install` aus'
-                    : 'Build-Hook (läuft bei `npm install` für Git-Dependencies)'
-        });
-    }
+                    ? ScriptSeverity.warn
+                    : ScriptSeverity.info;
 
-    return findings;
+            findings.push({
+                hook,
+                severity,
+                script,
+                reason: risk
+                    ? risk.reason
+                    : isInstall
+                        ? 'Install-Hook führt Code beim `npm install` aus'
+                        : 'Build-Hook (läuft bei `npm install` für Git-Dependencies)'
+            });
+        }
+
+        return findings;
+    }
 }

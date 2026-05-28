@@ -1,6 +1,6 @@
 import {HistoryAdded, HistoryEntry, HistoryRemoved, HistoryUpdate} from '../History/History.js';
 import {Api} from './Api.js';
-import {t} from './I18n.js';
+import {I18n} from './I18n.js';
 
 /**
  * Per-project timeline of package changes. Lists entries newest-first
@@ -70,7 +70,7 @@ export class HistoryView {
         this._root.appendChild(this._renderHeader());
         const hint = document.createElement('div');
         hint.className = 'list-placeholder';
-        hint.textContent = t('Loading history …');
+        hint.textContent = I18n.t('Loading history …');
         this._root.appendChild(hint);
     }
 
@@ -90,7 +90,7 @@ export class HistoryView {
         if (this._entries.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'list-placeholder';
-            empty.textContent = t(
+            empty.textContent = I18n.t(
                 'Currently no history. Whenever the project\'s packages change, a new entry shows up here (a snapshot is checked on every lockfile call).'
             );
             this._root.appendChild(empty);
@@ -121,7 +121,7 @@ export class HistoryView {
 
         const source = document.createElement('div');
         source.className = 'history-source';
-        source.textContent = t('Source: {source}', {source: entry.lockfileSource});
+        source.textContent = I18n.t('Source: {source}', {source: entry.lockfileSource});
         head.appendChild(source);
 
         const counts = document.createElement('div');
@@ -139,10 +139,10 @@ export class HistoryView {
             card.appendChild(this._renderUpdatedSection(entry.updated));
         }
         if (entry.added.length > 0) {
-            card.appendChild(this._renderListSection(t('Added'), entry.added, 'added'));
+            card.appendChild(this._renderListSection(I18n.t('Added'), entry.added, 'added'));
         }
         if (entry.removed.length > 0) {
-            card.appendChild(this._renderListSection(t('Removed'), entry.removed, 'removed'));
+            card.appendChild(this._renderListSection(I18n.t('Removed'), entry.removed, 'removed'));
         }
 
         return card;
@@ -154,7 +154,7 @@ export class HistoryView {
 
         const heading = document.createElement('div');
         heading.className = 'history-section-head';
-        heading.textContent = `${t('Updated')} (${updates.length})`;
+        heading.textContent = `${I18n.t('Updated')} (${updates.length})`;
         wrap.appendChild(heading);
 
         const list = document.createElement('div');
@@ -232,7 +232,7 @@ export class HistoryView {
 
         const declared = document.createElement('button');
         declared.className = 'installed-toggle-btn';
-        declared.textContent = t('Declared');
+        declared.textContent = I18n.t('Declared');
         declared.addEventListener('click', () => {
             if (this._projectUnid && this._onShowDeclared) {
                 this._onShowDeclared(this._projectUnid);
@@ -242,7 +242,7 @@ export class HistoryView {
 
         const installed = document.createElement('button');
         installed.className = 'installed-toggle-btn';
-        installed.textContent = t('Installed');
+        installed.textContent = I18n.t('Installed');
         installed.addEventListener('click', () => {
             if (this._projectUnid && this._onShowInstalled) {
                 this._onShowInstalled(this._projectUnid);
@@ -252,12 +252,12 @@ export class HistoryView {
 
         const history = document.createElement('button');
         history.className = 'installed-toggle-btn installed-toggle-btn-active';
-        history.textContent = t('History');
+        history.textContent = I18n.t('History');
         toggle.appendChild(history);
 
         const matrix = document.createElement('button');
         matrix.className = 'installed-toggle-btn';
-        matrix.textContent = t('Matrix');
+        matrix.textContent = I18n.t('Matrix');
         matrix.addEventListener('click', () => {
             if (this._projectUnid && this._onShowMatrix) {
                 this._onShowMatrix(this._projectUnid);
@@ -267,7 +267,7 @@ export class HistoryView {
 
         const tree = document.createElement('button');
         tree.className = 'installed-toggle-btn';
-        tree.textContent = t('Tree');
+        tree.textContent = I18n.t('Tree');
         tree.addEventListener('click', () => {
             if (this._projectUnid && this._onShowTree) {
                 this._onShowTree(this._projectUnid);

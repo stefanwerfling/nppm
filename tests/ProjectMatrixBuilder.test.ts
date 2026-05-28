@@ -5,7 +5,7 @@ import {describe, expect, it} from 'vitest';
 import {JsonCache} from '../Cache/JsonCache.js';
 import {ConfigProjectType} from '../Config/Config.js';
 import {MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
-import {buildProjectMatrix} from '../Matrix/ProjectMatrixBuilder.js';
+import {ProjectMatrixBuilder} from '../Matrix/ProjectMatrixBuilder.js';
 import {DependencyType, PackageManifest} from '../Project/PackageManifest.js';
 import {Project} from '../Project/Project.js';
 import {Registry, RegistryPackage} from '../Registry/Registry.js';
@@ -57,7 +57,7 @@ class FakeRegistry extends Registry {
     }
 }
 
-describe('buildProjectMatrix', () => {
+describe('ProjectMatrixBuilder.build', () => {
     it('puts root first and one column per workspace', async () => {
         const project = new FakeProject('p', [
             manifest('root', {foo: '^1.0.0'}),
@@ -65,7 +65,7 @@ describe('buildProjectMatrix', () => {
             manifest('web', {bar: '^2.0.0'}, 'apps/web')
         ]);
 
-        const matrix = await buildProjectMatrix('UNID', project, new FakeRegistry({}));
+        const matrix = await ProjectMatrixBuilder.build('UNID', project, new FakeRegistry({}));
         expect(matrix.workspaces.map((w) => w.label)).toEqual([
             'root',
             'packages/api',
@@ -80,7 +80,7 @@ describe('buildProjectMatrix', () => {
             manifest('child', {foo: '^2.0.0'}, 'packages/child')
         ]);
 
-        const matrix = await buildProjectMatrix('UNID', project, new FakeRegistry({
+        const matrix = await ProjectMatrixBuilder.build('UNID', project, new FakeRegistry({
             foo: {name: 'foo', latest: '2.0.0', versions: ['1.0.0', '2.0.0']}
         }));
 
@@ -92,7 +92,7 @@ describe('buildProjectMatrix', () => {
             manifest('root', {foo: '^1.2.3'}),
             manifest('child', {foo: '^1.2.3'}, 'packages/child')
         ]);
-        const matrix = await buildProjectMatrix('UNID', project, new FakeRegistry({
+        const matrix = await ProjectMatrixBuilder.build('UNID', project, new FakeRegistry({
             foo: {name: 'foo', latest: '1.2.3', versions: ['1.2.3']}
         }));
         expect(matrix.rows[0].status).toBe(MatrixRowStatus.aligned);
@@ -103,7 +103,7 @@ describe('buildProjectMatrix', () => {
             manifest('root', {foo: '^1'}),
             manifest('child', {}, 'packages/child')
         ]);
-        const matrix = await buildProjectMatrix('UNID', project, new FakeRegistry({}));
+        const matrix = await ProjectMatrixBuilder.build('UNID', project, new FakeRegistry({}));
         const row = matrix.rows[0];
         expect(row.cells['root']).toBeDefined();
         expect(row.cells['packages/child']).toBeUndefined();
@@ -111,7 +111,7 @@ describe('buildProjectMatrix', () => {
 
     it('handles a single-manifest project (only the root column)', async () => {
         const project = new FakeProject('p', [manifest('root', {foo: '^1.0.0'})]);
-        const matrix = await buildProjectMatrix('UNID', project, new FakeRegistry({}));
+        const matrix = await ProjectMatrixBuilder.build('UNID', project, new FakeRegistry({}));
         expect(matrix.workspaces).toEqual([{label: 'root'}]);
         expect(matrix.rows).toHaveLength(1);
     });

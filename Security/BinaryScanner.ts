@@ -62,95 +62,6 @@ const RULE_BY_EXT = (() => {
     return m;
 })();
 
-function fileExtension(path: string): string {
-    // Take the segment after the last `/`, then everything from the
-    // last `.` in that segment. Composite extensions like `.tar.gz`
-    // collapse to `.gz` here, which is fine — none of our rules need
-    // to look further.
-    const slash = path.lastIndexOf('/');
-    const base = slash >= 0 ? path.slice(slash + 1) : path;
-    const dot = base.lastIndexOf('.');
-    return dot >= 0 ? base.slice(dot).toLowerCase() : '';
-}
-
-/**
- * Text extensions that pop up in `bin/` directories (shell wrappers,
- * shebang-JS, …) — these are *not* pre-built native executables and
- * mustn't trigger the path-based heuristic below.
- */
-const KNOWN_TEXT_EXTS = new Set([
-    '.js', '.mjs', '.cjs', '.ts', '.sh', '.bash', '.zsh', '.fish',
-    '.py', '.rb', '.pl', '.json', '.md', '.txt', '.html', '.css',
-    '.yml', '.yaml', '.toml', '.lock', '.map'
-]);
-
-/**
- * Extension-less files under a `bin/` directory are conventionally
- * pre-built executables (`@esbuild/linux-x64/bin/esbuild`, biome,
- * lightningcss native binaries). They have no `.exe`/`.so` extension
- * because Unix doesn't need one — but they're absolutely binaries.
- *
- * Size floor of 10 KiB filters out shell-wrapper shims (those are
- * usually 1-2 KiB).
- */
-function pathLooksExecutable(path: string, ext: string, size: number): boolean {
-    if (size < 10 * 1024) {
-        return false;
-    }
-    if (ext !== '' && KNOWN_TEXT_EXTS.has(ext)) {
-        return false;
-    }
-    const segments = path.split('/');
-    return segments.includes('bin');
-}
-
-/**
- * Scan a fingerprint's file list for binaries with known-suspect
- * extensions. Returns findings sorted by severity (worst first), then
- * by path — the security panel renders them in this order.
- */
-export function scanBinaries(files: FileFingerprint[]): BinaryFinding[] {
-    const findings: BinaryFinding[] = [];
-
-    for (const f of files) {
-        const ext = fileExtension(f.path);
-        const rule = RULE_BY_EXT.get(ext);
-        if (rule) {
-            findings.push({
-                path: f.path,
-                size: f.size,
-                extension: ext,
-                kind: rule.kind,
-                severity: rule.severity
-            });
-            continue;
-        }
-        // No known extension — fall through to the path heuristic.
-        if (pathLooksExecutable(f.path, ext, f.size)) {
-            findings.push({
-                path: f.path,
-                size: f.size,
-                extension: ext,
-                kind: 'Pre-built Executable (bin/)',
-                severity: BinarySeverity.risk
-            });
-        }
-    }
-
-    const rank: Record<BinarySeverity, number> = {
-        [BinarySeverity.risk]: 0,
-        [BinarySeverity.warn]: 1,
-        [BinarySeverity.info]: 2
-    };
-
-    findings.sort((a, b) => {
-        const r = rank[a.severity] - rank[b.severity];
-        return r !== 0 ? r : a.path.localeCompare(b.path);
-    });
-
-    return findings;
-}
-
 /**
  * Compact summary for the matrix badge. `maxSeverity: null` = no
  * binary files at all (the boring common case for pure-JS packages).
@@ -163,29 +74,133 @@ export type BinarySummary = {
     totalCount: number;
 };
 
+/**
+ * Text extensions that pop up in `bin/` directories (shell wrappers,
+ * shebang-JS, …) — these are *not* pre-built native executables and
+ * mustn't trigger the path-based heuristic below.
+ */
+const KNOWN_TEXT_EXTS = new Set([
+    '.js', '.mjs', '.cjs', '.ts', '.sh', '.bash', '.zsh', '.fish',
+    '.py', '.rb', '.pl', '.json', '.md', '.txt', '.html', '.css',
+    '.yml', '.yaml', '.toml', '.lock', '.map'
+]);
+
+const SORT_RANK: Record<BinarySeverity, number> = {
+    [BinarySeverity.risk]: 0,
+    [BinarySeverity.warn]: 1,
+    [BinarySeverity.info]: 2
+};
+
 const SEVERITY_RANK: Record<BinarySeverity, number> = {
     [BinarySeverity.info]: 1,
     [BinarySeverity.warn]: 2,
     [BinarySeverity.risk]: 3
 };
 
-export function summariseBinaries(findings: BinaryFinding[]): {
-    maxSeverity: BinarySeverity|null;
-    riskCount: number;
-    totalCount: number;
-} {
-    let best: BinarySeverity|null = null;
-    let bestRank = 0;
-    let riskCount = 0;
-    for (const f of findings) {
-        const r = SEVERITY_RANK[f.severity];
-        if (r > bestRank) {
-            best = f.severity;
-            bestRank = r;
+/**
+ * Stateless binary-file classifier. Public surface is two static
+ * methods (`scan` + `summarise`); the extension table and path
+ * heuristic live as private statics so callers don't have to think
+ * about them.
+ */
+export class BinaryScanner {
+
+    /**
+     * Scan a fingerprint's file list for binaries with known-suspect
+     * extensions. Returns findings sorted by severity (worst first),
+     * then by path — the security panel renders them in this order.
+     */
+    public static scan(files: FileFingerprint[]): BinaryFinding[] {
+        const findings: BinaryFinding[] = [];
+
+        for (const f of files) {
+            const ext = BinaryScanner._fileExtension(f.path);
+            const rule = RULE_BY_EXT.get(ext);
+            if (rule) {
+                findings.push({
+                    path: f.path,
+                    size: f.size,
+                    extension: ext,
+                    kind: rule.kind,
+                    severity: rule.severity
+                });
+                continue;
+            }
+            // No known extension — fall through to the path heuristic.
+            if (BinaryScanner._pathLooksExecutable(f.path, ext, f.size)) {
+                findings.push({
+                    path: f.path,
+                    size: f.size,
+                    extension: ext,
+                    kind: 'Pre-built Executable (bin/)',
+                    severity: BinarySeverity.risk
+                });
+            }
         }
-        if (f.severity === BinarySeverity.risk) {
-            riskCount++;
-        }
+
+        findings.sort((a, b) => {
+            const r = SORT_RANK[a.severity] - SORT_RANK[b.severity];
+            return r !== 0 ? r : a.path.localeCompare(b.path);
+        });
+
+        return findings;
     }
-    return {maxSeverity: best, riskCount, totalCount: findings.length};
+
+    /**
+     * Roll a finding list up to one summary record — what the matrix
+     * badge consumes. `maxSeverity: null` = nothing to flag.
+     */
+    public static summarise(findings: BinaryFinding[]): {
+        maxSeverity: BinarySeverity|null;
+        riskCount: number;
+        totalCount: number;
+    } {
+        let best: BinarySeverity|null = null;
+        let bestRank = 0;
+        let riskCount = 0;
+        for (const f of findings) {
+            const r = SEVERITY_RANK[f.severity];
+            if (r > bestRank) {
+                best = f.severity;
+                bestRank = r;
+            }
+            if (f.severity === BinarySeverity.risk) {
+                riskCount++;
+            }
+        }
+        return {maxSeverity: best, riskCount, totalCount: findings.length};
+    }
+
+    /**
+     * Take the segment after the last `/`, then everything from the
+     * last `.` in that segment. Composite extensions like `.tar.gz`
+     * collapse to `.gz` here, which is fine — none of our rules need
+     * to look further.
+     */
+    private static _fileExtension(path: string): string {
+        const slash = path.lastIndexOf('/');
+        const base = slash >= 0 ? path.slice(slash + 1) : path;
+        const dot = base.lastIndexOf('.');
+        return dot >= 0 ? base.slice(dot).toLowerCase() : '';
+    }
+
+    /**
+     * Extension-less files under a `bin/` directory are conventionally
+     * pre-built executables (`@esbuild/linux-x64/bin/esbuild`, biome,
+     * lightningcss native binaries). They have no `.exe`/`.so` extension
+     * because Unix doesn't need one — but they're absolutely binaries.
+     *
+     * Size floor of 10 KiB filters out shell-wrapper shims (those are
+     * usually 1-2 KiB).
+     */
+    private static _pathLooksExecutable(path: string, ext: string, size: number): boolean {
+        if (size < 10 * 1024) {
+            return false;
+        }
+        if (ext !== '' && KNOWN_TEXT_EXTS.has(ext)) {
+            return false;
+        }
+        const segments = path.split('/');
+        return segments.includes('bin');
+    }
 }

@@ -1,7 +1,7 @@
 import {hierarchy, tree, HierarchyPointNode} from 'd3-hierarchy';
 import {DepGraphNode, DepGraphResponse, DepGraphStatus} from '../DepGraph/DepGraphBuilder.js';
 import {Api} from './Api.js';
-import {t} from './I18n.js';
+import {I18n} from './I18n.js';
 
 /**
  * Hierarchy datum the d3-tree layout walks. Each instance is one
@@ -108,7 +108,7 @@ export class DepTreeView {
         this._root.appendChild(this._renderHeader());
         const hint = document.createElement('div');
         hint.className = 'list-placeholder';
-        hint.textContent = t('Loading dep graph …');
+        hint.textContent = I18n.t('Loading dep graph …');
         this._root.appendChild(hint);
     }
 
@@ -206,7 +206,7 @@ export class DepTreeView {
 
         const meta = document.createElement('div');
         meta.className = 'installed-meta';
-        meta.textContent = t(
+        meta.textContent = I18n.t(
             '{n} resolved packages, {m} top-level deps. Click a node to expand/collapse its subtree.',
             {n: Object.keys(this._data.packages).length, m: this._data.rootDeps.length}
         );
@@ -235,10 +235,10 @@ export class DepTreeView {
         const wrap = document.createElement('div');
         wrap.className = 'deptree-legend';
         const items: {status: DepGraphStatus; label: string}[] = [
-            {status: 'aligned', label: t('aligned (= latest)')},
-            {status: 'outdated', label: t('outdated')},
-            {status: 'cve', label: t('CVEs known')},
-            {status: 'unknown', label: t('unknown')}
+            {status: 'aligned', label: I18n.t('aligned (= latest)')},
+            {status: 'outdated', label: I18n.t('outdated')},
+            {status: 'cve', label: I18n.t('CVEs known')},
+            {status: 'unknown', label: I18n.t('unknown')}
         ];
         for (const item of items) {
             const span = document.createElement('span');
@@ -428,7 +428,7 @@ export class DepTreeView {
 
         const declared = document.createElement('button');
         declared.className = 'installed-toggle-btn';
-        declared.textContent = t('Declared');
+        declared.textContent = I18n.t('Declared');
         declared.addEventListener('click', () => {
             if (this._projectUnid && this._onShowDeclared) {
                 this._onShowDeclared(this._projectUnid);
@@ -438,7 +438,7 @@ export class DepTreeView {
 
         const installed = document.createElement('button');
         installed.className = 'installed-toggle-btn';
-        installed.textContent = t('Installed');
+        installed.textContent = I18n.t('Installed');
         installed.addEventListener('click', () => {
             if (this._projectUnid && this._onShowInstalled) {
                 this._onShowInstalled(this._projectUnid);
@@ -448,7 +448,7 @@ export class DepTreeView {
 
         const history = document.createElement('button');
         history.className = 'installed-toggle-btn';
-        history.textContent = t('History');
+        history.textContent = I18n.t('History');
         history.addEventListener('click', () => {
             if (this._projectUnid && this._onShowHistory) {
                 this._onShowHistory(this._projectUnid);
@@ -458,7 +458,7 @@ export class DepTreeView {
 
         const matrix = document.createElement('button');
         matrix.className = 'installed-toggle-btn';
-        matrix.textContent = t('Matrix');
+        matrix.textContent = I18n.t('Matrix');
         matrix.addEventListener('click', () => {
             if (this._projectUnid && this._onShowMatrix) {
                 this._onShowMatrix(this._projectUnid);
@@ -468,7 +468,7 @@ export class DepTreeView {
 
         const tree = document.createElement('button');
         tree.className = 'installed-toggle-btn installed-toggle-btn-active';
-        tree.textContent = t('Tree');
+        tree.textContent = I18n.t('Tree');
         toggle.appendChild(tree);
 
         header.appendChild(toggle);

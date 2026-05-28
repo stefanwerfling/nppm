@@ -1,4 +1,4 @@
-import {isGitVersion} from '../Fingerprint/GitResolver.js';
+import {GitResolver} from '../Fingerprint/GitResolver.js';
 import {Registry, RegistryPublisher} from '../Registry/Registry.js';
 
 /**
@@ -31,49 +31,6 @@ export type MaintainerFinding = {
 };
 
 type SemverTriple = [number, number, number];
-
-function parseSemver(v: string): SemverTriple|null {
-    const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v.trim());
-    return m ? [+m[1], +m[2], +m[3]] : null;
-}
-
-function compare(a: SemverTriple, b: SemverTriple): number {
-    if (a[0] !== b[0]) {
-        return a[0] - b[0];
-    }
-    if (a[1] !== b[1]) {
-        return a[1] - b[1];
-    }
-    return a[2] - b[2];
-}
-
-/**
- * Sort the registry version list into chronologically-stable order
- * (semver ascending), filtering pre-releases. Returns the highest
- * stable versions below `target` ordered newest-first — we walk it
- * from index 0 to build the trust set of the most recent N predecessors.
- */
-export function previousStableVersions(versions: string[], target: string): string[] {
-    const tgt = parseSemver(target);
-    if (!tgt) {
-        return [];
-    }
-
-    const triples: {v: string; t: SemverTriple}[] = [];
-    for (const raw of versions) {
-        const t = parseSemver(raw);
-        if (!t) {
-            continue;
-        }
-        if (compare(t, tgt) >= 0) {
-            continue;
-        }
-        triples.push({v: raw, t});
-    }
-
-    triples.sort((a, b) => compare(b.t, a.t));
-    return triples.map((e) => e.v);
-}
 
 /**
  * Tuning options for the heuristic. All values are days unless noted;
@@ -110,18 +67,6 @@ const DEFAULT_SUSPICIOUS_GAP_DAYS = 180;
 const DEFAULT_MATURE_VERSIONS = 10;
 const DEFAULT_TRUST_WINDOW = 20;
 
-function diffDays(a: string|undefined, b: string|undefined): number|null {
-    if (!a || !b) {
-        return null;
-    }
-    const ta = Date.parse(a);
-    const tb = Date.parse(b);
-    if (isNaN(ta) || isNaN(tb)) {
-        return null;
-    }
-    return Math.round(Math.abs(ta - tb) / (24 * 60 * 60 * 1000));
-}
-
 /**
  * Detects when a published version's `_npmUser` is unfamiliar relative
  * to recent prior versions of the same package. Designed to catch the
@@ -151,7 +96,7 @@ export class MaintainerScanner {
     }
 
     public async scan(name: string, version: string): Promise<MaintainerFinding|null> {
-        if (isGitVersion(version)) {
+        if (GitResolver.isGitVersion(version)) {
             return null;
         }
 
@@ -163,7 +108,7 @@ export class MaintainerScanner {
         const publishers = reg.publishers ?? {};
         const current = publishers[version] ?? null;
 
-        const predecessors = previousStableVersions(reg.versions, version);
+        const predecessors = MaintainerScanner.previousStableVersions(reg.versions, version);
         const window = predecessors.slice(0, this._trustWindow);
 
         const trustSet = new Set<string>();
@@ -179,7 +124,7 @@ export class MaintainerScanner {
 
         const previous = predecessors[0] ?? null;
         const gapDays = previous && reg.time
-            ? diffDays(reg.time[version], reg.time[previous])
+            ? MaintainerScanner._diffDays(reg.time[version], reg.time[previous])
             : null;
 
         // No prior history to compare against → not flaggable.
@@ -290,6 +235,62 @@ export class MaintainerScanner {
             reason: `Neuer Publisher (${current.name}), aber Paket noch jung `
                 + `(${priorWithPub} Vorgänger) — könnte legitimer neuer Maintainer sein`
         };
+    }
+
+    /**
+     * Sort the registry version list into chronologically-stable
+     * order (semver ascending), filtering pre-releases. Returns the
+     * highest stable versions below `target` ordered newest-first —
+     * the trust-set walk takes the top N from index 0. Public because
+     * the tests exercise it directly.
+     */
+    public static previousStableVersions(versions: string[], target: string): string[] {
+        const tgt = MaintainerScanner._parseSemver(target);
+        if (!tgt) {
+            return [];
+        }
+
+        const triples: {v: string; t: SemverTriple}[] = [];
+        for (const raw of versions) {
+            const t = MaintainerScanner._parseSemver(raw);
+            if (!t) {
+                continue;
+            }
+            if (MaintainerScanner._compare(t, tgt) >= 0) {
+                continue;
+            }
+            triples.push({v: raw, t});
+        }
+
+        triples.sort((a, b) => MaintainerScanner._compare(b.t, a.t));
+        return triples.map((e) => e.v);
+    }
+
+    private static _parseSemver(v: string): SemverTriple|null {
+        const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v.trim());
+        return m ? [+m[1], +m[2], +m[3]] : null;
+    }
+
+    private static _compare(a: SemverTriple, b: SemverTriple): number {
+        if (a[0] !== b[0]) {
+            return a[0] - b[0];
+        }
+        if (a[1] !== b[1]) {
+            return a[1] - b[1];
+        }
+        return a[2] - b[2];
+    }
+
+    private static _diffDays(a: string|undefined, b: string|undefined): number|null {
+        if (!a || !b) {
+            return null;
+        }
+        const ta = Date.parse(a);
+        const tb = Date.parse(b);
+        if (isNaN(ta) || isNaN(tb)) {
+            return null;
+        }
+        return Math.round(Math.abs(ta - tb) / (24 * 60 * 60 * 1000));
     }
 }
 

@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {JsonCache} from '../Cache/JsonCache.js';
 import {Registry, RegistryPackage} from '../Registry/Registry.js';
-import {MaintainerScanner, MaintainerSeverity, previousStableVersions} from '../Security/MaintainerScanner.js';
+import {MaintainerScanner, MaintainerSeverity} from '../Security/MaintainerScanner.js';
 
 function makeRegistry(name: string, pkg: RegistryPackage): Registry {
     // Stand-in: poke the static `RegistryPackage` straight into a fresh
@@ -13,19 +13,19 @@ function makeRegistry(name: string, pkg: RegistryPackage): Registry {
     return new Registry('http://unused', cache);
 }
 
-describe('previousStableVersions', () => {
+describe('MaintainerScanner.previousStableVersions', () => {
     it('returns predecessors newest-first', () => {
-        const out = previousStableVersions(['1.0.0', '1.2.0', '1.1.0', '2.0.0'], '2.0.0');
+        const out = MaintainerScanner.previousStableVersions(['1.0.0', '1.2.0', '1.1.0', '2.0.0'], '2.0.0');
         expect(out).toEqual(['1.2.0', '1.1.0', '1.0.0']);
     });
 
     it('skips pre-release versions', () => {
-        const out = previousStableVersions(['1.0.0', '2.0.0-rc.1', '1.5.0'], '2.0.0');
+        const out = MaintainerScanner.previousStableVersions(['1.0.0', '2.0.0-rc.1', '1.5.0'], '2.0.0');
         expect(out).toEqual(['1.5.0', '1.0.0']);
     });
 
     it('returns empty list when target is not parseable', () => {
-        expect(previousStableVersions(['1.0.0'], 'not-semver')).toEqual([]);
+        expect(MaintainerScanner.previousStableVersions(['1.0.0'], 'not-semver')).toEqual([]);
     });
 });
 

@@ -3,7 +3,7 @@ import {describe, expect, it} from 'vitest';
 import {FingerprintBuilder} from '../Fingerprint/FingerprintBuilder.js';
 import {JsonCache} from '../Cache/JsonCache.js';
 import {Registry, RegistryPackage} from '../Registry/Registry.js';
-import {ChurnScanner, ChurnSeverity, findPreviousVersion} from '../Security/ChurnScanner.js';
+import {ChurnScanner, ChurnSeverity} from '../Security/ChurnScanner.js';
 
 const BLOCK = 512;
 
@@ -51,20 +51,20 @@ function makeRegistry(name: string, pkg: RegistryPackage, dir: string): Registry
     return new Registry('http://unused', cache);
 }
 
-describe('findPreviousVersion', () => {
+describe('ChurnScanner.findPreviousVersion', () => {
     it('picks the highest stable below target', () => {
-        expect(findPreviousVersion(['1.0.0', '1.1.0', '1.2.0', '2.0.0'], '2.0.0')).toBe('1.2.0');
-        expect(findPreviousVersion(['1.0.0', '1.0.1', '1.0.2'], '1.0.2')).toBe('1.0.1');
+        expect(ChurnScanner.findPreviousVersion(['1.0.0', '1.1.0', '1.2.0', '2.0.0'], '2.0.0')).toBe('1.2.0');
+        expect(ChurnScanner.findPreviousVersion(['1.0.0', '1.0.1', '1.0.2'], '1.0.2')).toBe('1.0.1');
     });
 
     it('ignores pre-release versions', () => {
-        expect(findPreviousVersion(['1.0.0', '2.0.0-rc.1', '2.0.0'], '2.0.0')).toBe('1.0.0');
+        expect(ChurnScanner.findPreviousVersion(['1.0.0', '2.0.0-rc.1', '2.0.0'], '2.0.0')).toBe('1.0.0');
     });
 
     it('returns null when nothing qualifies', () => {
-        expect(findPreviousVersion(['1.0.0'], '1.0.0')).toBeNull();
-        expect(findPreviousVersion([], '1.0.0')).toBeNull();
-        expect(findPreviousVersion(['1.0.0'], 'not-semver')).toBeNull();
+        expect(ChurnScanner.findPreviousVersion(['1.0.0'], '1.0.0')).toBeNull();
+        expect(ChurnScanner.findPreviousVersion([], '1.0.0')).toBeNull();
+        expect(ChurnScanner.findPreviousVersion(['1.0.0'], 'not-semver')).toBeNull();
     });
 });
 

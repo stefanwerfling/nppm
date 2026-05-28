@@ -104,246 +104,15 @@ const STRONG_COPYLEFT_IDS = new Set([
 ]);
 
 /**
- * Pattern-matcher for the allow/deny config. Supports exact match and
- * a trailing `*` wildcard (`BSD-*` matches `BSD-3-Clause`). Case
- * sensitive on purpose — SPDX IDs are conventionally case sensitive
- * and the few common typos (`mit` instead of `MIT`) are something
- * `LicenseScanner` already normalises before policy matching.
- */
-function matchesAny(id: string, patterns: readonly string[]|undefined): boolean {
-    if (!patterns) {
-        return false;
-    }
-    for (const p of patterns) {
-        if (p.endsWith('*')) {
-            if (id.startsWith(p.slice(0, -1))) {
-                return true;
-            }
-        } else if (id === p) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/**
- * Classify a single SPDX identifier (no expression syntax) — `MIT`,
- * `Apache-2.0`, `UNLICENSED`, `SEE LICENSE IN LICENSE.txt`, …. Returns
- * the bucket without touching policy rules; the caller applies
- * allow/deny on top.
- */
-function classifyAtom(id: string): LicenseSeverity {
-    const trimmed = id.trim();
-
-    if (trimmed.length === 0) {
-        return LicenseSeverity.unknown;
-    }
-
-    // npm's convention for "this package is proprietary, don't
-    // republish". Other proprietary markers: SEE-LICENSE-IN-..., a
-    // `LicenseRef-*` custom-reference, or a free-text license name.
-    if (trimmed === 'UNLICENSED') {
-        return LicenseSeverity.proprietary;
-    }
-    if (/^SEE\s+LICENSE/i.test(trimmed)) {
-        return LicenseSeverity.proprietary;
-    }
-    if (/^LicenseRef-/.test(trimmed)) {
-        return LicenseSeverity.proprietary;
-    }
-
-    // Normalise to the canonical form before set lookup. npm packages
-    // are inconsistent about pluses (`GPL-3.0+` vs `GPL-3.0-or-later`)
-    // and the `mit` lowercase typo is surprisingly common.
-    const canonical = canonicalise(trimmed);
-
-    if (PERMISSIVE_IDS.has(canonical)) {
-        return LicenseSeverity.permissive;
-    }
-    if (WEAK_COPYLEFT_IDS.has(canonical)) {
-        return LicenseSeverity.weakCopyleft;
-    }
-    if (STRONG_COPYLEFT_IDS.has(canonical)) {
-        return LicenseSeverity.strongCopyleft;
-    }
-
-    return LicenseSeverity.unknown;
-}
-
-function canonicalise(id: string): string {
-    // Case-canonicalise the well-known prefixes; anything else stays as-is.
-    const upper = id.toUpperCase();
-    for (const known of [...PERMISSIVE_IDS, ...WEAK_COPYLEFT_IDS, ...STRONG_COPYLEFT_IDS]) {
-        if (upper === known.toUpperCase()) {
-            return known;
-        }
-    }
-    return id;
-}
-
-/**
- * Token kinds used by the SPDX expression parser. Only the four kinds
- * SPDX 2.x defines (id, OR, AND, WITH) plus parentheses — enough for
- * 99 % of expressions seen on npm.
+ * Token kinds used by the SPDX expression parser. Only the four
+ * kinds SPDX 2.x defines (id, OR, AND, WITH) plus parentheses —
+ * enough for 99 % of expressions seen on npm.
  */
 type Token =
     | {kind: 'id'; value: string}
     | {kind: 'op'; value: 'OR'|'AND'|'WITH'}
     | {kind: 'lparen'}
     | {kind: 'rparen'};
-
-function tokenize(expr: string): Token[]|null {
-    const tokens: Token[] = [];
-    let i = 0;
-    const s = expr.trim();
-
-    while (i < s.length) {
-        const ch = s[i];
-
-        if (ch === ' ' || ch === '\t' || ch === '\n') {
-            i++;
-            continue;
-        }
-
-        if (ch === '(') {
-            tokens.push({kind: 'lparen'});
-            i++;
-            continue;
-        }
-
-        if (ch === ')') {
-            tokens.push({kind: 'rparen'});
-            i++;
-            continue;
-        }
-
-        // Identifier / keyword. SPDX IDs use [A-Za-z0-9.+-], plus the
-        // keywords OR/AND/WITH. Read until we hit a space or paren.
-        let j = i;
-        while (j < s.length && !/[\s()]/.test(s[j])) {
-            j++;
-        }
-        const word = s.slice(i, j);
-        if (word.length === 0) {
-            return null;
-        }
-
-        const upper = word.toUpperCase();
-        if (upper === 'OR' || upper === 'AND' || upper === 'WITH') {
-            tokens.push({kind: 'op', value: upper as 'OR'|'AND'|'WITH'});
-        } else {
-            tokens.push({kind: 'id', value: word});
-        }
-        i = j;
-    }
-
-    return tokens;
-}
-
-/**
- * Recursive-descent SPDX expression evaluator. Grammar (simplified):
- *
- *   expr   := term (OR term)*
- *   term   := factor (AND factor)*
- *   factor := atom (WITH id)?
- *   atom   := id | '(' expr ')'
- *
- * Returns the aggregate `{severity, identifiers}` of the expression.
- * `null` means we couldn't parse — caller falls back to atom-level
- * classification of the whole string.
- */
-function evalExpression(
-    tokens: Token[]
-): {severity: LicenseSeverity; identifiers: string[]}|null {
-    let pos = 0;
-    const ids = new Set<string>();
-
-    const peek = (): Token|null => tokens[pos] ?? null;
-    const consume = (): Token|null => tokens[pos++] ?? null;
-
-    const parseAtom = (): LicenseSeverity|null => {
-        const tok = consume();
-        if (!tok) {
-            return null;
-        }
-        if (tok.kind === 'lparen') {
-            const inner = parseExpr();
-            const close = consume();
-            if (!close || close.kind !== 'rparen') {
-                return null;
-            }
-            return inner;
-        }
-        if (tok.kind === 'id') {
-            ids.add(tok.value);
-            return classifyAtom(tok.value);
-        }
-        return null;
-    };
-
-    const parseFactor = (): LicenseSeverity|null => {
-        const sev = parseAtom();
-        if (sev === null) {
-            return null;
-        }
-        // `Apache-2.0 WITH Classpath-exception-2.0` — the WITH clause
-        // is an exception that loosens the parent license, never
-        // changes its bucket.
-        if (peek()?.kind === 'op' && (peek() as {value: string}).value === 'WITH') {
-            consume();
-            const next = consume();
-            if (!next || next.kind !== 'id') {
-                return null;
-            }
-            ids.add(next.value);
-        }
-        return sev;
-    };
-
-    const parseTerm = (): LicenseSeverity|null => {
-        let sev = parseFactor();
-        if (sev === null) {
-            return null;
-        }
-        while (peek()?.kind === 'op' && (peek() as {value: string}).value === 'AND') {
-            consume();
-            const next = parseFactor();
-            if (next === null) {
-                return null;
-            }
-            // AND: must comply with both — worst wins.
-            if (RANK[next] > RANK[sev]) {
-                sev = next;
-            }
-        }
-        return sev;
-    };
-
-    const parseExpr = (): LicenseSeverity|null => {
-        let sev = parseTerm();
-        if (sev === null) {
-            return null;
-        }
-        while (peek()?.kind === 'op' && (peek() as {value: string}).value === 'OR') {
-            consume();
-            const next = parseTerm();
-            if (next === null) {
-                return null;
-            }
-            // OR: user can pick the best one.
-            if (RANK[next] < RANK[sev]) {
-                sev = next;
-            }
-        }
-        return sev;
-    };
-
-    const severity = parseExpr();
-    if (severity === null || pos !== tokens.length) {
-        return null;
-    }
-    return {severity, identifiers: Array.from(ids)};
-}
 
 /**
  * Classifies the `license` field of an npm package against a (small)
@@ -389,8 +158,8 @@ export class LicenseScanner {
             };
         }
 
-        const tokens = tokenize(raw);
-        const evaluated = tokens ? evalExpression(tokens) : null;
+        const tokens = LicenseScanner._tokenize(raw);
+        const evaluated = tokens ? LicenseScanner._evalExpression(tokens) : null;
 
         // Policy lookup matches against the raw string AND each
         // recognised identifier. That way `BSD-*` in an allowlist
@@ -403,7 +172,7 @@ export class LicenseScanner {
         // Denylist always wins so a security-strict team can override
         // even a normally-permissive license (e.g. some companies
         // forbid CC-BY-4.0 for code).
-        if (candidates.some((c) => matchesAny(c, this._denylist))) {
+        if (candidates.some((c) => LicenseScanner._matchesAny(c, this._denylist))) {
             return {
                 spdx: raw,
                 severity: LicenseSeverity.proprietary,
@@ -413,7 +182,7 @@ export class LicenseScanner {
             };
         }
 
-        if (candidates.some((c) => matchesAny(c, this._allowlist))) {
+        if (candidates.some((c) => LicenseScanner._matchesAny(c, this._allowlist))) {
             return {
                 spdx: raw,
                 severity: LicenseSeverity.permissive,
@@ -437,7 +206,7 @@ export class LicenseScanner {
         // Couldn't parse the expression — treat the whole string as a
         // single atom. Catches free-text proprietary strings ("Acme
         // Corp internal license").
-        const atomSev = classifyAtom(raw);
+        const atomSev = LicenseScanner._classifyAtom(raw);
         return {
             spdx: raw,
             severity: atomSev,
@@ -461,6 +230,234 @@ export class LicenseScanner {
             case LicenseSeverity.unknown:
                 return `${head} nicht im SPDX-Katalog wiedererkannt`;
         }
+    }
+
+    /**
+     * Pattern-matcher for the allow/deny config. Supports exact
+     * match and a trailing `*` wildcard (`BSD-*` matches
+     * `BSD-3-Clause`). Case sensitive — SPDX IDs are conventionally
+     * case sensitive.
+     */
+    private static _matchesAny(id: string, patterns: readonly string[]|undefined): boolean {
+        if (!patterns) {
+            return false;
+        }
+        for (const p of patterns) {
+            if (p.endsWith('*')) {
+                if (id.startsWith(p.slice(0, -1))) {
+                    return true;
+                }
+            } else if (id === p) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Classify a single SPDX identifier (no expression syntax).
+     * Returns the bucket without touching policy rules; the caller
+     * applies allow/deny on top.
+     */
+    private static _classifyAtom(id: string): LicenseSeverity {
+        const trimmed = id.trim();
+
+        if (trimmed.length === 0) {
+            return LicenseSeverity.unknown;
+        }
+
+        if (trimmed === 'UNLICENSED') {
+            return LicenseSeverity.proprietary;
+        }
+        if (/^SEE\s+LICENSE/i.test(trimmed)) {
+            return LicenseSeverity.proprietary;
+        }
+        if (/^LicenseRef-/.test(trimmed)) {
+            return LicenseSeverity.proprietary;
+        }
+
+        const canonical = LicenseScanner._canonicalise(trimmed);
+
+        if (PERMISSIVE_IDS.has(canonical)) {
+            return LicenseSeverity.permissive;
+        }
+        if (WEAK_COPYLEFT_IDS.has(canonical)) {
+            return LicenseSeverity.weakCopyleft;
+        }
+        if (STRONG_COPYLEFT_IDS.has(canonical)) {
+            return LicenseSeverity.strongCopyleft;
+        }
+
+        return LicenseSeverity.unknown;
+    }
+
+    /**
+     * Case-canonicalise the well-known prefixes; anything else stays
+     * as-is. npm packages are inconsistent about case (`mit` instead
+     * of `MIT`) and pluses (`GPL-3.0+` vs `GPL-3.0-or-later`).
+     */
+    private static _canonicalise(id: string): string {
+        const upper = id.toUpperCase();
+        for (const known of [...PERMISSIVE_IDS, ...WEAK_COPYLEFT_IDS, ...STRONG_COPYLEFT_IDS]) {
+            if (upper === known.toUpperCase()) {
+                return known;
+            }
+        }
+        return id;
+    }
+
+    private static _tokenize(expr: string): Token[]|null {
+        const tokens: Token[] = [];
+        let i = 0;
+        const s = expr.trim();
+
+        while (i < s.length) {
+            const ch = s[i];
+
+            if (ch === ' ' || ch === '\t' || ch === '\n') {
+                i++;
+                continue;
+            }
+
+            if (ch === '(') {
+                tokens.push({kind: 'lparen'});
+                i++;
+                continue;
+            }
+
+            if (ch === ')') {
+                tokens.push({kind: 'rparen'});
+                i++;
+                continue;
+            }
+
+            // Identifier / keyword. SPDX IDs use [A-Za-z0-9.+-], plus
+            // the keywords OR/AND/WITH. Read until we hit a space or
+            // paren.
+            let j = i;
+            while (j < s.length && !/[\s()]/.test(s[j])) {
+                j++;
+            }
+            const word = s.slice(i, j);
+            if (word.length === 0) {
+                return null;
+            }
+
+            const upper = word.toUpperCase();
+            if (upper === 'OR' || upper === 'AND' || upper === 'WITH') {
+                tokens.push({kind: 'op', value: upper as 'OR'|'AND'|'WITH'});
+            } else {
+                tokens.push({kind: 'id', value: word});
+            }
+            i = j;
+        }
+
+        return tokens;
+    }
+
+    /**
+     * Recursive-descent SPDX expression evaluator. Grammar:
+     *
+     *   expr   := term (OR term)*
+     *   term   := factor (AND factor)*
+     *   factor := atom (WITH id)?
+     *   atom   := id | '(' expr ')'
+     *
+     * Returns the aggregate `{severity, identifiers}` of the
+     * expression. `null` means we couldn't parse — caller falls back
+     * to atom-level classification of the whole string.
+     */
+    private static _evalExpression(
+        tokens: Token[]
+    ): {severity: LicenseSeverity; identifiers: string[]}|null {
+        let pos = 0;
+        const ids = new Set<string>();
+
+        const peek = (): Token|null => tokens[pos] ?? null;
+        const consume = (): Token|null => tokens[pos++] ?? null;
+
+        const parseAtom = (): LicenseSeverity|null => {
+            const tok = consume();
+            if (!tok) {
+                return null;
+            }
+            if (tok.kind === 'lparen') {
+                const inner = parseExpr();
+                const close = consume();
+                if (!close || close.kind !== 'rparen') {
+                    return null;
+                }
+                return inner;
+            }
+            if (tok.kind === 'id') {
+                ids.add(tok.value);
+                return LicenseScanner._classifyAtom(tok.value);
+            }
+            return null;
+        };
+
+        const parseFactor = (): LicenseSeverity|null => {
+            const sev = parseAtom();
+            if (sev === null) {
+                return null;
+            }
+            // `Apache-2.0 WITH Classpath-exception-2.0` — the WITH
+            // clause is an exception that loosens the parent license,
+            // never changes its bucket.
+            if (peek()?.kind === 'op' && (peek() as {value: string}).value === 'WITH') {
+                consume();
+                const next = consume();
+                if (!next || next.kind !== 'id') {
+                    return null;
+                }
+                ids.add(next.value);
+            }
+            return sev;
+        };
+
+        const parseTerm = (): LicenseSeverity|null => {
+            let sev = parseFactor();
+            if (sev === null) {
+                return null;
+            }
+            while (peek()?.kind === 'op' && (peek() as {value: string}).value === 'AND') {
+                consume();
+                const next = parseFactor();
+                if (next === null) {
+                    return null;
+                }
+                // AND: must comply with both — worst wins.
+                if (RANK[next] > RANK[sev]) {
+                    sev = next;
+                }
+            }
+            return sev;
+        };
+
+        const parseExpr = (): LicenseSeverity|null => {
+            let sev = parseTerm();
+            if (sev === null) {
+                return null;
+            }
+            while (peek()?.kind === 'op' && (peek() as {value: string}).value === 'OR') {
+                consume();
+                const next = parseTerm();
+                if (next === null) {
+                    return null;
+                }
+                // OR: user can pick the best one.
+                if (RANK[next] < RANK[sev]) {
+                    sev = next;
+                }
+            }
+            return sev;
+        };
+
+        const severity = parseExpr();
+        if (severity === null || pos !== tokens.length) {
+            return null;
+        }
+        return {severity, identifiers: Array.from(ids)};
     }
 }
 

@@ -1,6 +1,6 @@
 import {ConfigProjectType} from '../Config/Config.js';
-import {isGitVersion} from '../Fingerprint/GitResolver.js';
-import {topLevelVersionMap} from '../Project/Lockfile.js';
+import {GitResolver} from '../Fingerprint/GitResolver.js';
+import {LockfileReader} from '../Project/Lockfile.js';
 import {PackageManifest, DependencyType} from '../Project/PackageManifest.js';
 import {Project} from '../Project/Project.js';
 import {Registry} from '../Registry/Registry.js';
@@ -60,223 +60,230 @@ export type MatrixResponse = {
 };
 
 /**
- * Strip range modifiers (`^`, `~`, `>=`, `=`, leading `v`, whitespace)
- * so we can compare an installed range against `latest`. This is a
- * deliberately lossy normalisation — for matrix colouring we just need
- * "does the pinned version look like the registry latest". Caret/tilde
- * widening is treated as "same" here (a user wanting strict equality
- * pins exact versions anyway).
+ * Cross-project matrix assembly. All methods are static — the builder
+ * holds no state; it just walks projects + registry once per request.
  */
-export function cleanRange(range: string): string {
-    return range
-        .trim()
-        .replace(/^[\^~=v]+/, '')
-        .replace(/^>=\s*/, '')
-        .split(/\s/)[0];
-}
+export class MatrixBuilder {
 
-/**
- * Same status decision as the global matrix uses, but parameterised
- * over plain version strings so the per-project view can reuse it
- * without forging fake `MatrixCell` shapes (those carry an
- * `internalDrift` flag that doesn't apply when workspaces are *not*
- * collapsed).
- */
-export function computeStatusFromVersions(
-    versions: string[],
-    latest: string|null
-): MatrixRowStatus {
-    const cleaned = new Set<string>();
-    for (const v of versions) {
-        cleaned.add(cleanRange(v));
+    /**
+     * Strip range modifiers (`^`, `~`, `>=`, `=`, leading `v`,
+     * whitespace) so we can compare an installed range against
+     * `latest`. Deliberately lossy: caret/tilde widening collapses to
+     * "same". A user wanting strict equality pins exact versions
+     * anyway.
+     */
+    public static cleanRange(range: string): string {
+        return range
+            .trim()
+            .replace(/^[\^~=v]+/, '')
+            .replace(/^>=\s*/, '')
+            .split(/\s/)[0];
     }
 
-    if (cleaned.size > 1) {
-        return MatrixRowStatus.drift;
-    }
-
-    if (latest === null) {
-        return MatrixRowStatus.unknown;
-    }
-
-    const single = cleaned.values().next().value;
-    if (single === undefined) {
-        return MatrixRowStatus.unknown;
-    }
-
-    return single === cleanRange(latest)
-        ? MatrixRowStatus.aligned
-        : MatrixRowStatus.outdated;
-}
-
-/**
- * Aggregate one project's manifests into a single per-package cell.
- * If the project's own workspaces disagree, `internalDrift` is set
- * and the cell's `version` shows the *root* manifest's version
- * (falling back to the first workspace that declares it).
- */
-function buildProjectCells(manifests: PackageManifest[]): Map<string, MatrixCell> {
-    const out = new Map<string, MatrixCell>();
-
-    // collect every (name -> [versions, types, source]) across manifests
-    const collected = new Map<string, {versions: Set<string>; types: Set<DependencyType>; rootVersion: string|null}>();
-
-    for (const manifest of manifests) {
-        const isRoot = manifest.workspace === undefined;
-
-        for (const dep of manifest.dependencies) {
-            let entry = collected.get(dep.name);
-
-            if (!entry) {
-                entry = {versions: new Set(), types: new Set(), rootVersion: null};
-                collected.set(dep.name, entry);
-            }
-
-            entry.versions.add(dep.version);
-            entry.types.add(dep.type);
-
-            if (isRoot) {
-                entry.rootVersion = dep.version;
-            }
+    /**
+     * Status decision parameterised over plain version strings so the
+     * per-project view can reuse it without forging fake `MatrixCell`
+     * shapes (those carry an `internalDrift` flag that doesn't apply
+     * when workspaces are *not* collapsed).
+     */
+    public static computeStatusFromVersions(
+        versions: string[],
+        latest: string|null
+    ): MatrixRowStatus {
+        const cleaned = new Set<string>();
+        for (const v of versions) {
+            cleaned.add(MatrixBuilder.cleanRange(v));
         }
+
+        if (cleaned.size > 1) {
+            return MatrixRowStatus.drift;
+        }
+
+        if (latest === null) {
+            return MatrixRowStatus.unknown;
+        }
+
+        const single = cleaned.values().next().value;
+        if (single === undefined) {
+            return MatrixRowStatus.unknown;
+        }
+
+        return single === MatrixBuilder.cleanRange(latest)
+            ? MatrixRowStatus.aligned
+            : MatrixRowStatus.outdated;
     }
 
-    for (const [name, entry] of collected.entries()) {
-        // prefer the root version for the displayed cell so the user
-        // sees what the "project as a whole" is pinning; if there's
-        // no root manifest declaration, pick any.
-        const display = entry.rootVersion ?? Array.from(entry.versions)[0];
+    /**
+     * Top-level builder: load each project's manifests, fold them
+     * into per-project cells, union the package names, ask the
+     * registry for `latest` of every name in one batch, then assemble
+     * the response.
+     */
+    public static async build(
+        registeredProjects: Map<string, Project>,
+        registry: Registry
+    ): Promise<MatrixResponse> {
+        const projects: MatrixProject[] = [];
+        const perProjectCells = new Map<string, Map<string, MatrixCell>>();
+        const allPackageNames = new Set<string>();
 
-        out.set(name, {
-            version: display,
-            types: Array.from(entry.types),
-            internalDrift: entry.versions.size > 1
-        });
-    }
+        for (const [unid, project] of registeredProjects.entries()) {
+            const meta: MatrixProject = {
+                unid,
+                name: project.getName(),
+                type: project.getType()
+            };
 
-    return out;
-}
-
-/**
- * Decide row status from the cells + registry data. See `MatrixRowStatus`
- * for semantics.
- */
-function computeStatus(
-    cells: Record<string, MatrixCell>,
-    latest: string|null
-): MatrixRowStatus {
-    const cleaned = new Set<string>();
-
-    for (const cell of Object.values(cells)) {
-        cleaned.add(cleanRange(cell.version));
-    }
-
-    if (cleaned.size > 1) {
-        return MatrixRowStatus.drift;
-    }
-
-    if (latest === null) {
-        return MatrixRowStatus.unknown;
-    }
-
-    const single = cleaned.values().next().value;
-
-    if (single === undefined) {
-        return MatrixRowStatus.unknown;
-    }
-
-    return single === cleanRange(latest)
-        ? MatrixRowStatus.aligned
-        : MatrixRowStatus.outdated;
-}
-
-/**
- * Top-level builder: load each project's manifests, fold them into
- * per-project cells, union the package names, ask the registry for
- * `latest` of every name in one batch, then assemble the response.
- */
-export async function buildMatrix(
-    registeredProjects: Map<string, Project>,
-    registry: Registry
-): Promise<MatrixResponse> {
-    const projects: MatrixProject[] = [];
-    const perProjectCells = new Map<string, Map<string, MatrixCell>>();
-    const allPackageNames = new Set<string>();
-
-    for (const [unid, project] of registeredProjects.entries()) {
-        const meta: MatrixProject = {
-            unid,
-            name: project.getName(),
-            type: project.getType()
-        };
-
-        try {
-            const manifests = await project.loadManifests();
-            const cells = buildProjectCells(manifests);
-
-            // Pull a `name → installed version` map from the project's
-            // lockfile so cells that pin a git URL can surface the
-            // concrete version next to it. Best-effort — lockfile
-            // failures don't block the matrix.
             try {
-                const lockfile = await project.loadLockfile();
-                if (lockfile) {
-                    const installed = topLevelVersionMap(lockfile);
-                    for (const [name, cell] of cells) {
-                        if (isGitVersion(cell.version)) {
-                            const v = installed.get(name);
-                            if (v) {
-                                cell.installedVersion = v;
+                const manifests = await project.loadManifests();
+                const cells = MatrixBuilder._buildProjectCells(manifests);
+
+                // Pull a `name → installed version` map from the
+                // project's lockfile so cells that pin a git URL can
+                // surface the concrete version next to it.
+                // Best-effort — lockfile failures don't block the
+                // matrix.
+                try {
+                    const lockfile = await project.loadLockfile();
+                    if (lockfile) {
+                        const installed = LockfileReader.topLevelVersionMap(lockfile);
+                        for (const [name, cell] of cells) {
+                            if (GitResolver.isGitVersion(cell.version)) {
+                                const v = installed.get(name);
+                                if (v) {
+                                    cell.installedVersion = v;
+                                }
                             }
                         }
                     }
+                } catch {
+                    // best-effort; matrix still renders without
                 }
-            } catch {
-                // best-effort; matrix still renders without
+
+                perProjectCells.set(unid, cells);
+
+                for (const name of cells.keys()) {
+                    allPackageNames.add(name);
+                }
+            } catch (e) {
+                meta.error = (e as Error).message;
+                perProjectCells.set(unid, new Map());
             }
 
-            perProjectCells.set(unid, cells);
-
-            for (const name of cells.keys()) {
-                allPackageNames.add(name);
-            }
-        } catch (e) {
-            meta.error = (e as Error).message;
-            perProjectCells.set(unid, new Map());
+            projects.push(meta);
         }
 
-        projects.push(meta);
+        // single batched registry call for the union — Registry
+        // handles concurrency + cache so this is fast on a warm cache.
+        const registryHits = await registry.fetchMany(Array.from(allPackageNames));
+
+        const rows: MatrixRow[] = [];
+
+        for (const pkgName of Array.from(allPackageNames).sort()) {
+            const rowCells: Record<string, MatrixCell> = {};
+
+            for (const [unid, cells] of perProjectCells.entries()) {
+                const cell = cells.get(pkgName);
+
+                if (cell) {
+                    rowCells[unid] = cell;
+                }
+            }
+
+            const reg = registryHits.get(pkgName) ?? null;
+            const latest = reg?.latest ?? null;
+            const latestPublishedAt = (latest && reg?.time?.[latest]) ?? null;
+
+            rows.push({
+                name: pkgName,
+                cells: rowCells,
+                latest,
+                latestPublishedAt,
+                status: MatrixBuilder._computeStatus(rowCells, latest)
+            });
+        }
+
+        return {projects, rows};
     }
 
-    // single batched registry call for the union — Registry handles
-    // concurrency + cache so this is fast on a warm cache.
-    const registryHits = await registry.fetchMany(Array.from(allPackageNames));
+    /**
+     * Aggregate one project's manifests into a single per-package
+     * cell. If the project's own workspaces disagree,
+     * `internalDrift` is set and the cell's `version` shows the
+     * *root* manifest's version (falling back to the first workspace
+     * that declares it).
+     */
+    private static _buildProjectCells(manifests: PackageManifest[]): Map<string, MatrixCell> {
+        const out = new Map<string, MatrixCell>();
 
-    const rows: MatrixRow[] = [];
+        const collected = new Map<string, {versions: Set<string>; types: Set<DependencyType>; rootVersion: string|null}>();
 
-    for (const pkgName of Array.from(allPackageNames).sort()) {
-        const rowCells: Record<string, MatrixCell> = {};
+        for (const manifest of manifests) {
+            const isRoot = manifest.workspace === undefined;
 
-        for (const [unid, cells] of perProjectCells.entries()) {
-            const cell = cells.get(pkgName);
+            for (const dep of manifest.dependencies) {
+                let entry = collected.get(dep.name);
 
-            if (cell) {
-                rowCells[unid] = cell;
+                if (!entry) {
+                    entry = {versions: new Set(), types: new Set(), rootVersion: null};
+                    collected.set(dep.name, entry);
+                }
+
+                entry.versions.add(dep.version);
+                entry.types.add(dep.type);
+
+                if (isRoot) {
+                    entry.rootVersion = dep.version;
+                }
             }
         }
 
-        const reg = registryHits.get(pkgName) ?? null;
-        const latest = reg?.latest ?? null;
-        const latestPublishedAt = (latest && reg?.time?.[latest]) ?? null;
+        for (const [name, entry] of collected.entries()) {
+            // prefer the root version for the displayed cell so the
+            // user sees what the "project as a whole" is pinning; if
+            // there's no root manifest declaration, pick any.
+            const display = entry.rootVersion ?? Array.from(entry.versions)[0];
 
-        rows.push({
-            name: pkgName,
-            cells: rowCells,
-            latest,
-            latestPublishedAt,
-            status: computeStatus(rowCells, latest)
-        });
+            out.set(name, {
+                version: display,
+                types: Array.from(entry.types),
+                internalDrift: entry.versions.size > 1
+            });
+        }
+
+        return out;
     }
 
-    return {projects, rows};
+    /**
+     * Decide row status from the cells + registry data. See
+     * `MatrixRowStatus` for semantics.
+     */
+    private static _computeStatus(
+        cells: Record<string, MatrixCell>,
+        latest: string|null
+    ): MatrixRowStatus {
+        const cleaned = new Set<string>();
+
+        for (const cell of Object.values(cells)) {
+            cleaned.add(MatrixBuilder.cleanRange(cell.version));
+        }
+
+        if (cleaned.size > 1) {
+            return MatrixRowStatus.drift;
+        }
+
+        if (latest === null) {
+            return MatrixRowStatus.unknown;
+        }
+
+        const single = cleaned.values().next().value;
+
+        if (single === undefined) {
+            return MatrixRowStatus.unknown;
+        }
+
+        return single === MatrixBuilder.cleanRange(latest)
+            ? MatrixRowStatus.aligned
+            : MatrixRowStatus.outdated;
+    }
 }

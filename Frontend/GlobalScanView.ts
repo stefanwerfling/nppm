@@ -5,7 +5,7 @@ import {
     ApiAnalyzeResultEvent,
     ApiAnalyzeStartEvent
 } from '../Api/ApiTypes.js';
-import {t} from './I18n.js';
+import {I18n} from './I18n.js';
 
 /**
  * One row in the global scan result. We keep both `vulnIds` and the
@@ -76,19 +76,19 @@ export class GlobalScanView {
 
         if (this._topbarBtn) {
             this._topbarBtn.disabled = true;
-            this._topbarBtn.textContent = t('Scanning …');
+            this._topbarBtn.textContent = I18n.t('Scanning …');
         }
         if (this._topbarProgress) {
             this._topbarProgress.style.display = '';
         }
-        this._updateProgress(0, 0, t('Starting …'));
+        this._updateProgress(0, 0, I18n.t('Starting …'));
 
         const es = new EventSource('/api/lockfile/analyze-all');
         this._stream = es;
 
         es.addEventListener('start', (e) => {
             const data = JSON.parse((e as MessageEvent).data) as ApiAnalyzeStartEvent;
-            this._updateProgress(0, data.total, t('Scanning CVEs'));
+            this._updateProgress(0, data.total, I18n.t('Scanning CVEs'));
         });
 
         es.addEventListener('result', (e) => {
@@ -116,15 +116,15 @@ export class GlobalScanView {
 
         es.addEventListener('end', (e) => {
             const data = JSON.parse((e as MessageEvent).data) as ApiAnalyzeEndEvent;
-            this._updateProgress(data.total, data.total, t('Done'));
-            this._finishScan(t('Scan finished — {n} unique packages checked', {n: data.total}));
+            this._updateProgress(data.total, data.total, I18n.t('Done'));
+            this._finishScan(I18n.t('Scan finished — {n} unique packages checked', {n: data.total}));
             this._renderTable();
         });
 
         es.addEventListener('error', (e) => {
             const msg = (e as MessageEvent).data
                 ? (JSON.parse((e as MessageEvent).data) as ApiAnalyzeErrorEvent).msg
-                : t('Connection to analyser lost');
+                : I18n.t('Connection to analyser lost');
             this._finishScan(msg);
         });
     }
@@ -141,7 +141,7 @@ export class GlobalScanView {
 
         if (this._topbarBtn) {
             this._topbarBtn.disabled = false;
-            this._topbarBtn.textContent = t('Re-scan');
+            this._topbarBtn.textContent = I18n.t('Re-scan');
         }
         if (this._topbarProgressText) {
             this._topbarProgressText.textContent = message;
@@ -167,7 +167,7 @@ export class GlobalScanView {
 
         const title = document.createElement('div');
         title.className = 'installed-title';
-        title.textContent = t('Global CVE scan');
+        title.textContent = I18n.t('Global CVE scan');
         header.appendChild(title);
 
         const filterWrap = document.createElement('label');
@@ -182,7 +182,7 @@ export class GlobalScanView {
         });
 
         const text = document.createElement('span');
-        text.textContent = ` ${t('Only issues')}`;
+        text.textContent = ` ${I18n.t('Only issues')}`;
 
         filterWrap.appendChild(checkbox);
         filterWrap.appendChild(text);
@@ -212,8 +212,8 @@ export class GlobalScanView {
             // Rows with vulns float to the top; within each tier sort by
             // name + version. Failed lookups (vulnIds === null) come
             // last because they're noise.
-            const sa = scoreRow(a);
-            const sb = scoreRow(b);
+            const sa = GlobalScanView._scoreRow(a);
+            const sb = GlobalScanView._scoreRow(b);
             if (sa !== sb) {
                 return sb - sa;
             }
@@ -227,8 +227,8 @@ export class GlobalScanView {
             const empty = document.createElement('div');
             empty.className = 'list-placeholder';
             empty.textContent = this._filterIssuesOnly
-                ? t('No hits so far.')
-                : t('No data yet — start the scan or wait for the first result.');
+                ? I18n.t('No hits so far.')
+                : I18n.t('No data yet — start the scan or wait for the first result.');
             host.appendChild(empty);
             return;
         }
@@ -238,10 +238,10 @@ export class GlobalScanView {
         table.innerHTML = `
             <thead>
                 <tr>
-                    <th>${t('Package')}</th>
-                    <th>${t('Version')}</th>
+                    <th>${I18n.t('Package')}</th>
+                    <th>${I18n.t('Version')}</th>
                     <th>CVEs</th>
-                    <th>${t('Projects')}</th>
+                    <th>${I18n.t('Projects')}</th>
                 </tr>
             </thead>
         `;
@@ -271,7 +271,7 @@ export class GlobalScanView {
         cves.className = 'installed-cve-cell';
         if (r.vulnIds === null) {
             cves.textContent = '?';
-            cves.title = t('OSV.dev unreachable for this package');
+            cves.title = I18n.t('OSV.dev unreachable for this package');
         } else if (r.vulnIds.length === 0) {
             cves.textContent = '✓';
             cves.classList.add('installed-cve-clean');
@@ -291,11 +291,16 @@ export class GlobalScanView {
 
         return tr;
     }
-}
 
-function scoreRow(r: GlobalRow): number {
-    if (r.vulnIds === null) {
-        return -1;
+    /**
+     * Sort weight for a result row: rows OSV couldn't reach sink to
+     * the bottom (-1), then ascending by vuln count. Pulled into a
+     * static so the sort callback above stays a one-liner.
+     */
+    private static _scoreRow(r: GlobalRow): number {
+        if (r.vulnIds === null) {
+            return -1;
+        }
+        return r.vulnIds.length;
     }
-    return r.vulnIds.length;
 }

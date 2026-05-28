@@ -1,43 +1,46 @@
 import 'normalize.css';
 import './main.css';
-import {getLanguage, LANGUAGES, setLanguage} from './Frontend/I18n.js';
+import {I18n, LANGUAGES} from './Frontend/I18n.js';
 import {Nppm} from './Frontend/Nppm.js';
 
 /**
- * Build the language picker into the topbar from the `LANGUAGES`
- * registry. Adding a new locale is then a single edit in `I18n.ts`
- * — the DOM updates itself the next page load. Switching reloads
- * the page; the alternative (re-render every view in-place) is more
- * error-prone for nppm's ~150 strings.
+ * Topbar language picker. Static `mount()` builds the DOM from the
+ * `LANGUAGES` registry — adding a new locale is then a single edit
+ * in `I18n.ts` and the DOM updates itself on the next page load.
+ * Switching reloads the page; re-rendering every view in-place would
+ * be more error-prone for nppm's ~150 strings.
  */
-function mountLanguagePicker(): void {
-    const host = document.getElementById('topbar-lang');
-    if (!host) {
-        return;
-    }
-    host.innerHTML = '';
-    const active = getLanguage();
-    for (const info of LANGUAGES) {
-        const btn = document.createElement('button');
-        btn.className = 'topbar-flag';
-        btn.title = info.label;
-        btn.dataset.lang = info.id;
-        btn.textContent = info.flag;
-        if (info.id === active) {
-            btn.classList.add('topbar-flag-active');
+class LanguagePicker {
+
+    public static mount(): void {
+        const host = document.getElementById('topbar-lang');
+        if (!host) {
+            return;
         }
-        btn.addEventListener('click', () => {
-            if (info.id === getLanguage()) {
-                return;
+        host.innerHTML = '';
+        const active = I18n.getLanguage();
+        for (const info of LANGUAGES) {
+            const btn = document.createElement('button');
+            btn.className = 'topbar-flag';
+            btn.title = info.label;
+            btn.dataset.lang = info.id;
+            btn.textContent = info.flag;
+            if (info.id === active) {
+                btn.classList.add('topbar-flag-active');
             }
-            setLanguage(info.id);
-            location.reload();
-        });
-        host.appendChild(btn);
+            btn.addEventListener('click', () => {
+                if (info.id === I18n.getLanguage()) {
+                    return;
+                }
+                I18n.setLanguage(info.id);
+                location.reload();
+            });
+            host.appendChild(btn);
+        }
     }
 }
 
-mountLanguagePicker();
+LanguagePicker.mount();
 
 const app = new Nppm();
 void app.start();

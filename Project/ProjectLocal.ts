@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import {ConfigProjectType} from '../Config/Config.js';
-import {Lockfile, parsePackageLock, scanNodeModules} from './Lockfile.js';
+import {Lockfile, LockfileReader} from './Lockfile.js';
 import {DependencyType, PackageDependency, PackageManifest} from './PackageManifest.js';
 import {Project} from './Project.js';
 
@@ -61,15 +61,15 @@ export class ProjectLocal implements Project {
         //      (no dev/peer/optional flags, no nested data)
         const lockPath = path.join(this._root, 'package-lock.json');
         if (fs.existsSync(lockPath)) {
-            return parsePackageLock(fs.readFileSync(lockPath, 'utf-8'), 'committed');
+            return LockfileReader.parse(fs.readFileSync(lockPath, 'utf-8'), 'committed');
         }
 
         const hiddenLockPath = path.join(this._root, 'node_modules', '.package-lock.json');
         if (fs.existsSync(hiddenLockPath)) {
-            return parsePackageLock(fs.readFileSync(hiddenLockPath, 'utf-8'), 'hidden');
+            return LockfileReader.parse(fs.readFileSync(hiddenLockPath, 'utf-8'), 'hidden');
         }
 
-        return scanNodeModules(this._root, fs);
+        return LockfileReader.scanNodeModules(this._root, fs);
     }
 
     public async loadManifests(): Promise<PackageManifest[]> {

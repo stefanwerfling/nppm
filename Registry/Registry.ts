@@ -1,107 +1,6 @@
 import {JsonCache} from '../Cache/JsonCache.js';
 
 /**
- * Coerce a registry-level `repository` value into a single URL/
- * shorthand string. npm allows three shapes:
- *   - `{ type: 'git', url: 'git+https://...' }`
- *   - `'owner/repo'` (npm shorthand)
- *   - `'git+https://...'` (bare URL)
- * Everything else collapses to `undefined`.
- */
-/**
- * Coerce the npm packument's `license` field into a single SPDX-style
- * string. npm allows three legacy shapes:
- *   - `license: "MIT"` (modern, what we want)
- *   - `license: {type: "MIT", url: "…"}` (deprecated object form)
- *   - `licenses: [{type: "MIT"}, {type: "Apache-2.0"}]` (legacy array,
- *     interpreted as a dual-license = SPDX OR expression)
- * Returns `undefined` when none of the above yield a usable string —
- * `LicenseScanner` treats that as `unknown`.
- */
-function extractLicense(license: unknown, licenses: unknown): string|undefined {
-    if (typeof license === 'string' && license.length > 0) {
-        return license;
-    }
-    if (license && typeof license === 'object') {
-        const type = (license as {type?: unknown}).type;
-        if (typeof type === 'string' && type.length > 0) {
-            return type;
-        }
-    }
-    if (Array.isArray(licenses) && licenses.length > 0) {
-        const ids = licenses
-            .map((l) => {
-                if (typeof l === 'string') {
-                    return l;
-                }
-                if (l && typeof l === 'object') {
-                    const t = (l as {type?: unknown}).type;
-                    return typeof t === 'string' ? t : null;
-                }
-                return null;
-            })
-            .filter((s): s is string => typeof s === 'string' && s.length > 0);
-        if (ids.length === 1) {
-            return ids[0];
-        }
-        if (ids.length > 1) {
-            return `(${ids.join(' OR ')})`;
-        }
-    }
-    return undefined;
-}
-
-/**
- * Pull `_npmUser` out of each version object in the packument. The
- * registry's packument is shaped as `{versions: {[v]: {_npmUser: {name,
- * email}, ...}}}`. Versions without `_npmUser` (very old releases) are
- * skipped; the resulting map only contains versions we actually have a
- * publisher for. Returns `undefined` when nothing usable was found, so
- * the field stays absent in the cached envelope.
- */
-function extractPublishers(versions: unknown): Record<string, RegistryPublisher>|undefined {
-    if (!versions || typeof versions !== 'object') {
-        return undefined;
-    }
-
-    const out: Record<string, RegistryPublisher> = {};
-    let any = false;
-
-    for (const [version, entry] of Object.entries(versions as Record<string, unknown>)) {
-        if (!entry || typeof entry !== 'object') {
-            continue;
-        }
-        const user = (entry as {_npmUser?: unknown})._npmUser;
-        if (!user || typeof user !== 'object') {
-            continue;
-        }
-        const u = user as {name?: unknown; email?: unknown};
-        if (typeof u.name !== 'string' || u.name.length === 0) {
-            continue;
-        }
-        out[version] = typeof u.email === 'string'
-            ? {name: u.name, email: u.email}
-            : {name: u.name};
-        any = true;
-    }
-
-    return any ? out : undefined;
-}
-
-function extractRepository(raw: unknown): string|undefined {
-    if (typeof raw === 'string') {
-        return raw;
-    }
-    if (raw && typeof raw === 'object') {
-        const url = (raw as {url?: unknown}).url;
-        if (typeof url === 'string') {
-            return url;
-        }
-    }
-    return undefined;
-}
-
-/**
  * Per-version publisher record. `name` is the npm username from
  * `_npmUser`; `email` is best-effort and frequently absent on old
  * versions. Missing for very old packages (pre-2014) where the
@@ -209,11 +108,11 @@ export class Registry {
                 latest: raw['dist-tags']?.latest ?? null,
                 versions: raw.versions ? Object.keys(raw.versions) : [],
                 time: raw.time,
-                repository: extractRepository(raw.repository),
+                repository: Registry._extractRepository(raw.repository),
                 description: typeof raw.description === 'string' ? raw.description : undefined,
                 homepage: typeof raw.homepage === 'string' ? raw.homepage : undefined,
-                license: extractLicense(raw.license, raw.licenses),
-                publishers: extractPublishers(raw.versions)
+                license: Registry._extractLicense(raw.license, raw.licenses),
+                publishers: Registry._extractPublishers(raw.versions)
             };
 
             this._cache.set(name, pkg);
@@ -252,5 +151,105 @@ export class Registry {
 
         await Promise.all(workers);
         return result;
+    }
+
+    /**
+     * Coerce a registry-level `repository` value into a single URL /
+     * shorthand string. npm allows three shapes:
+     *   - `{ type: 'git', url: 'git+https://...' }`
+     *   - `'owner/repo'` (npm shorthand)
+     *   - `'git+https://...'` (bare URL)
+     * Everything else collapses to `undefined`.
+     */
+    private static _extractRepository(raw: unknown): string|undefined {
+        if (typeof raw === 'string') {
+            return raw;
+        }
+        if (raw && typeof raw === 'object') {
+            const url = (raw as {url?: unknown}).url;
+            if (typeof url === 'string') {
+                return url;
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Coerce the npm packument's `license` field into a single
+     * SPDX-style string. npm allows three legacy shapes:
+     *   - `license: "MIT"` (modern, what we want)
+     *   - `license: {type: "MIT", url: "…"}` (deprecated object form)
+     *   - `licenses: [{type: "MIT"}, {type: "Apache-2.0"}]` (legacy
+     *     array, interpreted as a dual-license = SPDX OR expression)
+     * Returns `undefined` when none of the above yield a usable
+     * string — `LicenseScanner` treats that as `unknown`.
+     */
+    private static _extractLicense(license: unknown, licenses: unknown): string|undefined {
+        if (typeof license === 'string' && license.length > 0) {
+            return license;
+        }
+        if (license && typeof license === 'object') {
+            const type = (license as {type?: unknown}).type;
+            if (typeof type === 'string' && type.length > 0) {
+                return type;
+            }
+        }
+        if (Array.isArray(licenses) && licenses.length > 0) {
+            const ids = licenses
+                .map((l) => {
+                    if (typeof l === 'string') {
+                        return l;
+                    }
+                    if (l && typeof l === 'object') {
+                        const t = (l as {type?: unknown}).type;
+                        return typeof t === 'string' ? t : null;
+                    }
+                    return null;
+                })
+                .filter((s): s is string => typeof s === 'string' && s.length > 0);
+            if (ids.length === 1) {
+                return ids[0];
+            }
+            if (ids.length > 1) {
+                return `(${ids.join(' OR ')})`;
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Pull `_npmUser` out of each version object in the packument.
+     * Versions without `_npmUser` (very old releases) are skipped;
+     * the resulting map only contains versions we actually have a
+     * publisher for. Returns `undefined` when nothing usable was
+     * found, so the field stays absent in the cached envelope.
+     */
+    private static _extractPublishers(versions: unknown): Record<string, RegistryPublisher>|undefined {
+        if (!versions || typeof versions !== 'object') {
+            return undefined;
+        }
+
+        const out: Record<string, RegistryPublisher> = {};
+        let any = false;
+
+        for (const [version, entry] of Object.entries(versions as Record<string, unknown>)) {
+            if (!entry || typeof entry !== 'object') {
+                continue;
+            }
+            const user = (entry as {_npmUser?: unknown})._npmUser;
+            if (!user || typeof user !== 'object') {
+                continue;
+            }
+            const u = user as {name?: unknown; email?: unknown};
+            if (typeof u.name !== 'string' || u.name.length === 0) {
+                continue;
+            }
+            out[version] = typeof u.email === 'string'
+                ? {name: u.name, email: u.email}
+                : {name: u.name};
+            any = true;
+        }
+
+        return any ? out : undefined;
     }
 }

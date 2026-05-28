@@ -4,7 +4,7 @@ import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {JsonCache} from '../Cache/JsonCache.js';
 import {ConfigProjectType} from '../Config/Config.js';
-import {buildDepGraph} from '../DepGraph/DepGraphBuilder.js';
+import {DepGraphBuilder} from '../DepGraph/DepGraphBuilder.js';
 import {Lockfile, LockedPackage} from '../Project/Lockfile.js';
 import {DependencyType, PackageManifest} from '../Project/PackageManifest.js';
 import {Project} from '../Project/Project.js';
@@ -63,7 +63,7 @@ function pkg(name: string, version: string, opts: Partial<LockedPackage> = {}): 
     };
 }
 
-describe('buildDepGraph', () => {
+describe('DepGraphBuilder.build', () => {
     let dir: string;
 
     beforeEach(() => {
@@ -76,7 +76,7 @@ describe('buildDepGraph', () => {
 
     it('returns null when the project has no lockfile', async () => {
         const project = new FakeProject([], null);
-        const graph = await buildDepGraph('UNID', project, new FakeRegistry({}, dir), new JsonCache(dir, 60));
+        const graph = await DepGraphBuilder.build('UNID', project, new FakeRegistry({}, dir), new JsonCache(dir, 60));
         expect(graph).toBeNull();
     });
 
@@ -96,7 +96,7 @@ describe('buildDepGraph', () => {
             }
         );
 
-        const graph = await buildDepGraph('UNID', project, new FakeRegistry({}, dir), new JsonCache(dir, 60));
+        const graph = await DepGraphBuilder.build('UNID', project, new FakeRegistry({}, dir), new JsonCache(dir, 60));
         expect(graph!.rootDeps).toEqual([{name: 'foo', version: '1.2.3'}]);
         expect(graph!.packages['foo@1.2.3'].deps).toEqual([{name: 'bar', version: '2.0.0'}]);
     });
@@ -116,7 +116,7 @@ describe('buildDepGraph', () => {
             }
         );
 
-        const graph = await buildDepGraph('UNID', project, new FakeRegistry({}, dir), new JsonCache(dir, 60));
+        const graph = await DepGraphBuilder.build('UNID', project, new FakeRegistry({}, dir), new JsonCache(dir, 60));
         expect(graph!.packages['a@1.0.0'].deps).toEqual([{name: 'b', version: '2.0.0'}]);
     });
 
@@ -130,7 +130,7 @@ describe('buildDepGraph', () => {
             }
         );
 
-        const graph = await buildDepGraph('UNID', project, new FakeRegistry({}, dir), new JsonCache(dir, 60));
+        const graph = await DepGraphBuilder.build('UNID', project, new FakeRegistry({}, dir), new JsonCache(dir, 60));
         expect(graph!.packages['a@1.0.0'].deps).toEqual([{name: 'missing', version: ''}]);
     });
 
@@ -162,7 +162,7 @@ describe('buildDepGraph', () => {
             dir
         );
 
-        const graph = await buildDepGraph('UNID', project, registry, osvCache);
+        const graph = await DepGraphBuilder.build('UNID', project, registry, osvCache);
         expect(graph!.packages['clean@1.0.0'].status).toBe('aligned');
         expect(graph!.packages['outdated@1.0.0'].status).toBe('outdated');
         expect(graph!.packages['vulnerable@1.0.0'].status).toBe('cve');

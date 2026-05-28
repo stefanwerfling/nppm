@@ -50,56 +50,65 @@ const PATTERNS: PatternDef[] = [
 ];
 
 /**
- * Walk every file's cached `content` and return one finding per match.
- * Files without `content` (TypeScript declarations, binaries, files
- * over the size cap) are silently skipped — they were never cached, so
- * we can't scan them.
- *
- * Line numbers are 1-based and computed once per file from the leading
- * substring; this is O(file_size) but `content` is capped by the
- * fingerprint builder so it stays fast.
+ * Stateless regex scanner over the per-file `content` that
+ * `FingerprintBuilder` caches for JS sources. Pure: no instance state,
+ * everything goes through static methods so callers don't carry a
+ * scanner instance around for one-shot use.
  */
-export function scanPatterns(files: FileFingerprint[]): PatternFinding[] {
-    const findings: PatternFinding[] = [];
+export class PatternScanner {
 
-    for (const file of files) {
-        if (typeof file.content !== 'string') {
-            continue;
-        }
+    /**
+     * Walk every file's cached `content` and return one finding per
+     * match. Files without `content` (TypeScript declarations,
+     * binaries, files over the size cap) are silently skipped — they
+     * were never cached, so we can't scan them.
+     *
+     * Line numbers are 1-based and computed once per file from the
+     * leading substring; this is O(file_size) but `content` is capped
+     * by the fingerprint builder so it stays fast.
+     */
+    public static scan(files: FileFingerprint[]): PatternFinding[] {
+        const findings: PatternFinding[] = [];
 
-        for (const def of PATTERNS) {
-            // Reset regex state — these patterns are declared with the
-            // `g` flag, so `lastIndex` carries over across files
-            // otherwise.
-            def.regex.lastIndex = 0;
+        for (const file of files) {
+            if (typeof file.content !== 'string') {
+                continue;
+            }
 
-            let match: RegExpExecArray|null;
-            while ((match = def.regex.exec(file.content)) !== null) {
-                const before = file.content.slice(0, match.index);
-                const line = before.split('\n').length;
+            for (const def of PATTERNS) {
+                // Reset regex state — these patterns are declared with
+                // the `g` flag, so `lastIndex` carries over across
+                // files otherwise.
+                def.regex.lastIndex = 0;
 
-                findings.push({
-                    path: file.path,
-                    line,
-                    pattern: def.name,
-                    severity: def.severity,
-                    snippet: snippetAround(file.content, match.index, match[0].length)
-                });
+                let match: RegExpExecArray|null;
+                while ((match = def.regex.exec(file.content)) !== null) {
+                    const before = file.content.slice(0, match.index);
+                    const line = before.split('\n').length;
+
+                    findings.push({
+                        path: file.path,
+                        line,
+                        pattern: def.name,
+                        severity: def.severity,
+                        snippet: PatternScanner._snippetAround(file.content, match.index, match[0].length)
+                    });
+                }
             }
         }
+
+        return findings;
     }
 
-    return findings;
-}
-
-/**
- * Pull a one-line-ish window around the match for the UI. We don't
- * try to be precise — just enough context that the user can decide
- * whether to click through to the full source.
- */
-function snippetAround(source: string, start: number, length: number): string {
-    const lineStart = source.lastIndexOf('\n', start - 1) + 1;
-    const lineEnd = source.indexOf('\n', start + length);
-    const slice = source.slice(lineStart, lineEnd === -1 ? source.length : lineEnd);
-    return slice.length > 200 ? slice.slice(0, 200) + '…' : slice;
+    /**
+     * Pull a one-line-ish window around the match for the UI. We
+     * don't try to be precise — just enough context that the user can
+     * decide whether to click through to the full source.
+     */
+    private static _snippetAround(source: string, start: number, length: number): string {
+        const lineStart = source.lastIndexOf('\n', start - 1) + 1;
+        const lineEnd = source.indexOf('\n', start + length);
+        const slice = source.slice(lineStart, lineEnd === -1 ? source.length : lineEnd);
+        return slice.length > 200 ? slice.slice(0, 200) + '…' : slice;
+    }
 }

@@ -1,5 +1,5 @@
 import {ConfigProjectType} from '../Config/Config.js';
-import {Lockfile, parsePackageLock} from './Lockfile.js';
+import {Lockfile, LockfileReader} from './Lockfile.js';
 import {DependencyType, PackageDependency, PackageManifest} from './PackageManifest.js';
 import {Project} from './Project.js';
 
@@ -69,7 +69,7 @@ export abstract class ProjectRemote implements Project {
             return null;
         }
 
-        return parsePackageLock(body);
+        return LockfileReader.parse(body);
     }
 
     public async loadManifests(): Promise<PackageManifest[]> {

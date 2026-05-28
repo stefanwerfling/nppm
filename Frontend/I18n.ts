@@ -43,67 +43,80 @@ const LOCALES: Record<Language, Record<string, string>> = {
 export const DEFAULT_LANG: Language = 'en';
 const STORAGE_KEY = 'nppm.lang';
 
-const listeners: (() => void)[] = [];
-let current: Language = loadLanguage();
-
-function isLanguage(v: unknown): v is Language {
-    return typeof v === 'string' && LANGUAGES.some((l) => l.id === v);
-}
-
-function loadLanguage(): Language {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (isLanguage(raw)) {
-            return raw;
-        }
-    } catch {
-        // localStorage disabled (private mode etc.) — fall through.
-    }
-    return DEFAULT_LANG;
-}
-
 /**
- * Look up `text` in the current language. Falls back through
- *   current locale → default locale (`en`) → source string
- * so even an untranslated string never renders empty.
+ * Static-only i18n manager. All state (current language, listeners)
+ * lives in private statics rather than module globals — single
+ * instance by construction, accessible via `I18n.t(...)`,
+ * `I18n.setLanguage(...)`.
  *
- * `params` substitutes `{key}` placeholders.
+ * The bare `t` function is preserved as a thin re-export so the
+ * thousands of existing `t('...')` call sites don't need to be
+ * touched. It just forwards to `I18n.t`.
  */
-export function t(text: string, params?: Record<string, string|number>): string {
-    const fromCurrent = LOCALES[current]?.[text];
-    const fromDefault = LOCALES[DEFAULT_LANG]?.[text];
-    let result = fromCurrent ?? fromDefault ?? text;
-    if (params) {
-        for (const [k, v] of Object.entries(params)) {
-            result = result.split(`{${k}}`).join(String(v));
+export class I18n {
+
+    private static _current: Language = I18n._loadLanguage();
+    private static readonly _listeners: (() => void)[] = [];
+
+    /**
+     * Look up `text` in the current language. Falls back through
+     *   current locale → default locale (`en`) → source string
+     * so even an untranslated string never renders empty.
+     *
+     * `params` substitutes `{key}` placeholders.
+     */
+    public static t(text: string, params?: Record<string, string|number>): string {
+        const fromCurrent = LOCALES[I18n._current]?.[text];
+        const fromDefault = LOCALES[DEFAULT_LANG]?.[text];
+        let result = fromCurrent ?? fromDefault ?? text;
+        if (params) {
+            for (const [k, v] of Object.entries(params)) {
+                result = result.split(`{${k}}`).join(String(v));
+            }
+        }
+        return result;
+    }
+
+    public static getLanguage(): Language {
+        return I18n._current;
+    }
+
+    /**
+     * Persist + notify. Listeners fire synchronously so a picker can
+     * refresh its visuals before any subsequent navigation.
+     */
+    public static setLanguage(lang: Language): void {
+        if (lang === I18n._current || !LANGUAGES.some((l) => l.id === lang)) {
+            return;
+        }
+        I18n._current = lang;
+        try {
+            localStorage.setItem(STORAGE_KEY, lang);
+        } catch {
+            // best-effort
+        }
+        for (const fn of I18n._listeners) {
+            fn();
         }
     }
-    return result;
-}
 
-export function getLanguage(): Language {
-    return current;
-}
+    public static onLanguageChange(handler: () => void): void {
+        I18n._listeners.push(handler);
+    }
 
-/**
- * Persist + notify. Listeners fire synchronously so a picker can
- * refresh its visuals before any subsequent navigation.
- */
-export function setLanguage(lang: Language): void {
-    if (lang === current || !LANGUAGES.some((l) => l.id === lang)) {
-        return;
+    private static _isLanguage(v: unknown): v is Language {
+        return typeof v === 'string' && LANGUAGES.some((l) => l.id === v);
     }
-    current = lang;
-    try {
-        localStorage.setItem(STORAGE_KEY, lang);
-    } catch {
-        // best-effort
-    }
-    for (const fn of listeners) {
-        fn();
-    }
-}
 
-export function onLanguageChange(handler: () => void): void {
-    listeners.push(handler);
+    private static _loadLanguage(): Language {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (I18n._isLanguage(raw)) {
+                return raw;
+            }
+        } catch {
+            // localStorage disabled (private mode etc.) — fall through.
+        }
+        return DEFAULT_LANG;
+    }
 }

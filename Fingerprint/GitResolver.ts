@@ -1,52 +1,9 @@
-/**
- * Detect whether a dependency `version` string points at a git ref
- * rather than a published-to-registry semver. Covers the four shapes
- * npm understands natively:
- *
- *  - `git+https://host/owner/repo.git[#ref]`
- *  - `git+ssh://git@host/owner/repo.git[#ref]`
- *  - `git@host:owner/repo.git[#ref]`
- *  - `github:owner/repo[#ref]` (and the `gitlab:` / `bitbucket:` cousins)
- *
- * `git://` (plain) is also accepted for completeness — npm still
- * resolves it, even though most hosts have moved on.
- */
-export function isGitVersion(version: string): boolean {
-    const v = version.trim();
-    return /^(git\+|git:\/\/|git@|github:|gitlab:|bitbucket:)/i.test(v);
-}
-
 export type GitTarballSpec = {
     /** Direct tarball URL we can `fetch()` from. */
     url: string;
     /** Hint for diagnostics — the URL the user wrote. */
     source: string;
 };
-
-/**
- * Resolve a git-style dependency string to a downloadable tarball URL.
- * Returns `null` when the URL belongs to a host we don't (yet) know
- * how to fetch from — caller treats that the same as "tarball
- * unavailable".
- *
- * Currently supported: github.com (codeload), gitlab.com (archive
- * endpoint), bitbucket.org (`/get/` endpoint). All three serve public
- * repos without auth and without a User-Agent header.
- */
-export function resolveGitTarball(version: string): GitTarballSpec|null {
-    const v = version.trim();
-
-    for (const host of HOSTS) {
-        for (const pat of host.patterns) {
-            const m = pat.regex.exec(v);
-            if (m) {
-                return host.tarball(m[1], m[2], m[3], v);
-            }
-        }
-    }
-
-    return null;
-}
 
 type HostHandler = {
     patterns: {regex: RegExp}[];
@@ -106,3 +63,47 @@ const HOSTS: HostHandler[] = [
         })
     }
 ];
+
+/**
+ * Resolver for the four git-style dependency strings npm understands
+ * (`git+https://…`, `git+ssh://…`, `git@host:…`, `github:owner/repo`).
+ * Pure static — there is no per-resolver state.
+ */
+export class GitResolver {
+
+    /**
+     * Detect whether a dependency `version` string points at a git ref
+     * rather than a published-to-registry semver. Covers all four npm
+     * shapes; `git://` (plain) is accepted too even though most hosts
+     * have moved on.
+     */
+    public static isGitVersion(version: string): boolean {
+        const v = version.trim();
+        return /^(git\+|git:\/\/|git@|github:|gitlab:|bitbucket:)/i.test(v);
+    }
+
+    /**
+     * Resolve a git-style dependency string to a downloadable tarball
+     * URL. Returns `null` when the URL belongs to a host we don't
+     * (yet) know how to fetch from — caller treats that the same as
+     * "tarball unavailable".
+     *
+     * Currently supported: github.com (codeload), gitlab.com (archive
+     * endpoint), bitbucket.org (`/get/` endpoint). All three serve
+     * public repos without auth.
+     */
+    public static resolveTarball(version: string): GitTarballSpec|null {
+        const v = version.trim();
+
+        for (const host of HOSTS) {
+            for (const pat of host.patterns) {
+                const m = pat.regex.exec(v);
+                if (m) {
+                    return host.tarball(m[1], m[2], m[3], v);
+                }
+            }
+        }
+
+        return null;
+    }
+}

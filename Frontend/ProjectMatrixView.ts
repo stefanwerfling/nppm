@@ -1,7 +1,7 @@
 import {ProjectMatrixResponse, ProjectMatrixRow} from '../Matrix/ProjectMatrixBuilder.js';
 import {DependencyType} from '../Project/PackageManifest.js';
 import {Api} from './Api.js';
-import {t} from './I18n.js';
+import {I18n} from './I18n.js';
 
 /**
  * Per-project matrix: rows are packages, columns are this project's
@@ -68,7 +68,7 @@ export class ProjectMatrixView {
         this._root.appendChild(this._renderHeader());
         const hint = document.createElement('div');
         hint.className = 'list-placeholder';
-        hint.textContent = t('Loading matrix …');
+        hint.textContent = I18n.t('Loading matrix …');
         this._root.appendChild(hint);
     }
 
@@ -92,7 +92,7 @@ export class ProjectMatrixView {
         if (this._data.workspaces.length === 1 && this._data.workspaces[0].label === 'root') {
             const note = document.createElement('div');
             note.className = 'installed-meta';
-            note.textContent = t('This project has no workspaces — the matrix only shows the root column.');
+            note.textContent = I18n.t('This project has no workspaces — the matrix only shows the root column.');
             this._root.appendChild(note);
         }
 
@@ -108,11 +108,11 @@ export class ProjectMatrixView {
 
         const thead = document.createElement('thead');
         const trHead = document.createElement('tr');
-        trHead.appendChild(ProjectMatrixView._th(t('Package'), 'matrix-th-name'));
+        trHead.appendChild(ProjectMatrixView._th(I18n.t('Package'), 'matrix-th-name'));
         for (const ws of this._data!.workspaces) {
             trHead.appendChild(ProjectMatrixView._th(ws.label, 'matrix-th-project'));
         }
-        trHead.appendChild(ProjectMatrixView._th(t('Latest'), 'matrix-th-latest'));
+        trHead.appendChild(ProjectMatrixView._th(I18n.t('Latest'), 'matrix-th-latest'));
         thead.appendChild(trHead);
         table.appendChild(thead);
 
@@ -123,7 +123,7 @@ export class ProjectMatrixView {
             const td = document.createElement('td');
             td.colSpan = this._data!.workspaces.length + 2;
             td.className = 'matrix-empty';
-            td.textContent = t('No dependencies found.');
+            td.textContent = I18n.t('No dependencies found.');
             tr.appendChild(td);
             tbody.appendChild(tr);
         } else {
@@ -219,7 +219,7 @@ export class ProjectMatrixView {
 
         const declared = document.createElement('button');
         declared.className = 'installed-toggle-btn';
-        declared.textContent = t('Declared');
+        declared.textContent = I18n.t('Declared');
         declared.addEventListener('click', () => {
             if (this._projectUnid && this._onShowDeclared) {
                 this._onShowDeclared(this._projectUnid);
@@ -229,7 +229,7 @@ export class ProjectMatrixView {
 
         const installed = document.createElement('button');
         installed.className = 'installed-toggle-btn';
-        installed.textContent = t('Installed');
+        installed.textContent = I18n.t('Installed');
         installed.addEventListener('click', () => {
             if (this._projectUnid && this._onShowInstalled) {
                 this._onShowInstalled(this._projectUnid);
@@ -239,7 +239,7 @@ export class ProjectMatrixView {
 
         const history = document.createElement('button');
         history.className = 'installed-toggle-btn';
-        history.textContent = t('History');
+        history.textContent = I18n.t('History');
         history.addEventListener('click', () => {
             if (this._projectUnid && this._onShowHistory) {
                 this._onShowHistory(this._projectUnid);
@@ -249,12 +249,12 @@ export class ProjectMatrixView {
 
         const matrix = document.createElement('button');
         matrix.className = 'installed-toggle-btn installed-toggle-btn-active';
-        matrix.textContent = t('Matrix');
+        matrix.textContent = I18n.t('Matrix');
         toggle.appendChild(matrix);
 
         const tree = document.createElement('button');
         tree.className = 'installed-toggle-btn';
-        tree.textContent = t('Tree');
+        tree.textContent = I18n.t('Tree');
         tree.addEventListener('click', () => {
             if (this._projectUnid && this._onShowTree) {
                 this._onShowTree(this._projectUnid);

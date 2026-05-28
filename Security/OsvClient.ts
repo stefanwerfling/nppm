@@ -1,5 +1,5 @@
 import {JsonCache} from '../Cache/JsonCache.js';
-import {isGitVersion} from '../Fingerprint/GitResolver.js';
+import {GitResolver} from '../Fingerprint/GitResolver.js';
 
 /**
  * Stripped-down vulnerability record kept on disk. OSV returns a much
@@ -66,37 +66,6 @@ type OsvBatchRawResponse = {
 export type OsvFetcher = (body: object) => Promise<OsvRawResponse>;
 export type OsvBatchFetcher = (body: object) => Promise<OsvBatchRawResponse>;
 
-function defaultFetcher(baseUrl: string): OsvFetcher {
-    return async (body) => {
-        const res = await fetch(`${baseUrl}/v1/query`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(body)
-        });
-
-        if (!res.ok) {
-            throw new Error(`OSV ${res.status} ${res.statusText}`);
-        }
-
-        return (await res.json()) as OsvRawResponse;
-    };
-}
-
-function defaultBatchFetcher(baseUrl: string): OsvBatchFetcher {
-    return async (body) => {
-        const res = await fetch(`${baseUrl}/v1/querybatch`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(body)
-        });
-
-        if (!res.ok) {
-            throw new Error(`OSV batch ${res.status} ${res.statusText}`);
-        }
-
-        return (await res.json()) as OsvBatchRawResponse;
-    };
-}
 
 /**
  * Cap on the number of queries per outgoing batch request. OSV does not
@@ -131,8 +100,40 @@ export class OsvClient {
     ) {
         const clean = baseUrl.replace(/\/$/, '');
         this._cache = cache;
-        this._fetcher = fetcher ?? defaultFetcher(clean);
-        this._batchFetcher = batchFetcher ?? defaultBatchFetcher(clean);
+        this._fetcher = fetcher ?? OsvClient._defaultFetcher(clean);
+        this._batchFetcher = batchFetcher ?? OsvClient._defaultBatchFetcher(clean);
+    }
+
+    private static _defaultFetcher(baseUrl: string): OsvFetcher {
+        return async (body) => {
+            const res = await fetch(`${baseUrl}/v1/query`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            });
+
+            if (!res.ok) {
+                throw new Error(`OSV ${res.status} ${res.statusText}`);
+            }
+
+            return (await res.json()) as OsvRawResponse;
+        };
+    }
+
+    private static _defaultBatchFetcher(baseUrl: string): OsvBatchFetcher {
+        return async (body) => {
+            const res = await fetch(`${baseUrl}/v1/querybatch`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            });
+
+            if (!res.ok) {
+                throw new Error(`OSV batch ${res.status} ${res.statusText}`);
+            }
+
+            return (await res.json()) as OsvBatchRawResponse;
+        };
     }
 
     /**
@@ -158,7 +159,7 @@ export class OsvClient {
 
             // OSV doesn't index git-installed deps — skip them so the
             // batch doesn't carry junk queries that always return [].
-            if (isGitVersion(pkg.version)) {
+            if (GitResolver.isGitVersion(pkg.version)) {
                 out.set(key, []);
                 continue;
             }
@@ -226,7 +227,7 @@ export class OsvClient {
         // OSV.dev only indexes published-to-registry versions. A
         // `git+https://...` install has no ecosystem-version key OSV
         // could match against, so don't waste a request.
-        if (isGitVersion(version)) {
+        if (GitResolver.isGitVersion(version)) {
             return [];
         }
 

@@ -14,18 +14,8 @@ import {PatternFinding, PatternSeverity} from '../Security/PatternScanner.js';
 import {ScriptFinding, ScriptSeverity} from '../Security/ScriptScanner.js';
 import {SecurityReport} from '../Security/SecurityScanner.js';
 import {Api} from './Api.js';
-import {t} from './I18n.js';
-import {cleanRange} from './Version.js';
-
-function formatSize(bytes: number): string {
-    if (bytes < 1024) {
-        return `${bytes} B`;
-    }
-    if (bytes < 1024 * 1024) {
-        return `${(bytes / 1024).toFixed(1)} kB`;
-    }
-    return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-}
+import {I18n} from './I18n.js';
+import {Version} from './Version.js';
 
 enum Tab {
     files = 'files',
@@ -78,7 +68,7 @@ export class PackageDetailPanel {
     }
 
     private async _open(name: string, rawVersion: string, latest: string|null, tab: Tab): Promise<void> {
-        const version = cleanRange(rawVersion);
+        const version = Version.cleanRange(rawVersion);
         this._activeTab = tab;
         this._fingerprint = null;
         this._diffCache = null;
@@ -98,13 +88,13 @@ export class PackageDetailPanel {
             const response = await Api.fingerprint(name, version);
 
             if (!response.fingerprint) {
-                this._renderEmpty(t('{name} is not available on the registry.', {name: `${name}@${version}`}));
+                this._renderEmpty(I18n.t('{name} is not available on the registry.', {name: `${name}@${version}`}));
                 return;
             }
 
             this._fingerprint = response.fingerprint;
 
-            const cleanedLatest = latest ? cleanRange(latest) : null;
+            const cleanedLatest = latest ? Version.cleanRange(latest) : null;
             if (cleanedLatest && cleanedLatest !== version) {
                 this._diffTarget = cleanedLatest;
             }
@@ -179,7 +169,7 @@ export class PackageDetailPanel {
         if (!this._body) {
             return;
         }
-        this._body.innerHTML = `<div class="pdp-placeholder">${t('Loading fingerprint …')}</div>`;
+        this._body.innerHTML = `<div class="pdp-placeholder">${I18n.t('Loading fingerprint …')}</div>`;
     }
 
     private _renderEmpty(msg: string): void {
@@ -200,12 +190,12 @@ export class PackageDetailPanel {
         this._body.innerHTML = '';
 
         const tabs: {value: Tab; label: string}[] = [
-            {value: Tab.files, label: t('Files')},
-            {value: Tab.deps, label: t('Dependencies')},
+            {value: Tab.files, label: I18n.t('Files')},
+            {value: Tab.deps, label: I18n.t('Dependencies')},
             {value: Tab.diff, label: this._diffTarget
-                ? t('Diff against {target}', {target: this._diffTarget})
-                : t('Diff')},
-            {value: Tab.releases, label: t('Releases')},
+                ? I18n.t('Diff against {target}', {target: this._diffTarget})
+                : I18n.t('Diff')},
+            {value: Tab.releases, label: I18n.t('Releases')},
             {value: Tab.security, label: this._securityTabLabel()},
             {value: Tab.license, label: this._licenseTabLabel()}
         ];
@@ -224,7 +214,7 @@ export class PackageDetailPanel {
             // Diff tab is disabled when there is no second version to compare against.
             if (tab.value === Tab.diff && !this._diffTarget) {
                 btn.disabled = true;
-                btn.title = t('No comparison version available (cell version = latest or latest unknown)');
+                btn.title = I18n.t('No comparison version available (cell version = latest or latest unknown)');
             }
 
             btn.addEventListener('click', () => {
@@ -275,14 +265,14 @@ export class PackageDetailPanel {
 
     private _licenseTabLabel(): string {
         if (!this._securityReport) {
-            return t('License');
+            return I18n.t('License');
         }
         const sev = this._securityReport.license.severity;
         if (sev === LicenseSeverity.strongCopyleft
             || sev === LicenseSeverity.proprietary) {
-            return `${t('License')} !`;
+            return `${I18n.t('License')} !`;
         }
-        return t('License');
+        return I18n.t('License');
     }
 
     private _renderLicenseTab(): void {
@@ -304,7 +294,7 @@ export class PackageDetailPanel {
             }
             const loading = document.createElement('div');
             loading.className = 'pdp-placeholder';
-            loading.textContent = t('Loading license info …');
+            loading.textContent = I18n.t('Loading license info …');
             this._tabPane.appendChild(loading);
 
             if (!this._securityInflight) {
@@ -357,7 +347,7 @@ export class PackageDetailPanel {
         if (finding.policyMatched) {
             const policy = document.createElement('span');
             policy.className = 'pdp-script-reason';
-            policy.textContent = t('via nppm.json policy');
+            policy.textContent = I18n.t('via nppm.json policy');
             head.appendChild(policy);
         }
 
@@ -371,7 +361,7 @@ export class PackageDetailPanel {
         if (finding.identifiers.length > 1) {
             const ids = document.createElement('code');
             ids.className = 'pdp-script-body';
-            ids.textContent = t('Identifiers in expression: {ids}', {ids: finding.identifiers.join(', ')});
+            ids.textContent = I18n.t('Identifiers in expression: {ids}', {ids: finding.identifiers.join(', ')});
             card.appendChild(ids);
         }
 
@@ -389,7 +379,7 @@ export class PackageDetailPanel {
 
         const filesHead = document.createElement('div');
         filesHead.className = 'pdp-section-head';
-        filesHead.textContent = t('License files in tarball ({count})', {count: licenseFiles?.length ?? 0});
+        filesHead.textContent = I18n.t('License files in tarball ({count})', {count: licenseFiles?.length ?? 0});
         filesSection.appendChild(filesHead);
 
         if (licenseFiles && licenseFiles.length > 0) {
@@ -412,7 +402,7 @@ export class PackageDetailPanel {
         } else {
             const empty = document.createElement('div');
             empty.className = 'pdp-placeholder';
-            empty.textContent = t('No LICENSE/COPYING file shipped in the tarball.');
+            empty.textContent = I18n.t('No LICENSE/COPYING file shipped in the tarball.');
             filesSection.appendChild(empty);
         }
 
@@ -457,7 +447,7 @@ export class PackageDetailPanel {
         // e.g. "Sicherheit (3)". The user can see "is there anything in
         // there" without clicking. Churn counts when severity > info.
         if (!this._securityReport) {
-            return t('Security');
+            return I18n.t('Security');
         }
         const v = this._securityReport.vulns?.length ?? 0;
         const s = this._securityReport.scriptFindings.length;
@@ -466,7 +456,7 @@ export class PackageDetailPanel {
         const c = this._securityReport.churn && this._securityReport.churn.severity !== ChurnSeverity.info ? 1 : 0;
         const m = this._securityReport.maintainer && this._securityReport.maintainer.severity !== MaintainerSeverity.info ? 1 : 0;
         const n = v + s + p + b + c + m;
-        return n > 0 ? `${t('Security')} (${n})` : t('Security');
+        return n > 0 ? `${I18n.t('Security')} (${n})` : I18n.t('Security');
     }
 
     private _renderFilesTab(fp: PackageFingerprint): HTMLElement {
@@ -476,8 +466,8 @@ export class PackageDetailPanel {
         const summary = document.createElement('div');
         summary.className = 'pdp-summary';
         summary.innerHTML = `
-            <span class="pdp-stat"><strong>${fp.files.length}</strong> ${t('Files')}</span>
-            <span class="pdp-stat"><strong>${formatSize(totalSize)}</strong></span>
+            <span class="pdp-stat"><strong>${fp.files.length}</strong> ${I18n.t('Files')}</span>
+            <span class="pdp-stat"><strong>${PackageDetailPanel._formatSize(totalSize)}</strong></span>
         `;
         wrap.appendChild(summary);
 
@@ -491,7 +481,7 @@ export class PackageDetailPanel {
         if (!fp.manifest) {
             const empty = document.createElement('div');
             empty.className = 'pdp-error';
-            empty.textContent = t('No package.json found in tarball.');
+            empty.textContent = I18n.t('No package.json found in tarball.');
             wrap.appendChild(empty);
             return wrap;
         }
@@ -518,7 +508,7 @@ export class PackageDetailPanel {
         if (!any) {
             const empty = document.createElement('div');
             empty.className = 'pdp-placeholder';
-            empty.textContent = t('No declared dependencies in this package.');
+            empty.textContent = I18n.t('No declared dependencies in this package.');
             wrap.appendChild(empty);
         }
 
@@ -585,7 +575,7 @@ export class PackageDetailPanel {
 
         const loading = document.createElement('div');
         loading.className = 'pdp-placeholder';
-        loading.textContent = t('Loading releases …');
+        loading.textContent = I18n.t('Loading releases …');
         this._tabPane.appendChild(loading);
 
         if (this._releasesInflight) {
@@ -622,7 +612,7 @@ export class PackageDetailPanel {
         if (data.releases.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'pdp-placeholder';
-            empty.textContent = t('No published versions.');
+            empty.textContent = I18n.t('No published versions.');
             wrap.appendChild(empty);
             return wrap;
         }
@@ -631,7 +621,7 @@ export class PackageDetailPanel {
         if (!hasAnyBody && data.repository) {
             const hint = document.createElement('div');
             hint.className = 'pdp-releases-hint';
-            hint.textContent = t('No GitHub release notes found — only npm publish dates available.');
+            hint.textContent = I18n.t('No GitHub release notes found — only npm publish dates available.');
             wrap.appendChild(hint);
         }
 
@@ -731,7 +721,7 @@ export class PackageDetailPanel {
 
         const loading = document.createElement('div');
         loading.className = 'pdp-placeholder';
-        loading.textContent = t('Scanning CVEs and install scripts …');
+        loading.textContent = I18n.t('Scanning CVEs and install scripts …');
         this._tabPane.appendChild(loading);
 
         if (this._securityInflight) {
@@ -769,7 +759,7 @@ export class PackageDetailPanel {
         if (PackageDetailPanel._isGitVersion(report.version)) {
             const note = document.createElement('div');
             note.className = 'pdp-error';
-            note.textContent = t(
+            note.textContent = I18n.t(
                 'Git package: OSV.dev only indexes registry-installed versions. Script + code-pattern heuristics still ran.'
             );
             wrap.appendChild(note);
@@ -794,7 +784,7 @@ export class PackageDetailPanel {
             && !interestingChurn && !interestingMaintainer && report.vulns !== null) {
             const ok = document.createElement('div');
             ok.className = 'pdp-placeholder';
-            ok.textContent = t('No known CVEs (OSV.dev), no suspicious install scripts, no notable file churn, no known code patterns and no binary files.');
+            ok.textContent = I18n.t('No known CVEs (OSV.dev), no suspicious install scripts, no notable file churn, no known code patterns and no binary files.');
             wrap.appendChild(ok);
             return wrap;
         }
@@ -820,7 +810,7 @@ export class PackageDetailPanel {
         }
         const banner = document.createElement('div');
         banner.className = 'pdp-supply-chain';
-        banner.textContent = t(
+        banner.textContent = I18n.t(
             'Possible supply-chain attack: new publisher ({publisher}) + unusual file churn in the same release.',
             {publisher: maintainer.currentPublisher?.name ?? '?'}
         );
@@ -833,13 +823,13 @@ export class PackageDetailPanel {
 
         const heading = document.createElement('div');
         heading.className = 'pdp-section-head';
-        heading.textContent = t('Maintainer / Publisher');
+        heading.textContent = I18n.t('Maintainer / Publisher');
         wrap.appendChild(heading);
 
         if (!finding) {
             const empty = document.createElement('div');
             empty.className = 'pdp-placeholder';
-            empty.textContent = t('No registry record — git install or unknown package.');
+            empty.textContent = I18n.t('No registry record — git install or unknown package.');
             wrap.appendChild(empty);
             return wrap;
         }
@@ -866,7 +856,7 @@ export class PackageDetailPanel {
         if (finding.gapDays !== null) {
             const gap = document.createElement('span');
             gap.className = 'pdp-script-reason';
-            gap.textContent = t('{n} days since predecessor', {n: finding.gapDays});
+            gap.textContent = I18n.t('{n} days since predecessor', {n: finding.gapDays});
             head.appendChild(gap);
         }
 
@@ -880,7 +870,7 @@ export class PackageDetailPanel {
         if (finding.trustedPublishers.length > 0) {
             const trust = document.createElement('code');
             trust.className = 'pdp-script-body';
-            trust.textContent = t('Trust set: {names}', {names: finding.trustedPublishers.join(', ')});
+            trust.textContent = I18n.t('Trust set: {names}', {names: finding.trustedPublishers.join(', ')});
             card.appendChild(trust);
         }
 
@@ -902,7 +892,7 @@ export class PackageDetailPanel {
 
         const heading = document.createElement('div');
         heading.className = 'pdp-section-head';
-        heading.textContent = `${t('Binaries')} (${findings.length})`;
+        heading.textContent = `${I18n.t('Binaries')} (${findings.length})`;
         wrap.appendChild(heading);
 
         if (findings.length === 0) {
@@ -976,7 +966,7 @@ export class PackageDetailPanel {
 
         const heading = document.createElement('div');
         heading.className = 'pdp-section-head';
-        heading.textContent = `${t('Code patterns')} (${findings.length})`;
+        heading.textContent = `${I18n.t('Code patterns')} (${findings.length})`;
         wrap.appendChild(heading);
 
         if (findings.length === 0) {
@@ -1036,13 +1026,13 @@ export class PackageDetailPanel {
 
         const heading = document.createElement('div');
         heading.className = 'pdp-section-head';
-        heading.textContent = t('File churn (vs. predecessor)');
+        heading.textContent = I18n.t('File churn (vs. predecessor)');
         wrap.appendChild(heading);
 
         if (!churn) {
             const empty = document.createElement('div');
             empty.className = 'pdp-placeholder';
-            empty.textContent = t('No predecessor stable in registry or tarball unavailable.');
+            empty.textContent = I18n.t('No predecessor stable in registry or tarball unavailable.');
             wrap.appendChild(empty);
             return wrap;
         }
@@ -1072,7 +1062,7 @@ export class PackageDetailPanel {
 
         const stats = document.createElement('code');
         stats.className = 'pdp-script-body';
-        stats.textContent = `+${churn.added} ${t('Added')}   ~${churn.modified} ${t('Modified')}   -${churn.removed} ${t('Removed')}`;
+        stats.textContent = `+${churn.added} ${I18n.t('Added')}   ~${churn.modified} ${I18n.t('Modified')}   -${churn.removed} ${I18n.t('Removed')}`;
         card.appendChild(stats);
 
         wrap.appendChild(card);
@@ -1165,7 +1155,7 @@ export class PackageDetailPanel {
 
         const heading = document.createElement('div');
         heading.className = 'pdp-section-head';
-        heading.textContent = `${t('Install-scripts')} (${findings.length})`;
+        heading.textContent = `${I18n.t('Install-scripts')} (${findings.length})`;
         wrap.appendChild(heading);
 
         if (findings.length === 0) {
@@ -1240,7 +1230,7 @@ export class PackageDetailPanel {
         // Lazy fetch on first activation.
         const loading = document.createElement('div');
         loading.className = 'pdp-placeholder';
-        loading.textContent = t('Loading diff …');
+        loading.textContent = I18n.t('Loading diff …');
         this._tabPane.appendChild(loading);
 
         const name = this._fingerprint.name;
@@ -1253,7 +1243,7 @@ export class PackageDetailPanel {
             }
 
             if (!response.diff) {
-                this._diffError = t('One of the two versions is unavailable.');
+                this._diffError = I18n.t('One of the two versions is unavailable.');
             } else {
                 this._diffCache = response.diff;
             }
@@ -1269,8 +1259,8 @@ export class PackageDetailPanel {
 
     private _renderDiffBody(diff: FingerprintDiff): HTMLElement {
         const wrap = document.createElement('div');
-        wrap.appendChild(this._renderDiffSection(t('Added'), diff.added, 'added'));
-        wrap.appendChild(this._renderDiffSection(t('Removed'), diff.removed, 'removed'));
+        wrap.appendChild(this._renderDiffSection(I18n.t('Added'), diff.added, 'added'));
+        wrap.appendChild(this._renderDiffSection(I18n.t('Removed'), diff.removed, 'removed'));
         wrap.appendChild(this._renderModifiedSection(diff));
         return wrap;
     }
@@ -1281,7 +1271,7 @@ export class PackageDetailPanel {
 
         const heading = document.createElement('div');
         heading.className = 'pdp-section-head';
-        heading.textContent = `${t('Files')} (${files.length})`;
+        heading.textContent = `${I18n.t('Files')} (${files.length})`;
         wrap.appendChild(heading);
 
         const list = document.createElement('div');
@@ -1297,7 +1287,7 @@ export class PackageDetailPanel {
 
             const s = document.createElement('span');
             s.className = 'pdp-row-size';
-            s.textContent = formatSize(f.size);
+            s.textContent = PackageDetailPanel._formatSize(f.size);
 
             const h = document.createElement('span');
             h.className = 'pdp-row-hash';
@@ -1333,7 +1323,7 @@ export class PackageDetailPanel {
         for (const f of files) {
             const row = document.createElement('div');
             row.className = `pdp-row pdp-row-${cls}`;
-            row.textContent = `${f.path}  (${formatSize(f.size)})`;
+            row.textContent = `${f.path}  (${PackageDetailPanel._formatSize(f.size)})`;
             list.appendChild(row);
         }
 
@@ -1347,7 +1337,7 @@ export class PackageDetailPanel {
 
         const heading = document.createElement('div');
         heading.className = 'pdp-section-head';
-        heading.textContent = `${t('Modified')} (${diff.modified.length})`;
+        heading.textContent = `${I18n.t('Modified')} (${diff.modified.length})`;
         wrap.appendChild(heading);
 
         if (diff.modified.length === 0) {
@@ -1361,7 +1351,7 @@ export class PackageDetailPanel {
             const row = document.createElement('div');
             row.className = 'pdp-row pdp-row-modified';
             row.textContent =
-                `${m.path}  (${formatSize(m.before.size)} → ${formatSize(m.after.size)})`;
+                `${m.path}  (${PackageDetailPanel._formatSize(m.before.size)} → ${PackageDetailPanel._formatSize(m.after.size)})`;
             row.title = `${m.before.sha256}\n→\n${m.after.sha256}`;
             list.appendChild(row);
         }

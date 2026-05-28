@@ -7,8 +7,8 @@ import {PatternSeverity} from '../Security/PatternScanner.js';
 import {ScriptSeverity} from '../Security/ScriptScanner.js';
 import {PatternSummary, ScriptSummary} from '../Security/SecurityScanner.js';
 import {Api} from './Api.js';
-import {t} from './I18n.js';
-import {cleanRange} from './Version.js';
+import {I18n} from './I18n.js';
+import {Version} from './Version.js';
 
 /**
  * Filter mode buttons above the matrix.
@@ -54,13 +54,9 @@ const STATUS_RANK: Record<MatrixRowStatus, number> = {
 };
 
 /**
- * Weighted severity score per row. Higher = worse. Designed so that one
- * CVE outweighs a benign-but-present prepare-script (10 vs 1) and a
- * single risky postinstall (`node -e`-style) outweighs a CVE (20 vs 10).
- *
- * Score is computed against whatever heuristic data has arrived; absent
- * pieces contribute 0 — so the badge progressively gets more accurate
- * as the lazy batch endpoints settle.
+ * Per-severity weight tables consumed by `Matrix._severityScore`.
+ * Module-level for cheap-and-shared access; the score function lives
+ * as a private static on the `Matrix` class.
  */
 const SCRIPT_WEIGHT: Record<ScriptSeverity, number> = {
     [ScriptSeverity.info]: 1,
@@ -86,36 +82,6 @@ const MAINTAINER_WEIGHT: Record<MaintainerSeverity, number> = {
     [MaintainerSeverity.risk]: 25
 };
 
-function severityScore(
-    vulnIds: string[]|null|undefined,
-    scripts: ScriptSummary|undefined,
-    patterns: PatternSummary|undefined,
-    binaries: BinarySummary|undefined,
-    maintainer: MaintainerSummary|undefined
-): number {
-    let score = 0;
-    if (vulnIds && vulnIds.length > 0) {
-        score += vulnIds.length * 10;
-    }
-    if (scripts && scripts.maxSeverity !== null) {
-        score += SCRIPT_WEIGHT[scripts.maxSeverity];
-    }
-    if (patterns && patterns.maxSeverity !== null) {
-        // count multiplied by per-finding weight, capped at one full
-        // "risk hit" — otherwise a noisy library (50 child_process
-        // refs) dominates the sort and drowns out the true outliers.
-        const perWeight = PATTERN_WEIGHT[patterns.maxSeverity];
-        score += Math.min(patterns.count, 5) * perWeight;
-    }
-    if (binaries && binaries.maxSeverity !== null) {
-        score += BINARY_WEIGHT[binaries.maxSeverity];
-    }
-    if (maintainer && maintainer.severity !== null) {
-        score += MAINTAINER_WEIGHT[maintainer.severity];
-    }
-    return score;
-}
-
 /**
  * Persisted UI state — keeps filter, sort, and search across reloads
  * via localStorage. Stored as one JSON blob so we can extend later
@@ -128,23 +94,6 @@ type StoredMatrixState = {
     sort?: MatrixSort;
     search?: string;
 };
-
-function loadState(): StoredMatrixState {
-    try {
-        const raw = localStorage.getItem(STATE_STORAGE_KEY);
-        return raw ? JSON.parse(raw) as StoredMatrixState : {};
-    } catch {
-        return {};
-    }
-}
-
-function saveState(state: StoredMatrixState): void {
-    try {
-        localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
-    } catch {
-        // localStorage may be disabled (private mode etc) — best effort.
-    }
-}
 
 /**
  * Renders the cross-project dependency grid. Rows = packages, columns
@@ -179,7 +128,7 @@ export class Matrix {
     constructor(root: HTMLElement) {
         this._root = root;
 
-        const state = loadState();
+        const state = Matrix._loadState();
         if (state.filter) {
             this._filter = state.filter;
         }
@@ -192,7 +141,64 @@ export class Matrix {
     }
 
     private _persist(): void {
-        saveState({filter: this._filter, sort: this._sort, search: this._search});
+        Matrix._saveState({filter: this._filter, sort: this._sort, search: this._search});
+    }
+
+    private static _loadState(): StoredMatrixState {
+        try {
+            const raw = localStorage.getItem(STATE_STORAGE_KEY);
+            return raw ? JSON.parse(raw) as StoredMatrixState : {};
+        } catch {
+            return {};
+        }
+    }
+
+    private static _saveState(state: StoredMatrixState): void {
+        try {
+            localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
+        } catch {
+            // localStorage may be disabled (private mode etc) — best effort.
+        }
+    }
+
+    /**
+     * Weighted aggregate of CVE + heuristic severities. Higher =
+     * worse. Designed so one CVE outweighs a benign-but-present
+     * prepare-script (10 vs 1) and a single risky postinstall outweighs
+     * a CVE (20 vs 10). Score is computed against whatever heuristic
+     * data has arrived; absent pieces contribute 0 — the badge
+     * progressively gets more accurate as the lazy batch endpoints
+     * settle.
+     */
+    private static _severityScore(
+        vulnIds: string[]|null|undefined,
+        scripts: ScriptSummary|undefined,
+        patterns: PatternSummary|undefined,
+        binaries: BinarySummary|undefined,
+        maintainer: MaintainerSummary|undefined
+    ): number {
+        let score = 0;
+        if (vulnIds && vulnIds.length > 0) {
+            score += vulnIds.length * 10;
+        }
+        if (scripts && scripts.maxSeverity !== null) {
+            score += SCRIPT_WEIGHT[scripts.maxSeverity];
+        }
+        if (patterns && patterns.maxSeverity !== null) {
+            // count multiplied by per-finding weight, capped at one
+            // full "risk hit" — otherwise a noisy library (50
+            // child_process refs) dominates the sort and drowns out
+            // the true outliers.
+            const perWeight = PATTERN_WEIGHT[patterns.maxSeverity];
+            score += Math.min(patterns.count, 5) * perWeight;
+        }
+        if (binaries && binaries.maxSeverity !== null) {
+            score += BINARY_WEIGHT[binaries.maxSeverity];
+        }
+        if (maintainer && maintainer.severity !== null) {
+            score += MAINTAINER_WEIGHT[maintainer.severity];
+        }
+        return score;
     }
 
     public onProjectClick(handler: (unid: string) => void): void {
@@ -208,7 +214,7 @@ export class Matrix {
     }
 
     public renderLoading(): void {
-        this._root.innerHTML = `<div class="list-placeholder">${t('Loading matrix …')}</div>`;
+        this._root.innerHTML = `<div class="list-placeholder">${I18n.t('Loading matrix …')}</div>`;
     }
 
     public renderError(msg: string): void {
@@ -233,7 +239,7 @@ export class Matrix {
         const packages: {name: string; version: string}[] = [];
         for (const row of data.rows) {
             if (row.latest) {
-                packages.push({name: row.name, version: cleanRange(row.latest)});
+                packages.push({name: row.name, version: Version.cleanRange(row.latest)});
             }
         }
 
@@ -334,12 +340,12 @@ export class Matrix {
         bar.className = 'matrix-filters';
 
         const opts: {value: MatrixFilter; label: string}[] = [
-            {value: MatrixFilter.all, label: t('All')},
-            {value: MatrixFilter.issues, label: t('Issues')},
-            {value: MatrixFilter.drift, label: t('Drift')},
-            {value: MatrixFilter.outdated, label: t('Outdated')},
-            {value: MatrixFilter.insecure, label: t('Unsafe')},
-            {value: MatrixFilter.licenseIssue, label: t('Licenses')}
+            {value: MatrixFilter.all, label: I18n.t('All')},
+            {value: MatrixFilter.issues, label: I18n.t('Issues')},
+            {value: MatrixFilter.drift, label: I18n.t('Drift')},
+            {value: MatrixFilter.outdated, label: I18n.t('Outdated')},
+            {value: MatrixFilter.insecure, label: I18n.t('Unsafe')},
+            {value: MatrixFilter.licenseIssue, label: I18n.t('Licenses')}
         ];
 
         for (const opt of opts) {
@@ -360,7 +366,7 @@ export class Matrix {
         const search = document.createElement('input');
         search.type = 'search';
         search.className = 'matrix-search';
-        search.placeholder = t('Search package …');
+        search.placeholder = I18n.t('Search package …');
         search.value = this._search;
         // Re-render on each keystroke. The dataset is small (≤ a few
         // hundred rows) and re-rendering also re-applies the filter +
@@ -374,13 +380,13 @@ export class Matrix {
 
         const sortLabel = document.createElement('span');
         sortLabel.className = 'matrix-sort-label';
-        sortLabel.textContent = t('Sort:');
+        sortLabel.textContent = I18n.t('Sort:');
         bar.appendChild(sortLabel);
 
         const sorts: {value: MatrixSort; label: string}[] = [
-            {value: MatrixSort.name, label: t('Name')},
-            {value: MatrixSort.status, label: t('Status')},
-            {value: MatrixSort.severity, label: t('Severity')}
+            {value: MatrixSort.name, label: I18n.t('Name')},
+            {value: MatrixSort.status, label: I18n.t('Status')},
+            {value: MatrixSort.severity, label: I18n.t('Severity')}
         ];
 
         for (const s of sorts) {
@@ -455,7 +461,7 @@ export class Matrix {
         const thead = document.createElement('thead');
         const trHead = document.createElement('tr');
 
-        trHead.appendChild(Matrix._th(t('Package'), 'matrix-th-name'));
+        trHead.appendChild(Matrix._th(I18n.t('Package'), 'matrix-th-name'));
 
         for (const project of this._data!.projects) {
             const th = Matrix._th(project.name, 'matrix-th-project');
@@ -464,7 +470,7 @@ export class Matrix {
             trHead.appendChild(th);
         }
 
-        trHead.appendChild(Matrix._th(t('Latest'), 'matrix-th-latest'));
+        trHead.appendChild(Matrix._th(I18n.t('Latest'), 'matrix-th-latest'));
         thead.appendChild(trHead);
         table.appendChild(thead);
 
@@ -477,7 +483,7 @@ export class Matrix {
             const td = document.createElement('td');
             td.colSpan = this._data!.projects.length + 2;
             td.className = 'matrix-empty';
-            td.textContent = t('No matches for this filter.');
+            td.textContent = I18n.t('No matches for this filter.');
             tr.appendChild(td);
             tbody.appendChild(tr);
         } else {
@@ -524,7 +530,7 @@ export class Matrix {
             const badge = document.createElement('span');
             badge.className = `matrix-badge matrix-badge-script matrix-badge-script-${scripts.maxSeverity}`;
             badge.textContent = Matrix._scriptBadgeLabel(scripts.maxSeverity);
-            badge.title = t('{count} install hook(s) — severity {severity}', {count: scripts.count, severity: scripts.maxSeverity});
+            badge.title = I18n.t('{count} install hook(s) — severity {severity}', {count: scripts.count, severity: scripts.maxSeverity});
             badge.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (row.latest) {
@@ -542,7 +548,7 @@ export class Matrix {
             const badge = document.createElement('span');
             badge.className = 'matrix-badge matrix-badge-pattern';
             badge.textContent = `EVAL ${patterns.count}`;
-            badge.title = t('{count} dynamic code executions in tarball', {count: patterns.count});
+            badge.title = I18n.t('{count} dynamic code executions in tarball', {count: patterns.count});
             badge.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (row.latest) {
@@ -560,7 +566,7 @@ export class Matrix {
             const badge = document.createElement('span');
             badge.className = 'matrix-badge matrix-badge-binary';
             badge.textContent = `BIN ${binaries.riskCount}`;
-            badge.title = t('{count} native binary file(s) (.exe/.dll/.so/…) in tarball', {count: binaries.riskCount});
+            badge.title = I18n.t('{count} native binary file(s) (.exe/.dll/.so/…) in tarball', {count: binaries.riskCount});
             badge.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (row.latest) {
@@ -578,7 +584,7 @@ export class Matrix {
             const badge = document.createElement('span');
             badge.className = 'matrix-badge matrix-badge-maintainer';
             badge.textContent = 'OWNER!';
-            badge.title = t('New publisher ({publisher}) after long silence — possible account takeover', {publisher: maintainer.publisher ?? '?'});
+            badge.title = I18n.t('New publisher ({publisher}) after long silence — possible account takeover', {publisher: maintainer.publisher ?? '?'});
             badge.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (row.latest) {
@@ -646,7 +652,7 @@ export class Matrix {
                 if (cellData.internalDrift) {
                     const badge = document.createElement('span');
                     badge.className = 'matrix-badge matrix-badge-drift';
-                    badge.title = t('Workspaces of this project declared different versions');
+                    badge.title = I18n.t('Workspaces of this project declared different versions');
                     badge.textContent = 'WS';
                     td.appendChild(badge);
                 }
@@ -676,7 +682,7 @@ export class Matrix {
     }
 
     private _scoreFor(row: MatrixRow): number {
-        return severityScore(
+        return Matrix._severityScore(
             this._vulnsByName.get(row.name),
             this._scriptsByName.get(row.name),
             this._patternsByName.get(row.name),
@@ -774,8 +780,8 @@ export class Matrix {
         badge.className = `matrix-badge matrix-badge-license ${cls}`;
         badge.textContent = label;
         badge.title = summary.spdx
-            ? t('License: {spdx}', {spdx: summary.spdx})
-            : t('No license declared');
+            ? I18n.t('License: {spdx}', {spdx: summary.spdx})
+            : I18n.t('No license declared');
         return badge;
     }
 

@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {PackageFingerprint} from '../Fingerprint/Fingerprint.js';
-import {diffFingerprints} from '../Fingerprint/FingerprintDiff.js';
+import {FingerprintDiffer} from '../Fingerprint/FingerprintDiff.js';
 
 function fp(name: string, version: string, files: {path: string; sha256: string}[]): PackageFingerprint {
     return {
@@ -12,7 +12,7 @@ function fp(name: string, version: string, files: {path: string; sha256: string}
     };
 }
 
-describe('diffFingerprints', () => {
+describe('FingerprintDiffer.diff', () => {
     it('reports added, removed and modified files', () => {
         const before = fp('x', '1.0.0', [
             {path: 'a.js', sha256: 'aaa'},
@@ -25,7 +25,7 @@ describe('diffFingerprints', () => {
             {path: 'd.js', sha256: 'ddd'}           // added (c removed)
         ]);
 
-        const diff = diffFingerprints(before, after);
+        const diff = FingerprintDiffer.diff(before, after);
 
         expect(diff.added.map((f) => f.path)).toEqual(['d.js']);
         expect(diff.removed.map((f) => f.path)).toEqual(['c.js']);
@@ -37,7 +37,7 @@ describe('diffFingerprints', () => {
 
     it('returns empty lists for identical fingerprints', () => {
         const a = fp('x', '1.0.0', [{path: 'a.js', sha256: 'aaa'}]);
-        const diff = diffFingerprints(a, a);
+        const diff = FingerprintDiffer.diff(a, a);
 
         expect(diff.added).toEqual([]);
         expect(diff.removed).toEqual([]);
@@ -52,7 +52,7 @@ describe('diffFingerprints', () => {
             {path: 'm.js', sha256: 'm'}
         ]);
 
-        const diff = diffFingerprints(before, after);
+        const diff = FingerprintDiffer.diff(before, after);
         expect(diff.added.map((f) => f.path)).toEqual(['a.js', 'm.js', 'z.js']);
     });
 });

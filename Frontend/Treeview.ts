@@ -1,6 +1,6 @@
 import {ApiProject} from '../Api/ApiTypes.js';
 import {ConfigProjectType} from '../Config/Config.js';
-import {t} from './I18n.js';
+import {I18n} from './I18n.js';
 
 /**
  * Optional callback the parent component can register to react to
@@ -54,7 +54,7 @@ export class Treeview {
 
         const matrixItem: ApiProject = {
             unid: '__matrix__',
-            name: t('Matrix'),
+            name: I18n.t('Matrix'),
             type: ConfigProjectType.local,
             packageCount: 0,
             workspaceCount: 0
@@ -67,7 +67,7 @@ export class Treeview {
         if (projects.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'tree-empty';
-            empty.textContent = t('No projects configured in nppm.json.');
+            empty.textContent = I18n.t('No projects configured in nppm.json.');
             this._root.appendChild(empty);
             return;
         }

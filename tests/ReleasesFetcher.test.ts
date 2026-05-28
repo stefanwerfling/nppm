@@ -3,35 +3,35 @@ import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {JsonCache} from '../Cache/JsonCache.js';
-import {GithubRelease, ReleasesFetcher, _parseGithubRepoForTesting} from '../Releases/ReleasesFetcher.js';
+import {GithubRelease, ReleasesFetcher} from '../Releases/ReleasesFetcher.js';
 import {Registry, RegistryPackage} from '../Registry/Registry.js';
 
 describe('parseGithubRepo', () => {
     it('parses git+https github URLs', () => {
-        expect(_parseGithubRepoForTesting('git+https://github.com/foo/bar.git')).toEqual({
+        expect(ReleasesFetcher.parseGithubRepo('git+https://github.com/foo/bar.git')).toEqual({
             owner: 'foo',
             repo: 'bar'
         });
     });
     it('parses bare https github URLs', () => {
-        expect(_parseGithubRepoForTesting('https://github.com/foo/bar')).toEqual({
+        expect(ReleasesFetcher.parseGithubRepo('https://github.com/foo/bar')).toEqual({
             owner: 'foo',
             repo: 'bar'
         });
     });
     it('parses SCP-style git@', () => {
-        expect(_parseGithubRepoForTesting('git@github.com:foo/bar.git')).toEqual({
+        expect(ReleasesFetcher.parseGithubRepo('git@github.com:foo/bar.git')).toEqual({
             owner: 'foo',
             repo: 'bar'
         });
     });
     it('parses npm shorthand', () => {
-        expect(_parseGithubRepoForTesting('foo/bar')).toEqual({owner: 'foo', repo: 'bar'});
+        expect(ReleasesFetcher.parseGithubRepo('foo/bar')).toEqual({owner: 'foo', repo: 'bar'});
     });
     it('returns null for non-github / malformed', () => {
-        expect(_parseGithubRepoForTesting('https://gitlab.com/foo/bar')).toBeNull();
-        expect(_parseGithubRepoForTesting(undefined)).toBeNull();
-        expect(_parseGithubRepoForTesting('')).toBeNull();
+        expect(ReleasesFetcher.parseGithubRepo('https://gitlab.com/foo/bar')).toBeNull();
+        expect(ReleasesFetcher.parseGithubRepo(undefined)).toBeNull();
+        expect(ReleasesFetcher.parseGithubRepo('')).toBeNull();
     });
 });
 

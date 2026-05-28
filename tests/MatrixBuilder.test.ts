@@ -4,7 +4,7 @@ import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {JsonCache} from '../Cache/JsonCache.js';
 import {ConfigProjectType} from '../Config/Config.js';
-import {buildMatrix, MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
+import {MatrixBuilder, MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
 import {DependencyType, PackageManifest} from '../Project/PackageManifest.js';
 import {Project} from '../Project/Project.js';
 import {Registry, RegistryPackage} from '../Registry/Registry.js';
@@ -80,7 +80,7 @@ function manifest(
     };
 }
 
-describe('buildMatrix', () => {
+describe('MatrixBuilder.build', () => {
     let tmps: string[] = [];
 
     beforeEach(() => {
@@ -98,7 +98,7 @@ describe('buildMatrix', () => {
         const b = new FakeProject('b', [manifest('b', {foo: '^1', baz: '^3'})]);
 
         const projects = new Map<string, Project>([['1', a], ['2', b]]);
-        const matrix = await buildMatrix(projects, new FakeRegistry({}));
+        const matrix = await MatrixBuilder.build(projects, new FakeRegistry({}));
 
         expect(matrix.rows.map((r) => r.name).sort()).toEqual(['bar', 'baz', 'foo']);
     });
@@ -108,7 +108,7 @@ describe('buildMatrix', () => {
         const b = new FakeProject('b', [manifest('b', {foo: '^1.0.0'})]);
 
         const projects = new Map<string, Project>([['1', a], ['2', b]]);
-        const matrix = await buildMatrix(projects, new FakeRegistry({
+        const matrix = await MatrixBuilder.build(projects, new FakeRegistry({
             foo: {name: 'foo', latest: '1.0.0', versions: ['1.0.0']}
         }));
 
@@ -119,7 +119,7 @@ describe('buildMatrix', () => {
         const a = new FakeProject('a', [manifest('a', {foo: '^1.0.0'})]);
         const projects = new Map<string, Project>([['1', a]]);
 
-        const matrix = await buildMatrix(projects, new FakeRegistry({
+        const matrix = await MatrixBuilder.build(projects, new FakeRegistry({
             foo: {name: 'foo', latest: '2.0.0', versions: ['1.0.0', '2.0.0']}
         }));
 
@@ -132,7 +132,7 @@ describe('buildMatrix', () => {
         const b = new FakeProject('b', [manifest('b', {foo: '^2.0.0'})]);
 
         const projects = new Map<string, Project>([['1', a], ['2', b]]);
-        const matrix = await buildMatrix(projects, new FakeRegistry({
+        const matrix = await MatrixBuilder.build(projects, new FakeRegistry({
             foo: {name: 'foo', latest: '2.0.0', versions: ['1.0.0', '2.0.0']}
         }));
 
@@ -143,7 +143,7 @@ describe('buildMatrix', () => {
         const a = new FakeProject('a', [manifest('a', {foo: '^1'})]);
         const projects = new Map<string, Project>([['1', a]]);
 
-        const matrix = await buildMatrix(projects, new FakeRegistry({foo: null}));
+        const matrix = await MatrixBuilder.build(projects, new FakeRegistry({foo: null}));
         expect(matrix.rows[0].status).toBe(MatrixRowStatus.unknown);
     });
 
@@ -153,7 +153,7 @@ describe('buildMatrix', () => {
         const a = new FakeProject('a', [root, ws]);
 
         const projects = new Map<string, Project>([['1', a]]);
-        const matrix = await buildMatrix(projects, new FakeRegistry({
+        const matrix = await MatrixBuilder.build(projects, new FakeRegistry({
             foo: {name: 'foo', latest: '1.0.0', versions: ['1.0.0', '2.0.0']}
         }));
 
@@ -176,7 +176,7 @@ describe('buildMatrix', () => {
         const good = new FakeProject('good', [manifest('g', {x: '^1'})]);
         const projects = new Map<string, Project>([['1', broken], ['2', good]]);
 
-        const matrix = await buildMatrix(projects, new FakeRegistry({}));
+        const matrix = await MatrixBuilder.build(projects, new FakeRegistry({}));
         const brokenMeta = matrix.projects.find((p) => p.unid === '1')!;
         expect(brokenMeta.error).toMatch(/boom/);
         expect(matrix.rows.map((r) => r.name)).toEqual(['x']);

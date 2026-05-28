@@ -1,6 +1,6 @@
 import {ApiPackagesResponse} from '../Api/ApiTypes.js';
 import {DependencyType} from '../Project/PackageManifest.js';
-import {t} from './I18n.js';
+import {I18n} from './I18n.js';
 
 /**
  * Right-panel package list for one selected project: a flat table of
@@ -45,7 +45,7 @@ export class PackageList {
         this._root.innerHTML = '';
         const hint = document.createElement('div');
         hint.className = 'list-placeholder';
-        hint.textContent = t('Select a project on the left.');
+        hint.textContent = I18n.t('Select a project on the left.');
         this._root.appendChild(hint);
     }
 
@@ -68,10 +68,10 @@ export class PackageList {
         const thead = document.createElement('thead');
         thead.innerHTML = `
             <tr>
-                <th>${t('Package')}</th>
-                <th>${t('Version')}</th>
-                <th>${t('Type')}</th>
-                <th>${t('Source')}</th>
+                <th>${I18n.t('Package')}</th>
+                <th>${I18n.t('Version')}</th>
+                <th>${I18n.t('Type')}</th>
+                <th>${I18n.t('Source')}</th>
             </tr>
         `;
         table.appendChild(thead);
@@ -99,7 +99,7 @@ export class PackageList {
 
         if (tbody.children.length === 0) {
             const empty = document.createElement('tr');
-            empty.innerHTML = `<td colspan="4" class="pkg-empty">${t('No dependencies found.')}</td>`;
+            empty.innerHTML = `<td colspan="4" class="pkg-empty">${I18n.t('No dependencies found.')}</td>`;
             tbody.appendChild(empty);
         }
 
@@ -126,11 +126,11 @@ export class PackageList {
 
         const declared = document.createElement('button');
         declared.className = 'installed-toggle-btn installed-toggle-btn-active';
-        declared.textContent = t('Declared');
+        declared.textContent = I18n.t('Declared');
 
         const installed = document.createElement('button');
         installed.className = 'installed-toggle-btn';
-        installed.textContent = t('Installed');
+        installed.textContent = I18n.t('Installed');
         installed.addEventListener('click', () => {
             if (this._projectUnid && this._onShowInstalled) {
                 this._onShowInstalled(this._projectUnid);
@@ -139,7 +139,7 @@ export class PackageList {
 
         const history = document.createElement('button');
         history.className = 'installed-toggle-btn';
-        history.textContent = t('History');
+        history.textContent = I18n.t('History');
         history.addEventListener('click', () => {
             if (this._projectUnid && this._onShowHistory) {
                 this._onShowHistory(this._projectUnid);
@@ -148,7 +148,7 @@ export class PackageList {
 
         const matrix = document.createElement('button');
         matrix.className = 'installed-toggle-btn';
-        matrix.textContent = t('Matrix');
+        matrix.textContent = I18n.t('Matrix');
         matrix.addEventListener('click', () => {
             if (this._projectUnid && this._onShowMatrix) {
                 this._onShowMatrix(this._projectUnid);
@@ -157,7 +157,7 @@ export class PackageList {
 
         const tree = document.createElement('button');
         tree.className = 'installed-toggle-btn';
-        tree.textContent = t('Tree');
+        tree.textContent = I18n.t('Tree');
         tree.addEventListener('click', () => {
             if (this._projectUnid && this._onShowTree) {
                 this._onShowTree(this._projectUnid);

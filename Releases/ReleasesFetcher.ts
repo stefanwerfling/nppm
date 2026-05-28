@@ -20,81 +20,6 @@ export type GithubRelease = {
     published_at?: string|null;
 };
 
-function defaultGithubFetcher(): GithubReleasesFetcher {
-    return async (owner, repo, token) => {
-        const headers: Record<string, string> = {
-            // GitHub requires a User-Agent on every API request.
-            'User-Agent': 'nppm',
-            Accept: 'application/vnd.github.v3+json'
-        };
-        if (token) {
-            headers.Authorization = `Bearer ${token}`;
-        }
-
-        // 100 is the max per_page GitHub allows. One call covers ~99%
-        // of packages; we don't paginate further to keep the rate-
-        // limit budget tight.
-        const res = await fetch(
-            `https://api.github.com/repos/${owner}/${repo}/releases?per_page=100`,
-            {headers}
-        );
-
-        if (!res.ok) {
-            throw new Error(`GitHub releases ${owner}/${repo} → ${res.status} ${res.statusText}`);
-        }
-
-        return (await res.json()) as GithubRelease[];
-    };
-}
-
-/**
- * Extract `{owner, repo}` from a registry-style repository field.
- * Same shape variants as `extractRepository` in Registry.ts — `string`
- * is either an SCP/SSH/HTTPS git URL or the npm shorthand
- * `owner/repo`. Returns `null` for anything not pointing at github.com.
- */
-function parseGithubRepo(value: string|undefined): {owner: string; repo: string}|null {
-    if (!value) {
-        return null;
-    }
-    const v = value.trim();
-
-    // git+https:// / git://, with optional .git suffix and #fragment
-    let m = /^git\+?(?:ssh|https?):\/\/(?:[^@]+@)?github\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#.*)?$/i.exec(v);
-    if (m) {
-        return {owner: m[1], repo: m[2]};
-    }
-
-    // bare https://github.com/...
-    m = /^https?:\/\/github\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#.*)?$/i.exec(v);
-    if (m) {
-        return {owner: m[1], repo: m[2]};
-    }
-
-    // SCP-style git@github.com:owner/repo
-    m = /^git@github\.com:([^/]+)\/([^/#]+?)(?:\.git)?(?:#.*)?$/i.exec(v);
-    if (m) {
-        return {owner: m[1], repo: m[2]};
-    }
-
-    // shorthand `owner/repo` — npm accepts this with no scheme. Reject
-    // strings that look like full URLs to anything else.
-    m = /^([^/\s:@]+)\/([^/\s:@]+)$/i.exec(v);
-    if (m) {
-        return {owner: m[1], repo: m[2]};
-    }
-
-    return null;
-}
-
-/**
- * Strip the leading `v` from tag names and trim — GitHub tags are
- * often `v1.2.3` while npm versions are bare `1.2.3`. Used as the
- * join key when merging GH releases onto registry versions.
- */
-function normaliseTag(tag: string): string {
-    return tag.trim().replace(/^v/, '');
-}
 
 /**
  * Glue between the npm registry (version list + publish times) and
@@ -123,7 +48,7 @@ export class ReleasesFetcher {
     ) {
         this._registry = registry;
         this._cache = cache;
-        this._ghFetcher = opts.ghFetcher ?? defaultGithubFetcher();
+        this._ghFetcher = opts.ghFetcher ?? ReleasesFetcher._defaultGithubFetcher();
         this._ghToken = opts.token;
     }
 
@@ -151,16 +76,16 @@ export class ReleasesFetcher {
         }));
 
         // Enrich with GitHub release notes where possible.
-        const gh = parseGithubRepo(reg.repository);
+        const gh = ReleasesFetcher.parseGithubRepo(reg.repository);
         if (gh) {
             try {
                 const ghReleases = await this._ghFetcher(gh.owner, gh.repo, this._ghToken);
                 const byTag = new Map<string, GithubRelease>();
                 for (const r of ghReleases) {
-                    byTag.set(normaliseTag(r.tag_name), r);
+                    byTag.set(ReleasesFetcher._normaliseTag(r.tag_name), r);
                 }
                 for (const rel of releases) {
-                    const match = byTag.get(normaliseTag(rel.version));
+                    const match = byTag.get(ReleasesFetcher._normaliseTag(rel.version));
                     if (!match) {
                         continue;
                     }
@@ -208,8 +133,76 @@ export class ReleasesFetcher {
         this._cache?.set<Wrap>(key, {data: response});
         return response;
     }
-}
 
-// Re-export for tests that want to exercise the github-URL parser
-// without going through the full fetcher.
-export {parseGithubRepo as _parseGithubRepoForTesting};
+    /**
+     * Default GitHub Releases transport. Anonymous unless `token` is
+     * given; one paginated request, capped at 100 entries to keep the
+     * rate-limit budget tight.
+     */
+    private static _defaultGithubFetcher(): GithubReleasesFetcher {
+        return async (owner, repo, token) => {
+            const headers: Record<string, string> = {
+                'User-Agent': 'nppm',
+                Accept: 'application/vnd.github.v3+json'
+            };
+            if (token) {
+                headers.Authorization = `Bearer ${token}`;
+            }
+            const res = await fetch(
+                `https://api.github.com/repos/${owner}/${repo}/releases?per_page=100`,
+                {headers}
+            );
+            if (!res.ok) {
+                throw new Error(`GitHub releases ${owner}/${repo} → ${res.status} ${res.statusText}`);
+            }
+            return (await res.json()) as GithubRelease[];
+        };
+    }
+
+    /**
+     * Extract `{owner, repo}` from a registry-style repository field.
+     * Same shape variants as `Registry._extractRepository` — `string`
+     * is either an SCP/SSH/HTTPS git URL or the npm shorthand
+     * `owner/repo`. Returns `null` for anything not pointing at
+     * github.com. Public so tests can exercise it without going
+     * through the full fetcher.
+     */
+    public static parseGithubRepo(value: string|undefined): {owner: string; repo: string}|null {
+        if (!value) {
+            return null;
+        }
+        const v = value.trim();
+
+        // git+https:// / git://, with optional .git suffix and #fragment
+        let m = /^git\+?(?:ssh|https?):\/\/(?:[^@]+@)?github\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#.*)?$/i.exec(v);
+        if (m) {
+            return {owner: m[1], repo: m[2]};
+        }
+
+        m = /^https?:\/\/github\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#.*)?$/i.exec(v);
+        if (m) {
+            return {owner: m[1], repo: m[2]};
+        }
+
+        m = /^git@github\.com:([^/]+)\/([^/#]+?)(?:\.git)?(?:#.*)?$/i.exec(v);
+        if (m) {
+            return {owner: m[1], repo: m[2]};
+        }
+
+        m = /^([^/\s:@]+)\/([^/\s:@]+)$/i.exec(v);
+        if (m) {
+            return {owner: m[1], repo: m[2]};
+        }
+
+        return null;
+    }
+
+    /**
+     * Strip the leading `v` from tag names and trim — GitHub tags are
+     * often `v1.2.3` while npm versions are bare `1.2.3`. Used as the
+     * join key when merging GH releases onto registry versions.
+     */
+    private static _normaliseTag(tag: string): string {
+        return tag.trim().replace(/^v/, '');
+    }
+}

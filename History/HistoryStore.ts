@@ -22,49 +22,6 @@ export type HistoryReasonContext = {
 
 const VERSION_REGEX = /^(\d+)\.(\d+)\.(\d+)/;
 
-function parseTriple(v: string): [number, number, number]|null {
-    const m = VERSION_REGEX.exec(v.trim());
-    return m ? [+m[1], +m[2], +m[3]] : null;
-}
-
-function detectBumpType(from: string, to: string): HistoryBumpType|null {
-    const a = parseTriple(from);
-    const b = parseTriple(to);
-
-    if (!a || !b) {
-        return null;
-    }
-
-    if (b[0] !== a[0]) {
-        return 'major';
-    }
-    if (b[1] !== a[1]) {
-        return 'minor';
-    }
-    if (b[2] !== a[2]) {
-        return 'patch';
-    }
-    return 'none';
-}
-
-/**
- * Build the on-disk filename for one project's history. Format is
- * `<sanitised-name>-<hash-of-key>.json` — the name is what the user
- * recognises in a file listing, the short hash disambiguates two
- * projects that happen to share the same name but live at different
- * keys (`local:/a/kavula` vs `local:/b/kavula`).
- */
-function safeFilename(key: string, name: string): string {
-    const sanitised = name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^\.+/, '_') || 'project';
-    // Tiny non-crypto hash so colliding names stay distinguishable.
-    let h = 0;
-    for (let i = 0; i < key.length; i++) {
-        h = ((h << 5) - h + key.charCodeAt(i)) | 0;
-    }
-    const hex = (h >>> 0).toString(16).padStart(8, '0');
-    return `${sanitised}-${hex}.json`;
-}
-
 /**
  * Per-project history persistence. One JSON file per project in
  * `<cacheDir>/history/<safe>.json`. Files are written atomically (write
@@ -161,7 +118,7 @@ export class HistoryStore {
             if (prev === undefined) {
                 added.push({name, version});
             } else if (prev !== version) {
-                const bumpType = detectBumpType(prev, version);
+                const bumpType = HistoryStore._detectBumpType(prev, version);
                 const cves = ctx.cvesForOldVersion?.(name, prev) ?? null;
                 updated.push({
                     name,
@@ -229,7 +186,7 @@ export class HistoryStore {
     }
 
     private _fileFor(projectKey: string, projectName: string): string {
-        return path.join(this._dir, safeFilename(projectKey, projectName));
+        return path.join(this._dir, HistoryStore._safeFilename(projectKey, projectName));
     }
 
     /**
@@ -256,5 +213,48 @@ export class HistoryStore {
         }
 
         return parts.join(' — ');
+    }
+
+    private static _parseTriple(v: string): [number, number, number]|null {
+        const m = VERSION_REGEX.exec(v.trim());
+        return m ? [+m[1], +m[2], +m[3]] : null;
+    }
+
+    private static _detectBumpType(from: string, to: string): HistoryBumpType|null {
+        const a = HistoryStore._parseTriple(from);
+        const b = HistoryStore._parseTriple(to);
+
+        if (!a || !b) {
+            return null;
+        }
+
+        if (b[0] !== a[0]) {
+            return 'major';
+        }
+        if (b[1] !== a[1]) {
+            return 'minor';
+        }
+        if (b[2] !== a[2]) {
+            return 'patch';
+        }
+        return 'none';
+    }
+
+    /**
+     * Build the on-disk filename for one project's history. Format
+     * is `<sanitised-name>-<hash-of-key>.json` — the name is what the
+     * user recognises in a file listing, the short hash disambiguates
+     * two projects that happen to share the same name but live at
+     * different keys (`local:/a/kavula` vs `local:/b/kavula`).
+     */
+    private static _safeFilename(key: string, name: string): string {
+        const sanitised = name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^\.+/, '_') || 'project';
+        // Tiny non-crypto hash so colliding names stay distinguishable.
+        let h = 0;
+        for (let i = 0; i < key.length; i++) {
+            h = ((h << 5) - h + key.charCodeAt(i)) | 0;
+        }
+        const hex = (h >>> 0).toString(16).padStart(8, '0');
+        return `${sanitised}-${hex}.json`;
     }
 }

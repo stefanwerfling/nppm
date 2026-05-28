@@ -1,6 +1,6 @@
 import zlib from 'zlib';
 import {describe, expect, it} from 'vitest';
-import {parseTarball} from '../Fingerprint/TarballParser.js';
+import {TarballParser} from '../Fingerprint/TarballParser.js';
 
 const BLOCK = 512;
 
@@ -62,7 +62,7 @@ describe('TarballParser', () => {
             {name: 'package/index.js', content: 'console.log(1)'}
         ]);
 
-        const entries = parseTarball(tgz);
+        const entries = TarballParser.parse(tgz);
 
         expect(entries).toHaveLength(2);
         expect(entries[0].path).toBe('package.json');
@@ -74,7 +74,7 @@ describe('TarballParser', () => {
         const big = 'x'.repeat(BLOCK + 17);
         const tgz = buildTarball([{name: 'package/big.txt', content: big}]);
 
-        const entries = parseTarball(tgz);
+        const entries = TarballParser.parse(tgz);
         expect(entries).toHaveLength(1);
         expect(entries[0].content.length).toBe(BLOCK + 17);
         expect(entries[0].content.toString('utf8')).toBe(big);
@@ -88,7 +88,7 @@ describe('TarballParser', () => {
         const end = Buffer.alloc(BLOCK);
         const tgz = zlib.gzipSync(Buffer.concat([header, body, end]));
 
-        const entries = parseTarball(tgz);
+        const entries = TarballParser.parse(tgz);
         expect(entries).toHaveLength(1);
         expect(entries[0].path).toBe('README.md');
     });
@@ -103,7 +103,7 @@ describe('TarballParser', () => {
             {name: 'cookie-parser/index.d.ts', content: 'declare module "cookie-parser";'}
         ]);
 
-        const entries = parseTarball(tgz);
+        const entries = TarballParser.parse(tgz);
         expect(entries.map((e) => e.path)).toEqual(['package.json', 'index.d.ts']);
     });
 
@@ -113,7 +113,7 @@ describe('TarballParser', () => {
             {name: 'docs/readme.md', content: 'b'}
         ]);
 
-        const entries = parseTarball(tgz);
+        const entries = TarballParser.parse(tgz);
         // Without a single common dir we keep the raw paths so caller can
         // still find `package/index.js` etc.
         expect(entries.map((e) => e.path)).toEqual(['package/index.js', 'docs/readme.md']);

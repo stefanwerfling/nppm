@@ -2,10 +2,9 @@ import {FingerprintBuilder} from '../Fingerprint/FingerprintBuilder.js';
 import {Registry} from '../Registry/Registry.js';
 import {
     BinaryFinding,
+    BinaryScanner,
     BinarySeverity,
-    BinarySummary,
-    scanBinaries,
-    summariseBinaries
+    BinarySummary
 } from './BinaryScanner.js';
 import {ChurnFinding, ChurnScanner} from './ChurnScanner.js';
 import {
@@ -21,8 +20,8 @@ import {
     MaintainerSummary
 } from './MaintainerScanner.js';
 import {OsvClient, OsvVulnerability} from './OsvClient.js';
-import {PatternFinding, PatternSeverity, scanPatterns} from './PatternScanner.js';
-import {scanScripts, ScriptFinding, ScriptSeverity} from './ScriptScanner.js';
+import {PatternFinding, PatternScanner, PatternSeverity} from './PatternScanner.js';
+import {ScriptFinding, ScriptScanner, ScriptSeverity} from './ScriptScanner.js';
 
 /**
  * Combined view of "what should worry me about this `pkg@version`".
@@ -140,9 +139,9 @@ export class SecurityScanner {
             this._registry.fetchOne(name)
         ]);
 
-        const scriptFindings = scanScripts(fingerprint?.manifest ?? null);
-        const patternFindings = fingerprint ? scanPatterns(fingerprint.files) : [];
-        const binaryFindings = fingerprint ? scanBinaries(fingerprint.files) : [];
+        const scriptFindings = ScriptScanner.scan(fingerprint?.manifest ?? null);
+        const patternFindings = fingerprint ? PatternScanner.scan(fingerprint.files) : [];
+        const binaryFindings = fingerprint ? BinaryScanner.scan(fingerprint.files) : [];
 
         // Prefer the manifest license (per-version, can differ between
         // releases) over the packument license (top-level, version-
@@ -201,10 +200,10 @@ export class SecurityScanner {
                 const spdx = fingerprint?.manifest?.license ?? reg?.license ?? null;
                 const licenseFinding = this._license.classify(spdx);
 
-                const scriptFindings = scanScripts(fingerprint?.manifest ?? null);
-                const patternFindings = fingerprint ? scanPatterns(fingerprint.files) : [];
-                const binaryFindings = fingerprint ? scanBinaries(fingerprint.files) : [];
-                const binSummary = summariseBinaries(binaryFindings);
+                const scriptFindings = ScriptScanner.scan(fingerprint?.manifest ?? null);
+                const patternFindings = fingerprint ? PatternScanner.scan(fingerprint.files) : [];
+                const binaryFindings = fingerprint ? BinaryScanner.scan(fingerprint.files) : [];
+                const binSummary = BinaryScanner.summarise(binaryFindings);
 
                 result[i] = {
                     name: pkg.name,

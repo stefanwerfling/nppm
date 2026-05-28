@@ -23,11 +23,11 @@ import {
 import {JsonCache} from './Cache/JsonCache.js';
 import {ConfigProjectType, SchemaConfig} from './Config/Config.js';
 import {FingerprintBuilder} from './Fingerprint/FingerprintBuilder.js';
-import {diffFingerprints} from './Fingerprint/FingerprintDiff.js';
+import {FingerprintDiffer} from './Fingerprint/FingerprintDiff.js';
 import {HistoryStore} from './History/HistoryStore.js';
-import {buildDepGraph} from './DepGraph/DepGraphBuilder.js';
-import {buildMatrix} from './Matrix/MatrixBuilder.js';
-import {buildProjectMatrix} from './Matrix/ProjectMatrixBuilder.js';
+import {DepGraphBuilder} from './DepGraph/DepGraphBuilder.js';
+import {MatrixBuilder} from './Matrix/MatrixBuilder.js';
+import {ProjectMatrixBuilder} from './Matrix/ProjectMatrixBuilder.js';
 import {Project} from './Project/Project.js';
 import {ProjectGitea} from './Project/ProjectGitea.js';
 import {ProjectGithub} from './Project/ProjectGithub.js';
@@ -39,32 +39,23 @@ import {OsvClient} from './Security/OsvClient.js';
 import {SecurityScanner} from './Security/SecurityScanner.js';
 
 /**
- * Resolve a `"$VARNAME"` string into the corresponding env-var value;
- * pass anything else through unchanged. Used for token fields so the
- * config file never contains literal secrets.
+ * Backend wiring for the Vite dev server. Exposes one public method
+ * (`plugin()`) that the Vite config registers — the entire Express
+ * app, project loop, route handlers, and SSE streams are wired up
+ * inside `configureServer`. Kept as a class so the previously-free
+ * `expandEnv` helper has a real home as a private static.
  */
-function expandEnv(value: string|undefined): string|undefined {
-    if (!value) {
-        return value;
-    }
+class Server {
 
-    const match = /^\$([A-Z_][A-Z0-9_]*)$/i.exec(value);
-    if (!match) {
-        return value;
-    }
-
-    return process.env[match[1]];
-}
-
-/**
- * Express middleware mounted on the Vite dev server. Mirrors the
- * vtseditor architecture: backend lives here, frontend is everything
- * Vite serves from this same root.
- */
-function expressMiddleware(): Plugin {
-    return {
-        name: 'vite-express-middleware',
-        configureServer(server) {
+    /**
+     * Returns the Vite plugin object. The body matches the original
+     * `expressMiddleware` factory; the only structural change is that
+     * `expandEnv` is now a private static of this class.
+     */
+    public static plugin(): Plugin {
+        return {
+            name: 'vite-express-middleware',
+            configureServer(server) {
             const app = express();
             app.use(express.json());
 
@@ -223,7 +214,7 @@ function expressMiddleware(): Plugin {
                         gh.repo,
                         gh.name ?? gh.repo,
                         gh.ref,
-                        expandEnv(gh.token),
+                        Server._expandEnv(gh.token),
                         remoteCache
                     );
 
@@ -243,7 +234,7 @@ function expressMiddleware(): Plugin {
                             ge.url,
                             ge.name ?? ge.url,
                             ge.ref,
-                            expandEnv(ge.token),
+                            Server._expandEnv(ge.token),
                             remoteCache
                         );
 
@@ -374,7 +365,7 @@ function expressMiddleware(): Plugin {
                 }
 
                 try {
-                    const graph = await buildDepGraph(req.params.id, project, registry, securityCache);
+                    const graph = await DepGraphBuilder.build(req.params.id, project, registry, securityCache);
                     if (!graph) {
                         res.status(404).json({success: false, msg: 'Kein Lockfile vorhanden'});
                         return;
@@ -400,7 +391,7 @@ function expressMiddleware(): Plugin {
                 }
 
                 try {
-                    const matrix = await buildProjectMatrix(req.params.id, project, registry);
+                    const matrix = await ProjectMatrixBuilder.build(req.params.id, project, registry);
                     res.status(200).json(matrix);
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});
@@ -702,7 +693,7 @@ function expressMiddleware(): Plugin {
             // -------------------------------------------------------------
             app.get('/api/matrix', async (_req, res) => {
                 try {
-                    const matrix = await buildMatrix(projects, registry);
+                    const matrix = await MatrixBuilder.build(projects, registry);
                     res.status(200).json(matrix);
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});
@@ -884,7 +875,7 @@ function expressMiddleware(): Plugin {
                     const response: ApiFingerprintDiffResponse = {
                         before: {name, version: before},
                         after: {name, version: after},
-                        diff: fpBefore && fpAfter ? diffFingerprints(fpBefore, fpAfter) : null
+                        diff: fpBefore && fpAfter ? FingerprintDiffer.diff(fpBefore, fpAfter) : null
                     };
                     res.status(200).json(response);
                 } catch (e) {
@@ -893,10 +884,29 @@ function expressMiddleware(): Plugin {
             });
 
             server.middlewares.use(app);
+            }
+        };
+    }
+
+    /**
+     * Resolve a `"$VARNAME"` string into the corresponding env-var
+     * value; pass anything else through unchanged. Used for token
+     * fields so the config file never contains literal secrets.
+     */
+    private static _expandEnv(value: string|undefined): string|undefined {
+        if (!value) {
+            return value;
         }
-    };
+
+        const match = /^\$([A-Z_][A-Z0-9_]*)$/i.exec(value);
+        if (!match) {
+            return value;
+        }
+
+        return process.env[match[1]];
+    }
 }
 
 export default defineConfig({
-    plugins: [expressMiddleware()]
+    plugins: [Server.plugin()]
 });

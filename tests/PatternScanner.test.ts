@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {FileFingerprint} from '../Fingerprint/Fingerprint.js';
-import {PatternSeverity, scanPatterns} from '../Security/PatternScanner.js';
+import {PatternScanner, PatternSeverity} from '../Security/PatternScanner.js';
 
 function file(path: string, content: string|undefined): FileFingerprint {
     const f: FileFingerprint = {path, sha256: 'x', size: content?.length ?? 0};
@@ -10,9 +10,9 @@ function file(path: string, content: string|undefined): FileFingerprint {
     return f;
 }
 
-describe('scanPatterns', () => {
+describe('PatternScanner.scan', () => {
     it('flags eval() and new Function() as risk', () => {
-        const findings = scanPatterns([
+        const findings = PatternScanner.scan([
             file('lib/a.js', 'const x = eval("1+1");'),
             file('lib/b.js', 'const y = new Function("return 1");')
         ]);
@@ -24,7 +24,7 @@ describe('scanPatterns', () => {
     });
 
     it('flags child_process require and member access', () => {
-        const findings = scanPatterns([
+        const findings = PatternScanner.scan([
             // Two separate styles in two files. The combined-on-one-line
             // form `require("child_process").exec()` only matches the
             // require regex (the string literal breaks the `.exec`
@@ -44,7 +44,7 @@ describe('scanPatterns', () => {
 
     it('flags long base64 literal blobs', () => {
         const blob = 'A'.repeat(400);
-        const findings = scanPatterns([
+        const findings = PatternScanner.scan([
             file('lib/blob.js', `const data = "${blob}";`)
         ]);
 
@@ -53,7 +53,7 @@ describe('scanPatterns', () => {
     });
 
     it('skips files without cached content', () => {
-        const findings = scanPatterns([
+        const findings = PatternScanner.scan([
             file('lib/big.js', undefined),
             file('lib/clean.js', 'console.log("hi")')
         ]);
@@ -63,13 +63,13 @@ describe('scanPatterns', () => {
 
     it('reports the correct line number for matches on later lines', () => {
         const src = ['// header', '// comment', 'const x = eval(input);'].join('\n');
-        const findings = scanPatterns([file('lib/a.js', src)]);
+        const findings = PatternScanner.scan([file('lib/a.js', src)]);
         expect(findings[0].line).toBe(3);
     });
 
     it('emits one finding per match (multi-match files)', () => {
         const src = 'eval(a); eval(b); eval(c);';
-        const findings = scanPatterns([file('lib/m.js', src)]);
+        const findings = PatternScanner.scan([file('lib/m.js', src)]);
         expect(findings).toHaveLength(3);
     });
 });

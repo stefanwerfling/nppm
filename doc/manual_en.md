@@ -56,6 +56,8 @@ aggregated security score.
 - `SCRIPT` / `SCRIPT!` — lifecycle scripts at warn / risk level.
 - `EVAL N` — N dynamic-code-execution patterns in the tarball.
 - `BIN N` — N native binaries (`.exe / .dll / .so` …) in the tarball.
+- `OWNER!` — quick owner handover on a mature package (classic
+  account-takeover profile — see the maintainer scanner below).
 - `WS` — workspaces within one project disagreed.
 
 **Git-pinned dependencies** show the *installed* version as the cell
@@ -156,6 +158,8 @@ added / removed / modified. Lazy-loaded the first time the tab opens.
 Merged timeline:
 
 - Registry publish dates (always available)
+- Per-version publisher (`_npmUser`) — shown as `by <name>` next to the
+  date so owner handovers are visible at a glance in the timeline.
 - GitHub release titles + notes (when the package's `repository` field
   points at github.com)
 
@@ -167,13 +171,34 @@ limit.
 
 ### 3.5 Security
 
-Aggregates five scanners:
+Aggregates six scanners:
 
 - **CVEs** from OSV.dev (single-version query, deep results)
 - **Install-scripts** — lifecycle hooks classified info/warn/risk
 - **Code patterns** — `eval(`, `new Function(`, `child_process`, base64
 - **Binaries** — native code in the tarball
 - **File churn** — comparison against the previous stable version
+- **Maintainer / Publisher** — compares the `_npmUser` of the chosen
+  version against the trust set of recent predecessors.
+
+The maintainer scanner's severity is driven by **how quickly the owner
+changed** on a mature package — the empirical attack pattern (event-
+stream, ua-parser-js, coa, rc, @solana/web3.js) is "active project,
+sudden new publisher", not "dormant project, new maintainer".
+
+| Gap to previous version | Severity |
+|-------------------------|----------|
+| ≤ 30 days + ≥10 predecessors | `risk` — takeover profile |
+| 31 – 180 days + ≥10 predecessors | `warn` — unusual, worth a look |
+| > 180 days | `info` — likely a legitimate community takeover of an abandoned package |
+
+Thresholds are tunable in `nppm.json` under
+`security.maintainer.{quickHandoverDays,suspiciousGapDays,matureVersions,trustWindow}`.
+
+When `Maintainer = risk` **and** `Churn = warn/risk` hit the same
+release, the panel shows a red **"possible supply-chain attack"**
+banner at the top — that is the pattern the real-world takeovers
+listed above all shared.
 
 A "git package" note appears for git-installed dependencies because OSV
 only indexes registry versions — the other scanners still run normally.

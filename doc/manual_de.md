@@ -57,6 +57,8 @@ oder aggregierter Security-Score.
 - `SCRIPT` / `SCRIPT!` — Lifecycle-Scripts auf Warn-/Risk-Stufe.
 - `EVAL N` — N dynamische Code-Ausführungs-Pattern im Tarball.
 - `BIN N` — N native Binärdateien (`.exe / .dll / .so` …) im Tarball.
+- `OWNER!` — Schneller Owner-Wechsel auf einem etablierten Paket
+  (klassisches Account-Takeover-Profil — siehe Maintainer-Scanner unten).
 - `WS` — Workspaces *innerhalb* eines Projekts sind uneinig.
 
 **Git-Dependencies** zeigen die *installierte* Version als Zellenwert
@@ -162,6 +164,8 @@ hinzugefügt / entfernt / geändert. Lazy-loaded beim ersten Tab-Klick.
 Zusammengeführte Zeitleiste:
 
 - npm-Publish-Daten (immer verfügbar)
+- Publisher (`_npmUser`) pro Version — `by <name>` hinter dem Datum,
+  damit du Owner-Wechsel direkt am Versionsverlauf siehst.
 - GitHub-Release-Titel + Body-Notes (wenn das `repository`-Feld des
   Pakets auf github.com zeigt)
 
@@ -173,13 +177,34 @@ loszuwerden.
 
 ### 3.5 Sicherheit
 
-Aggregiert fünf Scanner:
+Aggregiert sechs Scanner:
 
 - **CVEs** aus OSV.dev (Single-Version-Query, volle Details)
 - **Install-Scripts** — Lifecycle-Hooks klassifiziert info/warn/risk
 - **Code-Pattern** — `eval(`, `new Function(`, `child_process`, base64
 - **Binärdateien** — nativer Code im Tarball
 - **Datei-Churn** — Vergleich gegen die vorherige Stable-Version
+- **Maintainer / Publisher** — vergleicht den `_npmUser` der gewählten
+  Version mit dem Trust-Set der letzten Vorgänger.
+
+Die Severity beim Maintainer-Scanner orientiert sich an der **Geschwindigkeit
+des Owner-Wechsels** auf einem etablierten Paket — empirisch hatten die
+echten npm-Account-Takeovers (event-stream, ua-parser-js, coa, rc,
+@solana/web3.js) kurze Gaps:
+
+| Gap zur Vorversion | Severity |
+|--------------------|----------|
+| ≤ 30 Tage + ≥10 Vorgänger | `risk` — Takeover-Profil |
+| 31 – 180 Tage + ≥10 Vorgänger | `warn` — ungewöhnlich, Blick lohnt sich |
+| > 180 Tage | `info` — wahrscheinlich legitime Community-Übernahme eines verlassenen Pakets |
+
+Schwellen sind in `nppm.json` unter `security.maintainer.{quickHandoverDays,
+suspiciousGapDays,matureVersions,trustWindow}` konfigurierbar.
+
+Wenn `Maintainer = risk` **und** `Churn = warn/risk` für dieselbe
+Version zusammenkommen, blendet das Panel oben einen roten **"Möglicher
+Supply-Chain-Angriff"**-Banner ein — das ist das Muster, das die
+genannten realen Takeovers gemeinsam hatten.
 
 Bei Git-Dependencies erscheint ein "Git-Paket"-Hinweis, weil OSV nur
 Registry-Versionen indiziert — die anderen Scanner laufen trotzdem

@@ -31,6 +31,12 @@ Vite dev server, frontend is plain TypeScript + DOM (no framework).
   - Binary-file detection (`.exe / .dll / .so / .node / .wasm` + bare
     binaries under `bin/`)
   - File-churn detection (suspiciously large patch bumps)
+  - Maintainer-handover detection — compares each version's `_npmUser`
+    against the publishers of the recent predecessors. Short gap + new
+    publisher on a mature package raises `risk` (event-stream /
+    ua-parser-js profile); long-silence handovers stay `info` (usually
+    a legitimate community takeover). Risk + churn together surface a
+    "possible supply-chain attack" banner.
 - **History** per project — every lockfile call snapshots the package state
   and appends an entry for adds/removes/version changes (with CVE-hint
   reason when applicable). Stored next to `nppm.json` in `.nppm-history/`.
@@ -84,9 +90,23 @@ Create a `nppm.json` next to where you run `nppm`. Minimal example:
   "server": {"port": 5190},
   "browser": {"open": false},
   "registry": {"url": "https://registry.npmjs.org"},
-  "cache": {"dir": ".nppm-cache", "ttlMinutes": 60}
+  "cache": {"dir": ".nppm-cache", "ttlMinutes": 60},
+  "security": {
+    "maintainer": {
+      "quickHandoverDays": 30,
+      "suspiciousGapDays": 180,
+      "matureVersions": 10,
+      "trustWindow": 20
+    }
+  }
 }
 ```
+
+The `security.maintainer` block is optional and tunes the publisher-
+handover detector. Defaults reflect the empirical attack patterns:
+handovers ≤ 30 d on a mature package land as `risk`, ≤ 180 d as
+`warn`, longer gaps as `info` (likely community takeover of an
+abandoned package). Strict projects can drop `quickHandoverDays`.
 
 `$VAR_NAME` references are expanded from the environment / `.env` at load
 time, so secrets never live in the config file.

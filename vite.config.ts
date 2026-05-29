@@ -5,6 +5,11 @@ import path from 'path';
 import {defineConfig, Plugin} from 'vite';
 import {SchemaErrors} from 'vts';
 import {
+    ApiBulkUpgradeApplyRequest,
+    ApiBulkUpgradePick,
+    ApiBulkUpgradePreviewRequest,
+    ApiBulkUpgradePreviewResponse,
+    ApiBulkUpgradePreviewResult,
     ApiFingerprintDiffResponse,
     ApiFingerprintResponse,
     ApiHistoryResponse,
@@ -39,6 +44,7 @@ import {CycloneDxBuilder} from './Sbom/CycloneDxBuilder.js';
 import {SbomCollector} from './Sbom/SbomCollector.js';
 import {SpdxBuilder} from './Sbom/SpdxBuilder.js';
 import {LifecycleScriptScanner} from './Upgrade/LifecycleScriptScanner.js';
+import {PackageJsonEditor} from './Upgrade/PackageJsonEditor.js';
 import {Upgrader} from './Upgrade/Upgrader.js';
 import {ProjectLocal} from './Project/ProjectLocal.js';
 
@@ -996,6 +1002,232 @@ class Server {
             });
 
             // -------------------------------------------------------------
+            // POST /api/matrix/upgrade/preview — Bulk-Upgrade Wizard.
+            // Takes an array of picks (one per checked cross-project
+            // matrix cell), plans each as a single-project upgrade
+            // preview, and returns the union. Picks targeting remote
+            // or unknown projects, or deps not present in the target
+            // package.json, come back as `skipped` envelopes so the
+            // modal can still list them.
+            // -------------------------------------------------------------
+            app.post('/api/matrix/upgrade/preview', async (req, res) => {
+                const body = req.body as Partial<ApiBulkUpgradePreviewRequest>;
+                if (!body || !Array.isArray(body.picks)) {
+                    res.status(400).json({success: false, msg: 'body must contain a `picks` array'});
+                    return;
+                }
+
+                const picks = body.picks.filter(Server._isValidPick);
+                const results: ApiBulkUpgradePreviewResult[] = [];
+
+                for (const pick of picks) {
+                    const project = projects.get(pick.projectUnid);
+                    if (!project) {
+                        results.push({pick, skipped: 'unknown-project'});
+                        continue;
+                    }
+                    if (!(project instanceof ProjectLocal)) {
+                        results.push({pick, skipped: 'not-local'});
+                        continue;
+                    }
+
+                    try {
+                        const upgrader = new Upgrader(project.getRoot());
+                        const single: ApiUpgradeRequest = {
+                            workspace: pick.workspace,
+                            name: pick.name,
+                            depType: pick.depType,
+                            fromRange: pick.fromRange,
+                            toRange: pick.toRange
+                        };
+                        const {path: abs, rel, result} = upgrader.preview(single);
+                        if (!result.changed && result.before === result.after) {
+                            // PackageJsonEditor returns changed:false both
+                            // when the dep is missing AND when it's already
+                            // at the target. Distinguish via currentRange.
+                            const current = PackageJsonEditor.currentRange(
+                                result.before, pick.depType, pick.name
+                            );
+                            results.push({
+                                pick,
+                                skipped: current === null ? 'not-found' : 'no-change'
+                            });
+                            continue;
+                        }
+
+                        let latestResolved: string|null = null;
+                        let heads = null;
+                        try {
+                            const pack = await registry.fetchOne(pick.name);
+                            latestResolved = pack?.latest ?? null;
+                            if (latestResolved) {
+                                heads = await securityScanner.scan(pick.name, latestResolved);
+                            }
+                        } catch {
+                            // Registry / scanner outages must not block
+                            // the bulk preview.
+                        }
+
+                        const preview: ApiUpgradePreviewResponse = {
+                            project: {unid: pick.projectUnid, name: project.getName()},
+                            request: single,
+                            packageJsonPath: abs,
+                            packageJsonRel: rel,
+                            before: result.before,
+                            after: result.after,
+                            latestResolvedVersion: latestResolved,
+                            securityHeadsUp: heads,
+                            allowInstall
+                        };
+                        results.push({pick, preview});
+                    } catch (e) {
+                        results.push({pick, skipped: 'not-found', msg: (e as Error).message});
+                    }
+                }
+
+                const response: ApiBulkUpgradePreviewResponse = {results, allowInstall};
+                res.status(200).json(response);
+            });
+
+            // -------------------------------------------------------------
+            // POST /api/matrix/upgrade/apply — SSE. Groups picks by
+            // project, snapshots each project's touched files into ONE
+            // backup folder, applies the edits, then (if mode=install)
+            // runs `npm install --ignore-scripts` once per project,
+            // sequentially. Streams events:
+            //
+            //   project-start  { unid, name, picks }
+            //   pick-result    { unid, rel, name, changed, skipped? }
+            //   start          { command, cwd }        // install only
+            //   stdout|stderr  { chunk }
+            //   end            { unid, exitCode }
+            //   done           { totalProjects }
+            // -------------------------------------------------------------
+            app.post('/api/matrix/upgrade/apply', async (req, res) => {
+                const body = req.body as Partial<ApiBulkUpgradeApplyRequest>;
+                if (!body || !Array.isArray(body.picks)) {
+                    res.status(400).json({success: false, msg: 'body must contain a `picks` array'});
+                    return;
+                }
+                const mode = body.mode === 'install' ? 'install' : 'edit';
+                if (mode === 'install' && !allowInstall) {
+                    res.status(403).json({
+                        success: false,
+                        msg: 'Install path disabled — set actions.allowInstall=true in nppm.json'
+                    });
+                    return;
+                }
+                const picks = body.picks.filter(Server._isValidPick);
+
+                res.set({
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'X-Accel-Buffering': 'no'
+                });
+                res.flushHeaders();
+
+                const send = (event: string, data: object): void => {
+                    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+                };
+
+                // Group by projectUnid, preserving first-seen order so
+                // the UI log reads top-to-bottom by what the user picked.
+                const groups = new Map<string, ApiBulkUpgradePick[]>();
+                for (const pick of picks) {
+                    let list = groups.get(pick.projectUnid);
+                    if (!list) {
+                        list = [];
+                        groups.set(pick.projectUnid, list);
+                    }
+                    list.push(pick);
+                }
+
+                let aborted = false;
+                let currentChild: ReturnType<typeof Upgrader.prototype.runInstall>|null = null;
+                req.on('close', () => {
+                    aborted = true;
+                    try {
+                        currentChild?.kill();
+                    } catch {
+                        // ignore
+                    }
+                });
+
+                try {
+                    for (const [unid, list] of groups.entries()) {
+                        if (aborted) {
+                            return;
+                        }
+                        const project = projects.get(unid);
+                        if (!project) {
+                            send('project-skip', {unid, reason: 'unknown-project'});
+                            continue;
+                        }
+                        if (!(project instanceof ProjectLocal)) {
+                            send('project-skip', {unid, reason: 'not-local'});
+                            continue;
+                        }
+
+                        send('project-start', {
+                            unid,
+                            name: project.getName(),
+                            picks: list.length
+                        });
+
+                        let backupDir: string|null = null;
+                        try {
+                            const upgrader = new Upgrader(project.getRoot());
+                            const apply = upgrader.applyMany(list.map((p) => ({
+                                workspace: p.workspace,
+                                name: p.name,
+                                depType: p.depType,
+                                fromRange: p.fromRange,
+                                toRange: p.toRange
+                            })));
+                            backupDir = apply.backup.dir;
+                            send('backup', {unid, dir: apply.backup.dir, files: apply.backup.files});
+                            for (const out of apply.results) {
+                                send('pick-result', {
+                                    unid,
+                                    name: out.request.name,
+                                    rel: out.rel,
+                                    changed: out.result.changed
+                                });
+                            }
+
+                            if (mode === 'install') {
+                                await new Promise<void>((resolve) => {
+                                    const sink = {
+                                        onStart: (command: string, cwd: string) => send('start', {unid, command, cwd}),
+                                        onStdout: (chunk: string) => send('stdout', {unid, chunk}),
+                                        onStderr: (chunk: string) => send('stderr', {unid, chunk}),
+                                        onEnd: (exitCode: number|null) => {
+                                            send('end', {unid, exitCode});
+                                            currentChild = null;
+                                            resolve();
+                                        },
+                                        onError: (msg: string) => send('error', {unid, msg})
+                                    };
+                                    currentChild = upgrader.runInstall(sink);
+                                });
+                            }
+                        } catch (e) {
+                            send('error', {unid, msg: (e as Error).message, backupDir});
+                        }
+                    }
+
+                    if (!aborted) {
+                        send('done', {totalProjects: groups.size});
+                    }
+                } catch (e) {
+                    send('error', {msg: (e as Error).message});
+                } finally {
+                    res.end();
+                }
+            });
+
+            // -------------------------------------------------------------
             // GET /api/releases?name=... — merged release timeline:
             // registry-known versions + (when github.com) GitHub
             // release titles / bodies. Newest first.
@@ -1083,6 +1315,24 @@ class Server {
             server.middlewares.use(app);
             }
         };
+    }
+
+    /**
+     * Shape guard for one Bulk-Upgrade pick. Used by both the
+     * `/api/matrix/upgrade/preview` and `/api/matrix/upgrade/apply`
+     * routes — the body comes off the wire untyped, so a single
+     * narrowing predicate keeps the route handlers readable.
+     */
+    private static _isValidPick(p: unknown): p is ApiBulkUpgradePick {
+        if (!p || typeof p !== 'object') {
+            return false;
+        }
+        const o = p as Record<string, unknown>;
+        return typeof o.projectUnid === 'string'
+            && typeof o.name === 'string'
+            && typeof o.depType === 'string'
+            && typeof o.fromRange === 'string'
+            && typeof o.toRange === 'string';
     }
 
 }

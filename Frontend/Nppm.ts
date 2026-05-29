@@ -1,5 +1,6 @@
 import {ApiProject} from '../Api/ApiTypes.js';
 import {Api} from './Api.js';
+import {BulkUpgradeModal} from './BulkUpgradeModal.js';
 import {DepTreeView} from './DepTreeView.js';
 import {GlobalScanView} from './GlobalScanView.js';
 import {HistoryView} from './HistoryView.js';
@@ -48,6 +49,7 @@ export class Nppm {
     private readonly _globalScanView: GlobalScanView;
     private readonly _detailPanel: PackageDetailPanel;
     private readonly _upgradeModal: UpgradeModal;
+    private readonly _bulkUpgradeModal: BulkUpgradeModal;
     private readonly _listRoot: HTMLElement;
     private _matrixHost: HTMLElement|null = null;
     private _packageHost: HTMLElement|null = null;
@@ -112,6 +114,7 @@ export class Nppm {
 
         this._detailPanel = new PackageDetailPanel();
         this._upgradeModal = new UpgradeModal();
+        this._bulkUpgradeModal = new BulkUpgradeModal();
 
         new Resizer(resizer, controls);
 
@@ -235,6 +238,10 @@ export class Nppm {
 
         this._matrix.onSecurityClick((pkg, version) => {
             void this._detailPanel.openOnSecurity(pkg, version, version);
+        });
+
+        this._matrix.onBulkUpgradeClick((picks) => {
+            void this._bulkUpgradeModal.open(picks);
         });
     }
 

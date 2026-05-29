@@ -30,7 +30,8 @@ time the UI changes.
 5. [Headless CI mode](#5-headless-ci-mode)
 6. [SBOM export](#6-sbom-export)
 7. [Upgrading a dep (Upgrade modal)](#7-upgrading-a-dep-upgrade-modal)
-8. [Switching language](#8-switching-language)
+8. [Bulk-Update Wizard](#8-bulk-update-wizard)
+9. [Switching language](#9-switching-language)
 
 ---
 
@@ -446,7 +447,89 @@ hand.
 
 ---
 
-## 8. Switching language
+## 8. Bulk-Update Wizard
+
+The per-cell Upgrade modal is great when you've got one outdated dep
+to think about. When ten of them piled up across three projects, the
+**Bulk-Update Wizard** turns that into one round-trip.
+
+In the **global matrix**, every outdated cell of a *local* project
+grows a checkbox next to the version. (Remote projects and git-pinned
+deps are skipped — the underlying `Upgrader` only mutates local
+files, and git installs have no registry `latest` to bump to.)
+Filtering by `Outdated` makes the candidates easier to spot.
+
+![Bulk selection in the matrix](screenshots/11_bulk_select.png)
+
+A sticky **footer bar** appears under the table the moment you tick
+the first checkbox: live count, **Clear selection**, and the primary
+**Update selected** trigger. Selections survive filter / sort changes
+within the same page session and clear on the next reload.
+
+Clicking **Update selected** opens the wizard:
+
+![Bulk-Upgrade Wizard](screenshots/12_bulk_modal.png)
+
+1. **Header** — total picks across all selected cells.
+2. **Summary** — `N planned, M skipped — across K project(s)`. Skipped
+   buckets are the same as the single-pick API: `not-local`,
+   `unknown-project`, `not-found` (the dep aggregates across
+   workspaces in the global matrix; if it lives only in a
+   non-root workspace, root-level edit can't reach it), `no-change`.
+3. **Per-project groups** — each project gets its own card with the
+   ticked picks. Each row shows `name`, the planned `from → to`
+   range, and a one-liner with the worst security signals on the
+   target version (CVE count, install-scripts, maintainer / churn /
+   license).
+4. **Skipped list** at the bottom — every pick that couldn't be
+   planned, with its reason, so nothing silently disappears.
+5. **Actions**:
+   - **Apply edits only** — writes every changed `package.json`, one
+     shared backup folder per project under
+     `.nppm-backups/<timestamp>/`, then reminds you to run `npm
+     install` by hand in each project.
+   - **Apply edits + install per project (--ignore-scripts)** —
+     same plus a sequential install. One `npm install` per project,
+     never in parallel (the npm cache lock would race). Streams the
+     output of all installs live into one combined log.
+
+The live log groups events per project:
+
+```
+── kavula (3 picks) ──
+  ✓ Backup saved to .nppm-backups/2026-05-29T11-15-02Z
+    · package.json
+    · package-lock.json
+  ✓ vitest → package.json
+  ✓ vite → package.json
+  ✓ typescript → package.json
+
+  $ npm install --ignore-scripts --no-audit --no-fund
+    (cwd: /home/swe/Dokumente/Projekte/pkg/kavula)
+
+  …
+  Install finished (exit 0)
+
+── swipemeister (2 picks) ──
+  ...
+```
+
+A failed install in one project surfaces as `error` but doesn't abort
+the next project — partial success is recoverable via the backup
+folders.
+
+The wizard does **not** offer a "Run lifecycle scripts" step (the
+single-package modal does). If you need to re-fire scripts after a
+bulk upgrade, open the affected packages individually via the per-
+project matrix and use the existing per-script Run button.
+
+> 💡 **Tip:** combine the `Outdated` filter with the search box to
+> bulk-update just one ecosystem at a time — e.g. type `vite` to
+> sweep up `vite`, `vitest`, `@vitejs/*` across every project.
+
+---
+
+## 9. Switching language
 
 The flags in the top-right corner switch the UI language. Default is
 English, German is shipped. Adding a third language is a three-step

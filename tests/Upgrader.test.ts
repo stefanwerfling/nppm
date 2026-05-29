@@ -183,6 +183,48 @@ describe('Upgrader', () => {
         expect(c.ended).toBe(0);
     });
 
+    it('applyMany() bundles multiple edits + lockfile into one backup', () => {
+        const rootPkg = path.join(tmp, 'package.json');
+        const wsDir = path.join(tmp, 'apps', 'api');
+        fs.mkdirSync(wsDir, {recursive: true});
+        const wsPkg = path.join(wsDir, 'package.json');
+        fs.writeFileSync(rootPkg, '{"dependencies":{"lodash":"^4.17.20"}}');
+        fs.writeFileSync(wsPkg, '{"devDependencies":{"vitest":"^3.0.0"}}');
+        fs.writeFileSync(path.join(tmp, 'package-lock.json'), '{"lockfileVersion":3}');
+
+        const upgrader = new Upgrader(tmp);
+        const out = upgrader.applyMany([
+            {name: 'lodash', depType: 'dependency', fromRange: '^4.17.20', toRange: '^4.17.21'},
+            {workspace: 'apps/api', name: 'vitest', depType: 'dev', fromRange: '^3.0.0', toRange: '^4.0.0'}
+        ]);
+
+        expect(out.results).toHaveLength(2);
+        expect(out.results.every((r) => r.result.changed)).toBe(true);
+        expect(fs.readFileSync(rootPkg, 'utf-8')).toContain('"lodash": "^4.17.21"');
+        expect(fs.readFileSync(wsPkg, 'utf-8')).toContain('"vitest": "^4.0.0"');
+
+        // Single backup folder, all three files snapshotted.
+        const snapshotted = new Set(out.backup.files);
+        expect(snapshotted.has('package.json')).toBe(true);
+        expect(snapshotted.has(path.join('apps', 'api', 'package.json'))).toBe(true);
+        expect(snapshotted.has('package-lock.json')).toBe(true);
+    });
+
+    it('applyMany() reports unchanged picks without aborting', () => {
+        const rootPkg = path.join(tmp, 'package.json');
+        fs.writeFileSync(rootPkg, '{"dependencies":{"lodash":"^4.17.20"}}');
+
+        const upgrader = new Upgrader(tmp);
+        const out = upgrader.applyMany([
+            {name: 'missing-pkg', depType: 'dependency', fromRange: '^1', toRange: '^2'},
+            {name: 'lodash', depType: 'dependency', fromRange: '^4.17.20', toRange: '^4.17.21'}
+        ]);
+
+        expect(out.results[0].result.changed).toBe(false);
+        expect(out.results[1].result.changed).toBe(true);
+        expect(fs.readFileSync(rootPkg, 'utf-8')).toContain('"lodash": "^4.17.21"');
+    });
+
     it('runInstall() routes spawn errors to onError + onEnd(null)', () => {
         const spawnStub: SpawnFn = () => {
             throw new Error('npm: not found');

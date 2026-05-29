@@ -1,4 +1,7 @@
 import {
+    ApiBulkUpgradePick,
+    ApiBulkUpgradePreviewRequest,
+    ApiBulkUpgradePreviewResponse,
     ApiDepGraphResponse,
     ApiFingerprintDiffResponse,
     ApiFingerprintResponse,
@@ -84,6 +87,25 @@ export class Api {
 
     public static lifecycleRunUrl(projectUnid: string): string {
         return `/api/projects/${projectUnid}/lifecycle-scripts/run`;
+    }
+
+    public static async matrixUpgradePreview(
+        picks: ApiBulkUpgradePick[]
+    ): Promise<ApiBulkUpgradePreviewResponse> {
+        const body: ApiBulkUpgradePreviewRequest = {picks};
+        const res = await fetch('/api/matrix/upgrade/preview', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            throw new Error(`/api/matrix/upgrade/preview → ${res.status} ${res.statusText}`);
+        }
+        return (await res.json()) as ApiBulkUpgradePreviewResponse;
+    }
+
+    public static matrixUpgradeApplyUrl(): string {
+        return '/api/matrix/upgrade/apply';
     }
 
     public static async releases(name: string): Promise<ApiReleasesResponse> {

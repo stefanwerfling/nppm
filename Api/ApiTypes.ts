@@ -308,3 +308,56 @@ export type ApiLifecycleScriptsResponse = {
 export type ApiLifecycleRunRequest = {
     name: string;
 };
+
+/**
+ * One row in the cross-project Bulk-Upgrade Wizard. Identifies the
+ * single dep bump in one project's `package.json` (root or a named
+ * workspace). The frontend collects these by checkbox in the global
+ * Matrix; the backend groups them by `projectUnid` so a project gets
+ * one shared backup + one install run regardless of how many of its
+ * deps were ticked.
+ */
+export type ApiBulkUpgradePick = {
+    projectUnid: string;
+    workspace?: string;
+    name: string;
+    depType: 'dependency'|'dev'|'peer'|'optional';
+    fromRange: string;
+    toRange: string;
+};
+
+/**
+ * Why a pick wasn't actionable. `not-local` is the most common — the
+ * Upgrader only mutates local-disk projects. `unknown-project` covers
+ * a stale UUID (server restart). `not-found` means the dep isn't in
+ * the named bucket of the target `package.json` (e.g. the row aggregated
+ * across workspaces and the dep only lives in a non-root one).
+ */
+export type ApiBulkUpgradeSkipReason =
+    'not-local'
+    |'unknown-project'
+    |'not-found'
+    |'no-change';
+
+/**
+ * One outcome from `POST /api/matrix/upgrade/preview`. Either a
+ * full single-pick preview (when planable) or a `skipped` envelope
+ * with a reason, so the modal can list both buckets at once.
+ */
+export type ApiBulkUpgradePreviewResult =
+    {pick: ApiBulkUpgradePick; preview: ApiUpgradePreviewResponse}
+    |{pick: ApiBulkUpgradePick; skipped: ApiBulkUpgradeSkipReason; msg?: string};
+
+export type ApiBulkUpgradePreviewRequest = {
+    picks: ApiBulkUpgradePick[];
+};
+
+export type ApiBulkUpgradePreviewResponse = {
+    results: ApiBulkUpgradePreviewResult[];
+    allowInstall: boolean;
+};
+
+export type ApiBulkUpgradeApplyRequest = {
+    picks: ApiBulkUpgradePick[];
+    mode: 'edit'|'install';
+};

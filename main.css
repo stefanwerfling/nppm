@@ -1457,3 +1457,248 @@ html, body {
     background: var(--c-accent);
     color: #fff;
 }
+
+/* Cross-project Bulk-Upgrade Wizard ----------------------------------- */
+
+.matrix-cell-check {
+    margin-right: 6px;
+    vertical-align: middle;
+    cursor: pointer;
+    accent-color: var(--c-accent);
+}
+
+.matrix-footer {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--c-panel);
+    border-top: 1px solid var(--c-border);
+    z-index: 5;
+}
+
+.matrix-footer-empty {
+    display: none;
+}
+
+.matrix-footer-count {
+    flex: 1;
+    font-size: 12px;
+    color: var(--c-muted);
+}
+
+.matrix-footer-clear,
+.matrix-footer-apply {
+    background: var(--c-panel);
+    color: var(--c-text);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    padding: 5px 12px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.matrix-footer-apply {
+    background: var(--c-accent);
+    border-color: var(--c-accent);
+    color: #fff;
+}
+
+.matrix-footer-apply[disabled],
+.matrix-footer-clear[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.bumd-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 1000;
+    padding: 5vh 2vw;
+    overflow-y: auto;
+}
+
+.bumd-panel {
+    background: var(--c-panel);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-md);
+    width: min(960px, 95vw);
+    max-width: 95vw;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.bumd-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--c-border);
+    padding-bottom: 8px;
+}
+
+.bumd-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+.bumd-close {
+    background: transparent;
+    color: var(--c-muted);
+    border: none;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 6px;
+}
+
+.bumd-close:hover {
+    color: var(--c-text);
+}
+
+.bumd-loading,
+.bumd-error,
+.bumd-empty,
+.bumd-note {
+    color: var(--c-muted);
+    font-size: 12px;
+}
+
+.bumd-error {
+    color: #e85a5a;
+}
+
+.bumd-summary {
+    font-size: 12px;
+    color: var(--c-text);
+}
+
+.bumd-section-head {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--c-muted);
+    margin-bottom: 6px;
+}
+
+.bumd-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.bumd-group {
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    background: var(--c-bg);
+}
+
+.bumd-pick {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 12px;
+    padding: 3px 0;
+}
+
+.bumd-pick-main {
+    flex: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    color: var(--c-text);
+}
+
+.bumd-pick-name {
+    font-weight: 600;
+}
+
+.bumd-pick-arrow {
+    color: var(--c-muted);
+}
+
+.bumd-pick-heads {
+    color: #f0b400;
+    font-size: 11px;
+}
+
+.bumd-skipped {
+    border-top: 1px solid var(--c-border);
+    padding-top: 8px;
+}
+
+.bumd-skipped-row {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--c-muted);
+}
+
+.bumd-log {
+    border-top: 1px solid var(--c-border);
+    padding-top: 10px;
+}
+
+.bumd-log-body {
+    display: block;
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 360px;
+    overflow: auto;
+}
+
+.bumd-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.bumd-btn {
+    background: var(--c-panel);
+    color: var(--c-text);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    padding: 6px 14px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.bumd-btn:hover:not([disabled]) {
+    background: var(--c-row-hover);
+}
+
+.bumd-btn[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.bumd-btn-primary {
+    background: var(--c-accent);
+    border-color: var(--c-accent);
+    color: #fff;
+}
+
+.bumd-btn-risky {
+    background: rgba(232, 90, 90, 0.15);
+    border-color: rgba(232, 90, 90, 0.5);
+    color: #f0b400;
+}

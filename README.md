@@ -11,6 +11,14 @@ Vite dev server, frontend is plain TypeScript + DOM (no framework).
 
 ![Matrix view](doc/screenshots/01_matrix.png)
 
+## Documentation
+
+- 🇬🇧 [User manual](doc/manual_en.md) — screenshot-driven walkthrough
+- 🇩🇪 [Benutzerhandbuch](doc/manual_de.md) — deutsche Version
+- 🛠 [`CLAUDE.md`](CLAUDE.md) — architecture reference (module map, API
+  routes, conventions)
+- 📜 [`LICENSE`](LICENSE) — MIT
+
 ## Features
 
 - **Cross-project matrix** — packages as rows, projects as columns, traffic
@@ -54,6 +62,14 @@ Vite dev server, frontend is plain TypeScript + DOM (no framework).
   lifecycle hook in `node_modules` with a per-package "Run" button
   (`npm rebuild <pkg>`) so the user can re-fire only the scripts
   they've reviewed. Backups land in `.nppm-backups/<timestamp>/`.
+- **Bulk-Update Wizard** — the cross-project matrix grows a checkbox
+  on every outdated cell of a local project. A sticky footer shows
+  the running selection count; "Update selected" opens a wizard with
+  a per-project grouped preview (each pick's `from → to` plus a
+  security heads-up), then applies all edits — one shared backup per
+  project — and optionally runs `npm install --ignore-scripts`
+  sequentially per project. Same `actions.allowInstall` gate as the
+  single-package modal.
 - **SBOM export** — `nppm sbom --format=cyclonedx|spdx` (or the
   `GET /api/projects/:id/sbom?format=…` endpoint) emits a Software
   Bill of Materials for one project. CycloneDX 1.6 and SPDX 2.3 JSON.
@@ -236,10 +252,17 @@ pipeline that understands non-zero exits.
 
 ## Usage
 
-Read the screenshot-driven walkthrough:
+Full screenshot-driven walkthrough lives in the per-language manuals
+linked at the top of this README. Quick chapter pointers:
 
-- 🇬🇧 [`doc/manual_en.md`](doc/manual_en.md)
-- 🇩🇪 [`doc/manual_de.md`](doc/manual_de.md)
+- [The cross-project matrix](doc/manual_en.md#1-the-cross-project-matrix)
+- [Drilling into one project](doc/manual_en.md#2-drilling-into-one-project)
+- [Package detail panel](doc/manual_en.md#3-package-detail-panel)
+- [Global CVE scan](doc/manual_en.md#4-global-cve-scan)
+- [Headless CI mode](doc/manual_en.md#5-headless-ci-mode)
+- [SBOM export](doc/manual_en.md#6-sbom-export)
+- [Upgrade modal](doc/manual_en.md#7-upgrading-a-dep-upgrade-modal)
+- [Bulk-Update Wizard](doc/manual_en.md#8-bulk-update-wizard)
 
 ## Caches
 

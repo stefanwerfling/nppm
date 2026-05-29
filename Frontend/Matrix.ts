@@ -1,3 +1,5 @@
+import {ApiBulkUpgradePick} from '../Api/ApiTypes.js';
+import {ConfigProjectType} from '../Config/Config.js';
 import {DependencyType} from '../Project/PackageManifest.js';
 import {MatrixResponse, MatrixRow, MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
 import {BinarySeverity, BinarySummary} from '../Security/BinaryScanner.js';
@@ -110,6 +112,12 @@ export class Matrix {
     private _onProjectClick: ((unid: string) => void)|null = null;
     private _onCellClick: ((pkg: string, version: string, latest: string|null) => void)|null = null;
     private _onSecurityClick: ((pkg: string, version: string) => void)|null = null;
+    private _onBulkUpgradeClick: ((picks: ApiBulkUpgradePick[]) => void)|null = null;
+    // Multi-select state for the cross-project Bulk-Upgrade Wizard.
+    // Keyed by `${unid}|${pkg}` — workspace is always root in the global
+    // matrix (cells aggregate workspaces), so the key collapses to that
+    // pair. Cleared on `setData`.
+    private _selected: Map<string, ApiBulkUpgradePick> = new Map();
     // Cached batched vuln lookups, keyed by package name (we always
     // batch against `latest`, so the version is implicit). `null` means
     // OSV failed for that package; `[]` means "asked, no vulns".
@@ -213,6 +221,10 @@ export class Matrix {
         this._onSecurityClick = handler;
     }
 
+    public onBulkUpgradeClick(handler: (picks: ApiBulkUpgradePick[]) => void): void {
+        this._onBulkUpgradeClick = handler;
+    }
+
     public renderLoading(): void {
         this._root.innerHTML = `<div class="list-placeholder">${I18n.t('Loading matrix …')}</div>`;
     }
@@ -227,6 +239,7 @@ export class Matrix {
 
     public setData(data: MatrixResponse): void {
         this._data = data;
+        this._selected = new Map();
         this._vulnsByName = new Map();
         this._scriptsByName = new Map();
         this._patternsByName = new Map();
@@ -333,6 +346,8 @@ export class Matrix {
         tableWrap.className = 'matrix-wrap';
         tableWrap.appendChild(this._renderTable());
         this._root.appendChild(tableWrap);
+
+        this._root.appendChild(this._renderBulkFooter());
     }
 
     private _renderFilters(): HTMLElement {
@@ -629,6 +644,41 @@ export class Matrix {
                     this._onCellClick?.(row.name, cellData.version, row.latest);
                 });
 
+                // Bulk-Upgrade checkbox: only for outdated rows on
+                // local projects with a known registry `latest` and a
+                // non-git installation. Click is stopped so it doesn't
+                // also open the detail panel.
+                if (
+                    row.status === MatrixRowStatus.outdated
+                    && row.latest
+                    && !cellData.installedVersion
+                    && project.type === ConfigProjectType.local
+                ) {
+                    const key = Matrix._pickKey(project.unid, row.name);
+                    const check = document.createElement('input');
+                    check.type = 'checkbox';
+                    check.className = 'matrix-cell-check';
+                    check.checked = this._selected.has(key);
+                    check.title = I18n.t('Add to Bulk Update');
+                    check.addEventListener('click', (e) => e.stopPropagation());
+                    check.addEventListener('change', () => {
+                        if (check.checked) {
+                            this._selected.set(key, {
+                                projectUnid: project.unid,
+                                workspace: '',
+                                name: row.name,
+                                depType: Matrix._toApiDepType(cellData.types[0]),
+                                fromRange: cellData.version,
+                                toRange: `^${row.latest}`
+                            });
+                        } else {
+                            this._selected.delete(key);
+                        }
+                        this._refreshBulkFooter();
+                    });
+                    td.appendChild(check);
+                }
+
                 const v = document.createElement('span');
                 v.className = 'matrix-cell-version';
                 if (cellData.installedVersion) {
@@ -739,6 +789,88 @@ export class Matrix {
         }
 
         return copy;
+    }
+
+    /**
+     * Sticky footer that surfaces the Bulk-Upgrade selection state
+     * and the "Update selected" trigger. Hidden (display:none via
+     * `matrix-footer-empty`) until the first checkbox is ticked —
+     * otherwise it would overlap the last matrix row in the default
+     * "All" view without offering anything to act on.
+     */
+    private _renderBulkFooter(): HTMLElement {
+        const bar = document.createElement('div');
+        bar.className = 'matrix-footer';
+
+        const count = document.createElement('span');
+        count.className = 'matrix-footer-count';
+        bar.appendChild(count);
+
+        const clear = document.createElement('button');
+        clear.className = 'matrix-footer-clear';
+        clear.textContent = I18n.t('Clear selection');
+        clear.addEventListener('click', () => {
+            this._selected.clear();
+            this._rerenderTable();
+            this._refreshBulkFooter();
+        });
+        bar.appendChild(clear);
+
+        const apply = document.createElement('button');
+        apply.className = 'matrix-footer-apply';
+        apply.textContent = I18n.t('Update selected');
+        apply.addEventListener('click', () => {
+            if (this._selected.size === 0) {
+                return;
+            }
+            this._onBulkUpgradeClick?.(Array.from(this._selected.values()));
+        });
+        bar.appendChild(apply);
+
+        Matrix._fillBulkFooter(bar, this._selected.size);
+        return bar;
+    }
+
+    /**
+     * In-place update of the sticky footer's count and disabled state
+     * — avoids tearing down + re-rendering the whole table on every
+     * checkbox toggle.
+     */
+    private _refreshBulkFooter(): void {
+        const bar = this._root.querySelector<HTMLElement>('.matrix-footer');
+        if (!bar) {
+            return;
+        }
+        Matrix._fillBulkFooter(bar, this._selected.size);
+    }
+
+    private static _fillBulkFooter(bar: HTMLElement, n: number): void {
+        const count = bar.querySelector<HTMLElement>('.matrix-footer-count');
+        const apply = bar.querySelector<HTMLButtonElement>('.matrix-footer-apply');
+        const clear = bar.querySelector<HTMLButtonElement>('.matrix-footer-clear');
+        if (count) {
+            count.textContent = I18n.t('{n} selected', {n});
+        }
+        if (apply) {
+            apply.disabled = n === 0;
+        }
+        if (clear) {
+            clear.disabled = n === 0;
+        }
+        bar.classList.toggle('matrix-footer-empty', n === 0);
+    }
+
+    private static _pickKey(projectUnid: string, name: string): string {
+        return `${projectUnid}|${name}`;
+    }
+
+    /**
+     * `DependencyType` (string enum) → the literal union the Upgrade
+     * API request expects. Identity at runtime; the cast keeps the
+     * static types narrow for the route handler.
+     */
+    private static _toApiDepType(t: DependencyType): 'dependency'|'dev'|'peer'|'optional' {
+        return t as unknown as 'dependency'|'dev'|'peer'|'optional';
     }
 
     private static _th(label: string, cls: string): HTMLElement {

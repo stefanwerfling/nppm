@@ -105,6 +105,55 @@ export class Upgrader {
     }
 
     /**
+     * Bulk variant of `applyEdit`: plan every pick first, snapshot all
+     * touched files (each pick's `package.json` + the project's lockfile
+     * if present) in ONE backup folder, then write every changed file.
+     * Picks where the dep isn't in the named bucket are returned with
+     * `changed:false` so the caller can report "skipped" without aborting
+     * the rest of the batch. Throws only on filesystem failures or
+     * unreadable `package.json` files — domain-level "nothing to do"
+     * surfaces as `changed:false`.
+     */
+    public applyMany(requests: ApiUpgradeRequest[]): {
+        backup: BackupStamp;
+        results: {request: ApiUpgradeRequest; path: string; rel: string; result: EditResult}[];
+    } {
+        // Plan everything up-front so the snapshot covers exactly the
+        // files we're about to touch — and so a parse failure aborts
+        // before we've mutated anything.
+        const planned: {request: ApiUpgradeRequest; abs: string; rel: string; result: EditResult}[] = [];
+        const touched = new Set<string>();
+        for (const request of requests) {
+            const {abs, rel} = this.resolvePackageJson(request);
+            if (!fs.existsSync(abs)) {
+                throw new Error(`package.json not found at ${abs}`);
+            }
+            const source = fs.readFileSync(abs, 'utf-8');
+            const result = PackageJsonEditor.apply(source, request.depType, request.name, request.toRange);
+            planned.push({request, abs, rel, result});
+            touched.add(abs);
+        }
+
+        const lockPath = path.join(this._projectRoot, 'package-lock.json');
+        const backupPaths = [...touched];
+        if (fs.existsSync(lockPath)) {
+            backupPaths.push(lockPath);
+        }
+        const backup = this._backups.save(this._projectRoot, backupPaths);
+
+        for (const p of planned) {
+            if (p.result.changed) {
+                fs.writeFileSync(p.abs, p.result.after);
+            }
+        }
+
+        return {
+            backup,
+            results: planned.map((p) => ({request: p.request, path: p.abs, rel: p.rel, result: p.result}))
+        };
+    }
+
+    /**
      * Spawn `npm install --ignore-scripts` in the project root and
      * pipe its output into `sink`. Returns the child handle so the
      * caller can hook abort/timeout policies; the sink already gets

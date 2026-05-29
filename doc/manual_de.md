@@ -31,7 +31,8 @@ Beispielprojekte.
 5. [Headless-CI-Modus](#5-headless-ci-modus)
 6. [SBOM-Export](#6-sbom-export)
 7. [Eine Abhängigkeit upgraden (Upgrade-Modal)](#7-eine-abhängigkeit-upgraden-upgrade-modal)
-8. [Sprache wechseln](#8-sprache-wechseln)
+8. [Bulk-Update-Wizard](#8-bulk-update-wizard)
+9. [Sprache wechseln](#9-sprache-wechseln)
 
 ---
 
@@ -458,7 +459,96 @@ zum manuellen Ausführen an.
 
 ---
 
-## 8. Sprache wechseln
+## 8. Bulk-Update-Wizard
+
+Das Per-Cell-Upgrade-Modal ist super, wenn man eine veraltete
+Dependency hat. Wenn sich aber zehn davon über drei Projekte
+angesammelt haben, macht der **Bulk-Update-Wizard** daraus einen
+einzigen Durchlauf.
+
+In der **globalen Matrix** bekommt jede Outdated-Cell eines *lokalen*
+Projekts eine Checkbox neben der Version. (Remote-Projekte und
+git-gepinnte Deps werden übersprungen — der `Upgrader` mutiert nur
+lokale Dateien, und Git-Installs haben kein Registry-`latest` zum
+Bumpen.) Mit dem `Outdated`-Filter sind die Kandidaten leichter zu
+finden.
+
+![Bulk-Auswahl in der Matrix](screenshots/11_bulk_select_de.png)
+
+Eine sticky **Footer-Bar** erscheint unter der Tabelle, sobald die
+erste Checkbox tickt: Live-Counter, **Auswahl löschen** und der
+primäre **Auswahl aktualisieren**-Trigger. Auswahlen überleben
+Filter-/Sort-Wechsel innerhalb derselben Page-Session und werden
+beim nächsten Reload zurückgesetzt.
+
+Klick auf **Auswahl aktualisieren** öffnet den Wizard:
+
+![Bulk-Upgrade-Wizard](screenshots/12_bulk_modal_de.png)
+
+1. **Header** — Anzahl der Picks über alle ausgewählten Cells.
+2. **Summary** — `N geplant, M übersprungen — über K Projekt(e)`.
+   Skip-Buckets sind identisch zur Single-Pick-API: `not-local`,
+   `unknown-project`, `not-found` (die Dep wird in der globalen
+   Matrix über Workspaces aggregiert; lebt sie nur in einem
+   Nicht-Root-Workspace, kann ein Root-Level-Edit sie nicht
+   erreichen), `no-change`.
+3. **Per-Projekt-Gruppen** — jedes Projekt bekommt eine eigene
+   Karte mit den getickten Picks. Pro Zeile: `name`, die geplante
+   `from → to`-Range und ein Einzeiler mit den schlimmsten
+   Security-Signalen auf die Zielversion (CVE-Anzahl,
+   Install-Scripts, Maintainer / Churn / Lizenz).
+4. **Skipped-Liste** unten — jede Auswahl, die nicht geplant
+   werden konnte, mit Grund. Nichts verschwindet still.
+5. **Aktionen**:
+   - **Nur package.json-Änderungen anwenden** — schreibt jede
+     geänderte `package.json`, ein geteiltes Backup-Verzeichnis
+     pro Projekt unter `.nppm-backups/<timestamp>/`, dann der
+     Hinweis pro Projekt `npm install` von Hand zu starten.
+   - **Änderungen + Install pro Projekt (--ignore-scripts)** —
+     dasselbe plus sequenzielles `npm install`. Ein Install pro
+     Projekt, niemals parallel (der npm-Cache-Lock würde
+     kollidieren). Streamt das Output aller Installs live in ein
+     gemeinsames Log.
+
+Das Live-Log ist nach Projekt gruppiert:
+
+```
+── kavula (3 picks) ──
+  ✓ Backup gespeichert nach .nppm-backups/2026-05-29T11-15-02Z
+    · package.json
+    · package-lock.json
+  ✓ vitest → package.json
+  ✓ vite → package.json
+  ✓ typescript → package.json
+
+  $ npm install --ignore-scripts --no-audit --no-fund
+    (cwd: /home/swe/Dokumente/Projekte/pkg/kavula)
+
+  …
+  Install fertig (Exit 0)
+
+── swipemeister (2 picks) ──
+  ...
+```
+
+Ein fehlgeschlagener Install in einem Projekt erscheint als `error`,
+bricht aber den Lauf für die anderen Projekte nicht ab —
+Teilerfolg ist über die Backup-Ordner wiederherstellbar.
+
+Der Wizard bietet **keinen** "Lifecycle-Scripts ausführen"-Schritt
+(das Single-Package-Modal schon). Wenn nach einem Bulk-Upgrade
+Scripts nachgefeuert werden müssen, das betroffene Paket in der
+Per-Projekt-Matrix einzeln öffnen und den dortigen per-Script
+Ausführen-Button nutzen.
+
+> 💡 **Tipp:** Den `Outdated`-Filter mit der Suchbox kombinieren,
+> um nur ein Ökosystem auf einmal zu bumpen — z.B. `vite`
+> eintippen, um `vite`, `vitest`, `@vitejs/*` über alle Projekte
+> auf einen Schlag zu erwischen.
+
+---
+
+## 9. Sprache wechseln
 
 Die Flaggen oben rechts schalten die UI-Sprache. Default ist Englisch,
 Deutsch ist mitgeliefert. Eine dritte Sprache hinzufügen ist ein

@@ -103,6 +103,7 @@ nppm/
 │   ├── DepTreeView.ts      D3-collapsible tree
 │   ├── UnusedView.ts       per-project depcheck-style report (unused/misplaced/missing)
 │   ├── UpgradeModal.ts     overlay: preview → edit/install → lifecycle-scripts list + Run buttons
+│   ├── BulkUpgradeModal.ts cross-project bulk wizard: grouped preview + per-project SSE install log
 │   ├── GlobalScanView.ts   SSE-driven global scan results
 │   ├── PackageDetailPanel.ts  modal w/ 5 tabs (Files/Deps/Diff/Releases/Security)
 │   ├── Treeview.ts         left-pane project list
@@ -133,6 +134,8 @@ nppm/
 | GET    | `/api/projects/:id/sbom?format=cyclonedx\|spdx`       | Software Bill of Materials (default: cyclonedx) |
 | POST   | `/api/projects/:id/upgrade/preview`                   | plan a single dep range bump (returns before/after + SecurityReport) |
 | POST   | `/api/projects/:id/upgrade/apply`                     | SSE: write backup + edit; if `mode=install`, also stream `npm install --ignore-scripts` |
+| POST   | `/api/matrix/upgrade/preview`                         | bulk preview for the cross-project Bulk-Upgrade Wizard |
+| POST   | `/api/matrix/upgrade/apply`                           | SSE: group picks by project, one backup + (optional) `npm install` per project |
 | GET    | `/api/projects/:id/lifecycle-scripts`                 | install/postinstall/prepare hooks across `node_modules/*` |
 | POST   | `/api/projects/:id/lifecycle-scripts/run`             | SSE: `npm rebuild <pkg>` — gated by `actions.allowInstall` |
 

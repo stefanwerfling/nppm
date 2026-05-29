@@ -22,6 +22,40 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import puppeteer from 'puppeteer';
 
+/**
+ * Read every configured local project's root `package.json` and return
+ * the union of declared dep names (deps + devDeps + peer + optional).
+ * Used by the Bulk-Upgrade Wizard capture to prefer checkboxes whose
+ * row will resolve to a real edit instead of a `not-found` skip
+ * (the global matrix aggregates workspaces, so workspace-only deps
+ * surface in the cell but can't be reached by a root edit).
+ */
+async function collectRootDepNames() {
+    const out = new Set();
+    try {
+        const cfg = JSON.parse(await readFile(path.join(PROJECT_ROOT, 'nppm.json'), 'utf-8'));
+        for (const p of cfg.projects ?? []) {
+            if (p?.type !== 'local' || !p.path) {
+                continue;
+            }
+            try {
+                const pkg = JSON.parse(await readFile(path.join(p.path, 'package.json'), 'utf-8'));
+                for (const bucket of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+                    for (const name of Object.keys(pkg[bucket] ?? {})) {
+                        out.add(name);
+                    }
+                }
+            } catch {
+                // Project root unreadable — skip; the fallback in
+                // captureBulkWizard still kicks in.
+            }
+        }
+    } catch {
+        // No nppm.json — caller will fall back to "first 3 anywhere".
+    }
+    return out;
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const SHOTS_DIR = path.join(__dirname, 'screenshots');
@@ -192,13 +226,156 @@ async function captureLanguage(browser, baseUrl, lang) {
     await sleep(2500);
     await shot(page, `10_panel_security${suffix}.png`);
 
+    await captureBulkWizard(page, lang, suffix, ROOT_DEP_NAMES);
+
     await page.close();
 }
+
+/**
+ * Cross-project Bulk-Upgrade Wizard. Switches back to the global
+ * matrix, sets the Outdated filter so checkboxes are visible without
+ * scrolling, ticks the first few, screenshots the matrix + footer,
+ * then opens the wizard and screenshots its grouped preview.
+ *
+ * Best-effort: if the user's projects happen to have zero outdated
+ * cells (everything already aligned), both screenshots get skipped
+ * with a console note.
+ */
+async function captureBulkWizard(page, lang, suffix, rootDepNames) {
+    // Close any open modal from a previous step.
+    await page.keyboard.press('Escape');
+    await sleep(300);
+
+    // Switch back to the global matrix view.
+    await page.evaluate(() => {
+        const item = Array.from(document.querySelectorAll('.tree-item'))
+            .find((el) => el.textContent?.trim() === 'Matrix');
+        item?.click();
+    });
+    await sleep(1500);
+    await waitForMatrix(page);
+
+    // Activate the Outdated filter so the candidates surface together.
+    const filtered = await page.evaluate((label) => {
+        const btn = Array.from(document.querySelectorAll('.matrix-filter-btn'))
+            .find((b) => b.textContent?.trim() === label);
+        if (btn) {
+            btn.click();
+            return true;
+        }
+        return false;
+    }, lang === 'de' ? 'Veraltet' : 'Outdated');
+
+    if (!filtered) {
+        console.log('  · Outdated filter button not found — skipping bulk wizard shots');
+        return;
+    }
+    await sleep(1500);
+
+    // Tick up to three checkboxes. Prefer rows whose package name is
+    // declared in some local project's *root* package.json — the
+    // global matrix aggregates workspaces, so workspace-only deps
+    // surface in the cell but a root-level edit can't reach them and
+    // they'd show as `not-found` in the wizard. The fallback list is
+    // generic well-known tools for repos whose `nppm.json` couldn't be
+    // read at script start.
+    const ticked = await page.evaluate((rootNames) => {
+        const known = new Set(rootNames);
+        const rows = Array.from(document.querySelectorAll('.matrix-row'));
+        const target = [];
+
+        // Pass 1 — only rows whose name is known to be in some root.
+        for (const row of rows) {
+            const name = row.querySelector('.matrix-cell-name > span:first-child')
+                ?.textContent?.trim() ?? '';
+            if (!known.has(name)) {
+                continue;
+            }
+            const box = row.querySelector('.matrix-cell-check');
+            if (box) {
+                target.push(box);
+            }
+            if (target.length >= 3) {
+                break;
+            }
+        }
+
+        // Pass 2 — top up with anything else visible. Mixed planned /
+        // skipped is still richer than a near-empty wizard.
+        if (target.length < 3) {
+            for (const extra of document.querySelectorAll('.matrix-cell-check')) {
+                if (target.includes(extra)) {
+                    continue;
+                }
+                target.push(extra);
+                if (target.length >= 3) {
+                    break;
+                }
+            }
+        }
+
+        for (const b of target) {
+            b.click();
+        }
+        return target.length;
+    }, Array.from(rootDepNames));
+
+    if (ticked === 0) {
+        console.log('  · No outdated cells with checkboxes — skipping bulk wizard shots');
+        return;
+    }
+
+    // Scroll the footer into view so it lands in the screenshot. The
+    // matrix area scrolls inside `.matrix-wrap`; scroll its parent so
+    // the sticky footer is visible without cropping the table.
+    await page.evaluate(() => {
+        const footer = document.querySelector('.matrix-footer');
+        footer?.scrollIntoView({block: 'end'});
+    });
+    await sleep(400);
+    await shot(page, `11_bulk_select${suffix}.png`);
+
+    // Click "Update selected" to open the wizard.
+    const opened = await page.evaluate(() => {
+        const apply = document.querySelector('.matrix-footer-apply');
+        if (apply && !apply.disabled) {
+            apply.click();
+            return true;
+        }
+        return false;
+    });
+
+    if (!opened) {
+        console.log('  · Update-selected button disabled — skipping wizard shot');
+        return;
+    }
+
+    // Wait for the modal to render past its loading state — the
+    // summary line shows up once the bulk preview returns.
+    try {
+        await page.waitForSelector('.bumd-summary', {timeout: 30_000});
+    } catch {
+        console.log('  · Wizard modal never reached summary state — taking shot anyway');
+    }
+    // Extra beat for any per-pick security heads-up that arrive after
+    // the summary lands.
+    await sleep(1500);
+    await shot(page, `12_bulk_modal${suffix}.png`);
+
+    // Close the modal so the next iteration starts clean.
+    await page.keyboard.press('Escape');
+    await sleep(300);
+}
+
+let ROOT_DEP_NAMES = new Set();
 
 async function main() {
     if (!existsSync(SHOTS_DIR)) {
         await mkdir(SHOTS_DIR, {recursive: true});
     }
+
+    ROOT_DEP_NAMES = await collectRootDepNames();
+    console.log(`Loaded ${ROOT_DEP_NAMES.size} root-dep names for bulk-wizard targeting.`);
 
     const baseUrl = await readBaseUrl();
     console.log(`Starting nppm at ${baseUrl} …`);

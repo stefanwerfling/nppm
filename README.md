@@ -62,6 +62,12 @@ Vite dev server, frontend is plain TypeScript + DOM (no framework).
   lifecycle hook in `node_modules` with a per-package "Run" button
   (`npm rebuild <pkg>`) so the user can re-fire only the scripts
   they've reviewed. Backups land in `.nppm-backups/<timestamp>/`.
+- **Open in IDE** — small `IDE` button next to every installed
+  package's path in the Installed view. Opens `node_modules/<pkg>` in
+  the editor configured under `actions.editor` (`vscode` /
+  `vscodium` / `cursor` / `phpstorm` / `webstorm` / `idea` / `subl`)
+  via its `://file/…` URL handler. Off by default — hidden when no
+  editor is configured.
 - **Bulk-Update Wizard** — the cross-project matrix grows a checkbox
   on every outdated cell of a local project. A sticky footer shows
   the running selection count; "Update selected" opens a wizard with
@@ -162,7 +168,8 @@ Create a `nppm.json` next to where you run `nppm`. Minimal example:
     }
   },
   "actions": {
-    "allowInstall": false
+    "allowInstall": false,
+    "editor": "phpstorm"
   }
 }
 ```
@@ -188,6 +195,13 @@ free-text → proprietary). Patterns support a trailing `*` wildcard;
 denylist wins over allowlist when both match. Set `treatUnknownAs:
 "proprietary"` to force a manual review for any package without a
 recognised license.
+
+The `actions.editor` field enables the per-row "Open in IDE" button in
+the Installed view. Set it to one of `vscode`, `vscodium`, `cursor`,
+`phpstorm`, `webstorm`, `idea`, `subl`; nppm builds the right
+URL-handler link (`vscode://file/…`, `phpstorm://open?file=…`, …) and
+relies on the OS to forward it to the running editor. Remote projects
+and unknown editor keys hide the button silently.
 
 The `security.unused` block is optional. `allowlist` is *added* to the
 built-in bin-tool list (vite/tsx/eslint/…), so you only need to name

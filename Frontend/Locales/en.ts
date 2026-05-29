@@ -146,6 +146,7 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     'Error{scope}: {msg}': 'Error{scope}: {msg}',
     'Bulk update finished — {n} project(s) processed': 'Bulk update finished — {n} project(s) processed',
     'Lifecycle scripts skipped by --ignore-scripts': 'Lifecycle scripts skipped by --ignore-scripts',
+    'Open in {editor}': 'Open in {editor}',
     'No lifecycle hooks found in node_modules — nothing to run.': 'No lifecycle hooks found in node_modules — nothing to run.',
     'Run': 'Run',
     'Manual: {cmd}': 'Manual: {cmd}',

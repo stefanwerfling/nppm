@@ -137,6 +137,7 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'Error{scope}: {msg}': 'Fehler{scope}: {msg}',
     'Bulk update finished — {n} project(s) processed': 'Bulk-Update fertig — {n} Projekt(e) verarbeitet',
     'Lifecycle scripts skipped by --ignore-scripts': 'Lifecycle-Scripts, die --ignore-scripts übersprungen hat',
+    'Open in {editor}': 'In {editor} öffnen',
     'No lifecycle hooks found in node_modules — nothing to run.': 'Keine Lifecycle-Hooks in node_modules gefunden — nichts auszuführen.',
     'Run': 'Ausführen',
     'Manual: {cmd}': 'Manuell: {cmd}',

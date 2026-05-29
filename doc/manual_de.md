@@ -96,6 +96,14 @@ Flache Tabelle aller Abhängigkeiten aus den `package.json`-Dateien
 
 ### 2.2 Installierte Abhängigkeiten
 
+Jede Zeile bekommt in der Pfad-Spalte einen kleinen **`IDE`**-Button,
+sobald `actions.editor` in `nppm.json` gesetzt ist. Klick öffnet
+`node_modules/<pkg>` im konfigurierten Editor über dessen
+URL-Handler (`vscode://`, `vscodium://`, `cursor://`, `phpstorm://`,
+`webstorm://`, `idea://`, `subl://`). Bei Remote-Projekten
+ausgeblendet (die Dateien liegen ja nicht lokal) und wenn kein Editor
+konfiguriert ist.
+
 Was npm tatsächlich auf der Platte aufgelöst hat. Die Anzeige nennt
 die *Quelle* der Daten:
 

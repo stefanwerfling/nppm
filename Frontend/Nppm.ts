@@ -252,6 +252,7 @@ export class Nppm {
         try {
             const response = await Api.listProjects();
             this._projects = response.projects;
+            this._installedView.setEditor(response.editor);
             this._treeview.render(response.projects);
             await this._loadMatrix();
         } catch (e) {
@@ -286,7 +287,7 @@ export class Nppm {
 
     private async _loadProjectInstalled(project: ApiProject): Promise<void> {
         this._switchTo(View.installed);
-        await this._installedView.show(project.unid, project.name);
+        await this._installedView.show(project.unid, project.name, project.root);
     }
 
     private async _loadProjectHistory(project: ApiProject): Promise<void> {

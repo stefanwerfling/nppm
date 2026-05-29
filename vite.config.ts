@@ -120,7 +120,8 @@ class Server {
                 securityCache,
                 securityScanner,
                 unusedDetector,
-                allowInstall
+                allowInstall,
+                editor
             } = loaded;
 
             for (const project of loaded.projects) {
@@ -152,6 +153,12 @@ class Server {
                 const result: ApiProject[] = [];
 
                 for (const [unid, project] of projects.entries()) {
+                    // Only local projects have an on-disk root the
+                    // frontend can plug into the IDE URL — remote
+                    // projects live as cached contents-API blobs.
+                    const root = project instanceof ProjectLocal
+                        ? project.getRoot()
+                        : undefined;
                     try {
                         const manifests = await project.loadManifests();
                         const total = manifests.reduce(
@@ -164,7 +171,8 @@ class Server {
                             name: project.getName(),
                             type: project.getType(),
                             packageCount: total,
-                            workspaceCount: manifests.length - 1
+                            workspaceCount: manifests.length - 1,
+                            root
                         });
                     } catch (e) {
                         result.push({
@@ -173,12 +181,13 @@ class Server {
                             type: project.getType(),
                             packageCount: 0,
                             workspaceCount: 0,
+                            root,
                             error: (e as Error).message
                         });
                     }
                 }
 
-                const response: ApiProjectsResponse = {projects: result};
+                const response: ApiProjectsResponse = {projects: result, editor};
                 res.status(200).json(response);
             });
 

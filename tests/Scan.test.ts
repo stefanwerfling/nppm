@@ -95,6 +95,7 @@ function makeEnvironment(opts: {
         securityScanner,
         unusedDetector,
         allowInstall: false,
+        editor: undefined,
         projects: opts.projects
     };
 }

@@ -149,9 +149,15 @@ export const SchemaConfigSecurity = Vts.object({
  * Upgrade modal. Both involve running third-party code on the user's
  * machine, so they share one gate; a "always edit, never run code"
  * stance is the default.
+ *
+ * `editor` enables the "Open in IDE" affordance — when set, package
+ * rows / cells get a button that fires the matching URL handler
+ * (`vscode://file/...`, `phpstorm://open?file=...`, etc.). One known
+ * key per supported IDE; absent / unknown leaves the buttons hidden.
  */
 export const SchemaConfigActions = Vts.object({
-    allowInstall: Vts.optional(Vts.boolean())
+    allowInstall: Vts.optional(Vts.boolean()),
+    editor: Vts.optional(Vts.string())
 });
 
 /**

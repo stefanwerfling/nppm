@@ -20,11 +20,24 @@ export type ApiProject = {
     type: ConfigProjectType;
     packageCount: number;
     workspaceCount: number;
+    /**
+     * Absolute on-disk root for local projects. Used by the frontend
+     * to build `vscode://file/<root>/node_modules/<pkg>` style URLs
+     * for the "Open in IDE" affordance. Omitted for remote projects
+     * (their files aren't on the user's machine).
+     */
+    root?: string;
     error?: string;
 };
 
 export type ApiProjectsResponse = {
     projects: ApiProject[];
+    /**
+     * `actions.editor` from `nppm.json` — see `Frontend/EditorUrl.ts`
+     * for the supported keys. `undefined` when not configured;
+     * frontend then hides every "Open in IDE" button.
+     */
+    editor?: string;
 };
 
 /**

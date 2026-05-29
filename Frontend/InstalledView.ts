@@ -7,6 +7,7 @@ import {
 } from '../Api/ApiTypes.js';
 import {Lockfile, LockedPackage} from '../Project/Lockfile.js';
 import {Api} from './Api.js';
+import {EditorUrl} from './EditorUrl.js';
 import {I18n} from './I18n.js';
 
 /**
@@ -30,6 +31,8 @@ export class InstalledView {
     private readonly _root: HTMLElement;
     private _projectUnid: string|null = null;
     private _projectName: string|null = null;
+    private _projectRoot: string|null = null;
+    private _editor: string|undefined = undefined;
     private _onShowDeclared: ((unid: string) => void)|null = null;
     private _onShowHistory: ((unid: string) => void)|null = null;
     private _onShowMatrix: ((unid: string) => void)|null = null;
@@ -74,10 +77,20 @@ export class InstalledView {
         this._onShowUnused = handler;
     }
 
-    public async show(unid: string, name: string): Promise<void> {
+    /**
+     * Set the editor key once at boot — Nppm reads it from
+     * `/api/projects` and pipes it down. `undefined` (default) hides
+     * every "Open in IDE" button.
+     */
+    public setEditor(editor: string|undefined): void {
+        this._editor = editor;
+    }
+
+    public async show(unid: string, name: string, root?: string): Promise<void> {
         this._stopStream();
         this._projectUnid = unid;
         this._projectName = name;
+        this._projectRoot = root ?? null;
         this._lockfile = null;
         this._vulnsByKey = new Map();
         this._rowsByKey = new Map();
@@ -186,8 +199,41 @@ export class InstalledView {
             <td class="pkg-type">${InstalledView._typeLabel(pkg)}</td>
             <td class="pkg-source">${InstalledView._esc(pkg.path)}</td>
         `;
+        const ideLink = this._buildIdeLink(pkg);
+        if (ideLink) {
+            // Append to the path cell so we don't widen the table.
+            row.querySelector('.pkg-source')?.appendChild(ideLink);
+        }
         row.appendChild(cveCell);
         return row;
+    }
+
+    /**
+     * Build the per-row "Open in IDE" anchor when both the editor key
+     * and the project root are known. The package path is the lockfile's
+     * `pkg.path` (e.g. `node_modules/foo` or
+     * `node_modules/a/node_modules/b`) — joined under the project root
+     * for the absolute filesystem location the IDE handler expects.
+     * Returns `null` when the affordance should stay hidden.
+     */
+    private _buildIdeLink(pkg: LockedPackage): HTMLAnchorElement|null {
+        if (!this._editor || !this._projectRoot) {
+            return null;
+        }
+        const rel = pkg.path.startsWith('/') ? pkg.path.slice(1) : pkg.path;
+        const abs = this._projectRoot.endsWith('/')
+            ? this._projectRoot + rel
+            : this._projectRoot + '/' + rel;
+        const url = EditorUrl.build(this._editor, abs);
+        if (!url) {
+            return null;
+        }
+        const a = document.createElement('a');
+        a.className = 'installed-ide-btn';
+        a.href = url;
+        a.textContent = 'IDE';
+        a.title = I18n.t('Open in {editor}', {editor: EditorUrl.label(this._editor)});
+        return a;
     }
 
     /**

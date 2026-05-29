@@ -52,6 +52,14 @@ export type LoadedConfig = {
      */
     allowInstall: boolean;
     /**
+     * `actions.editor` from the config — one of the keys supported by
+     * the frontend `EditorUrl` map (`vscode`, `vscodium`, `cursor`,
+     * `phpstorm`, `webstorm`, `idea`, `subl`). `undefined` when
+     * absent / unknown — the frontend then hides every "Open in IDE"
+     * button.
+     */
+    editor: string|undefined;
+    /**
      * Projects in *config order*. The Vite plugin re-keys them by UUID
      * for its API surface; the CLI iterates the array directly. Order
      * is preserved so both surfaces agree on `--project=<name>`
@@ -120,9 +128,13 @@ export class ConfigLoader {
             };
             actions?: {
                 allowInstall?: boolean;
+                editor?: string;
             };
         };
         const allowInstall = cfg.actions?.allowInstall === true;
+        const editor = typeof cfg.actions?.editor === 'string' && cfg.actions.editor.length > 0
+            ? cfg.actions.editor
+            : undefined;
 
         const registryUrl = cfg.registry?.url ?? 'https://registry.npmjs.org';
         const registryAuth = cfg.registry?.auth;
@@ -240,6 +252,7 @@ export class ConfigLoader {
             securityScanner,
             unusedDetector,
             allowInstall,
+            editor,
             projects
         };
     }

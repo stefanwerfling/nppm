@@ -1439,6 +1439,25 @@ html, body {
     margin-bottom: 4px;
 }
 
+.installed-ide-btn {
+    margin-left: 8px;
+    padding: 1px 6px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    background: var(--c-panel);
+    color: var(--c-accent);
+    text-decoration: none;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+}
+
+.installed-ide-btn:hover {
+    background: var(--c-accent);
+    color: #fff;
+}
+
 .matrix-cell-upgrade {
     margin-left: 6px;
     border: 1px solid var(--c-border);

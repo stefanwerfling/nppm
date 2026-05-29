@@ -104,6 +104,7 @@ nppm/
 │   ├── UnusedView.ts       per-project depcheck-style report (unused/misplaced/missing)
 │   ├── UpgradeModal.ts     overlay: preview → edit/install → lifecycle-scripts list + Run buttons
 │   ├── BulkUpgradeModal.ts cross-project bulk wizard: grouped preview + per-project SSE install log
+│   ├── EditorUrl.ts        URL-handler templates for vscode/vscodium/cursor/phpstorm/webstorm/idea/subl
 │   ├── GlobalScanView.ts   SSE-driven global scan results
 │   ├── PackageDetailPanel.ts  modal w/ 5 tabs (Files/Deps/Diff/Releases/Security)
 │   ├── Treeview.ts         left-pane project list

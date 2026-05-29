@@ -107,6 +107,13 @@ What npm actually resolved on disk. The view shows the *source* used:
 The **Start analysis** button kicks off a per-project SSE-streamed OSV
 check; the CVE column fills row-by-row while the progress bar runs.
 
+Each row's path cell gets a small **`IDE`** button when
+`actions.editor` is set in `nppm.json`. Clicking it opens
+`node_modules/<pkg>` in the configured editor via its URL handler
+(`vscode://`, `vscodium://`, `cursor://`, `phpstorm://`, `webstorm://`,
+`idea://`, `subl://`). Hidden for remote projects (the files aren't on
+your disk) and when no editor is configured.
+
 ### 2.3 Per-project matrix
 
 Same shape as the global matrix, but columns are the project's

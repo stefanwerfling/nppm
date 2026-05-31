@@ -58,6 +58,7 @@ nppm/
 │   ├── BinaryScanner.ts    extension- + bin/-path classification
 │   ├── MaintainerScanner.ts  _npmUser handover detection, gap-based severity
 │   ├── LicenseScanner.ts   SPDX classifier (permissive/weak/strong/proprietary/unknown) + mini expr parser
+│   ├── IntegrityScanner.ts lockfile `resolved+integrity` vs registry `dist` cross-check
 │   └── SecurityScanner.ts  aggregator + batched matrix-heuristics
 │
 ├── Unused/                 depcheck-style per-project hygiene scan
@@ -91,7 +92,18 @@ nppm/
 ├── DepGraph/DepGraphBuilder.ts  flat-graph walker, npm hoisting algorithm
 ├── History/                per-project change log
 │   ├── History.ts
-│   └── HistoryStore.ts     atomic-write JSON in .nppm-history/
+│   ├── HistoryStore.ts     atomic-write JSON in .nppm-history/
+│   ├── BackfillCommon.ts   parseLockfile/parsePackageJson + snapshots → entries
+│   ├── GitHistoryBackfill.ts  walks `git log -- package-lock.json`, falls back to package.json
+│   └── RemoteGitHistoryBackfill.ts  GitHub/Gitea commits API → HistoryEntry[]
+│
+├── Vulnerability/          retroactive CVE-exposure timeline
+│   ├── Timeline.ts         VersionPresenceInterval / VulnerabilityExposure / ExposureClass
+│   └── TimelineBuilder.ts  forward-replay history × OSV cache → exposure windows
+│
+├── PrReview/               branch-vs-branch dep delta with CVE delta
+│   ├── PrReview.ts         PrDepChange / PrSummary / PrReviewReport
+│   └── PrReviewBuilder.ts  diff package.json + lockfile at two refs + OSV batch
 │
 ├── Frontend/               every browser-side module
 │   ├── Nppm.ts             top-level orchestrator (panes, routing)
@@ -102,6 +114,8 @@ nppm/
 │   ├── HistoryView.ts      timeline cards
 │   ├── DepTreeView.ts      D3-collapsible tree
 │   ├── UnusedView.ts       per-project depcheck-style report (unused/misplaced/missing)
+│   ├── VulnerabilityTimelineView.ts  retroactive CVE exposure window per name@version
+│   ├── PrReviewView.ts     diffs package.json + lockfile between two git refs
 │   ├── UpgradeModal.ts     overlay: preview → edit/install → lifecycle-scripts list + Run buttons
 │   ├── BulkUpgradeModal.ts cross-project bulk wizard: grouped preview + per-project SSE install log
 │   ├── EditorUrl.ts        URL-handler templates for vscode/vscodium/cursor/phpstorm/webstorm/idea/subl
@@ -133,6 +147,10 @@ nppm/
 | GET    | `/api/projects/:id/depgraph`                          | flat resolved dep graph |
 | GET    | `/api/projects/:id/unused`                            | depcheck-style hygiene scan (unused / misplaced / missing) |
 | GET    | `/api/projects/:id/sbom?format=cyclonedx\|spdx`       | Software Bill of Materials (default: cyclonedx) |
+| GET    | `/api/projects/:id/vulnerability-timeline`            | retroactive CVE-exposure timeline (cache-only read) |
+| GET    | `/api/projects/:id/vulnerability-timeline/scan`       | SSE: git-backfill history + OSV catch-up |
+| GET    | `/api/projects/:id/pr-review?base=&head=`             | dep diff + CVE delta between two git refs |
+| GET    | `/api/projects/:id/integrity`                         | lockfile `integrity` cross-check vs registry `dist` |
 | POST   | `/api/projects/:id/upgrade/preview`                   | plan a single dep range bump (returns before/after + SecurityReport) |
 | POST   | `/api/projects/:id/upgrade/apply`                     | SSE: write backup + edit; if `mode=install`, also stream `npm install --ignore-scripts` |
 | POST   | `/api/matrix/upgrade/preview`                         | bulk preview for the cross-project Bulk-Upgrade Wizard |

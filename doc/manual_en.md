@@ -31,7 +31,9 @@ time the UI changes.
 6. [SBOM export](#6-sbom-export)
 7. [Upgrading a dep (Upgrade modal)](#7-upgrading-a-dep-upgrade-modal)
 8. [Bulk-Update Wizard](#8-bulk-update-wizard)
-9. [Switching language](#9-switching-language)
+9. [Vulnerability Timeline](#9-vulnerability-timeline)
+10. [PR Review](#10-pr-review)
+11. [Switching language](#11-switching-language)
 
 ---
 
@@ -79,10 +81,10 @@ Clicking a project column header drills into that project.
 
 ## 2. Drilling into one project
 
-Picking a project in the left treeview lands you in a six-tab project
-view: **Declared / Installed / History / Matrix / Tree / Unused**. The
-toggle is the same in every tab so navigation is one click away
-regardless of where you are.
+Picking a project in the left treeview lands you in an eight-tab project
+view: **Declared / Installed / History / Matrix / Tree / Unused / Vulns
+/ PR**. The toggle is the same in every tab so navigation is one click
+away regardless of where you are.
 
 ### 2.1 Declared dependencies
 
@@ -106,6 +108,28 @@ What npm actually resolved on disk. The view shows the *source* used:
 
 The **Start analysis** button kicks off a per-project SSE-streamed OSV
 check; the CVE column fills row-by-row while the progress bar runs.
+
+The **Integrity column** is filled at load time — no button required.
+Each row gets one of:
+
+- `✓` — lockfile `integrity + resolved` match what the npm registry
+  currently serves (the common case).
+- `mismatch` (red) — the registry now serves a different SRI hash than
+  the lockfile pinned. Possible mirror-hijack, dependency-confusion,
+  or hand-edited lockfile. Hover the pill for the side-by-side hashes.
+- `mirror` (grey) — `resolved` URL points off-registry but the
+  integrity still matches. Harmless custom mirror.
+- `no-hash` (grey) — lockfile entry has no integrity field (old npm,
+  hand-edits, git deps).
+- `private` (grey) — registry doesn't know this package. Private /
+  unpublished / internal.
+- `—` (muted) — registry cache hasn't been populated yet; show the
+  Declared view once or run a scan to warm it up.
+
+A summary pill (`Integrity: 1 mismatch · 3 info`) appears next to the
+meta line when the scan found anything non-trivial; clean projects
+stay quiet. The whole check is network-free against the registry
+cache that the Declared view + global scan populate.
 
 Each row's path cell gets a small **`IDE`** button when
 `actions.editor` is set in `nppm.json`. Clicking it opens
@@ -142,6 +166,22 @@ the outgoing version had known vulnerabilities in the OSV cache.
 
 History files live in `.nppm-history/` next to your `nppm.json` — safe
 to commit if you want long-term audit trails.
+
+**Git backfill.** The first time you open the [Vulnerability
+Timeline](#9-vulnerability-timeline) on a project with a `.git/`
+directory, nppm walks `git log -- package-lock.json` and reconstructs
+the full dep history retroactively — one entry per commit that
+touched the lockfile, with the real commit SHA + author timestamp.
+Same code path works for GitHub / Gitea projects via their commits
+API. When no lockfile was ever committed, the walker falls back to
+`git log -- package.json` and tracks declared-range drift instead;
+those entries get a yellow `declared-only` pill in the History view
+because the version strings are ranges (`^4.0.0`) rather than concrete
+versions, and the Vulns view can't OSV-query them.
+
+The backfill is idempotent by HEAD SHA — re-running the scan after a
+few new commits only fetches the new ones; old ones come from the
+cache.
 
 ### 2.6 Unused dependencies
 
@@ -536,7 +576,105 @@ project matrix and use the existing per-script Run button.
 
 ---
 
-## 9. Switching language
+## 9. Vulnerability Timeline
+
+> "From when to when was this project exposed to which CVE?"
+
+The **Vulns** tab inside the project view answers that question with
+data nppm already has: per-project history snapshots, OSV cached
+records, and (for new findings) the OSV `published` date.
+
+![Vulnerability Timeline](screenshots/13_vuln_timeline.png)
+
+The view sorts every (CVE, `name@version`, interval) triple into
+exposure cards, longest exposure first. Each row shows:
+
+- **`name@version`** — the package version that was sitting in your
+  project during the exposure window.
+- **Classification badge:**
+  - 🔴 `known-at-install` — the CVE was already public on OSV at the
+    moment this version entered the project. You installed a
+    known-vulnerable version.
+  - 🟡 `disclosed-during-use` — the CVE was filed *while* the version
+    was already in use. Retroactive exposure.
+  - ⚪ `pre-tracking` — the version was present before nppm had
+    history for the project; the lower-bound timestamp is the
+    earliest known one, not a true install date.
+- **`from → to`** — exposure window start / end. `still running` when
+  this version is currently installed.
+- **Disclosure date** — when OSV recorded the vulnerability.
+- **Coloured bar** — visual exposure timeline against the project's
+  history range.
+
+The header shows coverage (`scanned / total versions`) and the git
+backfill watermark (the HEAD SHA the last walk consumed). When the
+project is fresh (no backfill yet) or the OSV cache has gaps, the
+view fires a **Scan** SSE automatically: first git-backfill phase,
+then OSV catch-up. Subsequent opens are instant from cache.
+
+Click any row to jump into the [package detail panel](#3-package-detail-panel)
+landing on the Security tab — the bridge between the timeline and
+the per-package deep dive.
+
+Click on a GHSA-id in the card header to open the official OSV.dev
+vulnerability page for full context.
+
+This is the compliance-grade signal: a 12-month exposure report per
+project that no other npm tool emits, because no other npm tool pins
+history to disk.
+
+---
+
+## 10. PR Review
+
+> "What does this branch actually change in the lockfile, and is the
+> CVE balance better or worse?"
+
+The **PR** tab diffs `package.json` + `package-lock.json` between two
+git refs (default `main` vs `HEAD`) and renders one card per changed
+dep with the CVE delta.
+
+![PR Review](screenshots/14_pr_review.png)
+
+The header carries two input fields — **Base** and **Head** — plus a
+**Refresh** button. Type any ref that resolves locally (branch,
+tag, SHA, `HEAD~3`, …). Empty falls back to the defaults.
+
+Summary pills at the top:
+
+- `added: N`, `updated: N`, `removed: N`, `bucket: N` — counts per
+  change kind.
+- `+N CVE` (red) — new exposures the head branch *introduces*.
+- `−N CVE` (green) — exposures the head branch *closes*.
+
+Each card shows:
+
+- **Change-kind badge** — `ADDED` (green), `UPDATED` (yellow),
+  `REMOVED` (red), `BUCKET` (grey, e.g. `dependencies` →
+  `devDependencies`).
+- **Declared transition** — `^1.0.0 (dependency) → ^2.0.0 (dependency)`
+  from `package.json`.
+- **Resolved transition** — `1.0.5 → 2.0.3` from `package-lock.json`,
+  if both sides have a committed lockfile.
+- **CVE delta rows** —
+  - 🔴 `New exposures (N)` — GHSA pills for vulns the head version
+    adds that the base version didn't have.
+  - 🟢 `Closed by this PR (N)` — GHSA pills for vulns the base
+    version had that the head version no longer carries.
+
+Click the card head to jump into the [package detail panel](#3-package-detail-panel)
+on the Security tab for the new resolved version. Click a GHSA pill
+to open the OSV.dev page directly.
+
+**Scope note:** V1 surfaces the CVE delta only. Maintainer-change /
+install-script / pattern delta would each require a tarball fetch
+per side; deferred to a later SSE-driven endpoint. Local projects
+only — remote (GitHub / Gitea) PR review would need the same git-show
+API the backfill walker uses.
+
+---
+
+## 11. Switching language
 
 The flags in the top-right corner switch the UI language. Default is
 English, German is shipped. Adding a third language is a three-step

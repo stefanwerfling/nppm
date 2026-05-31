@@ -178,6 +178,18 @@ async function captureLanguage(browser, baseUrl, lang) {
         await clickToggle(page, lang === 'de' ? 'History' : 'History');
         await sleep(1500);
         await shot(page, `06_history${suffix}.png`);
+
+        // Vulns view — auto-fires a scan on first open, so give it
+        // time to settle (backfill phase can be slow on cold cache).
+        await clickToggle(page, 'Vulns');
+        await sleep(4000);
+        await shot(page, `13_vuln_timeline${suffix}.png`);
+
+        // PR review — defaults to main vs HEAD; the request returns
+        // quickly when both refs resolve, so a short wait suffices.
+        await clickToggle(page, 'PR');
+        await sleep(2500);
+        await shot(page, `14_pr_review${suffix}.png`);
     } else {
         console.log('No configured project found — skipping per-project shots.');
     }

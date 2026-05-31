@@ -6,8 +6,10 @@
 
 A local-first dashboard that compares npm dependency versions across many
 projects at once and surfaces drift, outdated packages, CVEs, install-time
-risks, and binary file presence in a single view. Backend lives inside a
-Vite dev server, frontend is plain TypeScript + DOM (no framework).
+risks, lockfile integrity drift, retroactive CVE exposure timelines,
+PR-review-grade dep diffs, and binary file presence in a single view.
+Backend lives inside a Vite dev server, frontend is plain TypeScript + DOM
+(no framework).
 
 ![Matrix view](doc/screenshots/01_matrix.png)
 
@@ -29,7 +31,7 @@ Vite dev server, frontend is plain TypeScript + DOM (no framework).
   see drift inside one project at a glance.
 - **Project sub-views** for each configured project: `Declared`
   (`package.json`), `Installed` (resolved from lockfile or `node_modules`),
-  `History`, `Matrix`, `Tree`.
+  `History`, `Matrix`, `Tree`, `Unused`, `Vulns`, `PR`.
 - **Dependency tree** — D3-based collapsible tree of every resolved package
   with status colouring (green / yellow / red / grey).
 - **Security scan**
@@ -51,6 +53,33 @@ Vite dev server, frontend is plain TypeScript + DOM (no framework).
     tab in the detail panel + `GPL` / `UNLIC` / `LIC?` matrix badges +
     a "Licenses" matrix filter. Compliance teams can plug in allow- /
     denylists via `security.license` in `nppm.json`.
+  - Lockfile-Integrity Cross-Check — compares the lockfile's pinned
+    `resolved + integrity` per entry against what the npm registry
+    currently serves. Detects mirror-hijack / dependency-confusion /
+    lockfile-injection as `risk`, custom-mirror redirects as `info`.
+    Surfaces in the Installed view as a new column + summary pill;
+    network-free against the warm registry cache.
+- **Retroactive Vulnerability Timeline** — answers "from when to when
+  was this project exposed to which CVE?". Forward-replays the
+  per-project history (live snapshots + git-reconstructed entries)
+  against the OSV cache to produce `[t_in, t_out)` exposure windows
+  per (CVE, `name@version`). Classifies each window as
+  `known-at-install` (red — installed an already-disclosed vuln),
+  `disclosed-during-use` (yellow — vuln filed while you were running
+  it), or `pre-tracking` (grey — bound to the first known timestamp).
+  Compliance-ready data for ISO 27001 / SOC2 / DORA reports.
+- **Git-backfilled history** — first time the Vulns view opens on a
+  project with a `.git/` directory, nppm walks `git log -- package-
+  lock.json` (or `package.json` when no lockfile was ever committed)
+  and reconstructs the dependency history retroactively. Same path
+  works for GitHub / Gitea via their commits API. Declared-only
+  fallback entries get a `declared-only` pill so the user knows
+  they don't carry CVE coverage.
+- **PR-Review-Mode** — diffs `package.json` + `package-lock.json`
+  between two git refs (default `main` vs `HEAD`) and renders one
+  card per changed dep with added / closed CVE pills. Local
+  projects only in v1. Custom base / head via input fields in the
+  view header.
 - **One-click upgrade** — outdated cells in the per-project matrix
   show a small `↑` button. The Upgrade modal previews the planned
   `package.json` edit, surfaces a security heads-up on the target
@@ -277,6 +306,8 @@ linked at the top of this README. Quick chapter pointers:
 - [SBOM export](doc/manual_en.md#6-sbom-export)
 - [Upgrade modal](doc/manual_en.md#7-upgrading-a-dep-upgrade-modal)
 - [Bulk-Update Wizard](doc/manual_en.md#8-bulk-update-wizard)
+- [Vulnerability Timeline](doc/manual_en.md#9-vulnerability-timeline)
+- [PR Review](doc/manual_en.md#10-pr-review)
 
 ## Caches
 

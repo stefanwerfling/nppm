@@ -24,6 +24,8 @@ export class ProjectMatrixView {
     private _onShowHistory: ((unid: string) => void)|null = null;
     private _onShowTree: ((unid: string) => void)|null = null;
     private _onShowUnused: ((unid: string) => void)|null = null;
+    private _onShowVulns: ((unid: string) => void)|null = null;
+    private _onShowPr: ((unid: string) => void)|null = null;
     private _onCellClick: ((pkg: string, version: string, latest: string|null) => void)|null = null;
     private _onUpgradeClick: ((seed: {
         workspace: string;
@@ -51,6 +53,12 @@ export class ProjectMatrixView {
     }
     public onShowUnused(h: (unid: string) => void): void {
         this._onShowUnused = h;
+    }
+    public onShowVulns(h: (unid: string) => void): void {
+        this._onShowVulns = h;
+    }
+    public onShowPr(h: (unid: string) => void): void {
+        this._onShowPr = h;
     }
     public onCellClick(h: (pkg: string, version: string, latest: string|null) => void): void {
         this._onCellClick = h;
@@ -318,6 +326,26 @@ export class ProjectMatrixView {
             }
         });
         toggle.appendChild(unused);
+
+        const vulns = document.createElement('button');
+        vulns.className = 'installed-toggle-btn';
+        vulns.textContent = I18n.t('Vulns');
+        vulns.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowVulns) {
+                this._onShowVulns(this._projectUnid);
+            }
+        });
+        toggle.appendChild(vulns);
+
+        const pr = document.createElement('button');
+        pr.className = 'installed-toggle-btn';
+        pr.textContent = I18n.t('PR');
+        pr.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowPr) {
+                this._onShowPr(this._projectUnid);
+            }
+        });
+        toggle.appendChild(pr);
 
         header.appendChild(toggle);
         return header;

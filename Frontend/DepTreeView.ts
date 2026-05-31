@@ -66,6 +66,8 @@ export class DepTreeView {
     private _onShowHistory: ((unid: string) => void)|null = null;
     private _onShowMatrix: ((unid: string) => void)|null = null;
     private _onShowUnused: ((unid: string) => void)|null = null;
+    private _onShowVulns: ((unid: string) => void)|null = null;
+    private _onShowPr: ((unid: string) => void)|null = null;
 
     constructor(root: HTMLElement) {
         this._root = root;
@@ -85,6 +87,12 @@ export class DepTreeView {
     }
     public onShowUnused(h: (unid: string) => void): void {
         this._onShowUnused = h;
+    }
+    public onShowVulns(h: (unid: string) => void): void {
+        this._onShowVulns = h;
+    }
+    public onShowPr(h: (unid: string) => void): void {
+        this._onShowPr = h;
     }
 
     public async show(unid: string, name: string): Promise<void> {
@@ -484,6 +492,26 @@ export class DepTreeView {
             }
         });
         toggle.appendChild(unused);
+
+        const vulns = document.createElement('button');
+        vulns.className = 'installed-toggle-btn';
+        vulns.textContent = I18n.t('Vulns');
+        vulns.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowVulns) {
+                this._onShowVulns(this._projectUnid);
+            }
+        });
+        toggle.appendChild(vulns);
+
+        const pr = document.createElement('button');
+        pr.className = 'installed-toggle-btn';
+        pr.textContent = I18n.t('PR');
+        pr.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowPr) {
+                this._onShowPr(this._projectUnid);
+            }
+        });
+        toggle.appendChild(pr);
 
         header.appendChild(toggle);
         return header;

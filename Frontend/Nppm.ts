@@ -13,6 +13,8 @@ import {Resizer} from './Resizer.js';
 import {Treeview} from './Treeview.js';
 import {UnusedView} from './UnusedView.js';
 import {UpgradeModal} from './UpgradeModal.js';
+import {PrReviewView} from './PrReviewView.js';
+import {VulnerabilityTimelineView} from './VulnerabilityTimelineView.js';
 
 /**
  * Active right-pane view. `packages` and `installed` are two flavours
@@ -29,6 +31,8 @@ enum View {
     projectMatrix = 'projectMatrix',
     depTree = 'depTree',
     unused = 'unused',
+    vulns = 'vulns',
+    pr = 'pr',
     global = 'global'
 }
 
@@ -46,6 +50,8 @@ export class Nppm {
     private readonly _projectMatrixView: ProjectMatrixView;
     private readonly _depTreeView: DepTreeView;
     private readonly _unusedView: UnusedView;
+    private readonly _vulnerabilityTimelineView: VulnerabilityTimelineView;
+    private readonly _prReviewView: PrReviewView;
     private readonly _globalScanView: GlobalScanView;
     private readonly _detailPanel: PackageDetailPanel;
     private readonly _upgradeModal: UpgradeModal;
@@ -58,6 +64,8 @@ export class Nppm {
     private _projectMatrixHost: HTMLElement|null = null;
     private _depTreeHost: HTMLElement|null = null;
     private _unusedHost: HTMLElement|null = null;
+    private _vulnsHost: HTMLElement|null = null;
+    private _prHost: HTMLElement|null = null;
     private _globalHost: HTMLElement|null = null;
     private _view: View = View.matrix;
     private _projects: ApiProject[] = [];
@@ -91,6 +99,8 @@ export class Nppm {
         this._projectMatrixView = new ProjectMatrixView(this._projectMatrixHost!);
         this._depTreeView = new DepTreeView(this._depTreeHost!);
         this._unusedView = new UnusedView(this._unusedHost!);
+        this._vulnerabilityTimelineView = new VulnerabilityTimelineView(this._vulnsHost!);
+        this._prReviewView = new PrReviewView(this._prHost!);
 
         // Topbar wiring for the global scan. These elements live in
         // index.html so non-pane components can drive them.
@@ -160,30 +170,50 @@ export class Nppm {
                 void this._loadProjectUnused(p);
             }
         };
+        const wireVulns = (unid: string): void => {
+            const p = findProject(unid);
+            if (p) {
+                void this._loadProjectVulns(p);
+            }
+        };
+        const wirePr = (unid: string): void => {
+            const p = findProject(unid);
+            if (p) {
+                void this._loadProjectPr(p);
+            }
+        };
 
         this._packageList.onShowInstalled(wireInstalled);
         this._packageList.onShowHistory(wireHistory);
         this._packageList.onShowMatrix(wireMatrix);
         this._packageList.onShowTree(wireTree);
         this._packageList.onShowUnused(wireUnused);
+        this._packageList.onShowVulns(wireVulns);
+        this._packageList.onShowPr(wirePr);
 
         this._installedView.onShowDeclared(wireDeclared);
         this._installedView.onShowHistory(wireHistory);
         this._installedView.onShowMatrix(wireMatrix);
         this._installedView.onShowTree(wireTree);
         this._installedView.onShowUnused(wireUnused);
+        this._installedView.onShowVulns(wireVulns);
+        this._installedView.onShowPr(wirePr);
 
         this._historyView.onShowDeclared(wireDeclared);
         this._historyView.onShowInstalled(wireInstalled);
         this._historyView.onShowMatrix(wireMatrix);
         this._historyView.onShowTree(wireTree);
         this._historyView.onShowUnused(wireUnused);
+        this._historyView.onShowVulns(wireVulns);
+        this._historyView.onShowPr(wirePr);
 
         this._projectMatrixView.onShowDeclared(wireDeclared);
         this._projectMatrixView.onShowInstalled(wireInstalled);
         this._projectMatrixView.onShowHistory(wireHistory);
         this._projectMatrixView.onShowTree(wireTree);
         this._projectMatrixView.onShowUnused(wireUnused);
+        this._projectMatrixView.onShowVulns(wireVulns);
+        this._projectMatrixView.onShowPr(wirePr);
         this._projectMatrixView.onCellClick((pkg, version, latest) => {
             void this._detailPanel.open(pkg, version, latest);
         });
@@ -209,12 +239,38 @@ export class Nppm {
         this._depTreeView.onShowHistory(wireHistory);
         this._depTreeView.onShowMatrix(wireMatrix);
         this._depTreeView.onShowUnused(wireUnused);
+        this._depTreeView.onShowVulns(wireVulns);
+        this._depTreeView.onShowPr(wirePr);
 
         this._unusedView.onShowDeclared(wireDeclared);
         this._unusedView.onShowInstalled(wireInstalled);
         this._unusedView.onShowHistory(wireHistory);
         this._unusedView.onShowMatrix(wireMatrix);
         this._unusedView.onShowTree(wireTree);
+        this._unusedView.onShowVulns(wireVulns);
+        this._unusedView.onShowPr(wirePr);
+
+        this._vulnerabilityTimelineView.onShowDeclared(wireDeclared);
+        this._vulnerabilityTimelineView.onShowInstalled(wireInstalled);
+        this._vulnerabilityTimelineView.onShowHistory(wireHistory);
+        this._vulnerabilityTimelineView.onShowMatrix(wireMatrix);
+        this._vulnerabilityTimelineView.onShowTree(wireTree);
+        this._vulnerabilityTimelineView.onShowUnused(wireUnused);
+        this._vulnerabilityTimelineView.onShowPr(wirePr);
+        this._vulnerabilityTimelineView.onExposureClick((pkg, version) => {
+            void this._detailPanel.openOnSecurity(pkg, version, version);
+        });
+
+        this._prReviewView.onShowDeclared(wireDeclared);
+        this._prReviewView.onShowInstalled(wireInstalled);
+        this._prReviewView.onShowHistory(wireHistory);
+        this._prReviewView.onShowMatrix(wireMatrix);
+        this._prReviewView.onShowTree(wireTree);
+        this._prReviewView.onShowUnused(wireUnused);
+        this._prReviewView.onShowVulns(wireVulns);
+        this._prReviewView.onDepClick((pkg, version) => {
+            void this._detailPanel.openOnSecurity(pkg, version, version);
+        });
 
         this._treeview.onSelect((project) => {
             if (project.unid === '__matrix__') {
@@ -311,6 +367,16 @@ export class Nppm {
         await this._unusedView.show(project.unid, project.name);
     }
 
+    private async _loadProjectVulns(project: ApiProject): Promise<void> {
+        this._switchTo(View.vulns);
+        await this._vulnerabilityTimelineView.show(project.unid, project.name);
+    }
+
+    private async _loadProjectPr(project: ApiProject): Promise<void> {
+        this._switchTo(View.pr);
+        await this._prReviewView.show(project.unid, project.name, project.type);
+    }
+
     /**
      * Carve the existing #list element into four stacked panes — matrix,
      * declared package list, installed (lockfile) view, and the global
@@ -348,6 +414,14 @@ export class Nppm {
         this._unusedHost.className = 'pane pane-unused';
         this._listRoot.appendChild(this._unusedHost);
 
+        this._vulnsHost = document.createElement('div');
+        this._vulnsHost.className = 'pane pane-vulns';
+        this._listRoot.appendChild(this._vulnsHost);
+
+        this._prHost = document.createElement('div');
+        this._prHost.className = 'pane pane-pr';
+        this._listRoot.appendChild(this._prHost);
+
         this._globalHost = document.createElement('div');
         this._globalHost.className = 'pane pane-global';
         this._listRoot.appendChild(this._globalHost);
@@ -358,7 +432,8 @@ export class Nppm {
 
         if (!this._matrixHost || !this._packageHost || !this._installedHost
             || !this._historyHost || !this._projectMatrixHost
-            || !this._depTreeHost || !this._unusedHost || !this._globalHost) {
+            || !this._depTreeHost || !this._unusedHost || !this._vulnsHost
+            || !this._prHost || !this._globalHost) {
             return;
         }
 
@@ -369,6 +444,8 @@ export class Nppm {
         this._projectMatrixHost.style.display = view === View.projectMatrix ? '' : 'none';
         this._depTreeHost.style.display = view === View.depTree ? '' : 'none';
         this._unusedHost.style.display = view === View.unused ? '' : 'none';
+        this._vulnsHost.style.display = view === View.vulns ? '' : 'none';
+        this._prHost.style.display = view === View.pr ? '' : 'none';
         this._globalHost.style.display = view === View.global ? '' : 'none';
     }
 }

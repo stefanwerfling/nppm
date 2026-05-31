@@ -19,7 +19,10 @@ import {
     ApiSecurityResponse,
     ApiUnusedResponse,
     ApiUpgradePreviewResponse,
-    ApiUpgradeRequest
+    ApiUpgradeRequest,
+    ApiVulnerabilityTimelineResponse,
+    ApiPrReviewResponse,
+    ApiIntegrityResponse
 } from '../Api/ApiTypes.js';
 import {MatrixResponse} from '../Matrix/MatrixBuilder.js';
 
@@ -55,6 +58,35 @@ export class Api {
 
     public static async unused(projectUnid: string): Promise<ApiUnusedResponse> {
         return Api._json<ApiUnusedResponse>(`/api/projects/${projectUnid}/unused`);
+    }
+
+    public static async vulnerabilityTimeline(projectUnid: string): Promise<ApiVulnerabilityTimelineResponse> {
+        return Api._json<ApiVulnerabilityTimelineResponse>(`/api/projects/${projectUnid}/vulnerability-timeline`);
+    }
+
+    public static vulnerabilityTimelineScanUrl(projectUnid: string): string {
+        return `/api/projects/${projectUnid}/vulnerability-timeline/scan`;
+    }
+
+    public static async integrity(projectUnid: string): Promise<ApiIntegrityResponse> {
+        return Api._json<ApiIntegrityResponse>(`/api/projects/${projectUnid}/integrity`);
+    }
+
+    public static async prReview(
+        projectUnid: string,
+        base?: string,
+        head?: string
+    ): Promise<ApiPrReviewResponse> {
+        const qs = new URLSearchParams();
+        if (base) {
+            qs.set('base', base);
+        }
+        if (head) {
+            qs.set('head', head);
+        }
+        const suffix = qs.toString();
+        const url = `/api/projects/${projectUnid}/pr-review${suffix ? `?${suffix}` : ''}`;
+        return Api._json<ApiPrReviewResponse>(url);
     }
 
     public static async upgradePreview(

@@ -13,6 +13,19 @@ export type RegistryPublisher = {
 };
 
 /**
+ * Per-version distribution metadata as the registry currently serves
+ * it. `tarball` is the URL the registry advertises; `integrity` is
+ * the SRI hash (typically `sha512-…` for modern publishes, `sha1-…`
+ * for very old ones). `IntegrityScanner` compares these to whatever
+ * the project's lockfile has pinned to detect mirror-hijack /
+ * dependency-confusion / lockfile-tampering.
+ */
+export type RegistryDist = {
+    tarball: string;
+    integrity?: string;
+};
+
+/**
  * Just the bits of the npm registry metadata response we actually
  * consume — `dist-tags.latest` and the keys of `versions` (we don't
  * need the per-version object, only that the version was published).
@@ -50,6 +63,15 @@ export type RegistryPackage = {
      * absent from the map.
      */
     publishers?: Record<string, RegistryPublisher>;
+    /**
+     * Per-version `dist` block (tarball URL + integrity SRI hash).
+     * Used by `IntegrityScanner` to cross-check the lockfile's pinned
+     * `resolved` + `integrity` against what the registry currently
+     * serves. Optional: cache entries written before the field was
+     * added lack it and the scanner reports such packages as
+     * "registry data unavailable" until the TTL refresh fills it in.
+     */
+    dist?: Record<string, RegistryDist>;
 };
 
 /**
@@ -112,7 +134,8 @@ export class Registry {
                 description: typeof raw.description === 'string' ? raw.description : undefined,
                 homepage: typeof raw.homepage === 'string' ? raw.homepage : undefined,
                 license: Registry._extractLicense(raw.license, raw.licenses),
-                publishers: Registry._extractPublishers(raw.versions)
+                publishers: Registry._extractPublishers(raw.versions),
+                dist: Registry._extractDist(raw.versions)
             };
 
             this._cache.set(name, pkg);
@@ -224,6 +247,44 @@ export class Registry {
      * publisher for. Returns `undefined` when nothing usable was
      * found, so the field stays absent in the cached envelope.
      */
+    /**
+     * Pull the `dist` block out of each version object. We keep only
+     * the two fields the integrity scanner needs (`tarball` URL and
+     * `integrity` SRI hash); the rest of npm's `dist` envelope
+     * (`shasum`, `fileCount`, `unpackedSize`, `signatures`, …) is
+     * ignored to keep the cached payload compact. Returns `undefined`
+     * when no usable `dist` blocks were found so the field stays
+     * absent in the cache.
+     */
+    private static _extractDist(versions: unknown): Record<string, RegistryDist>|undefined {
+        if (!versions || typeof versions !== 'object') {
+            return undefined;
+        }
+
+        const out: Record<string, RegistryDist> = {};
+        let any = false;
+
+        for (const [version, entry] of Object.entries(versions as Record<string, unknown>)) {
+            if (!entry || typeof entry !== 'object') {
+                continue;
+            }
+            const dist = (entry as {dist?: unknown}).dist;
+            if (!dist || typeof dist !== 'object') {
+                continue;
+            }
+            const d = dist as {tarball?: unknown; integrity?: unknown};
+            if (typeof d.tarball !== 'string' || d.tarball.length === 0) {
+                continue;
+            }
+            out[version] = typeof d.integrity === 'string' && d.integrity.length > 0
+                ? {tarball: d.tarball, integrity: d.integrity}
+                : {tarball: d.tarball};
+            any = true;
+        }
+
+        return any ? out : undefined;
+    }
+
     private static _extractPublishers(versions: unknown): Record<string, RegistryPublisher>|undefined {
         if (!versions || typeof versions !== 'object') {
             return undefined;

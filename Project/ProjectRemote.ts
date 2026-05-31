@@ -4,6 +4,16 @@ import {DependencyType, PackageDependency, PackageManifest} from './PackageManif
 import {Project} from './Project.js';
 
 /**
+ * One commit returned by `listCommitsForFile` — what nppm needs from
+ * the host's commit-history endpoint. Timestamps are unix-ms so the
+ * shape matches `HistoryEntry.timestamp` downstream.
+ */
+export type RemoteCommit = {
+    sha: string;
+    timestamp: number;
+};
+
+/**
  * Raw fields we consume from a remote package.json. Anything else in
  * the file is irrelevant to nppm and stays as `unknown`.
  */
@@ -53,6 +63,36 @@ export abstract class ProjectRemote implements Project {
      * Returns `[]` for unknown / non-directory paths.
      */
     protected abstract listDirectory(repoPath: string): Promise<string[]>;
+
+    /**
+     * Walk the host's commit-history API for `repoPath`, returning
+     * one entry per commit that touched the file, oldest-first.
+     * `null` signals that the API is unreachable or the project has
+     * no committed copy — both buckets the SSE handler surfaces as
+     * "remote backfill unavailable" rather than as an exception.
+     *
+     * Implementations are expected to paginate; the
+     * `RemoteGitHistoryBackfill` consumer relies on the result being
+     * the complete history within the configured cap.
+     */
+    public abstract listCommitsForFile(repoPath: string): Promise<RemoteCommit[]|null>;
+
+    /**
+     * Fetch the file contents at a specific commit SHA. Same
+     * not-found / not-text contract as `fetchFile` — returns `null`
+     * for a missing or binary file. Throws on transport / auth
+     * errors so the caller can decide whether to abort the walk.
+     */
+    public abstract fetchFileAtRef(repoPath: string, ref: string): Promise<string|null>;
+
+    /**
+     * Resolve the configured `ref` (or the repo's default branch) to
+     * a concrete commit SHA. Used as the backfill watermark stored
+     * in `HistoryFile.gitBackfilledHead` so the next call can
+     * short-circuit when HEAD hasn't moved. `null` when the API is
+     * unreachable.
+     */
+    public abstract getHeadSha(): Promise<string|null>;
 
     public async loadLockfile(): Promise<Lockfile|null> {
         // Remote contents API can serve `package-lock.json` just fine,

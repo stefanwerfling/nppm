@@ -21,6 +21,8 @@ export class HistoryView {
     private _onShowMatrix: ((unid: string) => void)|null = null;
     private _onShowTree: ((unid: string) => void)|null = null;
     private _onShowUnused: ((unid: string) => void)|null = null;
+    private _onShowVulns: ((unid: string) => void)|null = null;
+    private _onShowPr: ((unid: string) => void)|null = null;
     private _entries: HistoryEntry[] = [];
 
     constructor(root: HTMLElement) {
@@ -45,6 +47,14 @@ export class HistoryView {
 
     public onShowUnused(handler: (unid: string) => void): void {
         this._onShowUnused = handler;
+    }
+
+    public onShowVulns(handler: (unid: string) => void): void {
+        this._onShowVulns = handler;
+    }
+
+    public onShowPr(handler: (unid: string) => void): void {
+        this._onShowPr = handler;
     }
 
     public async show(unid: string, name: string): Promise<void> {
@@ -95,9 +105,20 @@ export class HistoryView {
         if (this._entries.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'list-placeholder';
-            empty.textContent = I18n.t(
+            empty.innerHTML = '';
+            const line1 = document.createElement('div');
+            line1.textContent = I18n.t(
                 'Currently no history. Whenever the project\'s packages change, a new entry shows up here (a snapshot is checked on every lockfile call).'
             );
+            empty.appendChild(line1);
+            const line2 = document.createElement('div');
+            line2.style.marginTop = '8px';
+            line2.style.fontSize = '11px';
+            line2.style.opacity = '0.7';
+            line2.textContent = I18n.t(
+                'Tip: open the Vulns view to backfill history from git (package-lock.json commits, or package.json as fallback).'
+            );
+            empty.appendChild(line2);
             this._root.appendChild(empty);
             return;
         }
@@ -128,6 +149,17 @@ export class HistoryView {
         source.className = 'history-source';
         source.textContent = I18n.t('Source: {source}', {source: entry.lockfileSource});
         head.appendChild(source);
+
+        // package.json-derived entries carry declared ranges, not
+        // resolved versions — surface that explicitly so the user
+        // doesn't expect the Vulns view to cover them.
+        if (entry.lockfileSource === 'package-json') {
+            const pill = document.createElement('span');
+            pill.className = 'history-pill history-pill-declared';
+            pill.textContent = I18n.t('declared-only');
+            pill.title = I18n.t('Entry parsed from package.json — version ranges, no CVE coverage in Vulns view.');
+            head.appendChild(pill);
+        }
 
         const counts = document.createElement('div');
         counts.className = 'history-counts';
@@ -289,6 +321,26 @@ export class HistoryView {
             }
         });
         toggle.appendChild(unused);
+
+        const vulns = document.createElement('button');
+        vulns.className = 'installed-toggle-btn';
+        vulns.textContent = I18n.t('Vulns');
+        vulns.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowVulns) {
+                this._onShowVulns(this._projectUnid);
+            }
+        });
+        toggle.appendChild(vulns);
+
+        const pr = document.createElement('button');
+        pr.className = 'installed-toggle-btn';
+        pr.textContent = I18n.t('PR');
+        pr.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowPr) {
+                this._onShowPr(this._projectUnid);
+            }
+        });
+        toggle.appendChild(pr);
 
         header.appendChild(toggle);
         return header;

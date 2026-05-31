@@ -3,9 +3,11 @@ import {
     ApiAnalyzeErrorEvent,
     ApiAnalyzeProgressEvent,
     ApiAnalyzeResultEvent,
-    ApiAnalyzeStartEvent
+    ApiAnalyzeStartEvent,
+    ApiIntegrityResponse
 } from '../Api/ApiTypes.js';
 import {Lockfile, LockedPackage} from '../Project/Lockfile.js';
+import {IntegrityFinding, IntegritySeverity} from '../Security/IntegrityScanner.js';
 import {Api} from './Api.js';
 import {EditorUrl} from './EditorUrl.js';
 import {I18n} from './I18n.js';
@@ -38,6 +40,8 @@ export class InstalledView {
     private _onShowMatrix: ((unid: string) => void)|null = null;
     private _onShowTree: ((unid: string) => void)|null = null;
     private _onShowUnused: ((unid: string) => void)|null = null;
+    private _onShowVulns: ((unid: string) => void)|null = null;
+    private _onShowPr: ((unid: string) => void)|null = null;
     private _lockfile: Lockfile|null = null;
     // Inflight SSE stream — kept so we can close it on view switch /
     // re-analysis. `null` means no analysis is running.
@@ -46,6 +50,11 @@ export class InstalledView {
     // `null` value means OSV failed for that specific entry; missing
     // key means "not yet scanned".
     private _vulnsByKey: Map<string, string[]|null> = new Map();
+    // Per-`${name}@${version}` integrity finding from the cross-check
+    // against the registry's current `dist` data. Missing key means
+    // "clean — no finding".
+    private _integrityByKey: Map<string, IntegrityFinding> = new Map();
+    private _integrityResp: ApiIntegrityResponse|null = null;
     // DOM references we update mid-stream without re-rendering the
     // whole table.
     private _progressBar: HTMLElement|null = null;
@@ -77,6 +86,14 @@ export class InstalledView {
         this._onShowUnused = handler;
     }
 
+    public onShowVulns(handler: (unid: string) => void): void {
+        this._onShowVulns = handler;
+    }
+
+    public onShowPr(handler: (unid: string) => void): void {
+        this._onShowPr = handler;
+    }
+
     /**
      * Set the editor key once at boot — Nppm reads it from
      * `/api/projects` and pipes it down. `undefined` (default) hides
@@ -93,11 +110,20 @@ export class InstalledView {
         this._projectRoot = root ?? null;
         this._lockfile = null;
         this._vulnsByKey = new Map();
+        this._integrityByKey = new Map();
+        this._integrityResp = null;
         this._rowsByKey = new Map();
         this._renderLoading();
 
         try {
-            const response = await Api.lockfile(unid);
+            // Lockfile + integrity in parallel — both endpoints read
+            // the lockfile, so kicking them off together saves one
+            // round-trip. Integrity is cache-only against the
+            // already-warmed registry pocket; rarely the slow side.
+            const [lockfileResp, integrityResp] = await Promise.all([
+                Api.lockfile(unid),
+                Api.integrity(unid).catch(() => null)
+            ]);
 
             // Guard against a stale response if the user switched
             // projects while the fetch was in flight.
@@ -105,7 +131,13 @@ export class InstalledView {
                 return;
             }
 
-            this._lockfile = response.lockfile;
+            this._lockfile = lockfileResp.lockfile;
+            if (integrityResp) {
+                this._integrityResp = integrityResp;
+                for (const f of integrityResp.findings) {
+                    this._integrityByKey.set(`${f.name}@${f.version}`, f);
+                }
+            }
             this._render();
         } catch (e) {
             if (this._projectUnid === unid) {
@@ -152,6 +184,14 @@ export class InstalledView {
         meta.textContent =
             I18n.t('{n} resolved packages', {n: this._lockfile.packages.length})
             + ` (${InstalledView._sourceLabel(this._lockfile)})`;
+
+        // Append integrity-summary pill when the scanner reported
+        // anything non-trivial. Clean projects stay quiet.
+        const sumPill = this._renderIntegritySummaryPill();
+        if (sumPill) {
+            meta.appendChild(document.createTextNode(' · '));
+            meta.appendChild(sumPill);
+        }
         this._root.appendChild(meta);
 
         this._root.appendChild(this._renderAnalyzeBar());
@@ -167,6 +207,7 @@ export class InstalledView {
                 <th>${I18n.t('Type')}</th>
                 <th>${I18n.t('Path')}</th>
                 <th>CVEs</th>
+                <th>${I18n.t('Integrity')}</th>
             </tr>
         `;
         table.appendChild(thead);
@@ -193,6 +234,7 @@ export class InstalledView {
     private _renderRow(pkg: LockedPackage): HTMLElement {
         const row = document.createElement('tr');
         const cveCell = this._renderCveCell(pkg);
+        const integrityCell = this._renderIntegrityCell(pkg);
         row.innerHTML = `
             <td class="pkg-name">${InstalledView._esc(pkg.name)}</td>
             <td class="pkg-version">${InstalledView._esc(pkg.version)}</td>
@@ -205,7 +247,90 @@ export class InstalledView {
             row.querySelector('.pkg-source')?.appendChild(ideLink);
         }
         row.appendChild(cveCell);
+        row.appendChild(integrityCell);
         return row;
+    }
+
+    /**
+     * Integrity column for one row. Renders one of four states:
+     *   - finding present → severity-coloured pill with title hint
+     *   - clean entry     → "✓" (registry data confirmed match)
+     *   - registry cache missing dist data → "—" (cold cache)
+     *   - integrity scan not run at all → "—"
+     */
+    private _renderIntegrityCell(pkg: LockedPackage): HTMLElement {
+        const td = document.createElement('td');
+        td.className = 'installed-integrity-cell';
+
+        const key = `${pkg.name}@${pkg.version}`;
+        const finding = this._integrityByKey.get(key);
+
+        if (!this._integrityResp) {
+            td.textContent = '—';
+            td.classList.add('pkg-empty');
+            return td;
+        }
+
+        if (!finding) {
+            td.textContent = '✓';
+            td.classList.add('installed-integrity-clean');
+            return td;
+        }
+
+        const pill = document.createElement('span');
+        pill.className = `installed-integrity-pill installed-integrity-pill-${finding.severity}`;
+        pill.textContent = InstalledView._integrityShortLabel(finding.kind);
+        pill.title = `${finding.message}\n\n`
+            + (finding.lockfileIntegrity ? `lockfile: ${finding.lockfileIntegrity}\n` : '')
+            + (finding.registryIntegrity ? `registry: ${finding.registryIntegrity}` : '');
+        td.appendChild(pill);
+        return td;
+    }
+
+    /**
+     * Compact pill label per finding kind. Keeps the column narrow;
+     * the full message lives in the `title` tooltip.
+     */
+    private static _integrityShortLabel(kind: string): string {
+        switch (kind) {
+            case 'integrity-mismatch': return I18n.t('mismatch');
+            case 'tarball-redirect': return I18n.t('mirror');
+            case 'integrity-missing': return I18n.t('no-hash');
+            case 'version-not-in-registry': return I18n.t('private');
+            default: return kind;
+        }
+    }
+
+    /**
+     * Summary pill that sits next to the meta line above the table.
+     * Only rendered when the scanner found at least one non-info
+     * issue — info-only projects stay quiet so the user is only
+     * nudged for actionable signals.
+     */
+    private _renderIntegritySummaryPill(): HTMLElement|null {
+        const r = this._integrityResp;
+        if (!r || r.noLockfile) {
+            return null;
+        }
+        const s = r.summary;
+        if (s.maxSeverity === null) {
+            return null;
+        }
+
+        const pill = document.createElement('span');
+        pill.className = `installed-integrity-pill installed-integrity-pill-${s.maxSeverity}`;
+        const parts: string[] = [];
+        if (s.riskCount > 0) {
+            parts.push(I18n.t('{n} mismatch', {n: String(s.riskCount)}));
+        }
+        if (s.warnCount > 0) {
+            parts.push(I18n.t('{n} warn', {n: String(s.warnCount)}));
+        }
+        if (s.infoCount > 0) {
+            parts.push(I18n.t('{n} info', {n: String(s.infoCount)}));
+        }
+        pill.textContent = I18n.t('Integrity') + ': ' + parts.join(' · ');
+        return pill;
     }
 
     /**
@@ -507,12 +632,32 @@ export class InstalledView {
             }
         });
 
+        const vulns = document.createElement('button');
+        vulns.className = 'installed-toggle-btn';
+        vulns.textContent = I18n.t('Vulns');
+        vulns.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowVulns) {
+                this._onShowVulns(this._projectUnid);
+            }
+        });
+
+        const pr = document.createElement('button');
+        pr.className = 'installed-toggle-btn';
+        pr.textContent = I18n.t('PR');
+        pr.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowPr) {
+                this._onShowPr(this._projectUnid);
+            }
+        });
+
         toggle.appendChild(declared);
         toggle.appendChild(installed);
         toggle.appendChild(history);
         toggle.appendChild(matrix);
         toggle.appendChild(tree);
         toggle.appendChild(unused);
+        toggle.appendChild(vulns);
+        toggle.appendChild(pr);
         header.appendChild(toggle);
 
         return header;

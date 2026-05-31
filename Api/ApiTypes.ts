@@ -6,8 +6,11 @@ import {ProjectMatrixResponse} from '../Matrix/ProjectMatrixBuilder.js';
 import {Lockfile} from '../Project/Lockfile.js';
 import {PackageDependency} from '../Project/PackageManifest.js';
 import {ReleasesResponse} from '../Releases/Releases.js';
+import {IntegrityFinding, IntegritySummary} from '../Security/IntegrityScanner.js';
 import {HeuristicsBatchEntry, SecurityReport} from '../Security/SecurityScanner.js';
+import {PrReviewReport} from '../PrReview/PrReview.js';
 import {UnusedReport} from '../Unused/UnusedReport.js';
+import {VulnerabilityTimelineResponse} from '../Vulnerability/Timeline.js';
 
 /**
  * One project as returned by `GET /api/projects`. `error` is populated
@@ -218,6 +221,86 @@ export type ApiMatrixHeuristicsResponse = {
  * remote (GitHub/Gitea) projects which the v1 detector doesn't scan.
  */
 export type ApiUnusedResponse = UnusedReport;
+
+/**
+ * Response shape of `GET /api/projects/:id/vulnerability-timeline`.
+ * Mirrors `VulnerabilityTimelineResponse` 1:1 — kept as its own type
+ * so the API surface stays explicit in `ApiTypes.ts`.
+ */
+export type ApiVulnerabilityTimelineResponse = VulnerabilityTimelineResponse;
+
+/**
+ * Response shape of `GET /api/projects/:id/pr-review`. Mirrors
+ * `PrReviewReport` 1:1 — kept as its own type so the API surface
+ * stays explicit in `ApiTypes.ts`.
+ */
+export type ApiPrReviewResponse = PrReviewReport;
+
+/**
+ * Response shape of `GET /api/projects/:id/integrity`. Lockfile-
+ * resolved + integrity cross-check against the registry's current
+ * `dist` metadata.
+ */
+export type ApiIntegrityResponse = {
+    project: {
+        unid: string;
+        name: string;
+        type: ConfigProjectType;
+    };
+    findings: IntegrityFinding[];
+    summary: IntegritySummary;
+    /**
+     * `true` when no lockfile was readable for this project — the
+     * scan returns empty findings + zero counts and the UI surfaces
+     * a "no data" banner. Distinct from "lockfile present, nothing
+     * found" (which leaves the field `false`).
+     */
+    noLockfile: boolean;
+};
+
+/**
+ * SSE event payloads for `GET /api/projects/:id/vulnerability-timeline/scan`.
+ * The stream runs two phases (git backfill then OSV catch-up), and
+ * `phase` lets the frontend route the progress bar between them.
+ *
+ * Sequence:
+ *   start            { gitAvailable, backfillRequired }
+ *   phase            { name: 'backfill', total }
+ *   progress         { current, total, phase: 'backfill' }   (×commits)
+ *   backfill-done    { mergedCount, headSha }
+ *   phase            { name: 'osv', total }
+ *   progress         { current, total, phase: 'osv' }        (×chunks)
+ *   end              { timeline: ApiVulnerabilityTimelineResponse }
+ *   | error          { msg }
+ */
+export type ApiTimelineScanStartEvent = {
+    gitAvailable: boolean;
+    backfillRequired: boolean;
+};
+
+export type ApiTimelineScanPhaseEvent = {
+    name: 'backfill'|'osv';
+    total: number;
+};
+
+export type ApiTimelineScanProgressEvent = {
+    current: number;
+    total: number;
+    phase: 'backfill'|'osv';
+};
+
+export type ApiTimelineScanBackfillDoneEvent = {
+    mergedCount: number;
+    headSha: string|null;
+};
+
+export type ApiTimelineScanEndEvent = {
+    timeline: ApiVulnerabilityTimelineResponse;
+};
+
+export type ApiTimelineScanErrorEvent = {
+    msg: string;
+};
 
 /**
  * One cell coordinate the Upgrade modal acts on. Identifies a single

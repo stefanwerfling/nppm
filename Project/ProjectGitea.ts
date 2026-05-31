@@ -1,6 +1,6 @@
 import {JsonCache} from '../Cache/JsonCache.js';
 import {ConfigProjectType} from '../Config/Config.js';
-import {ProjectRemote} from './ProjectRemote.js';
+import {ProjectRemote, RemoteCommit} from './ProjectRemote.js';
 
 /**
  * Gitea contents API entry — modeled after GitHub's, so the same
@@ -14,6 +14,24 @@ type GiteaContentEntry = {
     encoding?: string;
     content?: string;
 };
+
+/**
+ * Shape we consume from Gitea's commits API. Mirrors GitHub's
+ * envelope with minor field-name drift — `created` is the canonical
+ * timestamp.
+ */
+type GiteaCommitEntry = {
+    sha: string;
+    created?: string;
+    commit?: {
+        committer?: {date?: string};
+        author?: {date?: string};
+    };
+};
+
+/** Pagination cap — Gitea defaults to 50 per page, max is 50. */
+const GITEA_COMMITS_PER_PAGE = 50;
+const GITEA_MAX_PAGES = 20;
 
 /**
  * Reads a project from a Gitea instance. `url` is the full repo URL
@@ -75,27 +93,134 @@ export class ProjectGitea extends ProjectRemote {
             .map((e) => e.name);
     }
 
-    private async _request(repoPath: string): Promise<GiteaContentEntry|GiteaContentEntry[]|null> {
-        const cleanPath = repoPath.replace(/^\/+/, '');
-        const url = new URL(`${this._apiBase}/contents/${cleanPath}`);
+    public async fetchFileAtRef(repoPath: string, ref: string): Promise<string|null> {
+        const data = await this._request(repoPath, ref);
+        if (data === null || Array.isArray(data) || data.type !== 'file') {
+            return null;
+        }
+        if (data.encoding === 'base64' && typeof data.content === 'string') {
+            return Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf-8');
+        }
+        return null;
+    }
 
-        if (this._ref) {
-            url.searchParams.set('ref', this._ref);
+    public async listCommitsForFile(repoPath: string): Promise<RemoteCommit[]|null> {
+        const cleanPath = repoPath.replace(/^\/+/, '');
+        const collected: RemoteCommit[] = [];
+
+        for (let page = 1; page <= GITEA_MAX_PAGES; page++) {
+            const url = new URL(`${this._apiBase}/commits`);
+            url.searchParams.set('path', cleanPath);
+            url.searchParams.set('limit', String(GITEA_COMMITS_PER_PAGE));
+            url.searchParams.set('page', String(page));
+            if (this._ref) {
+                url.searchParams.set('sha', this._ref);
+            }
+
+            const cacheKey = `gitea_commits_${this._apiBase}_${this._ref ?? 'HEAD'}_${cleanPath}_p${page}`;
+            type Wrap = {data: GiteaCommitEntry[]|null};
+            let chunk: GiteaCommitEntry[]|null = null;
+
+            if (this._cache) {
+                const hit = this._cache.get<Wrap>(cacheKey);
+                if (hit !== null) {
+                    chunk = hit.data;
+                }
+            }
+
+            if (chunk === null) {
+                const res = await fetch(url.toString(), {headers: this._headers()});
+                if (res.status === 404) {
+                    this._cache?.set<Wrap>(cacheKey, {data: null});
+                    return null;
+                }
+                if (!res.ok) {
+                    throw new Error(`Gitea ${url.pathname} → ${res.status} ${res.statusText}`);
+                }
+                chunk = (await res.json()) as GiteaCommitEntry[];
+                this._cache?.set<Wrap>(cacheKey, {data: chunk});
+            }
+
+            if (chunk.length === 0) {
+                break;
+            }
+            for (const c of chunk) {
+                const date = c.created
+                    ?? c.commit?.committer?.date
+                    ?? c.commit?.author?.date;
+                if (!date) {
+                    continue;
+                }
+                const ts = Date.parse(date);
+                if (!Number.isFinite(ts)) {
+                    continue;
+                }
+                collected.push({sha: c.sha, timestamp: ts});
+            }
+            if (chunk.length < GITEA_COMMITS_PER_PAGE) {
+                break;
+            }
         }
 
+        collected.reverse();
+        return collected;
+    }
+
+    public async getHeadSha(): Promise<string|null> {
+        const ref = this._ref ?? 'HEAD';
+        const url = `${this._apiBase}/commits/${encodeURIComponent(ref)}`;
+        const cacheKey = `gitea_head_${this._apiBase}_${ref}`;
+        type Wrap = {data: string|null};
+
+        if (this._cache) {
+            const hit = this._cache.get<Wrap>(cacheKey);
+            if (hit !== null) {
+                return hit.data;
+            }
+        }
+
+        try {
+            const res = await fetch(url, {headers: this._headers()});
+            if (!res.ok) {
+                this._cache?.set<Wrap>(cacheKey, {data: null});
+                return null;
+            }
+            const body = (await res.json()) as {sha?: string};
+            const sha = typeof body.sha === 'string' ? body.sha : null;
+            this._cache?.set<Wrap>(cacheKey, {data: sha});
+            return sha;
+        } catch {
+            return null;
+        }
+    }
+
+    private _headers(): Record<string, string> {
         const headers: Record<string, string> = {
             Accept: 'application/json'
         };
-
         if (this._token) {
             // Gitea historically used `token X`; newer versions also
             // accept `Bearer X`. The token form is the safer default.
             headers.Authorization = `token ${this._token}`;
         }
+        return headers;
+    }
+
+    private async _request(
+        repoPath: string,
+        refOverride?: string
+    ): Promise<GiteaContentEntry|GiteaContentEntry[]|null> {
+        const cleanPath = repoPath.replace(/^\/+/, '');
+        const url = new URL(`${this._apiBase}/contents/${cleanPath}`);
+
+        const ref = refOverride ?? this._ref;
+        if (ref) {
+            url.searchParams.set('ref', ref);
+        }
 
         // Wrap in `{data: ...}` so we can distinguish a cached-404
         // (`{data: null}`) from a cache miss.
-        const cacheKey = `gitea_${this._apiBase}_${this._ref ?? 'HEAD'}_${cleanPath}`;
+        const cacheKey = `gitea_${this._apiBase}_${ref ?? 'HEAD'}_${cleanPath}`;
         type Wrap = {data: GiteaContentEntry|GiteaContentEntry[]|null};
 
         if (this._cache) {
@@ -105,7 +230,7 @@ export class ProjectGitea extends ProjectRemote {
             }
         }
 
-        const res = await fetch(url.toString(), {headers});
+        const res = await fetch(url.toString(), {headers: this._headers()});
 
         if (res.status === 404) {
             this._cache?.set<Wrap>(cacheKey, {data: null});

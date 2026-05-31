@@ -17,6 +17,8 @@ export class PackageList {
     private _onShowMatrix: ((unid: string) => void)|null = null;
     private _onShowTree: ((unid: string) => void)|null = null;
     private _onShowUnused: ((unid: string) => void)|null = null;
+    private _onShowVulns: ((unid: string) => void)|null = null;
+    private _onShowPr: ((unid: string) => void)|null = null;
 
     constructor(root: HTMLElement) {
         this._root = root;
@@ -40,6 +42,14 @@ export class PackageList {
 
     public onShowUnused(handler: (unid: string) => void): void {
         this._onShowUnused = handler;
+    }
+
+    public onShowVulns(handler: (unid: string) => void): void {
+        this._onShowVulns = handler;
+    }
+
+    public onShowPr(handler: (unid: string) => void): void {
+        this._onShowPr = handler;
     }
 
     public clear(): void {
@@ -178,12 +188,32 @@ export class PackageList {
             }
         });
 
+        const vulns = document.createElement('button');
+        vulns.className = 'installed-toggle-btn';
+        vulns.textContent = I18n.t('Vulns');
+        vulns.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowVulns) {
+                this._onShowVulns(this._projectUnid);
+            }
+        });
+
+        const pr = document.createElement('button');
+        pr.className = 'installed-toggle-btn';
+        pr.textContent = I18n.t('PR');
+        pr.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowPr) {
+                this._onShowPr(this._projectUnid);
+            }
+        });
+
         toggle.appendChild(declared);
         toggle.appendChild(installed);
         toggle.appendChild(history);
         toggle.appendChild(matrix);
         toggle.appendChild(tree);
         toggle.appendChild(unused);
+        toggle.appendChild(vulns);
+        toggle.appendChild(pr);
         header.appendChild(toggle);
 
         return header;

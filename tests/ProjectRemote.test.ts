@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {ConfigProjectType} from '../Config/Config.js';
-import {ProjectRemote} from '../Project/ProjectRemote.js';
+import {ProjectRemote, RemoteCommit} from '../Project/ProjectRemote.js';
 
 /**
  * Minimal test double that fills the abstract transport hooks from
@@ -30,6 +30,18 @@ class FakeRemote extends ProjectRemote {
 
     protected async listDirectory(repoPath: string): Promise<string[]> {
         return this._dirs.get(repoPath) ?? [];
+    }
+
+    public async listCommitsForFile(_repoPath: string): Promise<RemoteCommit[]|null> {
+        return [];
+    }
+
+    public async fetchFileAtRef(repoPath: string, _ref: string): Promise<string|null> {
+        return this._files.get(repoPath) ?? null;
+    }
+
+    public async getHeadSha(): Promise<string|null> {
+        return null;
     }
 }
 

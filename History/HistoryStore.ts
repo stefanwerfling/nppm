@@ -10,6 +10,18 @@ import {
 } from './History.js';
 
 /**
+ * Outcome of one `backfillFromGit` call. `mergedCount` reports the
+ * number of git-derived entries actually inserted (after dedupe by
+ * commit SHA); zero means the file already had every entry the walk
+ * produced.
+ */
+export type HistoryBackfillSummary = {
+    mergedCount: number;
+    headSha: string|null;
+    skippedReason: 'head-unchanged'|null;
+};
+
+/**
  * Optional context that lets `recordSnapshot` craft a better `reason`
  * label. Currently just the OSV-known CVEs for the *outgoing* version
  * of an updated package — if the old version had vulns and the user
@@ -50,7 +62,7 @@ export class HistoryStore {
         const file = this._fileFor(projectKey, projectName);
 
         if (!fs.existsSync(file)) {
-            return {projectKey, projectName, lastSnapshot: null, entries: []};
+            return {projectKey, projectName, lastSnapshot: null, entries: [], gitBackfilledHead: null};
         }
 
         try {
@@ -58,13 +70,96 @@ export class HistoryStore {
             // Keep the display name in sync if the user renamed the
             // project in the config — the key is what's stable.
             parsed.projectName = projectName;
+            if (parsed.gitBackfilledHead === undefined) {
+                parsed.gitBackfilledHead = null;
+            }
             return parsed;
         } catch {
             // Corrupt file → start fresh. We don't rename/back up
             // because the only way to corrupt this file is a crash
             // mid-write, and the next snapshot will overwrite it.
-            return {projectKey, projectName, lastSnapshot: null, entries: []};
+            return {projectKey, projectName, lastSnapshot: null, entries: [], gitBackfilledHead: null};
         }
+    }
+
+    /**
+     * Splice a chronological list of git-derived entries into the
+     * project's history. Idempotent by `commitSha` — re-running with
+     * the same `headSha` short-circuits, and overlapping entries from
+     * a previous backfill are skipped on SHA match. When `lastSnapshot`
+     * is empty (fresh project) and `seedLastSnapshot` is true, it
+     * gets seeded from `finalGitState` so subsequent `recordSnapshot`
+     * calls have a baseline to diff against.
+     *
+     * Pass `seedLastSnapshot: false` when the entries come from
+     * `package.json` parsing (versions are declared ranges, not
+     * concrete) — otherwise the first live `recordSnapshot` would
+     * see every dep as "changed" from `^1.0.0` to its resolved
+     * counterpart.
+     *
+     * Does NOT touch `lastSnapshot.timestamp` when a snapshot already
+     * exists — live nppm observations remain the authoritative "current
+     * state" boundary. The git entries simply prepend to the timeline.
+     */
+    public backfillFromGit(
+        projectKey: string,
+        projectName: string,
+        gitEntries: HistoryEntry[],
+        headSha: string|null,
+        finalGitState: {name: string; version: string}[],
+        seedLastSnapshot: boolean = true
+    ): HistoryBackfillSummary {
+        const state = this.read(projectKey, projectName);
+
+        if (headSha && state.gitBackfilledHead === headSha) {
+            return {mergedCount: 0, headSha, skippedReason: 'head-unchanged'};
+        }
+
+        const seenShas = new Set<string>();
+        for (const e of state.entries) {
+            if (e.source === 'git' && e.commitSha) {
+                seenShas.add(e.commitSha);
+            }
+        }
+
+        const fresh: HistoryEntry[] = [];
+        for (const e of gitEntries) {
+            if (e.commitSha && seenShas.has(e.commitSha)) {
+                continue;
+            }
+            fresh.push(e);
+        }
+
+        if (fresh.length === 0 && state.gitBackfilledHead === headSha) {
+            return {mergedCount: 0, headSha, skippedReason: 'head-unchanged'};
+        }
+
+        const merged = [...state.entries, ...fresh];
+        merged.sort((a, b) => a.timestamp - b.timestamp);
+
+        state.entries = merged;
+        state.gitBackfilledHead = headSha;
+
+        // Seed lastSnapshot only when truly empty AND the caller
+        // explicitly opts in — once nppm has observed anything live,
+        // that observation wins over the git state. The git walk's
+        // final commit might pre-date a live install that didn't get
+        // committed. Skipping the seed when entries hold ranges
+        // (`package.json` fallback path) also keeps `recordSnapshot`
+        // from emitting a false "every dep changed" delta on the
+        // next lockfile read.
+        if (seedLastSnapshot && state.lastSnapshot === null && finalGitState.length > 0) {
+            const tail = fresh.length > 0
+                ? fresh[fresh.length - 1].timestamp
+                : Date.now();
+            state.lastSnapshot = {
+                timestamp: tail,
+                packages: finalGitState.map((p) => ({name: p.name, version: p.version}))
+            };
+        }
+
+        this._write(projectKey, projectName, state);
+        return {mergedCount: fresh.length, headSha, skippedReason: null};
     }
 
     /**
@@ -166,7 +261,8 @@ export class HistoryStore {
             lockfileSource,
             added,
             removed,
-            updated
+            updated,
+            source: 'snapshot'
         };
 
         state.entries.push(entry);

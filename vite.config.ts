@@ -13,6 +13,7 @@ import {
     ApiFingerprintDiffResponse,
     ApiFingerprintResponse,
     ApiHistoryResponse,
+    ApiIntegrityResponse,
     ApiLockfileResponse,
     ApiManifest,
     ApiMatrixHeuristicsRequest,
@@ -34,7 +35,9 @@ import {JsonCache} from './Cache/JsonCache.js';
 import {ConfigProjectType, SchemaConfig} from './Config/Config.js';
 import {ConfigLoader} from './Config/ConfigLoader.js';
 import {FingerprintDiffer} from './Fingerprint/FingerprintDiff.js';
+import {GitHistoryBackfill} from './History/GitHistoryBackfill.js';
 import {HistoryStore} from './History/HistoryStore.js';
+import {RemoteGitHistoryBackfill} from './History/RemoteGitHistoryBackfill.js';
 import {DepGraphBuilder} from './DepGraph/DepGraphBuilder.js';
 import {MatrixBuilder} from './Matrix/MatrixBuilder.js';
 import {ProjectMatrixBuilder} from './Matrix/ProjectMatrixBuilder.js';
@@ -46,7 +49,11 @@ import {SpdxBuilder} from './Sbom/SpdxBuilder.js';
 import {LifecycleScriptScanner} from './Upgrade/LifecycleScriptScanner.js';
 import {PackageJsonEditor} from './Upgrade/PackageJsonEditor.js';
 import {Upgrader} from './Upgrade/Upgrader.js';
+import {IntegrityScanner} from './Security/IntegrityScanner.js';
+import {PrReviewBuilder} from './PrReview/PrReviewBuilder.js';
 import {ProjectLocal} from './Project/ProjectLocal.js';
+import {ProjectRemote} from './Project/ProjectRemote.js';
+import {TimelineBuilder} from './Vulnerability/TimelineBuilder.js';
 
 /**
  * Backend wiring for the Vite dev server. Exposes one public method
@@ -143,6 +150,11 @@ class Server {
             // `.nppm-cache` convention.
             const historyDir = path.join(projectRoot, '.nppm-history');
             const historyStore = new HistoryStore(historyDir);
+            const gitBackfill = new GitHistoryBackfill();
+            const remoteBackfill = new RemoteGitHistoryBackfill();
+            const timelineBuilder = new TimelineBuilder(securityCache);
+            const prReviewBuilder = new PrReviewBuilder(osvClient);
+            const integrityScanner = new IntegrityScanner(registry);
 
             // -------------------------------------------------------------
             // GET /api/projects — one row per configured project, with a
@@ -327,6 +339,345 @@ class Server {
                             type: project.getType()
                         },
                         entries: [...file.entries].reverse()
+                    };
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/projects/:id/vulnerability-timeline — cache-only
+            // read. Walks the project's history (git-backfilled + live
+            // snapshots) and crosses it with the on-disk OSV cache to
+            // produce a list of `[t_in, t_out)` exposure windows per
+            // CVE. Fast — never reaches OSV. The companion `/scan`
+            // SSE endpoint warms the cache + (if needed) backfills
+            // from git first.
+            // -------------------------------------------------------------
+            app.get('/api/projects/:id/vulnerability-timeline', async (req, res) => {
+                const project = projects.get(req.params.id);
+
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+
+                try {
+                    const history = historyStore.read(project.getKey(), project.getName());
+                    const gitAvailable = (project instanceof ProjectLocal
+                            && gitBackfill.isAvailable(project.getRoot()))
+                        || (project instanceof ProjectRemote
+                            && remoteBackfill.isAvailable(project));
+                    const timeline = timelineBuilder.build(
+                        {unid: req.params.id, name: project.getName(), type: project.getType()},
+                        history,
+                        gitAvailable
+                    );
+                    res.status(200).json(timeline);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/projects/:id/vulnerability-timeline/scan — SSE.
+            // Phase 1: walk git log for `package-lock.json`, splice
+            // reconstructed entries into the history store (idempotent
+            // by HEAD SHA).
+            // Phase 2: dedupe every `name@version` the history mentions,
+            // batch-query OSV for missing ones, write the records into
+            // the OSV caches the regular endpoints already use.
+            // Final event carries the freshly rebuilt timeline so the
+            // frontend doesn't have to round-trip after the stream
+            // closes.
+            // -------------------------------------------------------------
+            app.get('/api/projects/:id/vulnerability-timeline/scan', async (req, res) => {
+                const project = projects.get(req.params.id);
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+
+                res.set({
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'X-Accel-Buffering': 'no'
+                });
+                res.flushHeaders();
+
+                const send = (event: string, data: object): void => {
+                    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+                };
+
+                let aborted = false;
+                req.on('close', () => {
+                    aborted = true;
+                });
+
+                try {
+                    const localAvailable = project instanceof ProjectLocal
+                        && gitBackfill.isAvailable(project.getRoot());
+                    const remoteAvailable = project instanceof ProjectRemote
+                        && remoteBackfill.isAvailable(project);
+                    const gitAvailable = localAvailable || remoteAvailable;
+
+                    let backfillRequired = false;
+                    let backfillHead: string|null = null;
+                    if (localAvailable && project instanceof ProjectLocal) {
+                        backfillHead = gitBackfill.headSha(project.getRoot());
+                    } else if (remoteAvailable && project instanceof ProjectRemote) {
+                        backfillHead = await remoteBackfill.headSha(project);
+                    }
+                    if (gitAvailable) {
+                        const existing = historyStore.read(project.getKey(), project.getName());
+                        backfillRequired = backfillHead !== null
+                            && existing.gitBackfilledHead !== backfillHead;
+                    }
+
+                    send('start', {gitAvailable, backfillRequired});
+
+                    if (backfillRequired) {
+                        let result;
+                        if (project instanceof ProjectLocal) {
+                            result = gitBackfill.build(
+                                project.getRoot(),
+                                (current, total) => {
+                                    if (!aborted) {
+                                        send('progress', {current, total, phase: 'backfill'});
+                                    }
+                                }
+                            );
+                        } else if (project instanceof ProjectRemote) {
+                            try {
+                                result = await remoteBackfill.build(
+                                    project,
+                                    (current, total) => {
+                                        if (!aborted) {
+                                            send('progress', {current, total, phase: 'backfill'});
+                                        }
+                                    }
+                                );
+                            } catch (e) {
+                                send('error', {
+                                    msg: `Remote backfill failed: ${(e as Error).message}`
+                                });
+                                res.end();
+                                return;
+                            }
+                        }
+                        if (aborted || !result) {
+                            return;
+                        }
+                        send('phase', {name: 'backfill', total: result.entries.length});
+
+                        const summary = historyStore.backfillFromGit(
+                            project.getKey(),
+                            project.getName(),
+                            result.entries,
+                            result.headSha,
+                            result.finalState,
+                            // Only seed `lastSnapshot` when the
+                            // backfill produced resolved versions
+                            // (`committed` source). Declared-range
+                            // entries from the `package-json`
+                            // fallback would otherwise trip a
+                            // false "every dep changed" diff on
+                            // the next live `recordSnapshot`.
+                            result.source === 'committed'
+                        );
+                        send('backfill-done', {
+                            mergedCount: summary.mergedCount,
+                            headSha: summary.headSha
+                        });
+                    }
+
+                    if (aborted) {
+                        return;
+                    }
+
+                    // OSV catch-up. Walk every (name, version) the
+                    // history mentions, ask the batched OSV endpoint
+                    // for the unscanned ones, then refresh the
+                    // single-query records for any vuln we discovered
+                    // (so the timeline has `published` dates, not just
+                    // IDs).
+                    const refreshed = historyStore.read(project.getKey(), project.getName());
+                    const versions = new Set<string>();
+                    for (const entry of refreshed.entries) {
+                        for (const a of entry.added) {
+                            versions.add(`${a.name}@${a.version}`);
+                        }
+                        for (const r of entry.removed) {
+                            versions.add(`${r.name}@${r.version}`);
+                        }
+                        for (const u of entry.updated) {
+                            versions.add(`${u.name}@${u.fromVersion}`);
+                            versions.add(`${u.name}@${u.toVersion}`);
+                        }
+                    }
+                    for (const p of refreshed.lastSnapshot?.packages ?? []) {
+                        versions.add(`${p.name}@${p.version}`);
+                    }
+
+                    const pairs: {name: string; version: string}[] = [];
+                    for (const key of versions) {
+                        const at = key.lastIndexOf('@');
+                        if (at <= 0) {
+                            continue;
+                        }
+                        pairs.push({name: key.slice(0, at), version: key.slice(at + 1)});
+                    }
+
+                    send('phase', {name: 'osv', total: pairs.length});
+
+                    const CHUNK_SIZE = 50;
+                    let done = 0;
+                    const withVulns: {name: string; version: string; vulnIds: string[]}[] = [];
+
+                    for (let i = 0; i < pairs.length; i += CHUNK_SIZE) {
+                        if (aborted) {
+                            return;
+                        }
+                        const chunk = pairs.slice(i, i + CHUNK_SIZE);
+                        const map = await osvClient.queryBatch(chunk);
+                        for (const c of chunk) {
+                            const ids = map.get(`${c.name}@${c.version}`);
+                            if (ids && ids.length > 0) {
+                                withVulns.push({name: c.name, version: c.version, vulnIds: ids});
+                            }
+                            done++;
+                        }
+                        send('progress', {current: done, total: pairs.length, phase: 'osv'});
+                    }
+
+                    // For coordinates that have vulns but no full-record
+                    // cache entry yet, hit the single endpoint so the
+                    // timeline gets real `published` dates. Bounded by
+                    // the number of vulnerable packages (typically << all).
+                    for (const v of withVulns) {
+                        if (aborted) {
+                            return;
+                        }
+                        const cached = securityCache.get<{data: unknown}>(`osv_${v.name}@${v.version}`);
+                        if (cached !== null) {
+                            continue;
+                        }
+                        try {
+                            await osvClient.query(v.name, v.version);
+                        } catch {
+                            // best-effort — the batch IDs already let
+                            // the timeline classify the vuln, just
+                            // without a precise published date.
+                        }
+                    }
+
+                    if (aborted) {
+                        return;
+                    }
+
+                    const finalHistory = historyStore.read(project.getKey(), project.getName());
+                    const timeline = timelineBuilder.build(
+                        {unid: req.params.id, name: project.getName(), type: project.getType()},
+                        finalHistory,
+                        gitAvailable
+                    );
+                    send('end', {timeline});
+                } catch (e) {
+                    send('error', {msg: (e as Error).message});
+                } finally {
+                    res.end();
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/projects/:id/pr-review?base=&head= — diff
+            // `package.json` + `package-lock.json` between two git
+            // refs (default `main` vs `HEAD`), surface every changed
+            // dep with its CVE delta from the cached OSV pocket. Local
+            // projects only in v1 — remote would need API-driven
+            // git-show.
+            // -------------------------------------------------------------
+            app.get('/api/projects/:id/pr-review', async (req, res) => {
+                const project = projects.get(req.params.id);
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+                if (!(project instanceof ProjectLocal)) {
+                    res.status(400).json({success: false, msg: 'PR review only supported for local projects'});
+                    return;
+                }
+
+                const base = typeof req.query.base === 'string' && req.query.base.length > 0
+                    ? req.query.base
+                    : 'main';
+                const head = typeof req.query.head === 'string' && req.query.head.length > 0
+                    ? req.query.head
+                    : 'HEAD';
+
+                try {
+                    const report = await prReviewBuilder.build(project.getRoot(), base, head, {
+                        unid: req.params.id,
+                        name: project.getName(),
+                        type: project.getType()
+                    });
+                    res.status(200).json(report);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/projects/:id/integrity — cross-check the
+            // lockfile's pinned `resolved` + `integrity` per entry
+            // against what the registry currently serves. Surfaces
+            // mirror-hijack / dependency-confusion / lockfile-
+            // injection as risk-level findings. Works on any
+            // project type — `loadLockfile()` returns null cleanly
+            // for sources without one (signals via `noLockfile`).
+            // -------------------------------------------------------------
+            app.get('/api/projects/:id/integrity', async (req, res) => {
+                const project = projects.get(req.params.id);
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+
+                try {
+                    const lockfile = await project.loadLockfile();
+                    if (!lockfile) {
+                        const response: ApiIntegrityResponse = {
+                            project: {
+                                unid: req.params.id,
+                                name: project.getName(),
+                                type: project.getType()
+                            },
+                            findings: [],
+                            summary: IntegrityScanner.summarize([], 0),
+                            noLockfile: true
+                        };
+                        res.status(200).json(response);
+                        return;
+                    }
+
+                    const findings = await integrityScanner.scan(lockfile.packages);
+                    const totalScanned = new Set(
+                        lockfile.packages
+                            .filter((p) => p.name && p.version)
+                            .map((p) => `${p.name}@${p.version}`)
+                    ).size;
+                    const summary = IntegrityScanner.summarize(findings, totalScanned);
+                    const response: ApiIntegrityResponse = {
+                        project: {
+                            unid: req.params.id,
+                            name: project.getName(),
+                            type: project.getType()
+                        },
+                        findings,
+                        summary,
+                        noLockfile: false
                     };
                     res.status(200).json(response);
                 } catch (e) {

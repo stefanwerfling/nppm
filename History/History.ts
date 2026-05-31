@@ -26,6 +26,19 @@ export type HistoryRemoved = {
 };
 
 /**
+ * Where the entry came from. `snapshot` is the live nppm path —
+ * recorded whenever the lockfile endpoint runs. `git` is reconstructed
+ * by walking the project's git log for `package-lock.json`; the field
+ * lets the UI render git-backfilled entries with a distinct badge so
+ * the user can tell which deltas were observed live vs reconstructed.
+ *
+ * Optional so pre-existing history files (written before the
+ * backfill landed) still parse cleanly — readers default missing
+ * values to `snapshot`.
+ */
+export type HistoryEntrySource = 'snapshot'|'git';
+
+/**
  * One entry in the per-project history file. Each entry captures the
  * delta against the *previous* entry's package set, not the absolute
  * package list — keeps the file size manageable when most snapshots
@@ -41,6 +54,13 @@ export type HistoryEntry = {
     added: HistoryAdded[];
     removed: HistoryRemoved[];
     updated: HistoryUpdate[];
+    source?: HistoryEntrySource;
+    /**
+     * For `source: 'git'` entries, the SHA of the commit that produced
+     * the delta. Lets the UI link out and lets `backfillFromGit` de-dupe
+     * re-runs without scanning timestamps.
+     */
+    commitSha?: string;
 };
 
 /**
@@ -48,6 +68,12 @@ export type HistoryEntry = {
  * recent full package set; we keep it so the next diff is O(N)
  * without replaying every historical entry. `entries` is sorted
  * oldest-first; the UI reverses to newest-first.
+ *
+ * `gitBackfilledHead` records the HEAD SHA at the time
+ * `backfillFromGit` last ran. The next backfill attempt skips the
+ * walk entirely when HEAD hasn't moved — keeps repeat opens of the
+ * vulnerability-timeline view cheap. Cleared (`null`) on a fresh
+ * file.
  */
 export type HistoryFile = {
     projectKey: string;
@@ -57,4 +83,5 @@ export type HistoryFile = {
         packages: {name: string; version: string}[];
     }|null;
     entries: HistoryEntry[];
+    gitBackfilledHead?: string|null;
 };

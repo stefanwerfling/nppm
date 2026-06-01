@@ -39,6 +39,11 @@ import {
     ProvenanceScanner,
     ProvenanceSummary
 } from './ProvenanceScanner.js';
+import {
+    TyposquatFinding,
+    TyposquatScanner,
+    TyposquatSummary
+} from './TyposquatScanner.js';
 import {OsvClient, OsvVulnerability} from './OsvClient.js';
 import {PatternFinding, PatternScanner, PatternSeverity} from './PatternScanner.js';
 import {ScriptFinding, ScriptScanner, ScriptSeverity} from './ScriptScanner.js';
@@ -81,6 +86,12 @@ export type SecurityReport = {
      * derived purely from `scriptFindings`, no I/O.
      */
     ignoreScripts: IgnoreScriptsFinding;
+    /**
+     * Typosquat / homoglyph classification. Always present — pure
+     * derivation from the package name against a curated popular
+     * list, no I/O.
+     */
+    typosquat: TyposquatFinding;
 };
 
 /**
@@ -119,6 +130,7 @@ export type HeuristicsBatchEntry = {
     provenance: ProvenanceSummary;
     freshness: FreshnessSummary;
     cadence: CadenceSummary;
+    typosquat: TyposquatSummary;
 };
 
 /**
@@ -200,6 +212,7 @@ export class SecurityScanner {
         });
         const cadence = CadenceScanner.classify(reg?.time);
         const ignoreScripts = IgnoreScriptsScanner.classify(scriptFindings);
+        const typosquat = TyposquatScanner.classify(name);
 
         return {
             name,
@@ -214,7 +227,8 @@ export class SecurityScanner {
             provenance,
             freshness,
             cadence,
-            ignoreScripts
+            ignoreScripts,
+            typosquat
         };
     }
 
@@ -310,7 +324,8 @@ export class SecurityScanner {
                     ),
                     cadence: SecurityScanner._cadenceSummary(
                         pkg.name, pkg.version, reg?.time
-                    )
+                    ),
+                    typosquat: SecurityScanner._typosquatSummary(pkg.name, pkg.version)
                 };
             }
         };
@@ -338,6 +353,20 @@ export class SecurityScanner {
             level: finding?.level ?? null,
             packageAgeDays: finding?.packageAgeDays ?? null,
             maintainerAgeDays: finding?.maintainerAgeDays ?? null
+        };
+    }
+
+    private static _typosquatSummary(
+        name: string,
+        version: string
+    ): TyposquatSummary {
+        const finding = TyposquatScanner.classify(name);
+        return {
+            name,
+            version,
+            level: finding.level,
+            closestMatch: finding.closestMatch,
+            hasConfusables: finding.hasConfusables
         };
     }
 

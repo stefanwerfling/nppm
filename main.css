@@ -1055,6 +1055,32 @@ html, body {
     background: rgba(140, 80, 80, 0.6);
 }
 
+.matrix-badge-typosquat {
+    margin-left: 6px;
+    cursor: pointer;
+}
+
+.matrix-badge-typosquat-warn {
+    background: rgba(220, 130, 60, 0.35);
+    color: #ffc18a;
+    border: 1px solid rgba(220, 130, 60, 0.7);
+}
+
+.matrix-badge-typosquat-warn:hover {
+    background: rgba(220, 130, 60, 0.55);
+}
+
+.matrix-badge-typosquat-risk {
+    background: rgba(232, 90, 90, 0.5);
+    color: #fff0f0;
+    border: 1px solid rgba(232, 90, 90, 0.9);
+    font-weight: 700;
+}
+
+.matrix-badge-typosquat-risk:hover {
+    background: rgba(232, 90, 90, 0.7);
+}
+
 .pdp-ignore {
     border-left: 3px solid;
     padding: 6px 10px;

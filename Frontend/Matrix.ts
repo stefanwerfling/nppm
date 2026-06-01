@@ -11,6 +11,7 @@ import {MaintainerSeverity, MaintainerSummary} from '../Security/MaintainerScann
 import {PatternSeverity} from '../Security/PatternScanner.js';
 import {ProvenanceLevel, ProvenanceSummary} from '../Security/ProvenanceScanner.js';
 import {ScriptSeverity} from '../Security/ScriptScanner.js';
+import {TyposquatLevel, TyposquatSummary} from '../Security/TyposquatScanner.js';
 import {PatternSummary, ScriptSummary} from '../Security/SecurityScanner.js';
 import {Api} from './Api.js';
 import {I18n} from './I18n.js';
@@ -106,6 +107,13 @@ const CADENCE_WEIGHT: Record<CadenceLevel, number> = {
     [CadenceLevel.risk]: 12
 };
 
+const TYPOSQUAT_WEIGHT: Record<TyposquatLevel, number> = {
+    [TyposquatLevel.exact]: 0,
+    [TyposquatLevel.unrelated]: 0,
+    [TyposquatLevel.warn]: 10,
+    [TyposquatLevel.risk]: 35
+};
+
 /**
  * Persisted UI state — keeps filter, sort, and search across reloads
  * via localStorage. Stored as one JSON blob so we can extend later
@@ -154,6 +162,7 @@ export class Matrix {
     private _provenanceByName: Map<string, ProvenanceSummary> = new Map();
     private _freshnessByName: Map<string, FreshnessSummary> = new Map();
     private _cadenceByName: Map<string, CadenceSummary> = new Map();
+    private _typosquatByName: Map<string, TyposquatSummary> = new Map();
     // Per-name aggregated integrity status, loaded once after `setData`.
     // Missing key means "not yet asked" or "no finding"; present key
     // carries the worst severity any project's lockfile reported.
@@ -215,7 +224,8 @@ export class Matrix {
         maintainer: MaintainerSummary|undefined,
         integrity: ApiMatrixIntegrityEntry|undefined,
         freshness: FreshnessSummary|undefined,
-        cadence: CadenceSummary|undefined
+        cadence: CadenceSummary|undefined,
+        typosquat: TyposquatSummary|undefined
     ): number {
         let score = 0;
         if (vulnIds && vulnIds.length > 0) {
@@ -246,6 +256,9 @@ export class Matrix {
         }
         if (cadence && cadence.level !== null) {
             score += CADENCE_WEIGHT[cadence.level];
+        }
+        if (typosquat && typosquat.level !== null) {
+            score += TYPOSQUAT_WEIGHT[typosquat.level];
         }
         return score;
     }
@@ -290,6 +303,7 @@ export class Matrix {
         this._provenanceByName = new Map();
         this._freshnessByName = new Map();
         this._cadenceByName = new Map();
+        this._typosquatByName = new Map();
         this._integrityByName = new Map();
         this._render();
 
@@ -381,6 +395,7 @@ export class Matrix {
                 this._provenanceByName.set(entry.name, entry.provenance);
                 this._freshnessByName.set(entry.name, entry.freshness);
                 this._cadenceByName.set(entry.name, entry.cadence);
+                this._typosquatByName.set(entry.name, entry.typosquat);
                 if (entry.scripts.maxSeverity !== null
                     || entry.patterns.maxSeverity !== null
                     || entry.binaries.maxSeverity !== null
@@ -391,7 +406,9 @@ export class Matrix {
                     || entry.freshness.level === FreshnessLevel.risk
                     || entry.freshness.level === FreshnessLevel.warn
                     || entry.cadence.level === CadenceLevel.risk
-                    || entry.cadence.level === CadenceLevel.warn) {
+                    || entry.cadence.level === CadenceLevel.warn
+                    || entry.typosquat.level === TyposquatLevel.risk
+                    || entry.typosquat.level === TyposquatLevel.warn) {
                     anyHit = true;
                 }
             }
@@ -784,6 +801,26 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
+        // Typosquat badge — render warn (distance 2) + risk
+        // (distance 1 OR Unicode confusables). Exact + unrelated
+        // are silent; almost every package name lands there so a
+        // badge would be useless noise.
+        const typosquat = this._typosquatByName.get(row.name);
+        if (typosquat && (typosquat.level === TyposquatLevel.risk
+                          || typosquat.level === TyposquatLevel.warn)) {
+            const badge = document.createElement('span');
+            badge.className = `matrix-badge matrix-badge-typosquat matrix-badge-typosquat-${typosquat.level}`;
+            badge.textContent = typosquat.level === TyposquatLevel.risk ? 'SQUAT!' : 'SQUAT?';
+            badge.title = Matrix._typosquatTooltip(typosquat);
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (row.latest) {
+                    this._onSecurityClick?.(row.name, row.latest);
+                }
+            });
+            nameCell.appendChild(badge);
+        }
+
         tr.appendChild(nameCell);
 
         for (const project of this._data!.projects) {
@@ -897,7 +934,8 @@ export class Matrix {
             this._maintainersByName.get(row.name),
             this._integrityByName.get(row.name),
             this._freshnessByName.get(row.name),
-            this._cadenceByName.get(row.name)
+            this._cadenceByName.get(row.name),
+            this._typosquatByName.get(row.name)
         );
     }
 
@@ -1089,6 +1127,18 @@ export class Matrix {
      * without a `time` map) — in that case the badge wouldn't
      * render at all, but the helper stays defensive.
      */
+    private static _typosquatTooltip(summary: TyposquatSummary): string {
+        if (summary.hasConfusables) {
+            return summary.closestMatch
+                ? I18n.t('Contains non-ASCII characters and resembles popular "{name}"', {name: summary.closestMatch})
+                : I18n.t('Contains non-ASCII characters — npm names are ASCII-only');
+        }
+        if (summary.closestMatch) {
+            return I18n.t('Looks similar to popular "{name}" — possible typosquat', {name: summary.closestMatch});
+        }
+        return '';
+    }
+
     private static _cadenceTooltip(summary: CadenceSummary): string {
         const parts: string[] = [];
         if (summary.daysSinceLastRelease !== null) {

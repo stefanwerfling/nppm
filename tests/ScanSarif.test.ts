@@ -18,7 +18,8 @@ function heuristic(name: string, version: string): HeuristicsBatchEntry {
         license: {name, version, spdx: 'MIT', severity: LicenseSeverity.permissive},
         provenance: {name, version, level: null},
         freshness: {name, version, level: null, packageAgeDays: null, maintainerAgeDays: null},
-        cadence: {name, version, level: null, daysSinceLastRelease: null, medianCadenceDays: null}
+        cadence: {name, version, level: null, daysSinceLastRelease: null, medianCadenceDays: null},
+        typosquat: {name, version, level: null, closestMatch: null, hasConfusables: false}
     };
 }
 

@@ -11,6 +11,7 @@ import {LicenseFinding, LicenseSeverity} from '../Security/LicenseScanner.js';
 import {CadenceFinding, CadenceLevel} from '../Security/CadenceScanner.js';
 import {FreshnessFinding, FreshnessLevel} from '../Security/FreshnessScanner.js';
 import {IgnoreScriptsFinding, IgnoreScriptsLevel} from '../Security/IgnoreScriptsScanner.js';
+import {TyposquatFinding, TyposquatLevel} from '../Security/TyposquatScanner.js';
 import {MaintainerFinding, MaintainerSeverity} from '../Security/MaintainerScanner.js';
 import {ProvenanceFinding, ProvenanceLevel} from '../Security/ProvenanceScanner.js';
 import {OsvVulnerability} from '../Security/OsvClient.js';
@@ -803,6 +804,68 @@ export class PackageDetailPanel {
         wrap.appendChild(this._renderProvenanceSection(report.provenance));
         wrap.appendChild(this._renderFreshnessSection(report.freshness));
         wrap.appendChild(this._renderCadenceSection(report.cadence));
+        wrap.appendChild(this._renderTyposquatSection(report.typosquat));
+        return wrap;
+    }
+
+    /**
+     * Typosquat / homoglyph section — silent when the verdict is
+     * `exact` or `unrelated` (every legit package lands there and a
+     * "✓ no typosquat suspected" line would be pure noise). For
+     * warn + risk we surface the closest popular match and the
+     * confusable flag explicitly.
+     */
+    private _renderTyposquatSection(finding: TyposquatFinding): HTMLElement {
+        if (finding.level === TyposquatLevel.exact
+            || finding.level === TyposquatLevel.unrelated) {
+            // Returning an empty <div> keeps the appendChild chain
+            // simple while contributing no visible content.
+            const empty = document.createElement('div');
+            empty.style.display = 'none';
+            return empty;
+        }
+
+        const wrap = document.createElement('div');
+        wrap.className = 'pdp-section';
+
+        const heading = document.createElement('div');
+        heading.className = 'pdp-section-head';
+        heading.textContent = I18n.t('Typosquat / homoglyph check');
+        wrap.appendChild(heading);
+
+        const card = document.createElement('div');
+        card.className = `pdp-script pdp-script-${finding.level === TyposquatLevel.risk ? 'risk' : 'warn'}`;
+
+        const head = document.createElement('div');
+        head.className = 'pdp-script-head';
+        const sev = document.createElement('span');
+        sev.className = `pdp-sev pdp-sev-${finding.level === TyposquatLevel.risk ? 'risk' : 'warn'}`;
+        sev.textContent = finding.level === TyposquatLevel.risk ? 'SQUAT!' : 'SQUAT?';
+        head.appendChild(sev);
+
+        if (finding.closestMatch) {
+            const target = document.createElement('span');
+            target.className = 'pdp-script-hook';
+            target.textContent = `${I18n.t('closest popular')}: ${finding.closestMatch}` + (
+                finding.distance !== null ? ` (d=${finding.distance})` : ''
+            );
+            head.appendChild(target);
+        }
+        card.appendChild(head);
+
+        if (finding.hasConfusables) {
+            const flag = document.createElement('div');
+            flag.className = 'pdp-script-reason';
+            flag.textContent = I18n.t('Name contains non-ASCII characters — homoglyph attack');
+            card.appendChild(flag);
+        }
+
+        const reason = document.createElement('div');
+        reason.className = 'pdp-script-reason';
+        reason.textContent = finding.reason;
+        card.appendChild(reason);
+
+        wrap.appendChild(card);
         return wrap;
     }
 

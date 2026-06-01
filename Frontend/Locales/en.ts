@@ -285,5 +285,11 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     '--ignore-scripts: nothing to skip': '--ignore-scripts: nothing to skip',
     '--ignore-scripts: safe to use': '--ignore-scripts: safe to use',
     '--ignore-scripts: NOT safe — package needs the hook': '--ignore-scripts: NOT safe — package needs the hook',
-    '--ignore-scripts: STRONGLY recommended': '--ignore-scripts: STRONGLY recommended'
+    '--ignore-scripts: STRONGLY recommended': '--ignore-scripts: STRONGLY recommended',
+    'Typosquat / homoglyph check': 'Typosquat / homoglyph check',
+    'closest popular': 'closest popular',
+    'Name contains non-ASCII characters — homoglyph attack': 'Name contains non-ASCII characters — homoglyph attack',
+    'Contains non-ASCII characters and resembles popular "{name}"': 'Contains non-ASCII characters and resembles popular "{name}"',
+    'Contains non-ASCII characters — npm names are ASCII-only': 'Contains non-ASCII characters — npm names are ASCII-only',
+    'Looks similar to popular "{name}" — possible typosquat': 'Looks similar to popular "{name}" — possible typosquat'
 };

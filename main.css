@@ -993,6 +993,18 @@ html, body {
     background: rgba(255, 140, 50, 0.65);
 }
 
+.matrix-badge-provenance {
+    background: rgba(80, 180, 120, 0.25);
+    color: #9bd8b3;
+    border: 1px solid rgba(80, 180, 120, 0.6);
+    margin-left: 6px;
+    cursor: pointer;
+}
+
+.matrix-badge-provenance:hover {
+    background: rgba(80, 180, 120, 0.45);
+}
+
 .matrix-badge-license {
     margin-left: 6px;
     cursor: pointer;
@@ -1407,6 +1419,24 @@ html, body {
     background: rgba(150, 150, 150, 0.18);
     color: var(--c-muted);
     border: 1px solid rgba(150, 150, 150, 0.4);
+}
+
+.pdp-prov-pill-provenance {
+    background: rgba(80, 180, 120, 0.2);
+    color: #6cd391;
+    border: 1px solid rgba(80, 180, 120, 0.5);
+}
+
+.pdp-prov-pill-signed {
+    background: rgba(150, 150, 150, 0.18);
+    color: var(--c-muted);
+    border: 1px solid rgba(150, 150, 150, 0.4);
+}
+
+.pdp-prov-pill-unsigned {
+    background: rgba(240, 180, 0, 0.18);
+    color: #f0b400;
+    border: 1px solid rgba(240, 180, 0, 0.4);
 }
 
 .pdp-script-body {

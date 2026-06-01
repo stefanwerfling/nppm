@@ -193,6 +193,64 @@ describe('Registry', () => {
         expect(pkg!.publishers).toBeUndefined();
     });
 
+    it('extracts dist.signatures + dist.attestations from a provenance-published version', async () => {
+        vi.stubGlobal('fetch', makeFetch({
+            'https://registry.example/proven': {
+                name: 'proven',
+                'dist-tags': {latest: '1.0.0'},
+                versions: {
+                    '1.0.0': {
+                        dist: {
+                            tarball: 'https://registry.example/proven/-/proven-1.0.0.tgz',
+                            integrity: 'sha512-abc',
+                            signatures: [{keyid: 'SHA256:k', sig: 'MEYC'}],
+                            attestations: {
+                                url: 'https://registry.example/-/npm/v1/attestations/proven@1.0.0',
+                                provenance: {predicateType: 'https://slsa.dev/provenance/v0.2'}
+                            }
+                        }
+                    }
+                }
+            }
+        }));
+
+        const cache = new JsonCache(dir, 60);
+        const r = new Registry('https://registry.example', cache);
+        const pkg = await r.fetchOne('proven');
+
+        const dist = pkg!.dist?.['1.0.0'];
+        expect(dist).toBeDefined();
+        expect(dist!.integrity).toBe('sha512-abc');
+        expect(dist!.signatures).toEqual([{keyid: 'SHA256:k', sig: 'MEYC'}]);
+        expect(dist!.attestations?.url).toMatch(/attestations\/proven/);
+        expect(dist!.attestations?.provenance?.predicateType).toBe('https://slsa.dev/provenance/v0.2');
+    });
+
+    it('omits signatures/attestations when the registry serves neither', async () => {
+        vi.stubGlobal('fetch', makeFetch({
+            'https://registry.example/bare': {
+                name: 'bare',
+                'dist-tags': {latest: '1.0.0'},
+                versions: {
+                    '1.0.0': {
+                        dist: {
+                            tarball: 'https://registry.example/bare/-/bare-1.0.0.tgz'
+                        }
+                    }
+                }
+            }
+        }));
+
+        const cache = new JsonCache(dir, 60);
+        const r = new Registry('https://registry.example', cache);
+        const pkg = await r.fetchOne('bare');
+
+        const dist = pkg!.dist?.['1.0.0'];
+        expect(dist).toBeDefined();
+        expect(dist!.signatures).toBeUndefined();
+        expect(dist!.attestations).toBeUndefined();
+    });
+
     it('sends Authorization header when configured', async () => {
         const fetchMock = vi.fn(async () => ({
             ok: true,

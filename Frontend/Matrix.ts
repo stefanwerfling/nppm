@@ -7,6 +7,7 @@ import {IntegritySeverity} from '../Security/IntegrityScanner.js';
 import {LicenseSeverity, LicenseSummary} from '../Security/LicenseScanner.js';
 import {MaintainerSeverity, MaintainerSummary} from '../Security/MaintainerScanner.js';
 import {PatternSeverity} from '../Security/PatternScanner.js';
+import {ProvenanceLevel, ProvenanceSummary} from '../Security/ProvenanceScanner.js';
 import {ScriptSeverity} from '../Security/ScriptScanner.js';
 import {PatternSummary, ScriptSummary} from '../Security/SecurityScanner.js';
 import {Api} from './Api.js';
@@ -136,6 +137,7 @@ export class Matrix {
     private _binariesByName: Map<string, BinarySummary> = new Map();
     private _maintainersByName: Map<string, MaintainerSummary> = new Map();
     private _licensesByName: Map<string, LicenseSummary> = new Map();
+    private _provenanceByName: Map<string, ProvenanceSummary> = new Map();
     // Per-name aggregated integrity status, loaded once after `setData`.
     // Missing key means "not yet asked" or "no finding"; present key
     // carries the worst severity any project's lockfile reported.
@@ -261,6 +263,7 @@ export class Matrix {
         this._binariesByName = new Map();
         this._maintainersByName = new Map();
         this._licensesByName = new Map();
+        this._provenanceByName = new Map();
         this._integrityByName = new Map();
         this._render();
 
@@ -349,12 +352,14 @@ export class Matrix {
                 this._binariesByName.set(entry.name, entry.binaries);
                 this._maintainersByName.set(entry.name, entry.maintainer);
                 this._licensesByName.set(entry.name, entry.license);
+                this._provenanceByName.set(entry.name, entry.provenance);
                 if (entry.scripts.maxSeverity !== null
                     || entry.patterns.maxSeverity !== null
                     || entry.binaries.maxSeverity !== null
                     || (entry.maintainer.severity !== null
                         && entry.maintainer.severity !== MaintainerSeverity.info)
-                    || Matrix._isLicenseNotable(entry.license.severity)) {
+                    || Matrix._isLicenseNotable(entry.license.severity)
+                    || entry.provenance.level === ProvenanceLevel.provenance) {
                     anyHit = true;
                 }
             }
@@ -677,6 +682,27 @@ export class Matrix {
             badge.className = 'matrix-badge matrix-badge-integrity';
             badge.textContent = 'INTEGRITY!';
             badge.title = I18n.t('{n} project(s) pin a tarball whose integrity differs from the registry', {n: integrity.riskCount});
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (row.latest) {
+                    this._onSecurityClick?.(row.name, row.latest);
+                }
+            });
+            nameCell.appendChild(badge);
+        }
+
+        // Provenance badge — *positive* signal, only rendered for
+        // `provenance`-level (Sigstore-anchored). `signed` is the
+        // npm baseline and rendering it would clutter every row;
+        // `unsigned` is too quiet to be actionable. The badge is
+        // green by convention since it answers "this build is
+        // verifiable" rather than warning of a risk.
+        const provenance = this._provenanceByName.get(row.name);
+        if (provenance && provenance.level === ProvenanceLevel.provenance) {
+            const badge = document.createElement('span');
+            badge.className = 'matrix-badge matrix-badge-provenance';
+            badge.textContent = 'PROV ✓';
+            badge.title = I18n.t('Latest version published with --provenance (Sigstore-anchored CI build attestation)');
             badge.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (row.latest) {

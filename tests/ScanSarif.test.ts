@@ -15,7 +15,8 @@ function heuristic(name: string, version: string): HeuristicsBatchEntry {
         patterns: {name, version, maxSeverity: null, count: 0},
         binaries: {name, version, maxSeverity: null, riskCount: 0, totalCount: 0},
         maintainer: {name, version, severity: null, publisher: null},
-        license: {name, version, spdx: 'MIT', severity: LicenseSeverity.permissive}
+        license: {name, version, spdx: 'MIT', severity: LicenseSeverity.permissive},
+        provenance: {name, version, level: null}
     };
 }
 

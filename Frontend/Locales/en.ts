@@ -258,5 +258,12 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     '{n} project(s) pin a tarball whose integrity differs from the registry': '{n} project(s) pin a tarball whose integrity differs from the registry',
     'Publisher account has 2FA enabled': 'Publisher account has 2FA enabled',
     'Publisher account has no 2FA — credential-theft would be enough to publish': 'Publisher account has no 2FA — credential-theft would be enough to publish',
-    'Registry did not disclose the publisher\'s 2FA state (typical on the public mirror)': 'Registry did not disclose the publisher\'s 2FA state (typical on the public mirror)'
+    'Registry did not disclose the publisher\'s 2FA state (typical on the public mirror)': 'Registry did not disclose the publisher\'s 2FA state (typical on the public mirror)',
+    'Provenance / Signing': 'Provenance / Signing',
+    'Latest version published with --provenance (Sigstore-anchored CI build attestation)': 'Latest version published with --provenance (Sigstore-anchored CI build attestation)',
+    'No registry record yet — try again once the cache warms.': 'No registry record yet — try again once the cache warms.',
+    '{n} registry signature(s)': '{n} registry signature(s)',
+    'Published with --provenance: Sigstore signs an SLSA attestation binding the tarball to a specific CI workflow + commit.': 'Published with --provenance: Sigstore signs an SLSA attestation binding the tarball to a specific CI workflow + commit.',
+    'Registry-signed only. The npm key proves the tarball came from npm — but not from any specific build job or repo.': 'Registry-signed only. The npm key proves the tarball came from npm — but not from any specific build job or repo.',
+    'No signature at all — typical for very old releases or non-npm mirrors that strip signatures.': 'No signature at all — typical for very old releases or non-npm mirrors that strip signatures.'
 };

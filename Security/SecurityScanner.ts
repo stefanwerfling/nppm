@@ -20,6 +20,11 @@ import {
     MaintainerSummary
 } from './MaintainerScanner.js';
 import {Npm2FaFetcher} from './Npm2FaFetcher.js';
+import {
+    ProvenanceFinding,
+    ProvenanceScanner,
+    ProvenanceSummary
+} from './ProvenanceScanner.js';
 import {OsvClient, OsvVulnerability} from './OsvClient.js';
 import {PatternFinding, PatternScanner, PatternSeverity} from './PatternScanner.js';
 import {ScriptFinding, ScriptScanner, ScriptSeverity} from './ScriptScanner.js';
@@ -40,6 +45,12 @@ export type SecurityReport = {
     binaryFindings: BinaryFinding[];
     maintainer: MaintainerFinding|null;
     license: LicenseFinding;
+    /**
+     * `null` when the registry record for `name@version` is missing
+     * — distinct from `level: 'unsigned'` which means "we looked, no
+     * signatures or attestation".
+     */
+    provenance: ProvenanceFinding|null;
 };
 
 /**
@@ -75,6 +86,7 @@ export type HeuristicsBatchEntry = {
     binaries: BinarySummary;
     maintainer: MaintainerSummary;
     license: LicenseSummary;
+    provenance: ProvenanceSummary;
 };
 
 /**
@@ -149,6 +161,7 @@ export class SecurityScanner {
         // releases) over the packument license (top-level, version-
         // agnostic). Both fall back to `null` if neither is present.
         const spdx = fingerprint?.manifest?.license ?? reg?.license ?? null;
+        const provenance = ProvenanceScanner.classify(reg?.dist?.[version]);
 
         return {
             name,
@@ -159,7 +172,8 @@ export class SecurityScanner {
             patternFindings,
             binaryFindings,
             maintainer,
-            license: this._license.classify(spdx)
+            license: this._license.classify(spdx),
+            provenance
         };
     }
 
@@ -241,6 +255,11 @@ export class SecurityScanner {
                         version: pkg.version,
                         spdx: licenseFinding.spdx,
                         severity: licenseFinding.severity
+                    },
+                    provenance: {
+                        name: pkg.name,
+                        version: pkg.version,
+                        level: ProvenanceScanner.classify(reg?.dist?.[pkg.version])?.level ?? null
                     }
                 };
             }

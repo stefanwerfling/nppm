@@ -19,10 +19,25 @@ export type RegistryPublisher = {
  * for very old ones). `IntegrityScanner` compares these to whatever
  * the project's lockfile has pinned to detect mirror-hijack /
  * dependency-confusion / lockfile-tampering.
+ *
+ * `signatures` is the npm-registry-key signature array — present on
+ * every modern publish; absence is a signal of a very old release.
+ * `attestations` only appears when the maintainer published with
+ * `--provenance`: it points to a Sigstore-signed SLSA provenance
+ * bundle that ties the tarball to a specific CI build job. The
+ * `ProvenanceScanner` reads both to classify each version as
+ * `provenance` / `signed` / `unsigned`.
  */
 export type RegistryDist = {
     tarball: string;
     integrity?: string;
+    signatures?: {keyid: string; sig: string}[];
+    attestations?: {
+        url: string;
+        provenance?: {
+            predicateType?: string;
+        };
+    };
 };
 
 /**
@@ -276,13 +291,64 @@ export class Registry {
             if (typeof d.tarball !== 'string' || d.tarball.length === 0) {
                 continue;
             }
-            out[version] = typeof d.integrity === 'string' && d.integrity.length > 0
-                ? {tarball: d.tarball, integrity: d.integrity}
-                : {tarball: d.tarball};
+            const distEntry: RegistryDist = {tarball: d.tarball};
+            if (typeof d.integrity === 'string' && d.integrity.length > 0) {
+                distEntry.integrity = d.integrity;
+            }
+            const sigs = Registry._extractSignatures(
+                (d as {signatures?: unknown}).signatures
+            );
+            if (sigs) {
+                distEntry.signatures = sigs;
+            }
+            const att = Registry._extractAttestations(
+                (d as {attestations?: unknown}).attestations
+            );
+            if (att) {
+                distEntry.attestations = att;
+            }
+            out[version] = distEntry;
             any = true;
         }
 
         return any ? out : undefined;
+    }
+
+    private static _extractSignatures(raw: unknown): {keyid: string; sig: string}[]|undefined {
+        if (!Array.isArray(raw) || raw.length === 0) {
+            return undefined;
+        }
+        const out: {keyid: string; sig: string}[] = [];
+        for (const item of raw) {
+            if (!item || typeof item !== 'object') {
+                continue;
+            }
+            const o = item as {keyid?: unknown; sig?: unknown};
+            if (typeof o.keyid === 'string' && typeof o.sig === 'string') {
+                out.push({keyid: o.keyid, sig: o.sig});
+            }
+        }
+        return out.length > 0 ? out : undefined;
+    }
+
+    private static _extractAttestations(raw: unknown): RegistryDist['attestations']|undefined {
+        if (!raw || typeof raw !== 'object') {
+            return undefined;
+        }
+        const o = raw as {url?: unknown; provenance?: unknown};
+        if (typeof o.url !== 'string' || o.url.length === 0) {
+            return undefined;
+        }
+        const out: NonNullable<RegistryDist['attestations']> = {url: o.url};
+        if (o.provenance && typeof o.provenance === 'object') {
+            const p = o.provenance as {predicateType?: unknown};
+            if (typeof p.predicateType === 'string' && p.predicateType.length > 0) {
+                out.provenance = {predicateType: p.predicateType};
+            } else {
+                out.provenance = {};
+            }
+        }
+        return out;
     }
 
     private static _extractPublishers(versions: unknown): Record<string, RegistryPublisher>|undefined {

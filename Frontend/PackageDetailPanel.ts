@@ -9,6 +9,7 @@ import {BinaryFinding, BinarySeverity} from '../Security/BinaryScanner.js';
 import {ChurnFinding, ChurnSeverity} from '../Security/ChurnScanner.js';
 import {LicenseFinding, LicenseSeverity} from '../Security/LicenseScanner.js';
 import {MaintainerFinding, MaintainerSeverity} from '../Security/MaintainerScanner.js';
+import {ProvenanceFinding, ProvenanceLevel} from '../Security/ProvenanceScanner.js';
 import {OsvVulnerability} from '../Security/OsvClient.js';
 import {PatternFinding, PatternSeverity} from '../Security/PatternScanner.js';
 import {ScriptFinding, ScriptSeverity} from '../Security/ScriptScanner.js';
@@ -795,7 +796,100 @@ export class PackageDetailPanel {
         wrap.appendChild(this._renderBinariesSection(report.binaryFindings));
         wrap.appendChild(this._renderChurnSection(report.churn));
         wrap.appendChild(this._renderMaintainerSection(report.maintainer));
+        wrap.appendChild(this._renderProvenanceSection(report.provenance));
         return wrap;
+    }
+
+    /**
+     * Provenance / signing section. Three states map to three pills:
+     *   - `provenance`: green ✓ — Sigstore-anchored, attestation URL
+     *     surfaced as a link so the user can verify themselves
+     *   - `signed`: grey baseline — npm-registry signature only
+     *   - `unsigned`: faint info — no signature at all (very old or
+     *     non-npm mirror)
+     * `null` (no registry data) renders nothing at all so the section
+     * doesn't become "we don't know" noise on cold cache.
+     */
+    private _renderProvenanceSection(finding: ProvenanceFinding|null): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdp-section';
+
+        const heading = document.createElement('div');
+        heading.className = 'pdp-section-head';
+        heading.textContent = I18n.t('Provenance / Signing');
+        wrap.appendChild(heading);
+
+        if (!finding) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-placeholder';
+            empty.textContent = I18n.t('No registry record yet — try again once the cache warms.');
+            wrap.appendChild(empty);
+            return wrap;
+        }
+
+        const card = document.createElement('div');
+        card.className = `pdp-script pdp-prov-${finding.level}`;
+
+        const head = document.createElement('div');
+        head.className = 'pdp-script-head';
+
+        const pill = document.createElement('span');
+        pill.className = `pdp-tfa pdp-prov-pill-${finding.level}`;
+        pill.textContent = PackageDetailPanel._provenancePillLabel(finding.level);
+        head.appendChild(pill);
+
+        if (finding.signatureCount > 0) {
+            const sig = document.createElement('span');
+            sig.className = 'pdp-script-reason';
+            sig.textContent = I18n.t('{n} registry signature(s)', {n: finding.signatureCount});
+            head.appendChild(sig);
+        }
+
+        card.appendChild(head);
+
+        const reason = document.createElement('div');
+        reason.className = 'pdp-script-reason';
+        reason.textContent = PackageDetailPanel._provenanceReason(finding.level);
+        card.appendChild(reason);
+
+        if (finding.attestationUrl) {
+            const link = document.createElement('a');
+            link.className = 'pdp-script-body';
+            link.href = finding.attestationUrl;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = finding.attestationUrl;
+            card.appendChild(link);
+        }
+
+        if (finding.predicateType) {
+            const pred = document.createElement('code');
+            pred.className = 'pdp-script-body';
+            pred.textContent = `predicateType: ${finding.predicateType}`;
+            card.appendChild(pred);
+        }
+
+        wrap.appendChild(card);
+        return wrap;
+    }
+
+    private static _provenancePillLabel(level: ProvenanceLevel): string {
+        switch (level) {
+            case ProvenanceLevel.provenance: return 'PROV ✓';
+            case ProvenanceLevel.signed: return 'SIGNED';
+            case ProvenanceLevel.unsigned: return 'UNSIGNED';
+        }
+    }
+
+    private static _provenanceReason(level: ProvenanceLevel): string {
+        switch (level) {
+            case ProvenanceLevel.provenance:
+                return I18n.t('Published with --provenance: Sigstore signs an SLSA attestation binding the tarball to a specific CI workflow + commit.');
+            case ProvenanceLevel.signed:
+                return I18n.t('Registry-signed only. The npm key proves the tarball came from npm — but not from any specific build job or repo.');
+            case ProvenanceLevel.unsigned:
+                return I18n.t('No signature at all — typical for very old releases or non-npm mirrors that strip signatures.');
+        }
     }
 
     private static _supplyChainRisk(

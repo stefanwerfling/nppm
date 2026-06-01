@@ -249,5 +249,12 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     '{n} project(s) pin a tarball whose integrity differs from the registry': '{n} Projekt(e) pinnen einen Tarball, dessen Integrity vom Registry abweicht',
     'Publisher account has 2FA enabled': 'Publisher-Konto hat 2FA aktiviert',
     'Publisher account has no 2FA — credential-theft would be enough to publish': 'Publisher-Konto hat kein 2FA — Credential-Theft genügt zum Publishen',
-    'Registry did not disclose the publisher\'s 2FA state (typical on the public mirror)': 'Registry verrät den 2FA-Status des Publishers nicht (Standardverhalten beim öffentlichen Mirror)'
+    'Registry did not disclose the publisher\'s 2FA state (typical on the public mirror)': 'Registry verrät den 2FA-Status des Publishers nicht (Standardverhalten beim öffentlichen Mirror)',
+    'Provenance / Signing': 'Provenance / Signatur',
+    'Latest version published with --provenance (Sigstore-anchored CI build attestation)': 'Latest-Version wurde mit --provenance veröffentlicht (Sigstore-verankerte CI-Build-Attestation)',
+    'No registry record yet — try again once the cache warms.': 'Noch kein Registry-Eintrag — bitte später erneut versuchen (Cache muss erst warm werden).',
+    '{n} registry signature(s)': '{n} Registry-Signatur(en)',
+    'Published with --provenance: Sigstore signs an SLSA attestation binding the tarball to a specific CI workflow + commit.': 'Mit --provenance veröffentlicht: Sigstore signiert eine SLSA-Attestation, die den Tarball an einen konkreten CI-Workflow + Commit bindet.',
+    'Registry-signed only. The npm key proves the tarball came from npm — but not from any specific build job or repo.': 'Nur Registry-signiert. Der npm-Schlüssel belegt, dass der Tarball von npm kommt — aber nicht aus einem bestimmten Build oder Repo.',
+    'No signature at all — typical for very old releases or non-npm mirrors that strip signatures.': 'Keine Signatur — typisch für sehr alte Releases oder non-npm-Mirrors, die Signaturen entfernen.'
 };

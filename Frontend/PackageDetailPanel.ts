@@ -8,6 +8,7 @@ import {Release, ReleasesResponse} from '../Releases/Releases.js';
 import {BinaryFinding, BinarySeverity} from '../Security/BinaryScanner.js';
 import {ChurnFinding, ChurnSeverity} from '../Security/ChurnScanner.js';
 import {LicenseFinding, LicenseSeverity} from '../Security/LicenseScanner.js';
+import {CadenceFinding, CadenceLevel} from '../Security/CadenceScanner.js';
 import {FreshnessFinding, FreshnessLevel} from '../Security/FreshnessScanner.js';
 import {MaintainerFinding, MaintainerSeverity} from '../Security/MaintainerScanner.js';
 import {ProvenanceFinding, ProvenanceLevel} from '../Security/ProvenanceScanner.js';
@@ -799,7 +800,80 @@ export class PackageDetailPanel {
         wrap.appendChild(this._renderMaintainerSection(report.maintainer));
         wrap.appendChild(this._renderProvenanceSection(report.provenance));
         wrap.appendChild(this._renderFreshnessSection(report.freshness));
+        wrap.appendChild(this._renderCadenceSection(report.cadence));
         return wrap;
+    }
+
+    /**
+     * Release-cadence section — answers "is this package still
+     * alive?". Renders last release age, the median gap between
+     * releases over the recent window, and a traffic-light pill.
+     */
+    private _renderCadenceSection(finding: CadenceFinding|null): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdp-section';
+
+        const heading = document.createElement('div');
+        heading.className = 'pdp-section-head';
+        heading.textContent = I18n.t('Release cadence');
+        wrap.appendChild(heading);
+
+        if (!finding) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-placeholder';
+            empty.textContent = I18n.t('No release-history data — registry packument lacks a time map.');
+            wrap.appendChild(empty);
+            return wrap;
+        }
+
+        const card = document.createElement('div');
+        card.className = `pdp-script pdp-script-${finding.level}`;
+
+        const head = document.createElement('div');
+        head.className = 'pdp-script-head';
+        const sev = document.createElement('span');
+        sev.className = `pdp-sev pdp-sev-${finding.level}`;
+        sev.textContent = PackageDetailPanel._cadenceSeverityLabel(finding.level);
+        head.appendChild(sev);
+        card.appendChild(head);
+
+        const body = document.createElement('div');
+        body.className = 'pdp-fresh-body';
+
+        const lastLine = document.createElement('div');
+        lastLine.className = 'pdp-fresh-line';
+        lastLine.textContent = finding.daysSinceLastRelease !== null
+            ? I18n.t('Last release: {n} days ago', {n: finding.daysSinceLastRelease})
+            : I18n.t('Last release: unknown');
+        body.appendChild(lastLine);
+
+        const cadenceLine = document.createElement('div');
+        cadenceLine.className = 'pdp-fresh-line';
+        cadenceLine.textContent = finding.medianCadenceDays !== null
+            ? I18n.t('Median cadence: every {n} days over {count} releases', {
+                n: finding.medianCadenceDays,
+                count: finding.releaseCount
+            })
+            : I18n.t('Median cadence: not enough releases to compute');
+        body.appendChild(cadenceLine);
+
+        card.appendChild(body);
+
+        const reason = document.createElement('div');
+        reason.className = 'pdp-script-reason';
+        reason.textContent = finding.reason;
+        card.appendChild(reason);
+
+        wrap.appendChild(card);
+        return wrap;
+    }
+
+    private static _cadenceSeverityLabel(level: CadenceLevel): string {
+        switch (level) {
+            case CadenceLevel.info: return 'ALIVE';
+            case CadenceLevel.warn: return 'STALE';
+            case CadenceLevel.risk: return 'STALE!';
+        }
     }
 
     /**

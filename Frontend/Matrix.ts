@@ -3,6 +3,7 @@ import {ConfigProjectType} from '../Config/Config.js';
 import {DependencyType} from '../Project/PackageManifest.js';
 import {MatrixResponse, MatrixRow, MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
 import {BinarySeverity, BinarySummary} from '../Security/BinaryScanner.js';
+import {CadenceLevel, CadenceSummary} from '../Security/CadenceScanner.js';
 import {FreshnessLevel, FreshnessSummary} from '../Security/FreshnessScanner.js';
 import {IntegritySeverity} from '../Security/IntegrityScanner.js';
 import {LicenseSeverity, LicenseSummary} from '../Security/LicenseScanner.js';
@@ -99,6 +100,12 @@ const FRESHNESS_WEIGHT: Record<FreshnessLevel, number> = {
     [FreshnessLevel.risk]: 20
 };
 
+const CADENCE_WEIGHT: Record<CadenceLevel, number> = {
+    [CadenceLevel.info]: 0,
+    [CadenceLevel.warn]: 3,
+    [CadenceLevel.risk]: 12
+};
+
 /**
  * Persisted UI state — keeps filter, sort, and search across reloads
  * via localStorage. Stored as one JSON blob so we can extend later
@@ -146,6 +153,7 @@ export class Matrix {
     private _licensesByName: Map<string, LicenseSummary> = new Map();
     private _provenanceByName: Map<string, ProvenanceSummary> = new Map();
     private _freshnessByName: Map<string, FreshnessSummary> = new Map();
+    private _cadenceByName: Map<string, CadenceSummary> = new Map();
     // Per-name aggregated integrity status, loaded once after `setData`.
     // Missing key means "not yet asked" or "no finding"; present key
     // carries the worst severity any project's lockfile reported.
@@ -206,7 +214,8 @@ export class Matrix {
         binaries: BinarySummary|undefined,
         maintainer: MaintainerSummary|undefined,
         integrity: ApiMatrixIntegrityEntry|undefined,
-        freshness: FreshnessSummary|undefined
+        freshness: FreshnessSummary|undefined,
+        cadence: CadenceSummary|undefined
     ): number {
         let score = 0;
         if (vulnIds && vulnIds.length > 0) {
@@ -234,6 +243,9 @@ export class Matrix {
         }
         if (freshness && freshness.level !== null) {
             score += FRESHNESS_WEIGHT[freshness.level];
+        }
+        if (cadence && cadence.level !== null) {
+            score += CADENCE_WEIGHT[cadence.level];
         }
         return score;
     }
@@ -277,6 +289,7 @@ export class Matrix {
         this._licensesByName = new Map();
         this._provenanceByName = new Map();
         this._freshnessByName = new Map();
+        this._cadenceByName = new Map();
         this._integrityByName = new Map();
         this._render();
 
@@ -367,6 +380,7 @@ export class Matrix {
                 this._licensesByName.set(entry.name, entry.license);
                 this._provenanceByName.set(entry.name, entry.provenance);
                 this._freshnessByName.set(entry.name, entry.freshness);
+                this._cadenceByName.set(entry.name, entry.cadence);
                 if (entry.scripts.maxSeverity !== null
                     || entry.patterns.maxSeverity !== null
                     || entry.binaries.maxSeverity !== null
@@ -375,7 +389,9 @@ export class Matrix {
                     || Matrix._isLicenseNotable(entry.license.severity)
                     || entry.provenance.level === ProvenanceLevel.provenance
                     || entry.freshness.level === FreshnessLevel.risk
-                    || entry.freshness.level === FreshnessLevel.warn) {
+                    || entry.freshness.level === FreshnessLevel.warn
+                    || entry.cadence.level === CadenceLevel.risk
+                    || entry.cadence.level === CadenceLevel.warn) {
                     anyHit = true;
                 }
             }
@@ -748,6 +764,26 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
+        // Cadence badge — "is this package still alive?". Render
+        // warn (slowing, yellow) and risk (likely abandoned, red);
+        // info is silent to keep noise down. Threshold defaults:
+        // 180d warn, 730d risk.
+        const cadence = this._cadenceByName.get(row.name);
+        if (cadence && (cadence.level === CadenceLevel.risk
+                        || cadence.level === CadenceLevel.warn)) {
+            const badge = document.createElement('span');
+            badge.className = `matrix-badge matrix-badge-cadence matrix-badge-cadence-${cadence.level}`;
+            badge.textContent = cadence.level === CadenceLevel.risk ? 'STALE!' : 'STALE';
+            badge.title = Matrix._cadenceTooltip(cadence);
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (row.latest) {
+                    this._onSecurityClick?.(row.name, row.latest);
+                }
+            });
+            nameCell.appendChild(badge);
+        }
+
         tr.appendChild(nameCell);
 
         for (const project of this._data!.projects) {
@@ -860,7 +896,8 @@ export class Matrix {
             this._binariesByName.get(row.name),
             this._maintainersByName.get(row.name),
             this._integrityByName.get(row.name),
-            this._freshnessByName.get(row.name)
+            this._freshnessByName.get(row.name),
+            this._cadenceByName.get(row.name)
         );
     }
 
@@ -1046,6 +1083,23 @@ export class Matrix {
      * 401s on the public mirror) — the package-age fragment alone
      * still reads cleanly.
      */
+    /**
+     * Build the cadence-badge tooltip from whatever signals were
+     * resolved. Both numbers may be missing (very old packument
+     * without a `time` map) — in that case the badge wouldn't
+     * render at all, but the helper stays defensive.
+     */
+    private static _cadenceTooltip(summary: CadenceSummary): string {
+        const parts: string[] = [];
+        if (summary.daysSinceLastRelease !== null) {
+            parts.push(I18n.t('Last release {n} days ago', {n: summary.daysSinceLastRelease}));
+        }
+        if (summary.medianCadenceDays !== null) {
+            parts.push(I18n.t('median cadence every {n} days', {n: summary.medianCadenceDays}));
+        }
+        return parts.join(' · ');
+    }
+
     private static _freshnessTooltip(summary: FreshnessSummary): string {
         const parts: string[] = [];
         if (summary.packageAgeDays !== null) {

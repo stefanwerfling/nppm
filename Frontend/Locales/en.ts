@@ -273,5 +273,13 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     'Package: first published {n} days ago': 'Package: first published {n} days ago',
     'Package: publish date unknown': 'Package: publish date unknown',
     'Publisher account: {n} days old': 'Publisher account: {n} days old',
-    'Publisher account: age unknown (registry did not disclose)': 'Publisher account: age unknown (registry did not disclose)'
+    'Publisher account: age unknown (registry did not disclose)': 'Publisher account: age unknown (registry did not disclose)',
+    'Release cadence': 'Release cadence',
+    'No release-history data — registry packument lacks a time map.': 'No release-history data — registry packument lacks a time map.',
+    'Last release: {n} days ago': 'Last release: {n} days ago',
+    'Last release: unknown': 'Last release: unknown',
+    'Median cadence: every {n} days over {count} releases': 'Median cadence: every {n} days over {count} releases',
+    'Median cadence: not enough releases to compute': 'Median cadence: not enough releases to compute',
+    'Last release {n} days ago': 'Last release {n} days ago',
+    'median cadence every {n} days': 'median cadence every {n} days'
 };

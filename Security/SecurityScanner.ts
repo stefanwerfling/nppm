@@ -20,6 +20,11 @@ import {
     MaintainerSummary
 } from './MaintainerScanner.js';
 import {
+    CadenceFinding,
+    CadenceScanner,
+    CadenceSummary
+} from './CadenceScanner.js';
+import {
     FreshnessFinding,
     FreshnessScanner,
     FreshnessSummary
@@ -61,6 +66,11 @@ export type SecurityReport = {
      * the publisher's account-creation date could be resolved.
      */
     freshness: FreshnessFinding|null;
+    /**
+     * Release-cadence classifier. `null` when the registry packument
+     * has no `time` map to read.
+     */
+    cadence: CadenceFinding|null;
 };
 
 /**
@@ -98,6 +108,7 @@ export type HeuristicsBatchEntry = {
     license: LicenseSummary;
     provenance: ProvenanceSummary;
     freshness: FreshnessSummary;
+    cadence: CadenceSummary;
 };
 
 /**
@@ -177,6 +188,7 @@ export class SecurityScanner {
             firstPublishedAt: reg?.time?.created ?? null,
             maintainerCreatedAt: maintainer?.currentPublisherCreatedAt ?? null
         });
+        const cadence = CadenceScanner.classify(reg?.time);
 
         return {
             name,
@@ -189,7 +201,8 @@ export class SecurityScanner {
             maintainer,
             license: this._license.classify(spdx),
             provenance,
-            freshness
+            freshness,
+            cadence
         };
     }
 
@@ -282,6 +295,9 @@ export class SecurityScanner {
                         pkg.name, pkg.version,
                         reg?.time?.created ?? null,
                         maintainer?.currentPublisherCreatedAt ?? null
+                    ),
+                    cadence: SecurityScanner._cadenceSummary(
+                        pkg.name, pkg.version, reg?.time
                     )
                 };
             }
@@ -310,6 +326,21 @@ export class SecurityScanner {
             level: finding?.level ?? null,
             packageAgeDays: finding?.packageAgeDays ?? null,
             maintainerAgeDays: finding?.maintainerAgeDays ?? null
+        };
+    }
+
+    private static _cadenceSummary(
+        name: string,
+        version: string,
+        timeMap: Record<string, string>|undefined
+    ): CadenceSummary {
+        const finding = CadenceScanner.classify(timeMap);
+        return {
+            name,
+            version,
+            level: finding?.level ?? null,
+            daysSinceLastRelease: finding?.daysSinceLastRelease ?? null,
+            medianCadenceDays: finding?.medianCadenceDays ?? null
         };
     }
 

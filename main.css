@@ -1030,6 +1030,31 @@ html, body {
     background: rgba(232, 90, 90, 0.55);
 }
 
+.matrix-badge-cadence {
+    margin-left: 6px;
+    cursor: pointer;
+}
+
+.matrix-badge-cadence-warn {
+    background: rgba(160, 130, 60, 0.3);
+    color: #d8c180;
+    border: 1px solid rgba(160, 130, 60, 0.6);
+}
+
+.matrix-badge-cadence-warn:hover {
+    background: rgba(160, 130, 60, 0.5);
+}
+
+.matrix-badge-cadence-risk {
+    background: rgba(140, 80, 80, 0.4);
+    color: #e8a4a4;
+    border: 1px solid rgba(140, 80, 80, 0.75);
+}
+
+.matrix-badge-cadence-risk:hover {
+    background: rgba(140, 80, 80, 0.6);
+}
+
 .pdp-fresh-body {
     font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
     color: var(--c-text);

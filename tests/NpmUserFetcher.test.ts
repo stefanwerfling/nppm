@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {JsonCache} from '../Cache/JsonCache.js';
-import {Npm2FaFetcher} from '../Security/Npm2FaFetcher.js';
+import {NpmUserFetcher} from '../Security/NpmUserFetcher.js';
 
 /**
  * Replace the global fetch with a fixed-response stub for the
@@ -28,37 +28,54 @@ function stubFetch(impl: (url: string) => {ok: boolean; status?: number; body?: 
     };
 }
 
-describe('Npm2FaFetcher.parseTfa', () => {
+describe('NpmUserFetcher.parseTfa', () => {
     it('treats a literal `true` as enabled', () => {
-        expect(Npm2FaFetcher.parseTfa(true)).toBe(true);
+        expect(NpmUserFetcher.parseTfa(true)).toBe(true);
     });
 
     it('treats a literal `false` as not enabled', () => {
-        expect(Npm2FaFetcher.parseTfa(false)).toBe(false);
+        expect(NpmUserFetcher.parseTfa(false)).toBe(false);
     });
 
     it('treats a missing field as not enabled', () => {
-        expect(Npm2FaFetcher.parseTfa(undefined)).toBe(false);
-        expect(Npm2FaFetcher.parseTfa(null)).toBe(false);
+        expect(NpmUserFetcher.parseTfa(undefined)).toBe(false);
+        expect(NpmUserFetcher.parseTfa(null)).toBe(false);
     });
 
     it('treats a mode-object as enabled', () => {
-        expect(Npm2FaFetcher.parseTfa({mode: 'auth-only'})).toBe(true);
-        expect(Npm2FaFetcher.parseTfa({mode: 'auth-and-writes'})).toBe(true);
+        expect(NpmUserFetcher.parseTfa({mode: 'auth-only'})).toBe(true);
+        expect(NpmUserFetcher.parseTfa({mode: 'auth-and-writes'})).toBe(true);
     });
 
     it('reports unknown shapes as `null` rather than guessing', () => {
-        expect(Npm2FaFetcher.parseTfa({})).toBeNull();
-        expect(Npm2FaFetcher.parseTfa('whatever')).toBeNull();
+        expect(NpmUserFetcher.parseTfa({})).toBeNull();
+        expect(NpmUserFetcher.parseTfa('whatever')).toBeNull();
     });
 });
 
-describe('Npm2FaFetcher.fetch', () => {
+describe('NpmUserFetcher.parseCreated', () => {
+    it('returns plain ISO strings as-is', () => {
+        expect(NpmUserFetcher.parseCreated('2021-01-01T00:00:00.000Z')).toBe('2021-01-01T00:00:00.000Z');
+    });
+
+    it('pulls the iso field out of the legacy {ts, iso} shape', () => {
+        expect(NpmUserFetcher.parseCreated({ts: 1, iso: '2022-05-02T00:00:00Z'})).toBe('2022-05-02T00:00:00Z');
+    });
+
+    it('returns null for missing or empty values', () => {
+        expect(NpmUserFetcher.parseCreated(undefined)).toBeNull();
+        expect(NpmUserFetcher.parseCreated(null)).toBeNull();
+        expect(NpmUserFetcher.parseCreated('')).toBeNull();
+        expect(NpmUserFetcher.parseCreated({})).toBeNull();
+    });
+});
+
+describe('NpmUserFetcher.fetch', () => {
     let dir: string;
     let cache: JsonCache;
 
     beforeEach(() => {
-        dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nppm-tfa-'));
+        dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nppm-user-'));
         cache = new JsonCache(dir, 60);
     });
 
@@ -66,11 +83,17 @@ describe('Npm2FaFetcher.fetch', () => {
         fs.rmSync(dir, {recursive: true, force: true});
     });
 
-    it('returns a real boolean when the registry hands one back', async () => {
-        const restore = stubFetch(() => ({ok: true, body: {tfa: {mode: 'auth-and-writes'}}}));
+    it('returns the parsed envelope when the registry answers', async () => {
+        const restore = stubFetch(() => ({
+            ok: true,
+            body: {tfa: {mode: 'auth-and-writes'}, created: '2018-03-15T10:00:00Z'}
+        }));
         try {
-            const fetcher = new Npm2FaFetcher('http://r', cache);
-            expect(await fetcher.fetch('alice')).toBe(true);
+            const fetcher = new NpmUserFetcher('http://r', cache);
+            const doc = await fetcher.fetch('alice');
+            expect(doc).not.toBeNull();
+            expect(doc!.tfa).toBe(true);
+            expect(doc!.created).toBe('2018-03-15T10:00:00Z');
         } finally {
             restore();
         }
@@ -79,21 +102,21 @@ describe('Npm2FaFetcher.fetch', () => {
     it('returns null when the registry refuses (401 etc.)', async () => {
         const restore = stubFetch(() => ({ok: false, status: 401}));
         try {
-            const fetcher = new Npm2FaFetcher('http://r', cache);
+            const fetcher = new NpmUserFetcher('http://r', cache);
             expect(await fetcher.fetch('alice')).toBeNull();
         } finally {
             restore();
         }
     });
 
-    it('caches the result so a second fetch never hits the network', async () => {
+    it('caches the parsed envelope so a second fetch never hits the network', async () => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;
-            return {ok: true, body: {tfa: true}};
+            return {ok: true, body: {tfa: true, created: '2020-01-01T00:00:00Z'}};
         });
         try {
-            const fetcher = new Npm2FaFetcher('http://r', cache);
+            const fetcher = new NpmUserFetcher('http://r', cache);
             await fetcher.fetch('alice');
             await fetcher.fetch('alice');
             expect(calls).toBe(1);
@@ -102,14 +125,14 @@ describe('Npm2FaFetcher.fetch', () => {
         }
     });
 
-    it('caches an unknown answer too — `null` is not a miss', async () => {
+    it('caches the null envelope too — refusal is not a miss', async () => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;
             return {ok: false, status: 401};
         });
         try {
-            const fetcher = new Npm2FaFetcher('http://r', cache);
+            const fetcher = new NpmUserFetcher('http://r', cache);
             await fetcher.fetch('alice');
             await fetcher.fetch('alice');
             expect(calls).toBe(1);
@@ -122,10 +145,10 @@ describe('Npm2FaFetcher.fetch', () => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;
-            return {ok: true, body: {tfa: true}};
+            return {ok: true, body: {tfa: true, created: '2020-01-01T00:00:00Z'}};
         });
         try {
-            const fetcher = new Npm2FaFetcher('http://r', cache);
+            const fetcher = new NpmUserFetcher('http://r', cache);
             expect(await fetcher.fetch('')).toBeNull();
             expect(calls).toBe(0);
         } finally {

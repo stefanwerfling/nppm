@@ -256,5 +256,13 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     '{n} registry signature(s)': '{n} Registry-Signatur(en)',
     'Published with --provenance: Sigstore signs an SLSA attestation binding the tarball to a specific CI workflow + commit.': 'Mit --provenance veröffentlicht: Sigstore signiert eine SLSA-Attestation, die den Tarball an einen konkreten CI-Workflow + Commit bindet.',
     'Registry-signed only. The npm key proves the tarball came from npm — but not from any specific build job or repo.': 'Nur Registry-signiert. Der npm-Schlüssel belegt, dass der Tarball von npm kommt — aber nicht aus einem bestimmten Build oder Repo.',
-    'No signature at all — typical for very old releases or non-npm mirrors that strip signatures.': 'Keine Signatur — typisch für sehr alte Releases oder non-npm-Mirrors, die Signaturen entfernen.'
+    'No signature at all — typical for very old releases or non-npm mirrors that strip signatures.': 'Keine Signatur — typisch für sehr alte Releases oder non-npm-Mirrors, die Signaturen entfernen.',
+    'Brand-new indicators': 'Brand-new-Indikatoren',
+    'No publish-date data available — cannot judge freshness.': 'Keine Publish-Daten verfügbar — Frische nicht bewertbar.',
+    'Package first published {n} days ago': 'Paket erstmals vor {n} Tagen veröffentlicht',
+    'Publisher account {n} days old': 'Publisher-Account ist {n} Tage alt',
+    'Package: first published {n} days ago': 'Paket: erstmals vor {n} Tagen veröffentlicht',
+    'Package: publish date unknown': 'Paket: Publish-Datum unbekannt',
+    'Publisher account: {n} days old': 'Publisher-Account: {n} Tage alt',
+    'Publisher account: age unknown (registry did not disclose)': 'Publisher-Account: Alter unbekannt (Registry verrät es nicht)'
 };

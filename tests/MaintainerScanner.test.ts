@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {JsonCache} from '../Cache/JsonCache.js';
 import {Registry, RegistryPackage} from '../Registry/Registry.js';
 import {MaintainerScanner, MaintainerSeverity} from '../Security/MaintainerScanner.js';
-import {Npm2FaFetcher} from '../Security/Npm2FaFetcher.js';
+import {NpmUserFetcher} from '../Security/NpmUserFetcher.js';
 
 function makeRegistry(name: string, pkg: RegistryPackage): Registry {
     // Stand-in: poke the static `RegistryPackage` straight into a fresh
@@ -218,7 +218,7 @@ describe('MaintainerScanner.scan', () => {
         }
     });
 
-    it('attaches the publisher 2FA flag when a fetcher is wired', async () => {
+    it('attaches the publisher 2FA flag + account-created date when a fetcher is wired', async () => {
         const registry = makeRegistry('pkg', pkgWithHandover({
             priorCount: 20,
             oldOwner: 'alice',
@@ -226,25 +226,30 @@ describe('MaintainerScanner.scan', () => {
             gapDays: 3
         }));
 
-        const dir = '/tmp/nppm-tfa-' + Math.random().toString(36).slice(2);
-        const tfaCache = new JsonCache(dir, 60);
-        // Stub fetch to report 2FA off for the new publisher.
+        const dir = '/tmp/nppm-user-' + Math.random().toString(36).slice(2);
+        const userCache = new JsonCache(dir, 60);
+        // Stub fetch to report 2FA off + a known account-creation
+        // timestamp for the new publisher.
         const originalFetch = globalThis.fetch;
         globalThis.fetch = (async (input: RequestInfo | URL) => {
             const url = typeof input === 'string' ? input : input.toString();
-            const tfa = url.includes('eve') ? false : true;
+            const isEve = url.includes('eve');
             return {
                 ok: true, status: 200, statusText: 'OK',
-                json: async () => ({tfa})
+                json: async () => ({
+                    tfa: !isEve,
+                    created: isEve ? '2026-05-30T00:00:00Z' : '2018-01-01T00:00:00Z'
+                })
             } as unknown as Response;
         }) as typeof fetch;
 
         try {
-            const fetcher = new Npm2FaFetcher('http://unused', tfaCache);
+            const fetcher = new NpmUserFetcher('http://unused', userCache);
             const scanner = new MaintainerScanner(registry, {}, fetcher);
             const finding = await scanner.scan('pkg', '1.0.20');
 
             expect(finding!.currentPublisher2FA).toBe(false);
+            expect(finding!.currentPublisherCreatedAt).toBe('2026-05-30T00:00:00Z');
         } finally {
             globalThis.fetch = originalFetch;
         }

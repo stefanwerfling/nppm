@@ -16,7 +16,8 @@ function heuristic(name: string, version: string): HeuristicsBatchEntry {
         binaries: {name, version, maxSeverity: null, riskCount: 0, totalCount: 0},
         maintainer: {name, version, severity: null, publisher: null},
         license: {name, version, spdx: 'MIT', severity: LicenseSeverity.permissive},
-        provenance: {name, version, level: null}
+        provenance: {name, version, level: null},
+        freshness: {name, version, level: null, packageAgeDays: null, maintainerAgeDays: null}
     };
 }
 

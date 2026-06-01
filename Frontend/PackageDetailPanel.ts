@@ -8,6 +8,7 @@ import {Release, ReleasesResponse} from '../Releases/Releases.js';
 import {BinaryFinding, BinarySeverity} from '../Security/BinaryScanner.js';
 import {ChurnFinding, ChurnSeverity} from '../Security/ChurnScanner.js';
 import {LicenseFinding, LicenseSeverity} from '../Security/LicenseScanner.js';
+import {FreshnessFinding, FreshnessLevel} from '../Security/FreshnessScanner.js';
 import {MaintainerFinding, MaintainerSeverity} from '../Security/MaintainerScanner.js';
 import {ProvenanceFinding, ProvenanceLevel} from '../Security/ProvenanceScanner.js';
 import {OsvVulnerability} from '../Security/OsvClient.js';
@@ -797,7 +798,79 @@ export class PackageDetailPanel {
         wrap.appendChild(this._renderChurnSection(report.churn));
         wrap.appendChild(this._renderMaintainerSection(report.maintainer));
         wrap.appendChild(this._renderProvenanceSection(report.provenance));
+        wrap.appendChild(this._renderFreshnessSection(report.freshness));
         return wrap;
+    }
+
+    /**
+     * "Brand new" section — package age + maintainer-account age,
+     * each on its own line with traffic-light colouring. Rendered
+     * only when at least one signal is available; the heading stays
+     * even on null so the user gets a "no data" placeholder rather
+     * than wondering whether the scan failed.
+     */
+    private _renderFreshnessSection(finding: FreshnessFinding|null): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdp-section';
+
+        const heading = document.createElement('div');
+        heading.className = 'pdp-section-head';
+        heading.textContent = I18n.t('Brand-new indicators');
+        wrap.appendChild(heading);
+
+        if (!finding) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-placeholder';
+            empty.textContent = I18n.t('No publish-date data available — cannot judge freshness.');
+            wrap.appendChild(empty);
+            return wrap;
+        }
+
+        const card = document.createElement('div');
+        card.className = `pdp-script pdp-script-${finding.level}`;
+
+        const head = document.createElement('div');
+        head.className = 'pdp-script-head';
+        const sev = document.createElement('span');
+        sev.className = `pdp-sev pdp-sev-${finding.level}`;
+        sev.textContent = PackageDetailPanel._freshnessSeverityLabel(finding.level);
+        head.appendChild(sev);
+        card.appendChild(head);
+
+        const body = document.createElement('div');
+        body.className = 'pdp-fresh-body';
+
+        const pkgLine = document.createElement('div');
+        pkgLine.className = 'pdp-fresh-line';
+        pkgLine.textContent = finding.packageAgeDays !== null
+            ? I18n.t('Package: first published {n} days ago', {n: finding.packageAgeDays})
+            : I18n.t('Package: publish date unknown');
+        body.appendChild(pkgLine);
+
+        const mntLine = document.createElement('div');
+        mntLine.className = 'pdp-fresh-line';
+        mntLine.textContent = finding.maintainerAgeDays !== null
+            ? I18n.t('Publisher account: {n} days old', {n: finding.maintainerAgeDays})
+            : I18n.t('Publisher account: age unknown (registry did not disclose)');
+        body.appendChild(mntLine);
+
+        card.appendChild(body);
+
+        const reason = document.createElement('div');
+        reason.className = 'pdp-script-reason';
+        reason.textContent = finding.reason;
+        card.appendChild(reason);
+
+        wrap.appendChild(card);
+        return wrap;
+    }
+
+    private static _freshnessSeverityLabel(level: FreshnessLevel): string {
+        switch (level) {
+            case FreshnessLevel.info: return 'OK';
+            case FreshnessLevel.warn: return 'NEW';
+            case FreshnessLevel.risk: return 'NEW!';
+        }
     }
 
     /**

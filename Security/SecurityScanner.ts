@@ -19,7 +19,12 @@ import {
     MaintainerScannerOptions,
     MaintainerSummary
 } from './MaintainerScanner.js';
-import {Npm2FaFetcher} from './Npm2FaFetcher.js';
+import {
+    FreshnessFinding,
+    FreshnessScanner,
+    FreshnessSummary
+} from './FreshnessScanner.js';
+import {NpmUserFetcher} from './NpmUserFetcher.js';
 import {
     ProvenanceFinding,
     ProvenanceScanner,
@@ -51,6 +56,11 @@ export type SecurityReport = {
      * signatures or attestation".
      */
     provenance: ProvenanceFinding|null;
+    /**
+     * "Brand new" classifier. `null` when neither `time.created` nor
+     * the publisher's account-creation date could be resolved.
+     */
+    freshness: FreshnessFinding|null;
 };
 
 /**
@@ -87,6 +97,7 @@ export type HeuristicsBatchEntry = {
     maintainer: MaintainerSummary;
     license: LicenseSummary;
     provenance: ProvenanceSummary;
+    freshness: FreshnessSummary;
 };
 
 /**
@@ -128,14 +139,14 @@ export class SecurityScanner {
         opts: {
             maintainer?: MaintainerScannerOptions;
             license?: LicenseScannerOptions;
-            tfaFetcher?: Npm2FaFetcher|null;
+            userFetcher?: NpmUserFetcher|null;
         } = {}
     ) {
         this._osv = osv;
         this._fingerprint = fingerprint;
         this._registry = registry;
         this._churn = new ChurnScanner(registry, fingerprint);
-        this._maintainer = new MaintainerScanner(registry, opts.maintainer, opts.tfaFetcher ?? null);
+        this._maintainer = new MaintainerScanner(registry, opts.maintainer, opts.userFetcher ?? null);
         this._license = new LicenseScanner(opts.license);
     }
 
@@ -162,6 +173,10 @@ export class SecurityScanner {
         // agnostic). Both fall back to `null` if neither is present.
         const spdx = fingerprint?.manifest?.license ?? reg?.license ?? null;
         const provenance = ProvenanceScanner.classify(reg?.dist?.[version]);
+        const freshness = FreshnessScanner.classify({
+            firstPublishedAt: reg?.time?.created ?? null,
+            maintainerCreatedAt: maintainer?.currentPublisherCreatedAt ?? null
+        });
 
         return {
             name,
@@ -173,7 +188,8 @@ export class SecurityScanner {
             binaryFindings,
             maintainer,
             license: this._license.classify(spdx),
-            provenance
+            provenance,
+            freshness
         };
     }
 
@@ -248,7 +264,8 @@ export class SecurityScanner {
                         version: pkg.version,
                         severity: maintainer ? maintainer.severity : null,
                         publisher: maintainer?.currentPublisher?.name ?? null,
-                        publisher2FA: maintainer?.currentPublisher2FA ?? null
+                        publisher2FA: maintainer?.currentPublisher2FA ?? null,
+                        publisherCreatedAt: maintainer?.currentPublisherCreatedAt ?? null
                     },
                     license: {
                         name: pkg.name,
@@ -260,7 +277,12 @@ export class SecurityScanner {
                         name: pkg.name,
                         version: pkg.version,
                         level: ProvenanceScanner.classify(reg?.dist?.[pkg.version])?.level ?? null
-                    }
+                    },
+                    freshness: SecurityScanner._freshnessSummary(
+                        pkg.name, pkg.version,
+                        reg?.time?.created ?? null,
+                        maintainer?.currentPublisherCreatedAt ?? null
+                    )
                 };
             }
         };
@@ -273,6 +295,22 @@ export class SecurityScanner {
         await Promise.all(workers);
 
         return result;
+    }
+
+    private static _freshnessSummary(
+        name: string,
+        version: string,
+        firstPublishedAt: string|null,
+        maintainerCreatedAt: string|null
+    ): FreshnessSummary {
+        const finding = FreshnessScanner.classify({firstPublishedAt, maintainerCreatedAt});
+        return {
+            name,
+            version,
+            level: finding?.level ?? null,
+            packageAgeDays: finding?.packageAgeDays ?? null,
+            maintainerAgeDays: finding?.maintainerAgeDays ?? null
+        };
     }
 
     private static _maxScriptSeverity(findings: ScriptFinding[]): ScriptSeverity|null {

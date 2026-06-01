@@ -3,6 +3,7 @@ import {ConfigProjectType} from '../Config/Config.js';
 import {DependencyType} from '../Project/PackageManifest.js';
 import {MatrixResponse, MatrixRow, MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
 import {BinarySeverity, BinarySummary} from '../Security/BinaryScanner.js';
+import {FreshnessLevel, FreshnessSummary} from '../Security/FreshnessScanner.js';
 import {IntegritySeverity} from '../Security/IntegrityScanner.js';
 import {LicenseSeverity, LicenseSummary} from '../Security/LicenseScanner.js';
 import {MaintainerSeverity, MaintainerSummary} from '../Security/MaintainerScanner.js';
@@ -92,6 +93,12 @@ const INTEGRITY_WEIGHT: Record<IntegritySeverity, number> = {
     [IntegritySeverity.risk]: 30
 };
 
+const FRESHNESS_WEIGHT: Record<FreshnessLevel, number> = {
+    [FreshnessLevel.info]: 0,
+    [FreshnessLevel.warn]: 5,
+    [FreshnessLevel.risk]: 20
+};
+
 /**
  * Persisted UI state — keeps filter, sort, and search across reloads
  * via localStorage. Stored as one JSON blob so we can extend later
@@ -138,6 +145,7 @@ export class Matrix {
     private _maintainersByName: Map<string, MaintainerSummary> = new Map();
     private _licensesByName: Map<string, LicenseSummary> = new Map();
     private _provenanceByName: Map<string, ProvenanceSummary> = new Map();
+    private _freshnessByName: Map<string, FreshnessSummary> = new Map();
     // Per-name aggregated integrity status, loaded once after `setData`.
     // Missing key means "not yet asked" or "no finding"; present key
     // carries the worst severity any project's lockfile reported.
@@ -197,7 +205,8 @@ export class Matrix {
         patterns: PatternSummary|undefined,
         binaries: BinarySummary|undefined,
         maintainer: MaintainerSummary|undefined,
-        integrity: ApiMatrixIntegrityEntry|undefined
+        integrity: ApiMatrixIntegrityEntry|undefined,
+        freshness: FreshnessSummary|undefined
     ): number {
         let score = 0;
         if (vulnIds && vulnIds.length > 0) {
@@ -222,6 +231,9 @@ export class Matrix {
         }
         if (integrity && integrity.severity !== null) {
             score += INTEGRITY_WEIGHT[integrity.severity];
+        }
+        if (freshness && freshness.level !== null) {
+            score += FRESHNESS_WEIGHT[freshness.level];
         }
         return score;
     }
@@ -264,6 +276,7 @@ export class Matrix {
         this._maintainersByName = new Map();
         this._licensesByName = new Map();
         this._provenanceByName = new Map();
+        this._freshnessByName = new Map();
         this._integrityByName = new Map();
         this._render();
 
@@ -353,13 +366,16 @@ export class Matrix {
                 this._maintainersByName.set(entry.name, entry.maintainer);
                 this._licensesByName.set(entry.name, entry.license);
                 this._provenanceByName.set(entry.name, entry.provenance);
+                this._freshnessByName.set(entry.name, entry.freshness);
                 if (entry.scripts.maxSeverity !== null
                     || entry.patterns.maxSeverity !== null
                     || entry.binaries.maxSeverity !== null
                     || (entry.maintainer.severity !== null
                         && entry.maintainer.severity !== MaintainerSeverity.info)
                     || Matrix._isLicenseNotable(entry.license.severity)
-                    || entry.provenance.level === ProvenanceLevel.provenance) {
+                    || entry.provenance.level === ProvenanceLevel.provenance
+                    || entry.freshness.level === FreshnessLevel.risk
+                    || entry.freshness.level === FreshnessLevel.warn) {
                     anyHit = true;
                 }
             }
@@ -712,6 +728,26 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
+        // Freshness badge — "brand new" signal. Renders for warn and
+        // risk; both colours via CSS modifier. Warn = young but past
+        // the risk threshold (typically <30d); risk = very young
+        // (typically <7d), the classic typosquat profile.
+        const freshness = this._freshnessByName.get(row.name);
+        if (freshness && (freshness.level === FreshnessLevel.risk
+                          || freshness.level === FreshnessLevel.warn)) {
+            const badge = document.createElement('span');
+            badge.className = `matrix-badge matrix-badge-freshness matrix-badge-freshness-${freshness.level}`;
+            badge.textContent = freshness.level === FreshnessLevel.risk ? 'NEW!' : 'NEW';
+            badge.title = Matrix._freshnessTooltip(freshness);
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (row.latest) {
+                    this._onSecurityClick?.(row.name, row.latest);
+                }
+            });
+            nameCell.appendChild(badge);
+        }
+
         tr.appendChild(nameCell);
 
         for (const project of this._data!.projects) {
@@ -823,7 +859,8 @@ export class Matrix {
             this._patternsByName.get(row.name),
             this._binariesByName.get(row.name),
             this._maintainersByName.get(row.name),
-            this._integrityByName.get(row.name)
+            this._integrityByName.get(row.name),
+            this._freshnessByName.get(row.name)
         );
     }
 
@@ -1001,6 +1038,23 @@ export class Matrix {
             ? I18n.t('License: {spdx}', {spdx: summary.spdx})
             : I18n.t('No license declared');
         return badge;
+    }
+
+    /**
+     * Build the freshness-badge tooltip from whichever signals were
+     * resolved. Missing maintainer age is the common case (registry
+     * 401s on the public mirror) — the package-age fragment alone
+     * still reads cleanly.
+     */
+    private static _freshnessTooltip(summary: FreshnessSummary): string {
+        const parts: string[] = [];
+        if (summary.packageAgeDays !== null) {
+            parts.push(I18n.t('Package first published {n} days ago', {n: summary.packageAgeDays}));
+        }
+        if (summary.maintainerAgeDays !== null) {
+            parts.push(I18n.t('Publisher account {n} days old', {n: summary.maintainerAgeDays}));
+        }
+        return parts.join(' · ');
     }
 
     private static _scriptBadgeLabel(s: ScriptSeverity): string {

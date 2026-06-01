@@ -265,5 +265,13 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     '{n} registry signature(s)': '{n} registry signature(s)',
     'Published with --provenance: Sigstore signs an SLSA attestation binding the tarball to a specific CI workflow + commit.': 'Published with --provenance: Sigstore signs an SLSA attestation binding the tarball to a specific CI workflow + commit.',
     'Registry-signed only. The npm key proves the tarball came from npm — but not from any specific build job or repo.': 'Registry-signed only. The npm key proves the tarball came from npm — but not from any specific build job or repo.',
-    'No signature at all — typical for very old releases or non-npm mirrors that strip signatures.': 'No signature at all — typical for very old releases or non-npm mirrors that strip signatures.'
+    'No signature at all — typical for very old releases or non-npm mirrors that strip signatures.': 'No signature at all — typical for very old releases or non-npm mirrors that strip signatures.',
+    'Brand-new indicators': 'Brand-new indicators',
+    'No publish-date data available — cannot judge freshness.': 'No publish-date data available — cannot judge freshness.',
+    'Package first published {n} days ago': 'Package first published {n} days ago',
+    'Publisher account {n} days old': 'Publisher account {n} days old',
+    'Package: first published {n} days ago': 'Package: first published {n} days ago',
+    'Package: publish date unknown': 'Package: publish date unknown',
+    'Publisher account: {n} days old': 'Publisher account: {n} days old',
+    'Publisher account: age unknown (registry did not disclose)': 'Publisher account: age unknown (registry did not disclose)'
 };

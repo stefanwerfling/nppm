@@ -1005,6 +1005,42 @@ html, body {
     background: rgba(80, 180, 120, 0.45);
 }
 
+.matrix-badge-freshness {
+    margin-left: 6px;
+    cursor: pointer;
+}
+
+.matrix-badge-freshness-warn {
+    background: rgba(240, 180, 0, 0.25);
+    color: #ffd55a;
+    border: 1px solid rgba(240, 180, 0, 0.55);
+}
+
+.matrix-badge-freshness-warn:hover {
+    background: rgba(240, 180, 0, 0.4);
+}
+
+.matrix-badge-freshness-risk {
+    background: rgba(232, 90, 90, 0.35);
+    color: #ffb0b0;
+    border: 1px solid rgba(232, 90, 90, 0.7);
+}
+
+.matrix-badge-freshness-risk:hover {
+    background: rgba(232, 90, 90, 0.55);
+}
+
+.pdp-fresh-body {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    color: var(--c-text);
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+.pdp-fresh-line {
+    line-height: 1.5;
+}
+
 .matrix-badge-license {
     margin-left: 6px;
     cursor: pointer;

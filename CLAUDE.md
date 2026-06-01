@@ -143,6 +143,7 @@ nppm/
 | GET    | `/api/projects/:id/lockfile`                          | parsed lockfile (or `node_modules` fallback) |
 | GET    | `/api/projects/:id/lockfile/analyze`                  | SSE per-project OSV scan |
 | GET    | `/api/projects/:id/history`                           | per-project change log |
+| GET    | `/api/projects/:id/history/backfill`                  | SSE: git-backfill only (no OSV) — drives History-view button |
 | GET    | `/api/projects/:id/matrix`                            | per-project matrix |
 | GET    | `/api/projects/:id/depgraph`                          | flat resolved dep graph |
 | GET    | `/api/projects/:id/unused`                            | depcheck-style hygiene scan (unused / misplaced / missing) |

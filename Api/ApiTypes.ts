@@ -80,7 +80,9 @@ export type ApiLockfileResponse = {
 
 /**
  * Response of `GET /api/projects/:id/history`. Entries are sorted
- * newest-first for direct rendering in the UI.
+ * newest-first for direct rendering in the UI. `gitAvailable` +
+ * `gitBackfilledHead` mirror the Vulnerability-Timeline response so
+ * the History view can render the same scan-bar UX.
  */
 export type ApiHistoryResponse = {
     project: {
@@ -89,6 +91,33 @@ export type ApiHistoryResponse = {
         type: ConfigProjectType;
     };
     entries: HistoryEntry[];
+    gitAvailable: boolean;
+    gitBackfilledHead: string|null;
+};
+
+/**
+ * Server-sent events on `/api/projects/:id/history/backfill`.
+ * Mirrors the backfill phase of the Vulnerability-Timeline scan
+ * stream — same payloads, but no OSV catch-up.
+ */
+export type ApiHistoryBackfillStartEvent = {
+    gitAvailable: boolean;
+    backfillRequired: boolean;
+};
+
+export type ApiHistoryBackfillProgressEvent = {
+    current: number;
+    total: number;
+};
+
+export type ApiHistoryBackfillEndEvent = {
+    entries: HistoryEntry[];
+    gitBackfilledHead: string|null;
+    mergedCount: number;
+};
+
+export type ApiHistoryBackfillErrorEvent = {
+    msg: string;
 };
 
 /**

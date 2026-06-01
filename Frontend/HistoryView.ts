@@ -1,3 +1,10 @@
+import {
+    ApiHistoryBackfillEndEvent,
+    ApiHistoryBackfillErrorEvent,
+    ApiHistoryBackfillProgressEvent,
+    ApiHistoryBackfillStartEvent,
+    ApiHistoryResponse
+} from '../Api/ApiTypes.js';
 import {HistoryAdded, HistoryEntry, HistoryRemoved, HistoryUpdate} from '../History/History.js';
 import {Api} from './Api.js';
 import {I18n} from './I18n.js';
@@ -10,6 +17,12 @@ import {I18n} from './I18n.js';
  * toggle in the header is the same three-button group, so the user
  * stays oriented when switching between the three views of the same
  * project.
+ *
+ * When the project has a git source, the scan bar above the timeline
+ * lets the user reconstruct historical entries from `git log` —
+ * lockfile commits first, `package.json` as fallback. This is the
+ * same backfill the Vulns view runs, but stops short of the OSV
+ * catch-up (History doesn't care about CVE coverage).
  */
 export class HistoryView {
 
@@ -24,6 +37,12 @@ export class HistoryView {
     private _onShowVulns: ((unid: string) => void)|null = null;
     private _onShowPr: ((unid: string) => void)|null = null;
     private _entries: HistoryEntry[] = [];
+    private _gitAvailable: boolean = false;
+    private _gitBackfilledHead: string|null = null;
+    private _stream: EventSource|null = null;
+    private _scanBtn: HTMLButtonElement|null = null;
+    private _progressBar: HTMLElement|null = null;
+    private _progressText: HTMLElement|null = null;
 
     constructor(root: HTMLElement) {
         this._root = root;
@@ -58,6 +77,11 @@ export class HistoryView {
     }
 
     public async show(unid: string, name: string): Promise<void> {
+        // Close any leftover SSE from a previous project — switching
+        // mid-backfill drops the stream so the UI doesn't apply a
+        // response that belongs elsewhere.
+        this._closeStream();
+
         this._projectUnid = unid;
         this._projectName = name;
         this._renderLoading();
@@ -71,12 +95,25 @@ export class HistoryView {
                 return;
             }
 
-            this._entries = response.entries;
+            this._applyResponse(response);
             this._render();
         } catch (e) {
             if (this._projectUnid === unid) {
                 this._renderError((e as Error).message);
             }
+        }
+    }
+
+    private _applyResponse(response: ApiHistoryResponse): void {
+        this._entries = response.entries;
+        this._gitAvailable = response.gitAvailable;
+        this._gitBackfilledHead = response.gitBackfilledHead;
+    }
+
+    private _closeStream(): void {
+        if (this._stream) {
+            this._stream.close();
+            this._stream = null;
         }
     }
 
@@ -101,24 +138,14 @@ export class HistoryView {
     private _render(): void {
         this._root.innerHTML = '';
         this._root.appendChild(this._renderHeader());
+        this._root.appendChild(this._renderScanBar());
 
         if (this._entries.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'list-placeholder';
-            empty.innerHTML = '';
-            const line1 = document.createElement('div');
-            line1.textContent = I18n.t(
+            empty.textContent = I18n.t(
                 'Currently no history. Whenever the project\'s packages change, a new entry shows up here (a snapshot is checked on every lockfile call).'
             );
-            empty.appendChild(line1);
-            const line2 = document.createElement('div');
-            line2.style.marginTop = '8px';
-            line2.style.fontSize = '11px';
-            line2.style.opacity = '0.7';
-            line2.textContent = I18n.t(
-                'Tip: open the Vulns view to backfill history from git (package-lock.json commits, or package.json as fallback).'
-            );
-            empty.appendChild(line2);
             this._root.appendChild(empty);
             return;
         }
@@ -126,11 +153,211 @@ export class HistoryView {
         const timeline = document.createElement('div');
         timeline.className = 'history-timeline';
 
+        // Group consecutive entries by date — entries are already
+        // newest-first, so a simple lastDate tracker is enough; no
+        // separate Map needed.
+        let lastDate = '';
         for (const entry of this._entries) {
-            timeline.appendChild(this._renderEntry(entry));
+            const date = HistoryView._formatDate(entry.timestamp);
+            if (date !== lastDate) {
+                timeline.appendChild(HistoryView._renderTimelineLabel(date));
+                lastDate = date;
+            }
+            timeline.appendChild(this._renderTimelineItem(entry));
         }
 
         this._root.appendChild(timeline);
+    }
+
+    /**
+     * One timeline row: a colored icon sitting on the vertical line,
+     * plus the existing entry card to its right. The icon's colour
+     * reflects whether the entry was add-only, update-only,
+     * remove-only, or a mix.
+     */
+    private _renderTimelineItem(entry: HistoryEntry): HTMLElement {
+        const item = document.createElement('div');
+        item.className = 'timeline-item';
+
+        const dominant = HistoryView._dominantKind(entry);
+        const icon = document.createElement('div');
+        icon.className = `timeline-icon timeline-icon-${dominant.kind}`;
+        icon.textContent = dominant.symbol;
+        item.appendChild(icon);
+
+        item.appendChild(this._renderEntry(entry));
+        return item;
+    }
+
+    private static _renderTimelineLabel(date: string): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'timeline-label';
+        const pill = document.createElement('span');
+        pill.textContent = date;
+        wrap.appendChild(pill);
+        return wrap;
+    }
+
+    /**
+     * Classify an entry for icon styling. Pure-add / pure-update /
+     * pure-remove get their own colour; anything else is "mixed".
+     */
+    private static _dominantKind(entry: HistoryEntry): {kind: string; symbol: string} {
+        const a = entry.added.length;
+        const u = entry.updated.length;
+        const r = entry.removed.length;
+        if (a > 0 && u === 0 && r === 0) {
+            return {kind: 'added', symbol: '+'};
+        }
+        if (u > 0 && a === 0 && r === 0) {
+            return {kind: 'updated', symbol: '~'};
+        }
+        if (r > 0 && a === 0 && u === 0) {
+            return {kind: 'removed', symbol: '−'};
+        }
+        return {kind: 'mixed', symbol: '●'};
+    }
+
+    /**
+     * The bar above the timeline. Same shape as the Vulns view's
+     * scan bar (so the two stay visually consistent), but the button
+     * only triggers the git backfill — no OSV catch-up.
+     */
+    private _renderScanBar(): HTMLElement {
+        const bar = document.createElement('div');
+        bar.className = 'vuln-scanbar';
+
+        const summary = document.createElement('div');
+        summary.className = 'vuln-summary';
+
+        if (this._gitBackfilledHead) {
+            const head = document.createElement('button');
+            head.type = 'button';
+            head.className = 'vuln-summary-pill vuln-summary-pill-soft vuln-summary-pill-clickable';
+            head.textContent = I18n.t('git history reconstructed from {sha}', {
+                sha: this._gitBackfilledHead.slice(0, 7)
+            });
+            head.title = I18n.t('Click to re-pull git history');
+            head.addEventListener('click', () => this._startBackfill());
+            summary.appendChild(head);
+        } else if (this._gitAvailable) {
+            const hint = document.createElement('button');
+            hint.type = 'button';
+            hint.className = 'vuln-summary-pill vuln-summary-pill-soft vuln-summary-pill-clickable';
+            hint.textContent = I18n.t('git history not yet reconstructed — run a scan');
+            hint.title = I18n.t('Click to reconstruct history from git');
+            hint.addEventListener('click', () => this._startBackfill());
+            summary.appendChild(hint);
+        } else {
+            const hint = document.createElement('span');
+            hint.className = 'vuln-summary-pill vuln-summary-pill-soft';
+            hint.textContent = I18n.t('no git source — only live snapshots will appear here');
+            summary.appendChild(hint);
+        }
+
+        bar.appendChild(summary);
+
+        const btn = document.createElement('button');
+        btn.className = 'installed-analyze-btn';
+        btn.textContent = this._gitBackfilledHead
+            ? I18n.t('Re-pull from git')
+            : I18n.t('Backfill from git');
+        btn.disabled = !this._gitAvailable;
+        if (btn.disabled) {
+            btn.title = I18n.t('No git source detected for this project');
+        }
+        btn.addEventListener('click', () => this._startBackfill());
+        this._scanBtn = btn;
+        bar.appendChild(btn);
+
+        const progress = document.createElement('div');
+        progress.className = 'installed-progress';
+        progress.style.display = 'none';
+        const fill = document.createElement('div');
+        fill.className = 'installed-progress-fill';
+        progress.appendChild(fill);
+        bar.appendChild(progress);
+        this._progressBar = fill;
+
+        const text = document.createElement('div');
+        text.className = 'installed-progress-text';
+        text.style.display = 'none';
+        bar.appendChild(text);
+        this._progressText = text;
+
+        return bar;
+    }
+
+    private _startBackfill(): void {
+        if (!this._projectUnid || this._stream || !this._gitAvailable) {
+            return;
+        }
+        const unid = this._projectUnid;
+
+        if (this._scanBtn) {
+            this._scanBtn.disabled = true;
+        }
+        if (this._progressBar) {
+            this._progressBar.parentElement!.style.display = '';
+            this._progressBar.style.width = '0%';
+        }
+        if (this._progressText) {
+            this._progressText.style.display = '';
+            this._progressText.textContent = I18n.t('Starting …');
+        }
+
+        const url = Api.historyBackfillUrl(unid);
+        const es = new EventSource(url);
+        this._stream = es;
+
+        es.addEventListener('start', (ev: MessageEvent<string>) => {
+            const data = JSON.parse(ev.data) as ApiHistoryBackfillStartEvent;
+            if (this._progressText) {
+                this._progressText.textContent = data.backfillRequired
+                    ? I18n.t('Reconstructing git history …')
+                    : I18n.t('Already up to date — re-checking …');
+            }
+        });
+
+        es.addEventListener('progress', (ev: MessageEvent<string>) => {
+            const data = JSON.parse(ev.data) as ApiHistoryBackfillProgressEvent;
+            const pct = data.total > 0 ? Math.round((data.current / data.total) * 100) : 0;
+            if (this._progressBar) {
+                this._progressBar.style.width = `${pct}%`;
+            }
+            if (this._progressText) {
+                this._progressText.textContent = I18n.t(
+                    'Reconstructing git history ({current}/{total}) …',
+                    {current: String(data.current), total: String(data.total)}
+                );
+            }
+        });
+
+        es.addEventListener('end', (ev: MessageEvent<string>) => {
+            const data = JSON.parse(ev.data) as ApiHistoryBackfillEndEvent;
+            if (this._projectUnid === unid) {
+                this._entries = data.entries;
+                this._gitBackfilledHead = data.gitBackfilledHead;
+                this._closeStream();
+                this._render();
+            }
+        });
+
+        es.addEventListener('error', (ev) => {
+            const data = ev instanceof MessageEvent && typeof ev.data === 'string'
+                ? (JSON.parse(ev.data) as ApiHistoryBackfillErrorEvent)
+                : {msg: I18n.t('Connection to backfill lost')};
+            this._closeStream();
+            if (this._projectUnid !== unid) {
+                return;
+            }
+            if (this._progressText) {
+                this._progressText.textContent = data.msg;
+            }
+            if (this._scanBtn) {
+                this._scanBtn.disabled = !this._gitAvailable;
+            }
+        });
     }
 
     private _renderEntry(entry: HistoryEntry): HTMLElement {
@@ -349,7 +576,12 @@ export class HistoryView {
     private static _formatTime(ms: number): string {
         const d = new Date(ms);
         const pad = (n: number): string => n.toString().padStart(2, '0');
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} `
-            + `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    private static _formatDate(ms: number): string {
+        const d = new Date(ms);
+        const pad = (n: number): string => n.toString().padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     }
 }

@@ -332,17 +332,141 @@ class Server {
 
                 try {
                     const file = historyStore.read(project.getKey(), project.getName());
+                    const gitAvailable = (project instanceof ProjectLocal
+                            && gitBackfill.isAvailable(project.getRoot()))
+                        || (project instanceof ProjectRemote
+                            && remoteBackfill.isAvailable(project));
                     const response: ApiHistoryResponse = {
                         project: {
                             unid: req.params.id,
                             name: project.getName(),
                             type: project.getType()
                         },
-                        entries: [...file.entries].reverse()
+                        entries: [...file.entries].reverse(),
+                        gitAvailable,
+                        gitBackfilledHead: file.gitBackfilledHead ?? null
                     };
                     res.status(200).json(response);
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/projects/:id/history/backfill — SSE. Runs the
+            // same git-history reconstruction as the Vulnerability-
+            // Timeline scan, but stops there (no OSV catch-up). Lets
+            // the History view itself trigger a backfill — semantically
+            // the right home for the action, and faster than the full
+            // scan when you don't care about CVE coverage.
+            // -------------------------------------------------------------
+            app.get('/api/projects/:id/history/backfill', async (req, res) => {
+                const project = projects.get(req.params.id);
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+
+                res.set({
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'X-Accel-Buffering': 'no'
+                });
+                res.flushHeaders();
+
+                const send = (event: string, data: object): void => {
+                    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+                };
+
+                let aborted = false;
+                req.on('close', () => {
+                    aborted = true;
+                });
+
+                try {
+                    const localAvailable = project instanceof ProjectLocal
+                        && gitBackfill.isAvailable(project.getRoot());
+                    const remoteAvailable = project instanceof ProjectRemote
+                        && remoteBackfill.isAvailable(project);
+                    const gitAvailable = localAvailable || remoteAvailable;
+
+                    let backfillHead: string|null = null;
+                    if (localAvailable && project instanceof ProjectLocal) {
+                        backfillHead = gitBackfill.headSha(project.getRoot());
+                    } else if (remoteAvailable && project instanceof ProjectRemote) {
+                        backfillHead = await remoteBackfill.headSha(project);
+                    }
+
+                    const existing = historyStore.read(project.getKey(), project.getName());
+                    const backfillRequired = gitAvailable
+                        && backfillHead !== null
+                        && (existing.gitBackfilledHead !== backfillHead
+                            || existing.entries.length === 0);
+
+                    send('start', {gitAvailable, backfillRequired});
+
+                    let mergedCount = 0;
+
+                    if (backfillRequired) {
+                        let result;
+                        if (project instanceof ProjectLocal) {
+                            result = gitBackfill.build(
+                                project.getRoot(),
+                                (current, total) => {
+                                    if (!aborted) {
+                                        send('progress', {current, total});
+                                    }
+                                }
+                            );
+                        } else if (project instanceof ProjectRemote) {
+                            try {
+                                result = await remoteBackfill.build(
+                                    project,
+                                    (current, total) => {
+                                        if (!aborted) {
+                                            send('progress', {current, total});
+                                        }
+                                    }
+                                );
+                            } catch (e) {
+                                send('error', {
+                                    msg: `Remote backfill failed: ${(e as Error).message}`
+                                });
+                                res.end();
+                                return;
+                            }
+                        }
+
+                        if (aborted || !result) {
+                            return;
+                        }
+
+                        const summary = historyStore.backfillFromGit(
+                            project.getKey(),
+                            project.getName(),
+                            result.entries,
+                            result.headSha,
+                            result.finalState,
+                            result.source === 'committed'
+                        );
+                        mergedCount = summary.mergedCount;
+                    }
+
+                    if (aborted) {
+                        return;
+                    }
+
+                    const finalState = historyStore.read(project.getKey(), project.getName());
+                    send('end', {
+                        entries: [...finalState.entries].reverse(),
+                        gitBackfilledHead: finalState.gitBackfilledHead ?? null,
+                        mergedCount
+                    });
+                } catch (e) {
+                    send('error', {msg: (e as Error).message});
+                } finally {
+                    res.end();
                 }
             });
 
@@ -432,8 +556,14 @@ class Server {
                     }
                     if (gitAvailable) {
                         const existing = historyStore.read(project.getKey(), project.getName());
+                        // Re-run the walk when HEAD moved OR when a
+                        // previous run set the watermark but produced
+                        // no entries (recovery from a broken earlier
+                        // backfill — the user clicks the pill again
+                        // expecting their history to fill in).
                         backfillRequired = backfillHead !== null
-                            && existing.gitBackfilledHead !== backfillHead;
+                            && (existing.gitBackfilledHead !== backfillHead
+                                || existing.entries.length === 0);
                     }
 
                     send('start', {gitAvailable, backfillRequired});

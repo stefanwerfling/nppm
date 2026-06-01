@@ -111,7 +111,13 @@ export class HistoryStore {
     ): HistoryBackfillSummary {
         const state = this.read(projectKey, projectName);
 
-        if (headSha && state.gitBackfilledHead === headSha) {
+        // Watermark hits short-circuit the walk — but only when we
+        // actually have entries to show for it. A previous run that
+        // set `gitBackfilledHead` and wrote no entries (e.g. a
+        // crashed walk) would otherwise lock the project into an
+        // empty history forever, since the watermark would keep
+        // matching HEAD.
+        if (headSha && state.gitBackfilledHead === headSha && state.entries.length > 0) {
             return {mergedCount: 0, headSha, skippedReason: 'head-unchanged'};
         }
 

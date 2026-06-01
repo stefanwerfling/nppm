@@ -174,16 +174,21 @@ Schwachstellen im OSV-Cache hatte.
 
 ![History](screenshots/06_history_de.png)
 
-Die History-Dateien liegen in `.nppm-history/` neben deiner
-`nppm.json` — kannst du committen, wenn du langfristige Audit-Spuren
-willst.
+Die Einträge werden als vertikale Timeline gerendert. Jedes Datum
+bekommt seinen eigenen Pill am Gruppenkopf; jeder Eintrag hat ein
+farbiges Icon auf der Spur — `+` (grün) für reine Adds, `~` (gelb)
+für reine Updates, `−` (rot) für reine Removes, `●` (Akzent) für
+gemischte Änderungen. Die History-Dateien liegen in `.nppm-history/`
+neben deiner `nppm.json` — kannst du committen, wenn du langfristige
+Audit-Spuren willst.
 
-**Git-Backfill.** Beim ersten Öffnen der [Vulnerability-Timeline](#9-vulnerability-timeline)
-auf einem Projekt mit `.git/`-Ordner walkt nppm `git log -- package-
-lock.json` und rekonstruiert die vollständige Dependency-History
-rückwirkend — ein Eintrag pro Commit, der die Lockfile angefasst
-hat, mit echtem Commit-SHA + Author-Zeitstempel. Derselbe Code-Pfad
-funktioniert für GitHub-/Gitea-Projekte über deren Commits-API.
+**Git-Backfill.** Die Scan-Leiste oberhalb der Timeline trägt einen
+`Aus git nachpflegen`-Button (deaktiviert, wenn für das Projekt keine
+`.git/`-Quelle erkannt wird). Ein Klick walkt bei lokalen Projekten
+`git log -- package-lock.json` (bzw. die entsprechende Commits-API
+für GitHub-/Gitea-Quellen) und rekonstruiert die vollständige
+Dependency-History rückwirkend — ein Eintrag pro Commit, der die
+Lockfile angefasst hat, mit echtem Commit-SHA + Author-Zeitstempel.
 Wenn nie eine Lockfile committed wurde, fällt der Walker auf
 `git log -- package.json` zurück und trackt stattdessen die
 deklarierten Range-Änderungen; diese Einträge bekommen in der
@@ -191,9 +196,14 @@ History-Ansicht eine gelbe `nur-deklariert`-Pille, weil die
 Versions-Strings Ranges (`^4.0.0`) und keine konkreten Versionen
 sind — die Vulns-Ansicht kann sie nicht OSV-querien.
 
-Der Backfill ist idempotent über die HEAD-SHA — ein erneuter Scan
-nach ein paar neuen Commits holt nur die neuen; alte kommen aus
-dem Cache.
+Der Status-Pill neben dem Button zeigt, ob ein Backfill bereits
+gelaufen ist (`git-History rekonstruiert aus <sha>`) oder noch
+aussteht (`git-History noch nicht rekonstruiert — Scan starten`).
+Erneutes Nachpflegen ist günstig: idempotent über die HEAD-SHA, es
+werden nur neue Commits verarbeitet. Der Backfill läuft zusätzlich
+transparent beim ersten Öffnen der Vulns-Ansicht — wenn du nur die
+History gefüllt haben willst (ohne OSV-Nachholjagd), ist der Button
+in der History-Ansicht der schnellere Weg.
 
 ### 2.6 Unbenutzte Abhängigkeiten
 

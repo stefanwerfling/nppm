@@ -395,10 +395,69 @@ html, body {
 /* History-Tab */
 
 .history-timeline {
+    position: relative;
+    padding: 8px 0 8px 44px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
 }
+
+/* The vertical track. Sits at the centre of the icon column so the
+   icons can punch through it. */
+.history-timeline::before {
+    content: '';
+    position: absolute;
+    left: 19px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--c-border);
+}
+
+.timeline-label {
+    position: relative;
+    margin: 4px 0 -4px -44px;
+    padding-left: 44px;
+}
+
+.timeline-label > span {
+    display: inline-block;
+    background: var(--c-accent);
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 600;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.timeline-item {
+    position: relative;
+}
+
+.timeline-icon {
+    position: absolute;
+    left: -36px;
+    top: 8px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--c-bg);
+    border: 2px solid var(--c-border);
+    color: var(--c-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    z-index: 1;
+}
+
+.timeline-icon-added    { border-color: #4caf50; color: #4caf50; }
+.timeline-icon-updated  { border-color: #f0b400; color: #f0b400; }
+.timeline-icon-removed  { border-color: #e85a5a; color: #e85a5a; }
+.timeline-icon-mixed    { border-color: var(--c-accent); color: var(--c-accent); }
 
 .history-card {
     border: 1px solid var(--c-border);
@@ -1810,6 +1869,24 @@ html, body {
     background: var(--c-row-hover);
     color: var(--c-muted);
     border: 1px solid var(--c-border);
+}
+
+button.vuln-summary-pill {
+    font: inherit;
+}
+
+.vuln-summary-pill-clickable {
+    cursor: pointer;
+}
+
+.vuln-summary-pill-clickable:hover {
+    color: var(--c-text);
+    border-color: var(--c-accent);
+}
+
+.vuln-summary-pill-clickable:disabled {
+    cursor: default;
+    opacity: 0.6;
 }
 
 .vuln-timeline {

@@ -64,6 +64,31 @@ describe('HistoryStore.backfillFromGit', () => {
         expect(second.skippedReason).toBe('head-unchanged');
     });
 
+    it('recovers from a stale watermark with zero stored entries', () => {
+        const store = new HistoryStore(dir);
+        // Simulate a broken earlier run: watermark set, but no
+        // entries were ever written. A naive `head === existing.head`
+        // check would lock the project in this state forever.
+        store.backfillFromGit('/p', 'p', [], 'aaa', [], false);
+        const broken = store.read('/p', 'p');
+        expect(broken.entries).toHaveLength(0);
+        expect(broken.gitBackfilledHead).toBe('aaa');
+
+        // Same HEAD, but now the walk produces entries — the store
+        // must accept them instead of short-circuiting.
+        const entries = [
+            gitEntry(1000, 'c1', [{name: 'foo', version: '1.0.0'}]),
+            gitEntry(2000, 'c2', [{name: 'bar', version: '2.0.0'}])
+        ];
+        const recovery = store.backfillFromGit('/p', 'p', entries, 'aaa', [
+            {name: 'foo', version: '1.0.0'},
+            {name: 'bar', version: '2.0.0'}
+        ]);
+        expect(recovery.mergedCount).toBe(2);
+        expect(recovery.skippedReason).toBeNull();
+        expect(store.read('/p', 'p').entries).toHaveLength(2);
+    });
+
     it('does not overwrite lastSnapshot when nppm has already observed live state', () => {
         const store = new HistoryStore(dir);
         // Live snapshot first — installs not committed to git

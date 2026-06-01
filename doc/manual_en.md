@@ -164,24 +164,33 @@ the outgoing version had known vulnerabilities in the OSV cache.
 
 ![History](screenshots/06_history.png)
 
-History files live in `.nppm-history/` next to your `nppm.json` — safe
-to commit if you want long-term audit trails.
+Entries are rendered as a vertical timeline. Each date gets its own
+pill at the top of its group; each entry has a coloured icon on the
+track — `+` (green) for add-only changes, `~` (yellow) for pure
+updates, `−` (red) for remove-only, `●` (accent) for anything mixed.
+History files live in `.nppm-history/` next to your `nppm.json` —
+safe to commit if you want long-term audit trails.
 
-**Git backfill.** The first time you open the [Vulnerability
-Timeline](#9-vulnerability-timeline) on a project with a `.git/`
-directory, nppm walks `git log -- package-lock.json` and reconstructs
-the full dep history retroactively — one entry per commit that
-touched the lockfile, with the real commit SHA + author timestamp.
-Same code path works for GitHub / Gitea projects via their commits
-API. When no lockfile was ever committed, the walker falls back to
-`git log -- package.json` and tracks declared-range drift instead;
-those entries get a yellow `declared-only` pill in the History view
-because the version strings are ranges (`^4.0.0`) rather than concrete
-versions, and the Vulns view can't OSV-query them.
+**Git backfill.** The scan bar above the timeline carries a
+`Backfill from git` button (disabled when no `.git/` source is
+detected for this project). One click walks `git log --
+package-lock.json` on local projects (or the equivalent commits API
+for GitHub / Gitea sources) and reconstructs the full dep history
+retroactively — one entry per commit that touched the lockfile, with
+the real commit SHA + author timestamp. When no lockfile was ever
+committed, the walker falls back to `git log -- package.json` and
+tracks declared-range drift instead; those entries get a yellow
+`declared-only` pill in the History view because the version strings
+are ranges (`^4.0.0`) rather than concrete versions, and the Vulns
+view can't OSV-query them.
 
-The backfill is idempotent by HEAD SHA — re-running the scan after a
-few new commits only fetches the new ones; old ones come from the
-cache.
+The pill next to the button shows whether a backfill has run yet
+(`git history reconstructed from <sha>`) or is still pending
+(`git history not yet reconstructed — run a scan`). Re-running is
+cheap: idempotent by HEAD SHA, only new commits get processed. The
+backfill is also triggered transparently the first time the Vulns
+view opens — but if you only want the history view filled in (no OSV
+catch-up), the History button is the faster path.
 
 ### 2.6 Unused dependencies
 

@@ -177,6 +177,27 @@ async function captureLanguage(browser, baseUrl, lang) {
 
         await clickToggle(page, lang === 'de' ? 'History' : 'History');
         await sleep(1500);
+        // If the History view shows an enabled Backfill button (this
+        // project has a `.git/` source), trigger it so the timeline
+        // shot isn't empty when the lockfile hasn't drifted yet.
+        const backfillTriggered = await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('.installed-analyze-btn'));
+            const hit = btns.find((b) => !b.disabled
+                && /(Backfill|nachpflegen|Re-pull|neu)/i.test(b.textContent || ''));
+            if (hit) {
+                hit.click();
+                return true;
+            }
+            return false;
+        });
+        if (backfillTriggered) {
+            try {
+                await page.waitForSelector('.timeline-item', {timeout: 20_000});
+            } catch {
+                // Backfill produced nothing — fine, take whatever's there.
+            }
+            await sleep(800);
+        }
         await shot(page, `06_history${suffix}.png`);
 
         // Vulns view — auto-fires a scan on first open, so give it

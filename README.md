@@ -68,13 +68,14 @@ Backend lives inside a Vite dev server, frontend is plain TypeScript + DOM
   `disclosed-during-use` (yellow — vuln filed while you were running
   it), or `pre-tracking` (grey — bound to the first known timestamp).
   Compliance-ready data for ISO 27001 / SOC2 / DORA reports.
-- **Git-backfilled history** — first time the Vulns view opens on a
-  project with a `.git/` directory, nppm walks `git log -- package-
-  lock.json` (or `package.json` when no lockfile was ever committed)
-  and reconstructs the dependency history retroactively. Same path
-  works for GitHub / Gitea via their commits API. Declared-only
-  fallback entries get a `declared-only` pill so the user knows
-  they don't carry CVE coverage.
+- **Git-backfilled history** — the History view has a `Backfill from
+  git` button (disabled when no `.git/` is detected) that walks
+  `git log -- package-lock.json` (or `package.json` when no lockfile
+  was ever committed) and reconstructs the dependency history
+  retroactively. Same path works for GitHub / Gitea via their commits
+  API. Declared-only fallback entries get a `declared-only` pill so
+  the user knows they don't carry CVE coverage. Re-running is
+  idempotent by HEAD SHA.
 - **PR-Review-Mode** — diffs `package.json` + `package-lock.json`
   between two git refs (default `main` vs `HEAD`) and renders one
   card per changed dep with added / closed CVE pills. Local
@@ -128,6 +129,8 @@ Backend lives inside a Vite dev server, frontend is plain TypeScript + DOM
 - **History** per project — every lockfile call snapshots the package state
   and appends an entry for adds/removes/version changes (with CVE-hint
   reason when applicable). Stored next to `nppm.json` in `.nppm-history/`.
+  Rendered as a vertical timeline with date-grouped pills and per-entry
+  icons (`+` add-only, `~` update-only, `−` remove-only, `●` mixed).
 - **Releases tab** — registry timeline merged with GitHub release notes.
 - **Global scan** — SSE-streamed CVE check across every project's lockfile,
   with progress bar in the topbar.

@@ -48,6 +48,10 @@ export class Api {
         return Api._json<ApiHistoryResponse>(`/api/projects/${projectUnid}/history`);
     }
 
+    public static historyBackfillUrl(projectUnid: string): string {
+        return `/api/projects/${projectUnid}/history/backfill`;
+    }
+
     public static async projectMatrix(projectUnid: string): Promise<ApiProjectMatrixResponse> {
         return Api._json<ApiProjectMatrixResponse>(`/api/projects/${projectUnid}/matrix`);
     }

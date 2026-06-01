@@ -10,6 +10,7 @@ import {ChurnFinding, ChurnSeverity} from '../Security/ChurnScanner.js';
 import {LicenseFinding, LicenseSeverity} from '../Security/LicenseScanner.js';
 import {CadenceFinding, CadenceLevel} from '../Security/CadenceScanner.js';
 import {FreshnessFinding, FreshnessLevel} from '../Security/FreshnessScanner.js';
+import {IgnoreScriptsFinding, IgnoreScriptsLevel} from '../Security/IgnoreScriptsScanner.js';
 import {MaintainerFinding, MaintainerSeverity} from '../Security/MaintainerScanner.js';
 import {ProvenanceFinding, ProvenanceLevel} from '../Security/ProvenanceScanner.js';
 import {OsvVulnerability} from '../Security/OsvClient.js';
@@ -794,6 +795,7 @@ export class PackageDetailPanel {
 
         wrap.appendChild(this._renderVulnsSection(report.vulns));
         wrap.appendChild(this._renderScriptsSection(report.scriptFindings));
+        wrap.appendChild(this._renderIgnoreScriptsBanner(report.ignoreScripts));
         wrap.appendChild(this._renderPatternsSection(report.patternFindings));
         wrap.appendChild(this._renderBinariesSection(report.binaryFindings));
         wrap.appendChild(this._renderChurnSection(report.churn));
@@ -802,6 +804,43 @@ export class PackageDetailPanel {
         wrap.appendChild(this._renderFreshnessSection(report.freshness));
         wrap.appendChild(this._renderCadenceSection(report.cadence));
         return wrap;
+    }
+
+    /**
+     * `--ignore-scripts` recommendation banner. Sits right after
+     * the Scripts section because it's meta-info about exactly
+     * those hooks: should the user globally skip them on install?
+     * Renders four distinct verdicts (unaffected / safe / needed /
+     * avoid) — each with a unique colour and explicit action.
+     */
+    private _renderIgnoreScriptsBanner(finding: IgnoreScriptsFinding): HTMLElement {
+        const banner = document.createElement('div');
+        banner.className = `pdp-ignore pdp-ignore-${finding.level}`;
+
+        const head = document.createElement('div');
+        head.className = 'pdp-ignore-head';
+        head.textContent = PackageDetailPanel._ignoreScriptsHeadline(finding.level);
+        banner.appendChild(head);
+
+        const body = document.createElement('div');
+        body.className = 'pdp-ignore-body';
+        body.textContent = finding.reason;
+        banner.appendChild(body);
+
+        return banner;
+    }
+
+    private static _ignoreScriptsHeadline(level: IgnoreScriptsLevel): string {
+        switch (level) {
+            case IgnoreScriptsLevel.unaffected:
+                return I18n.t('--ignore-scripts: nothing to skip');
+            case IgnoreScriptsLevel.safeToIgnore:
+                return I18n.t('--ignore-scripts: safe to use');
+            case IgnoreScriptsLevel.needsScripts:
+                return I18n.t('--ignore-scripts: NOT safe — package needs the hook');
+            case IgnoreScriptsLevel.avoidScripts:
+                return I18n.t('--ignore-scripts: STRONGLY recommended');
+        }
     }
 
     /**

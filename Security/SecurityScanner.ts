@@ -29,6 +29,10 @@ import {
     FreshnessScanner,
     FreshnessSummary
 } from './FreshnessScanner.js';
+import {
+    IgnoreScriptsFinding,
+    IgnoreScriptsScanner
+} from './IgnoreScriptsScanner.js';
 import {NpmUserFetcher} from './NpmUserFetcher.js';
 import {
     ProvenanceFinding,
@@ -71,6 +75,12 @@ export type SecurityReport = {
      * has no `time` map to read.
      */
     cadence: CadenceFinding|null;
+    /**
+     * Recommendation for whether `npm install --ignore-scripts` is
+     * safe / needed / risky for this package. Always present —
+     * derived purely from `scriptFindings`, no I/O.
+     */
+    ignoreScripts: IgnoreScriptsFinding;
 };
 
 /**
@@ -189,6 +199,7 @@ export class SecurityScanner {
             maintainerCreatedAt: maintainer?.currentPublisherCreatedAt ?? null
         });
         const cadence = CadenceScanner.classify(reg?.time);
+        const ignoreScripts = IgnoreScriptsScanner.classify(scriptFindings);
 
         return {
             name,
@@ -202,7 +213,8 @@ export class SecurityScanner {
             license: this._license.classify(spdx),
             provenance,
             freshness,
-            cadence
+            cadence,
+            ignoreScripts
         };
     }
 

@@ -272,5 +272,9 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'Median cadence: every {n} days over {count} releases': 'Mittlere Kadenz: alle {n} Tage über {count} Releases',
     'Median cadence: not enough releases to compute': 'Mittlere Kadenz: zu wenige Releases',
     'Last release {n} days ago': 'Letztes Release vor {n} Tagen',
-    'median cadence every {n} days': 'mittlere Kadenz alle {n} Tage'
+    'median cadence every {n} days': 'mittlere Kadenz alle {n} Tage',
+    '--ignore-scripts: nothing to skip': '--ignore-scripts: nichts zu überspringen',
+    '--ignore-scripts: safe to use': '--ignore-scripts: bedenkenlos nutzbar',
+    '--ignore-scripts: NOT safe — package needs the hook': '--ignore-scripts: NICHT sicher — das Paket braucht den Hook',
+    '--ignore-scripts: STRONGLY recommended': '--ignore-scripts: DRINGEND empfohlen'
 };

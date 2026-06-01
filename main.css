@@ -1055,6 +1055,59 @@ html, body {
     background: rgba(140, 80, 80, 0.6);
 }
 
+.pdp-ignore {
+    border-left: 3px solid;
+    padding: 6px 10px;
+    margin: 8px 0 4px;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: var(--c-bg);
+}
+
+.pdp-ignore-head {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    margin-bottom: 4px;
+}
+
+.pdp-ignore-body {
+    font-size: 12px;
+    color: var(--c-muted);
+    line-height: 1.4;
+}
+
+.pdp-ignore-unaffected {
+    border-left-color: rgba(120, 120, 120, 0.6);
+}
+
+.pdp-ignore-unaffected .pdp-ignore-head {
+    color: var(--c-muted);
+}
+
+.pdp-ignore-safe-to-ignore {
+    border-left-color: rgba(80, 180, 120, 0.7);
+}
+
+.pdp-ignore-safe-to-ignore .pdp-ignore-head {
+    color: #6cd391;
+}
+
+.pdp-ignore-needs-scripts {
+    border-left-color: rgba(240, 180, 0, 0.7);
+}
+
+.pdp-ignore-needs-scripts .pdp-ignore-head {
+    color: #f0b400;
+}
+
+.pdp-ignore-avoid-scripts {
+    border-left-color: rgba(232, 90, 90, 0.7);
+}
+
+.pdp-ignore-avoid-scripts .pdp-ignore-head {
+    color: #e85a5a;
+}
+
 .pdp-fresh-body {
     font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
     color: var(--c-text);

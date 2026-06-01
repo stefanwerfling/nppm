@@ -281,5 +281,9 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     'Median cadence: every {n} days over {count} releases': 'Median cadence: every {n} days over {count} releases',
     'Median cadence: not enough releases to compute': 'Median cadence: not enough releases to compute',
     'Last release {n} days ago': 'Last release {n} days ago',
-    'median cadence every {n} days': 'median cadence every {n} days'
+    'median cadence every {n} days': 'median cadence every {n} days',
+    '--ignore-scripts: nothing to skip': '--ignore-scripts: nothing to skip',
+    '--ignore-scripts: safe to use': '--ignore-scripts: safe to use',
+    '--ignore-scripts: NOT safe — package needs the hook': '--ignore-scripts: NOT safe — package needs the hook',
+    '--ignore-scripts: STRONGLY recommended': '--ignore-scripts: STRONGLY recommended'
 };

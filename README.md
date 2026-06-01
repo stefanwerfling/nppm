@@ -13,6 +13,19 @@ Backend lives inside a Vite dev server, frontend is plain TypeScript + DOM
 
 ![Matrix view](doc/screenshots/01_matrix.png)
 
+<p align="center">
+  <img src="doc/git-npm-helix.svg" width="80" height="150" alt="git + npm interweave into nppm — the best combination" />
+</p>
+
+> **git + npm — the best combination.** nppm draws its strength from
+> both data sources at once: the **npm registry** carries versions,
+> publishers, integrity, provenance and CVE links; **git** carries
+> the time axis — which lockfile state belonged to which commit.
+> Interweaving the two is what makes the retroactive vulnerability
+> timeline, the PR-review dep deltas, and the git-backfilled history
+> work at all. nppm shines on projects that are both versioned in git
+> **and** reproducibly installed via `package-lock.json`.
+
 ## Documentation
 
 - 🇬🇧 [User manual](doc/manual_en.md) — screenshot-driven walkthrough

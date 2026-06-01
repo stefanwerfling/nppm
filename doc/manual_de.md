@@ -11,6 +11,21 @@ docs:screenshots` aus deiner eigenen `nppm.json` erzeugt — d.h. du
 siehst hier echte Daten aus deinen konfigurierten Projekten, nicht
 Beispielprojekte.
 
+<p align="center">
+  <img src="git-npm-helix.svg" width="80" height="150" alt="git + npm münden in nppm — die beste Kombination" />
+</p>
+
+> **git + npm — die beste Kombination.** nppm zieht seine Stärke aus
+> beiden Datenquellen gleichzeitig: das **npm-Registry** liefert
+> Versionen, Publisher, Integrity, Provenance und CVE-Verknüpfungen
+> für jedes Paket; **git** liefert die zeitliche Achse — welcher
+> Lockfile-Stand zu welchem Commit gehörte. Erst die Verschränkung
+> aus beiden erlaubt Features wie die retroaktive
+> Vulnerability-Timeline, PR-Review-Deltas und die git-rückwärts
+> rekonstruierte History. Ein lokales nppm-Projekt sollte deswegen
+> idealerweise sowohl in git versioniert sein als auch über
+> `package-lock.json` reproduzierbar installieren.
+
 ## Inhalt
 
 1. [Die projektübergreifende Matrix](#1-die-projektübergreifende-matrix)

@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 150" width="80" height="150" role="img" aria-label="git + npm interweave into nppm">
+  <title>git + npm interweave into nppm</title>
+
+  <!-- Top badges: the two strands of nppm's data model. Centred over
+       the start of each strand so the visual reads top-down: badge →
+       strand → helix → convergence → nppm. -->
+  <g font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+     font-weight="700">
+    <!-- git badge (blue, left) -->
+    <rect x="14" y="4" width="24" height="14" rx="3" fill="#3574F0"/>
+    <text x="26" y="14.6" font-size="9" fill="#ffffff" text-anchor="middle">git</text>
+
+    <!-- npm badge (red, right) -->
+    <rect x="42" y="4" width="24" height="14" rx="3" fill="#CB3837"/>
+    <text x="54" y="14.6" font-size="9" fill="#ffffff" text-anchor="middle">npm</text>
+  </g>
+
+  <!-- Short connectors leading the eye from each badge into its
+       strand. Same colour as the strand below so the continuity
+       reads cleanly. -->
+  <line x1="26" y1="18" x2="26" y2="24" stroke="#3574F0" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="54" y1="18" x2="54" y2="24" stroke="#CB3837" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- "Base pairs" — light rungs at the three apart-points of the
+       helix, drawn before the strands so the latter paint over the
+       rung endpoints. -->
+  <g stroke="#8a8a8a" stroke-width="1.4" stroke-linecap="round" opacity="0.7">
+    <line x1="26" y1="46" x2="54" y2="46"/>
+    <line x1="26" y1="68" x2="54" y2="68"/>
+    <line x1="26" y1="90" x2="54" y2="90"/>
+  </g>
+
+  <!-- Two sine-wave strands, mirrored (180° phase) over two full
+       periods, then a final cubic that converges both into the nppm
+       badge at the bottom. cx=40, amp=14, period=44. -->
+  <g fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+    <!-- git strand (blue, left peak first) — 2 periods + converge -->
+    <path stroke="#3574F0" d="
+      M 26 24
+      C 26 30.08 32.27 35 40 35
+      C 47.73 35 54 39.92 54 46
+      C 54 52.08 47.73 57 40 57
+      C 32.27 57 26 61.92 26 68
+      C 26 74.08 32.27 79 40 79
+      C 47.73 79 54 83.92 54 90
+      C 54 96.08 47.73 101 40 101
+      C 32.27 101 26 105.92 26 112
+      C 26 119.7 32.3 126 40 126
+    "/>
+
+    <!-- npm strand (red, right peak first) — 2 periods + converge -->
+    <path stroke="#CB3837" d="
+      M 54 24
+      C 54 30.08 47.73 35 40 35
+      C 32.27 35 26 39.92 26 46
+      C 26 52.08 32.27 57 40 57
+      C 47.73 57 54 61.92 54 68
+      C 54 74.08 47.73 79 40 79
+      C 32.27 79 26 83.92 26 90
+      C 26 96.08 32.27 101 40 101
+      C 47.73 101 54 105.92 54 112
+      C 54 119.7 47.7 126 40 126
+    "/>
+  </g>
+
+  <!-- Bottom badge: nppm. Both strands feed into the top edge at
+       (40, 126); the badge sits underneath, picking up the
+       project's brand accent (dark panel + #3574F0 stroke, same as
+       the main nppm logo) so the merger reads as "the two upstream
+       data streams become this app". -->
+  <g font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+     font-weight="700">
+    <rect x="22" y="126" width="36" height="16" rx="3" fill="#1e1f22" stroke="#3574F0" stroke-width="1.6"/>
+    <text x="40" y="137.4" font-size="10" fill="#ffffff" text-anchor="middle">nppm</text>
+  </g>
+</svg>

@@ -11,6 +11,20 @@ own `nppm.json`. All screenshots are generated against the *current*
 configured projects via `npm run docs:screenshots` — re-run that any
 time the UI changes.
 
+<p align="center">
+  <img src="git-npm-helix.svg" width="80" height="150" alt="git + npm interweave into nppm — the best combination" />
+</p>
+
+> **git + npm — the best combination.** nppm draws its strength from
+> both data sources at once: the **npm registry** carries versions,
+> publishers, integrity, provenance and CVE links for every package;
+> **git** carries the time axis — which lockfile state belonged to
+> which commit. Interweaving the two is what makes the retroactive
+> vulnerability timeline, the PR-review dep deltas and the
+> git-backfilled history possible at all. A local nppm project is
+> therefore at its best when it is both versioned in git **and**
+> reproducibly installed via `package-lock.json`.
+
 ## Table of contents
 
 1. [The cross-project matrix](#1-the-cross-project-matrix)

@@ -7,6 +7,8 @@ import {
     ApiFingerprintResponse,
     ApiHistoryResponse,
     ApiLockfileResponse,
+    ApiBundlesRequest,
+    ApiBundlesResponse,
     ApiMatrixHeuristicsRequest,
     ApiMatrixHeuristicsResponse,
     ApiMatrixIntegrityResponse,
@@ -192,6 +194,21 @@ export class Api {
 
     public static async matrixIntegrity(): Promise<ApiMatrixIntegrityResponse> {
         return Api._json<ApiMatrixIntegrityResponse>('/api/matrix/integrity');
+    }
+
+    public static async matrixBundles(
+        packages: {name: string; version: string}[]
+    ): Promise<ApiBundlesResponse> {
+        const body: ApiBundlesRequest = {packages};
+        const res = await fetch('/api/matrix/bundles', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            throw new Error(`/api/matrix/bundles → ${res.status} ${res.statusText}`);
+        }
+        return (await res.json()) as ApiBundlesResponse;
     }
 
     public static async matrixHeuristics(

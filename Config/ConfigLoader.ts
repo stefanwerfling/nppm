@@ -1,4 +1,5 @@
 import path from 'path';
+import {BundlephobiaFetcher} from '../Bundle/BundlephobiaFetcher.js';
 import {JsonCache} from '../Cache/JsonCache.js';
 import {FingerprintBuilder} from '../Fingerprint/FingerprintBuilder.js';
 import {Project} from '../Project/Project.js';
@@ -45,6 +46,7 @@ export type LoadedConfig = {
     securityCache: JsonCache;
     securityScanner: SecurityScanner;
     unusedDetector: UnusedDetector;
+    bundlephobiaFetcher: BundlephobiaFetcher;
     /**
      * `actions.allowInstall` from the config. Defaults to `false`. The
      * dev server's "Edit + install" + per-package "Run script" buttons
@@ -199,6 +201,17 @@ export class ConfigLoader {
             devPathGlobs: cfg.security?.unused?.devPathGlobs
         });
 
+        // Bundle-size cache is permanent — bundlephobia computes
+        // against an immutable `name@version`, so a once-resolved
+        // result is correct forever. Network calls are bounded by
+        // the fetcher's concurrency cap.
+        const bundleCache = new JsonCache(
+            path.join(cacheDir, 'bundlephobia'),
+            cacheTtlMinutes,
+            {permanent: true}
+        );
+        const bundlephobiaFetcher = new BundlephobiaFetcher(bundleCache);
+
         const projects: Project[] = [];
         for (const entry of (cfg.projects ?? []) as Array<{type: ConfigProjectType}>) {
             if (entry.type === ConfigProjectType.local) {
@@ -261,6 +274,7 @@ export class ConfigLoader {
             securityCache,
             securityScanner,
             unusedDetector,
+            bundlephobiaFetcher,
             allowInstall,
             editor,
             projects

@@ -10,6 +10,8 @@ import {
     ApiBulkUpgradePreviewRequest,
     ApiBulkUpgradePreviewResponse,
     ApiBulkUpgradePreviewResult,
+    ApiBundlesRequest,
+    ApiBundlesResponse,
     ApiFingerprintDiffResponse,
     ApiFingerprintResponse,
     ApiHistoryResponse,
@@ -128,6 +130,7 @@ class Server {
                 securityCache,
                 securityScanner,
                 unusedDetector,
+                bundlephobiaFetcher,
                 allowInstall,
                 editor
             } = loaded;
@@ -1486,6 +1489,48 @@ class Server {
                 try {
                     const results = await securityScanner.scanHeuristicsBatch(packages);
                     const response: ApiMatrixHeuristicsResponse = {results};
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // POST /api/matrix/bundles — bundlephobia batched lookup for
+            // the matrix size column. Body: `{packages: [{name, version}]}`.
+            // Permanent cache (immutable `name@version`) so warm runs
+            // return instantly; cold runs queue under the fetcher's
+            // concurrency cap.
+            // -------------------------------------------------------------
+            app.post('/api/matrix/bundles', async (req, res) => {
+                const body = req.body as Partial<ApiBundlesRequest>;
+
+                if (!body || !Array.isArray(body.packages)) {
+                    res.status(400).json({
+                        success: false,
+                        msg: 'body must contain a `packages` array'
+                    });
+                    return;
+                }
+
+                const packages = body.packages.filter(
+                    (p): p is {name: string; version: string} =>
+                        typeof p?.name === 'string' && typeof p?.version === 'string'
+                );
+
+                try {
+                    const map = await bundlephobiaFetcher.fetchMany(packages);
+                    const results = packages.map((p) => {
+                        const hit = map.get(`${p.name}@${p.version}`);
+                        return {
+                            name: p.name,
+                            version: p.version,
+                            size: hit?.size ?? null,
+                            gzip: hit?.gzip ?? null,
+                            dependencyCount: hit?.dependencyCount ?? null
+                        };
+                    });
+                    const response: ApiBundlesResponse = {results};
                     res.status(200).json(response);
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});

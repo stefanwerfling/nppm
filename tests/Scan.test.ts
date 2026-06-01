@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
+import {BundlephobiaFetcher} from '../Bundle/BundlephobiaFetcher.js';
 import {JsonCache} from '../Cache/JsonCache.js';
 import {ConfigProjectType} from '../Config/Config.js';
 import {LoadedConfig} from '../Config/ConfigLoader.js';
@@ -80,6 +81,8 @@ function makeEnvironment(opts: {
     const osvClient = new OsvClient(securityCache);
     const securityScanner = new SecurityScanner(osvClient, fingerprintBuilder, registry);
     const unusedDetector = new UnusedDetector({}, opts.unusedFs);
+    const bundleCache = new JsonCache(path.join(opts.cacheDir, 'bundlephobia'), 60, {permanent: true});
+    const bundlephobiaFetcher = new BundlephobiaFetcher(bundleCache);
 
     return {
         projectRoot: opts.cacheDir,
@@ -94,6 +97,7 @@ function makeEnvironment(opts: {
         securityCache,
         securityScanner,
         unusedDetector,
+        bundlephobiaFetcher,
         allowInstall: false,
         editor: undefined,
         projects: opts.projects

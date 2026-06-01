@@ -264,6 +264,28 @@ export type ApiMatrixIntegrityResponse = {
 };
 
 /**
+ * One bundlephobia lookup result for the matrix size badge.
+ * `size`/`gzip` carry bytes; the matrix renders them in human
+ * units. `null` means bundlephobia returned nothing usable for
+ * that coordinate (404 / unbuildable / network error).
+ */
+export type ApiBundleEntry = {
+    name: string;
+    version: string;
+    size: number|null;
+    gzip: number|null;
+    dependencyCount: number|null;
+};
+
+export type ApiBundlesRequest = {
+    packages: {name: string; version: string}[];
+};
+
+export type ApiBundlesResponse = {
+    results: ApiBundleEntry[];
+};
+
+/**
  * Response shape of `GET /api/projects/:id/unused`. Mirrors
  * `UnusedReport` 1:1 — kept as its own type so the API surface stays
  * explicit in `ApiTypes.ts`. `supported: false` is the sentinel for

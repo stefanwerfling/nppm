@@ -1,4 +1,4 @@
-import {ApiBulkUpgradePick, ApiMatrixIntegrityEntry} from '../Api/ApiTypes.js';
+import {ApiBulkUpgradePick, ApiBundleEntry, ApiMatrixIntegrityEntry} from '../Api/ApiTypes.js';
 import {ConfigProjectType} from '../Config/Config.js';
 import {DependencyType} from '../Project/PackageManifest.js';
 import {MatrixResponse, MatrixRow, MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
@@ -163,6 +163,10 @@ export class Matrix {
     private _freshnessByName: Map<string, FreshnessSummary> = new Map();
     private _cadenceByName: Map<string, CadenceSummary> = new Map();
     private _typosquatByName: Map<string, TyposquatSummary> = new Map();
+    // Bundlephobia size keyed by package name (we always query against
+    // `latest`, so the version is implicit). `null` means asked-and-
+    // unbuildable; missing key means not yet asked.
+    private _bundlesByName: Map<string, ApiBundleEntry> = new Map();
     // Per-name aggregated integrity status, loaded once after `setData`.
     // Missing key means "not yet asked" or "no finding"; present key
     // carries the worst severity any project's lockfile reported.
@@ -304,6 +308,7 @@ export class Matrix {
         this._freshnessByName = new Map();
         this._cadenceByName = new Map();
         this._typosquatByName = new Map();
+        this._bundlesByName = new Map();
         this._integrityByName = new Map();
         this._render();
 
@@ -317,11 +322,37 @@ export class Matrix {
 
         // CVE lookup is fast (OSV batch); the fingerprint-derived
         // heuristics (scripts + patterns) are slow on cold start
-        // (tarball downloads). Fire all three in parallel — whichever
+        // (tarball downloads). Fire all in parallel — whichever
         // returns first repaints, the others follow.
         void this._loadVulnBadges(gen, packages);
         void this._loadHeuristicBadges(gen, packages);
         void this._loadIntegrityBadges(gen);
+        void this._loadBundleSizes(gen, packages);
+    }
+
+    private async _loadBundleSizes(gen: number, packages: {name: string; version: string}[]): Promise<void> {
+        if (packages.length === 0) {
+            return;
+        }
+        try {
+            const response = await Api.matrixBundles(packages);
+            if (gen !== this._securityGen) {
+                return;
+            }
+            let anyHit = false;
+            for (const entry of response.results) {
+                this._bundlesByName.set(entry.name, entry);
+                if (entry.gzip !== null) {
+                    anyHit = true;
+                }
+            }
+            if (anyHit) {
+                this._rerenderTable();
+            }
+        } catch {
+            // Best-effort — bundlephobia outages must not break the
+            // matrix itself.
+        }
     }
 
     private async _loadVulnBadges(gen: number, packages: {name: string; version: string}[]): Promise<void> {
@@ -613,6 +644,24 @@ export class Matrix {
         const nameText = document.createElement('span');
         nameText.textContent = row.name;
         nameCell.appendChild(nameText);
+
+        // Bundle-size pill — informational rather than a warning.
+        // Coloured by gzip-size threshold (muted < 50kB, warn 50–200kB,
+        // risk > 200kB) so a glance at the matrix surfaces the
+        // outliers without crowding every row.
+        const bundle = this._bundlesByName.get(row.name);
+        if (bundle && bundle.gzip !== null) {
+            const pill = document.createElement('span');
+            const bucket = Matrix._bundleBucket(bundle.gzip);
+            pill.className = `matrix-bundle matrix-bundle-${bucket}`;
+            pill.textContent = Matrix._formatBytes(bundle.gzip);
+            pill.title = I18n.t('Bundle: {gzip} gzipped, {size} minified, {deps} transitive deps', {
+                gzip: Matrix._formatBytes(bundle.gzip),
+                size: bundle.size !== null ? Matrix._formatBytes(bundle.size) : '?',
+                deps: bundle.dependencyCount ?? '?'
+            });
+            nameCell.appendChild(pill);
+        }
 
         const vulnIds = this._vulnsByName.get(row.name);
         if (vulnIds && vulnIds.length > 0) {
@@ -1127,6 +1176,36 @@ export class Matrix {
      * without a `time` map) — in that case the badge wouldn't
      * render at all, but the helper stays defensive.
      */
+    /**
+     * Three-bucket gzip-size classifier for the bundle-size pill.
+     * Thresholds picked from the bundlephobia hall-of-fame: a
+     * typical utility lands well under 50kB, a UI framework hits
+     * 50-200kB, and anything over 200kB is worth a second look.
+     */
+    private static _bundleBucket(gzipBytes: number): 'small'|'medium'|'large' {
+        if (gzipBytes < 50_000) {
+            return 'small';
+        }
+        if (gzipBytes < 200_000) {
+            return 'medium';
+        }
+        return 'large';
+    }
+
+    /**
+     * Format byte counts as `N kB` or `N.M MB`. Bundlephobia returns
+     * decimal-kilobytes by convention so we follow suit.
+     */
+    private static _formatBytes(bytes: number): string {
+        if (bytes < 1000) {
+            return `${bytes} B`;
+        }
+        if (bytes < 1_000_000) {
+            return `${Math.round(bytes / 1000)} kB`;
+        }
+        return `${(bytes / 1_000_000).toFixed(1)} MB`;
+    }
+
     private static _typosquatTooltip(summary: TyposquatSummary): string {
         if (summary.hasConfusables) {
             return summary.closestMatch

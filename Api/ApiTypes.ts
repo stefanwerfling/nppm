@@ -6,7 +6,7 @@ import {ProjectMatrixResponse} from '../Matrix/ProjectMatrixBuilder.js';
 import {Lockfile} from '../Project/Lockfile.js';
 import {PackageDependency} from '../Project/PackageManifest.js';
 import {ReleasesResponse} from '../Releases/Releases.js';
-import {IntegrityFinding, IntegritySummary} from '../Security/IntegrityScanner.js';
+import {IntegrityFinding, IntegritySeverity, IntegritySummary} from '../Security/IntegrityScanner.js';
 import {HeuristicsBatchEntry, SecurityReport} from '../Security/SecurityScanner.js';
 import {PrReviewReport} from '../PrReview/PrReview.js';
 import {UnusedReport} from '../Unused/UnusedReport.js';
@@ -241,6 +241,26 @@ export type ApiMatrixHeuristicsRequest = {
 
 export type ApiMatrixHeuristicsResponse = {
     results: HeuristicsBatchEntry[];
+};
+
+/**
+ * Aggregated integrity status per package name for the cross-project
+ * matrix badge. Walks every configured project's lockfile, runs the
+ * `IntegrityScanner` per project, then collapses the findings per
+ * package name: `severity` is the worst across all versions any
+ * project pinned, `riskCount` counts only the `risk`-tier hits.
+ *
+ * `severity: null` means every lockfile entry checked clean (or no
+ * findings could be produced — cold registry cache, no lockfiles).
+ */
+export type ApiMatrixIntegrityEntry = {
+    name: string;
+    severity: IntegritySeverity|null;
+    riskCount: number;
+};
+
+export type ApiMatrixIntegrityResponse = {
+    results: ApiMatrixIntegrityEntry[];
 };
 
 /**

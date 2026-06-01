@@ -9,6 +9,7 @@ import {
     ApiLockfileResponse,
     ApiMatrixHeuristicsRequest,
     ApiMatrixHeuristicsResponse,
+    ApiMatrixIntegrityResponse,
     ApiMatrixSecurityRequest,
     ApiMatrixSecurityResponse,
     ApiPackagesResponse,
@@ -187,6 +188,10 @@ export class Api {
         }
 
         return (await res.json()) as ApiMatrixSecurityResponse;
+    }
+
+    public static async matrixIntegrity(): Promise<ApiMatrixIntegrityResponse> {
+        return Api._json<ApiMatrixIntegrityResponse>('/api/matrix/integrity');
     }
 
     public static async matrixHeuristics(

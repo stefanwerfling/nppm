@@ -981,6 +981,18 @@ html, body {
     background: rgba(255, 80, 130, 0.65);
 }
 
+.matrix-badge-integrity {
+    background: rgba(255, 140, 50, 0.45);
+    color: #ffe1c2;
+    border: 1px solid rgba(255, 140, 50, 0.85);
+    margin-left: 6px;
+    cursor: pointer;
+}
+
+.matrix-badge-integrity:hover {
+    background: rgba(255, 140, 50, 0.65);
+}
+
 .matrix-badge-license {
     margin-left: 6px;
     cursor: pointer;
@@ -1370,6 +1382,33 @@ html, body {
     margin-bottom: 6px;
 }
 
+.pdp-tfa {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.5px;
+    margin-left: 6px;
+}
+
+.pdp-tfa-on {
+    background: rgba(80, 180, 120, 0.2);
+    color: #6cd391;
+    border: 1px solid rgba(80, 180, 120, 0.5);
+}
+
+.pdp-tfa-off {
+    background: rgba(232, 90, 90, 0.2);
+    color: #e85a5a;
+    border: 1px solid rgba(232, 90, 90, 0.5);
+}
+
+.pdp-tfa-unknown {
+    background: rgba(150, 150, 150, 0.18);
+    color: var(--c-muted);
+    border: 1px solid rgba(150, 150, 150, 0.4);
+}
+
 .pdp-script-body {
     display: block;
     background: var(--c-panel);
@@ -1567,6 +1606,50 @@ html, body {
 .installed-ide-btn:hover {
     background: var(--c-accent);
     color: #fff;
+}
+
+.installed-why-btn {
+    margin-left: 6px;
+    padding: 0 6px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    background: var(--c-panel);
+    color: var(--c-muted);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 14px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.installed-why-btn:hover {
+    background: var(--c-accent);
+    border-color: var(--c-accent);
+    color: #fff;
+}
+
+.wmd-meta {
+    font-size: 12px;
+    color: var(--c-text);
+}
+
+.wmd-paths {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.wmd-path {
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    margin: 0;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--c-text);
+    white-space: pre-wrap;
+    word-break: break-all;
 }
 
 .matrix-cell-upgrade {

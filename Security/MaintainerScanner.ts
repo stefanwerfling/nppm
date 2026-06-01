@@ -1,5 +1,6 @@
 import {GitResolver} from '../Fingerprint/GitResolver.js';
 import {Registry, RegistryPublisher} from '../Registry/Registry.js';
+import {Npm2FaFetcher} from './Npm2FaFetcher.js';
 
 /**
  * Three-level severity, matching the other scanners. `info` = trusted
@@ -28,6 +29,21 @@ export type MaintainerFinding = {
     gapDays: number|null;
     severity: MaintainerSeverity;
     reason: string;
+    /**
+     * 2FA status of the current publisher's npm account, when the
+     * registry was willing to disclose it.
+     *
+     *   - `true`  → 2FA enabled (login *and/or* publish gated)
+     *   - `false` → no 2FA on the account
+     *   - `null`  → registry refused to tell us (typically 401 on the
+     *               public mirror) or no `Npm2FaFetcher` was wired
+     *
+     * The scanner *does not* change its severity decision based on
+     * this field — it would punish accounts on public mirrors that
+     * never expose `tfa` to anonymous queries. The UI surfaces it
+     * separately so the user can factor it into their own judgement.
+     */
+    currentPublisher2FA?: boolean|null;
 };
 
 type SemverTriple = [number, number, number];
@@ -82,13 +98,19 @@ const DEFAULT_TRUST_WINDOW = 20;
 export class MaintainerScanner {
 
     private readonly _registry: Registry;
+    private readonly _tfaFetcher: Npm2FaFetcher|null;
     private readonly _quickHandoverDays: number;
     private readonly _suspiciousGapDays: number;
     private readonly _matureVersions: number;
     private readonly _trustWindow: number;
 
-    constructor(registry: Registry, opts: MaintainerScannerOptions = {}) {
+    constructor(
+        registry: Registry,
+        opts: MaintainerScannerOptions = {},
+        tfaFetcher: Npm2FaFetcher|null = null
+    ) {
         this._registry = registry;
+        this._tfaFetcher = tfaFetcher;
         this._quickHandoverDays = opts.quickHandoverDays ?? DEFAULT_QUICK_HANDOVER_DAYS;
         this._suspiciousGapDays = opts.suspiciousGapDays ?? DEFAULT_SUSPICIOUS_GAP_DAYS;
         this._matureVersions = opts.matureVersions ?? DEFAULT_MATURE_VERSIONS;
@@ -96,6 +118,34 @@ export class MaintainerScanner {
     }
 
     public async scan(name: string, version: string): Promise<MaintainerFinding|null> {
+        const finding = await this._classify(name, version);
+        if (finding === null) {
+            return null;
+        }
+        finding.currentPublisher2FA = await this._fetch2FA(finding.currentPublisher?.name);
+        return finding;
+    }
+
+    /**
+     * Resolve the current publisher's 2FA state via the optional
+     * fetcher. Always returns `null` when no fetcher is wired (every
+     * test that constructed the scanner without one) so the field is
+     * present but explicitly "unknown".
+     */
+    private async _fetch2FA(username: string|null|undefined): Promise<boolean|null> {
+        if (!this._tfaFetcher || !username) {
+            return null;
+        }
+        return this._tfaFetcher.fetch(username);
+    }
+
+    /**
+     * Original severity-classification logic. Returns the finding
+     * without the 2FA enrichment, which `scan()` attaches as a single
+     * follow-up step. Split out so every return branch doesn't have
+     * to await the fetcher itself.
+     */
+    private async _classify(name: string, version: string): Promise<MaintainerFinding|null> {
         if (GitResolver.isGitVersion(version)) {
             return null;
         }
@@ -296,11 +346,15 @@ export class MaintainerScanner {
 
 /**
  * Compact summary for the matrix badge — same shape as the other
- * heuristic summaries (`ScriptSummary`, `PatternSummary`, …).
+ * heuristic summaries (`ScriptSummary`, `PatternSummary`, …). `publisher2FA`
+ * mirrors `MaintainerFinding.currentPublisher2FA` so the matrix
+ * tooltip can flag accounts the registry confirmed have 2FA off
+ * without re-fetching anything.
  */
 export type MaintainerSummary = {
     name: string;
     version: string;
     severity: MaintainerSeverity|null;
     publisher: string|null;
+    publisher2FA?: boolean|null;
 };

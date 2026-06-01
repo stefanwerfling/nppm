@@ -6,6 +6,7 @@ import {JsonCache} from '../Cache/JsonCache.js';
 import {LockedPackage} from '../Project/Lockfile.js';
 import {Registry, RegistryPackage} from '../Registry/Registry.js';
 import {
+    IntegrityFinding,
     IntegrityFindingKind,
     IntegrityScanner,
     IntegritySeverity
@@ -275,5 +276,38 @@ describe('IntegrityScanner', () => {
         const summary = IntegrityScanner.summarize([], 5);
         expect(summary.maxSeverity).toBeNull();
         expect(summary.totalScanned).toBe(5);
+    });
+
+    it('aggregateByName collapses cross-project findings to per-name max severity', () => {
+        const findings: IntegrityFinding[] = [
+            // pkg-a: two projects reporting different severities for two versions
+            {
+                name: 'pkg-a', version: '1.0.0',
+                kind: IntegrityFindingKind.tarballRedirect,
+                severity: IntegritySeverity.info, message: ''
+            },
+            {
+                name: 'pkg-a', version: '2.0.0',
+                kind: IntegrityFindingKind.integrityMismatch,
+                severity: IntegritySeverity.risk, message: ''
+            },
+            // pkg-b: only risk
+            {
+                name: 'pkg-b', version: '1.0.0',
+                kind: IntegrityFindingKind.integrityMismatch,
+                severity: IntegritySeverity.risk, message: ''
+            },
+            // pkg-c: only info
+            {
+                name: 'pkg-c', version: '1.0.0',
+                kind: IntegrityFindingKind.versionNotInRegistry,
+                severity: IntegritySeverity.info, message: ''
+            }
+        ];
+
+        const out = IntegrityScanner.aggregateByName(findings);
+        expect(out.get('pkg-a')).toEqual({severity: IntegritySeverity.risk, riskCount: 1});
+        expect(out.get('pkg-b')).toEqual({severity: IntegritySeverity.risk, riskCount: 1});
+        expect(out.get('pkg-c')).toEqual({severity: IntegritySeverity.info, riskCount: 0});
     });
 });

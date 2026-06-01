@@ -15,6 +15,7 @@ import {UnusedView} from './UnusedView.js';
 import {UpgradeModal} from './UpgradeModal.js';
 import {PrReviewView} from './PrReviewView.js';
 import {VulnerabilityTimelineView} from './VulnerabilityTimelineView.js';
+import {WhyModal} from './WhyModal.js';
 
 /**
  * Active right-pane view. `packages` and `installed` are two flavours
@@ -56,6 +57,7 @@ export class Nppm {
     private readonly _detailPanel: PackageDetailPanel;
     private readonly _upgradeModal: UpgradeModal;
     private readonly _bulkUpgradeModal: BulkUpgradeModal;
+    private readonly _whyModal: WhyModal;
     private readonly _listRoot: HTMLElement;
     private _matrixHost: HTMLElement|null = null;
     private _packageHost: HTMLElement|null = null;
@@ -125,6 +127,7 @@ export class Nppm {
         this._detailPanel = new PackageDetailPanel();
         this._upgradeModal = new UpgradeModal();
         this._bulkUpgradeModal = new BulkUpgradeModal();
+        this._whyModal = new WhyModal();
 
         new Resizer(resizer, controls);
 
@@ -198,6 +201,9 @@ export class Nppm {
         this._installedView.onShowUnused(wireUnused);
         this._installedView.onShowVulns(wireVulns);
         this._installedView.onShowPr(wirePr);
+        this._installedView.onWhy((unid, name, version) => {
+            void this._whyModal.open(unid, name, version);
+        });
 
         this._historyView.onShowDeclared(wireDeclared);
         this._historyView.onShowInstalled(wireInstalled);

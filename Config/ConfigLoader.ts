@@ -7,6 +7,7 @@ import {ProjectGithub} from '../Project/ProjectGithub.js';
 import {ProjectLocal} from '../Project/ProjectLocal.js';
 import {Registry} from '../Registry/Registry.js';
 import {LicenseSeverity} from '../Security/LicenseScanner.js';
+import {Npm2FaFetcher} from '../Security/Npm2FaFetcher.js';
 import {OsvClient} from '../Security/OsvClient.js';
 import {SecurityScanner} from '../Security/SecurityScanner.js';
 import {UnusedDetector} from '../Unused/UnusedDetector.js';
@@ -160,6 +161,14 @@ export class ConfigLoader {
         const securityCache = new JsonCache(path.join(cacheDir, 'security'), cacheTtlMinutes);
         const osvClient = new OsvClient(securityCache);
 
+        // 2FA status rarely changes — reuse the registry TTL pocket so
+        // cold-start cost is amortised across browser reloads. The
+        // registry frequently 401s anonymous reads of `/-/user/*`, so
+        // most lookups cache as "unknown"; that's still useful because
+        // it stops every reload from re-asking.
+        const tfaCache = new JsonCache(path.join(cacheDir, 'npm-2fa'), cacheTtlMinutes);
+        const tfaFetcher = new Npm2FaFetcher(registryUrl, tfaCache, registryAuth);
+
         // `treatUnknownAs` arrives as a free-form string from the
         // config (VTS schema can't constrain it to enum values
         // without a custom validator). Unknown values fall back to
@@ -180,7 +189,8 @@ export class ConfigLoader {
                     allowlist: cfg.security?.license?.allowlist,
                     denylist: cfg.security?.license?.denylist,
                     treatUnknownAs
-                }
+                },
+                tfaFetcher
             }
         );
 

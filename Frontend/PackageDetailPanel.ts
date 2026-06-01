@@ -860,6 +860,28 @@ export class PackageDetailPanel {
             head.appendChild(gap);
         }
 
+        // 2FA pill — `true` / `false` only render when the registry
+        // was willing to answer; `undefined`/`null` (typical on the
+        // public mirror) is rendered as a small "?" so the user knows
+        // we asked but couldn't tell.
+        const tfa = document.createElement('span');
+        tfa.className = 'pdp-tfa';
+        const tfaState = finding.currentPublisher2FA;
+        if (tfaState === true) {
+            tfa.classList.add('pdp-tfa-on');
+            tfa.textContent = '2FA ✓';
+            tfa.title = I18n.t('Publisher account has 2FA enabled');
+        } else if (tfaState === false) {
+            tfa.classList.add('pdp-tfa-off');
+            tfa.textContent = '2FA ✗';
+            tfa.title = I18n.t('Publisher account has no 2FA — credential-theft would be enough to publish');
+        } else {
+            tfa.classList.add('pdp-tfa-unknown');
+            tfa.textContent = '2FA ?';
+            tfa.title = I18n.t('Registry did not disclose the publisher\'s 2FA state (typical on the public mirror)');
+        }
+        head.appendChild(tfa);
+
         card.appendChild(head);
 
         const reason = document.createElement('div');

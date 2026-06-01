@@ -1,8 +1,9 @@
-import {ApiBulkUpgradePick} from '../Api/ApiTypes.js';
+import {ApiBulkUpgradePick, ApiMatrixIntegrityEntry} from '../Api/ApiTypes.js';
 import {ConfigProjectType} from '../Config/Config.js';
 import {DependencyType} from '../Project/PackageManifest.js';
 import {MatrixResponse, MatrixRow, MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
 import {BinarySeverity, BinarySummary} from '../Security/BinaryScanner.js';
+import {IntegritySeverity} from '../Security/IntegrityScanner.js';
 import {LicenseSeverity, LicenseSummary} from '../Security/LicenseScanner.js';
 import {MaintainerSeverity, MaintainerSummary} from '../Security/MaintainerScanner.js';
 import {PatternSeverity} from '../Security/PatternScanner.js';
@@ -84,6 +85,12 @@ const MAINTAINER_WEIGHT: Record<MaintainerSeverity, number> = {
     [MaintainerSeverity.risk]: 25
 };
 
+const INTEGRITY_WEIGHT: Record<IntegritySeverity, number> = {
+    [IntegritySeverity.info]: 0,
+    [IntegritySeverity.warn]: 8,
+    [IntegritySeverity.risk]: 30
+};
+
 /**
  * Persisted UI state — keeps filter, sort, and search across reloads
  * via localStorage. Stored as one JSON blob so we can extend later
@@ -129,6 +136,10 @@ export class Matrix {
     private _binariesByName: Map<string, BinarySummary> = new Map();
     private _maintainersByName: Map<string, MaintainerSummary> = new Map();
     private _licensesByName: Map<string, LicenseSummary> = new Map();
+    // Per-name aggregated integrity status, loaded once after `setData`.
+    // Missing key means "not yet asked" or "no finding"; present key
+    // carries the worst severity any project's lockfile reported.
+    private _integrityByName: Map<string, ApiMatrixIntegrityEntry> = new Map();
     // Generation counter so a late security response from a previous
     // `setData` call cannot overwrite a newer matrix.
     private _securityGen: number = 0;
@@ -183,7 +194,8 @@ export class Matrix {
         scripts: ScriptSummary|undefined,
         patterns: PatternSummary|undefined,
         binaries: BinarySummary|undefined,
-        maintainer: MaintainerSummary|undefined
+        maintainer: MaintainerSummary|undefined,
+        integrity: ApiMatrixIntegrityEntry|undefined
     ): number {
         let score = 0;
         if (vulnIds && vulnIds.length > 0) {
@@ -205,6 +217,9 @@ export class Matrix {
         }
         if (maintainer && maintainer.severity !== null) {
             score += MAINTAINER_WEIGHT[maintainer.severity];
+        }
+        if (integrity && integrity.severity !== null) {
+            score += INTEGRITY_WEIGHT[integrity.severity];
         }
         return score;
     }
@@ -246,6 +261,7 @@ export class Matrix {
         this._binariesByName = new Map();
         this._maintainersByName = new Map();
         this._licensesByName = new Map();
+        this._integrityByName = new Map();
         this._render();
 
         const gen = ++this._securityGen;
@@ -258,10 +274,11 @@ export class Matrix {
 
         // CVE lookup is fast (OSV batch); the fingerprint-derived
         // heuristics (scripts + patterns) are slow on cold start
-        // (tarball downloads). Fire both in parallel — whichever
-        // returns first repaints, the other follows.
+        // (tarball downloads). Fire all three in parallel — whichever
+        // returns first repaints, the others follow.
         void this._loadVulnBadges(gen, packages);
         void this._loadHeuristicBadges(gen, packages);
+        void this._loadIntegrityBadges(gen);
     }
 
     private async _loadVulnBadges(gen: number, packages: {name: string; version: string}[]): Promise<void> {
@@ -289,6 +306,27 @@ export class Matrix {
             }
         } catch {
             // Best-effort: silent on failure (detail panel still has it).
+        }
+    }
+
+    private async _loadIntegrityBadges(gen: number): Promise<void> {
+        try {
+            const response = await Api.matrixIntegrity();
+            if (gen !== this._securityGen) {
+                return;
+            }
+            let anyHit = false;
+            for (const entry of response.results) {
+                this._integrityByName.set(entry.name, entry);
+                if (entry.severity === IntegritySeverity.risk) {
+                    anyHit = true;
+                }
+            }
+            if (anyHit) {
+                this._rerenderTable();
+            }
+        } catch {
+            // Best-effort: silent on failure (per-project view still surfaces it).
         }
     }
 
@@ -627,6 +665,27 @@ export class Matrix {
             }
         }
 
+        // Integrity badge only for risk-tier — `warn` covers benign
+        // custom mirrors and `info` covers private/unpublished
+        // packages, both of which are noise on a cross-project view.
+        // A `risk` finding means at least one project's lockfile pins
+        // a tarball whose integrity differs from what the registry
+        // now serves — real supply-chain signal.
+        const integrity = this._integrityByName.get(row.name);
+        if (integrity && integrity.severity === IntegritySeverity.risk) {
+            const badge = document.createElement('span');
+            badge.className = 'matrix-badge matrix-badge-integrity';
+            badge.textContent = 'INTEGRITY!';
+            badge.title = I18n.t('{n} project(s) pin a tarball whose integrity differs from the registry', {n: integrity.riskCount});
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (row.latest) {
+                    this._onSecurityClick?.(row.name, row.latest);
+                }
+            });
+            nameCell.appendChild(badge);
+        }
+
         tr.appendChild(nameCell);
 
         for (const project of this._data!.projects) {
@@ -737,7 +796,8 @@ export class Matrix {
             this._scriptsByName.get(row.name),
             this._patternsByName.get(row.name),
             this._binariesByName.get(row.name),
-            this._maintainersByName.get(row.name)
+            this._maintainersByName.get(row.name),
+            this._integrityByName.get(row.name)
         );
     }
 

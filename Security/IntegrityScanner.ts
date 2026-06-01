@@ -124,6 +124,36 @@ export class IntegrityScanner {
     }
 
     /**
+     * Reduce a finding stream to one row per package name, keeping the
+     * worst severity and the count of `risk`-tier hits. Used by the
+     * cross-project matrix badge: callers pre-merge findings across
+     * projects, then hand them in here for the per-name collapse.
+     */
+    public static aggregateByName(
+        findings: IntegrityFinding[]
+    ): Map<string, {severity: IntegritySeverity; riskCount: number}> {
+        const rank: Record<IntegritySeverity, number> = {
+            [IntegritySeverity.info]: 1,
+            [IntegritySeverity.warn]: 2,
+            [IntegritySeverity.risk]: 3
+        };
+        const out = new Map<string, {severity: IntegritySeverity; riskCount: number}>();
+        for (const f of findings) {
+            const existing = out.get(f.name);
+            const riskInc = f.severity === IntegritySeverity.risk ? 1 : 0;
+            if (!existing) {
+                out.set(f.name, {severity: f.severity, riskCount: riskInc});
+                continue;
+            }
+            if (rank[f.severity] > rank[existing.severity]) {
+                existing.severity = f.severity;
+            }
+            existing.riskCount += riskInc;
+        }
+        return out;
+    }
+
+    /**
      * Aggregate a finding list into the summary envelope. Public so
      * the route handler can compute the summary from the same scan
      * data it sends to the frontend, without scanning twice.

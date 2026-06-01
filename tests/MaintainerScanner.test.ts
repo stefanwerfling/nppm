@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {JsonCache} from '../Cache/JsonCache.js';
 import {Registry, RegistryPackage} from '../Registry/Registry.js';
 import {MaintainerScanner, MaintainerSeverity} from '../Security/MaintainerScanner.js';
+import {Npm2FaFetcher} from '../Security/Npm2FaFetcher.js';
 
 function makeRegistry(name: string, pkg: RegistryPackage): Registry {
     // Stand-in: poke the static `RegistryPackage` straight into a fresh
@@ -215,6 +216,47 @@ describe('MaintainerScanner.scan', () => {
         } finally {
             globalThis.fetch = originalFetch;
         }
+    });
+
+    it('attaches the publisher 2FA flag when a fetcher is wired', async () => {
+        const registry = makeRegistry('pkg', pkgWithHandover({
+            priorCount: 20,
+            oldOwner: 'alice',
+            newOwner: 'eve',
+            gapDays: 3
+        }));
+
+        const dir = '/tmp/nppm-tfa-' + Math.random().toString(36).slice(2);
+        const tfaCache = new JsonCache(dir, 60);
+        // Stub fetch to report 2FA off for the new publisher.
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = (async (input: RequestInfo | URL) => {
+            const url = typeof input === 'string' ? input : input.toString();
+            const tfa = url.includes('eve') ? false : true;
+            return {
+                ok: true, status: 200, statusText: 'OK',
+                json: async () => ({tfa})
+            } as unknown as Response;
+        }) as typeof fetch;
+
+        try {
+            const fetcher = new Npm2FaFetcher('http://unused', tfaCache);
+            const scanner = new MaintainerScanner(registry, {}, fetcher);
+            const finding = await scanner.scan('pkg', '1.0.20');
+
+            expect(finding!.currentPublisher2FA).toBe(false);
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    it('leaves the 2FA flag as `null` when no fetcher is provided', async () => {
+        const registry = makeRegistry('pkg', pkgWithHandover({
+            priorCount: 20, oldOwner: 'alice', newOwner: 'alice', gapDays: 30
+        }));
+        const scanner = new MaintainerScanner(registry);
+        const finding = await scanner.scan('pkg', '1.0.20');
+        expect(finding!.currentPublisher2FA ?? null).toBeNull();
     });
 
     it('treats a missing _npmUser field as INFO (pre-2014 packages)', async () => {

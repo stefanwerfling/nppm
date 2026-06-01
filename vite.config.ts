@@ -18,6 +18,7 @@ import {
     ApiManifest,
     ApiMatrixHeuristicsRequest,
     ApiMatrixHeuristicsResponse,
+    ApiMatrixIntegrityResponse,
     ApiMatrixSecurityRequest,
     ApiMatrixSecurityResponse,
     ApiPackagesResponse,
@@ -1485,6 +1486,46 @@ class Server {
                 try {
                     const results = await securityScanner.scanHeuristicsBatch(packages);
                     const response: ApiMatrixHeuristicsResponse = {results};
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/matrix/integrity — cross-project integrity roll-up
+            // for the global matrix badge. Runs `IntegrityScanner.scan`
+            // per project lockfile, merges findings, then collapses by
+            // package name to the worst severity + risk-tier count.
+            // No body: the route always acts on every configured
+            // project. Best-effort per project — a single lockfile read
+            // error skips that project, not the whole response.
+            // -------------------------------------------------------------
+            app.get('/api/matrix/integrity', async (_req, res) => {
+                try {
+                    const allFindings = [];
+                    for (const project of projects.values()) {
+                        try {
+                            const lockfile = await project.loadLockfile();
+                            if (!lockfile) {
+                                continue;
+                            }
+                            const findings = await integrityScanner.scan(lockfile.packages);
+                            allFindings.push(...findings);
+                        } catch {
+                            // Skip projects whose lockfile cannot be
+                            // parsed — the matrix view still gets the
+                            // healthy ones.
+                        }
+                    }
+
+                    const aggregated = IntegrityScanner.aggregateByName(allFindings);
+                    const results = Array.from(aggregated.entries()).map(([name, v]) => ({
+                        name,
+                        severity: v.severity,
+                        riskCount: v.riskCount
+                    }));
+                    const response: ApiMatrixIntegrityResponse = {results};
                     res.status(200).json(response);
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});

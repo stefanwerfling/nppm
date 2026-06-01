@@ -239,5 +239,15 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     '{n} resolved packages, {m} top-level deps. Click a node to expand/collapse its subtree.': '{n} aufgelöste Pakete, {m} Top-Level-Deps. Klick auf einen Knoten = Subtree ein-/ausklappen.',
     '{name} is not available on the registry.': '{name} ist nicht im Registry verfügbar.',
     'node_modules/.package-lock.json v{n}': 'node_modules/.package-lock.json v{n}',
-    'package-lock.json v{n}': 'package-lock.json v{n}'
+    'package-lock.json v{n}': 'package-lock.json v{n}',
+    'Why is this package installed?': 'Warum ist dieses Paket installiert?',
+    'Why {pkg}?': 'Warum {pkg}?',
+    'This is a direct (top-level) dependency of the project.': 'Direkte (Top-Level-)Abhängigkeit dieses Projekts.',
+    'This package is pulled in transitively. Chains:': 'Dieses Paket wird transitiv eingezogen. Ketten:',
+    'No parent could be resolved — the lockfile may be inconsistent.': 'Kein Vorgänger auflösbar — Lockfile evtl. inkonsistent.',
+    'Package not found in the dep graph — was the analyser run on a different lockfile?': 'Paket nicht im Dep-Graph gefunden — wurde der Analyser auf einem anderen Lockfile gestartet?',
+    '{n} project(s) pin a tarball whose integrity differs from the registry': '{n} Projekt(e) pinnen einen Tarball, dessen Integrity vom Registry abweicht',
+    'Publisher account has 2FA enabled': 'Publisher-Konto hat 2FA aktiviert',
+    'Publisher account has no 2FA — credential-theft would be enough to publish': 'Publisher-Konto hat kein 2FA — Credential-Theft genügt zum Publishen',
+    'Registry did not disclose the publisher\'s 2FA state (typical on the public mirror)': 'Registry verrät den 2FA-Status des Publishers nicht (Standardverhalten beim öffentlichen Mirror)'
 };

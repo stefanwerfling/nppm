@@ -42,6 +42,7 @@ export class InstalledView {
     private _onShowUnused: ((unid: string) => void)|null = null;
     private _onShowVulns: ((unid: string) => void)|null = null;
     private _onShowPr: ((unid: string) => void)|null = null;
+    private _onWhy: ((unid: string, name: string, version: string) => void)|null = null;
     private _lockfile: Lockfile|null = null;
     // Inflight SSE stream — kept so we can close it on view switch /
     // re-analysis. `null` means no analysis is running.
@@ -92,6 +93,10 @@ export class InstalledView {
 
     public onShowPr(handler: (unid: string) => void): void {
         this._onShowPr = handler;
+    }
+
+    public onWhy(handler: (unid: string, name: string, version: string) => void): void {
+        this._onWhy = handler;
     }
 
     /**
@@ -246,9 +251,37 @@ export class InstalledView {
             // Append to the path cell so we don't widen the table.
             row.querySelector('.pkg-source')?.appendChild(ideLink);
         }
+        const whyBtn = this._buildWhyButton(pkg);
+        if (whyBtn) {
+            row.querySelector('.pkg-source')?.appendChild(whyBtn);
+        }
         row.appendChild(cveCell);
         row.appendChild(integrityCell);
         return row;
+    }
+
+    /**
+     * `npm why`-style reverse-lookup button. Clicking it opens the
+     * `WhyModal` for this `(name, version)` so the user can trace the
+     * chain back to the root dependencies. Returns `null` when no
+     * handler is wired (typically a test harness) — production always
+     * gets one from `Nppm`.
+     */
+    private _buildWhyButton(pkg: LockedPackage): HTMLButtonElement|null {
+        if (!this._onWhy || !this._projectUnid) {
+            return null;
+        }
+        const btn = document.createElement('button');
+        btn.className = 'installed-why-btn';
+        btn.textContent = '?';
+        btn.title = I18n.t('Why is this package installed?');
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (this._onWhy && this._projectUnid) {
+                this._onWhy(this._projectUnid, pkg.name, pkg.version);
+            }
+        });
+        return btn;
     }
 
     /**

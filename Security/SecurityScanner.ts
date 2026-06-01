@@ -19,6 +19,7 @@ import {
     MaintainerScannerOptions,
     MaintainerSummary
 } from './MaintainerScanner.js';
+import {Npm2FaFetcher} from './Npm2FaFetcher.js';
 import {OsvClient, OsvVulnerability} from './OsvClient.js';
 import {PatternFinding, PatternScanner, PatternSeverity} from './PatternScanner.js';
 import {ScriptFinding, ScriptScanner, ScriptSeverity} from './ScriptScanner.js';
@@ -115,13 +116,14 @@ export class SecurityScanner {
         opts: {
             maintainer?: MaintainerScannerOptions;
             license?: LicenseScannerOptions;
+            tfaFetcher?: Npm2FaFetcher|null;
         } = {}
     ) {
         this._osv = osv;
         this._fingerprint = fingerprint;
         this._registry = registry;
         this._churn = new ChurnScanner(registry, fingerprint);
-        this._maintainer = new MaintainerScanner(registry, opts.maintainer);
+        this._maintainer = new MaintainerScanner(registry, opts.maintainer, opts.tfaFetcher ?? null);
         this._license = new LicenseScanner(opts.license);
     }
 
@@ -231,7 +233,8 @@ export class SecurityScanner {
                         name: pkg.name,
                         version: pkg.version,
                         severity: maintainer ? maintainer.severity : null,
-                        publisher: maintainer?.currentPublisher?.name ?? null
+                        publisher: maintainer?.currentPublisher?.name ?? null,
+                        publisher2FA: maintainer?.currentPublisher2FA ?? null
                     },
                     license: {
                         name: pkg.name,

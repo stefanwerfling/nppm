@@ -43,6 +43,9 @@ class FakeProject implements Project {
     public async loadLockfile() {
         return null;
     }
+    public isHidden() { return false; }
+    public setHidden(_v: boolean) {}
+    public getConfigIndex() { return -1; }
 }
 
 class FakeRegistry extends Registry {

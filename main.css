@@ -199,6 +199,7 @@ html, body {
     padding: 6px 12px;
     cursor: pointer;
     border-left: 2px solid transparent;
+    position: relative;
 }
 
 .tree-item:hover {
@@ -208,6 +209,12 @@ html, body {
 .tree-item-active {
     background: var(--c-row-active);
     border-left-color: var(--c-accent);
+}
+
+.tree-item-hidden .tree-item-name,
+.tree-item-hidden .tree-item-meta {
+    opacity: 0.45;
+    font-style: italic;
 }
 
 .tree-item-name {
@@ -222,6 +229,42 @@ html, body {
 
 .tree-item-meta-error {
     color: var(--c-error);
+}
+
+.tree-item-actions {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 80ms ease-in;
+}
+
+.tree-item:hover .tree-item-actions,
+.tree-item-hidden .tree-item-actions {
+    opacity: 1;
+}
+
+.tree-item-eye,
+.tree-item-gear {
+    background: transparent;
+    color: var(--c-muted);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    padding: 2px 4px;
+    line-height: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tree-item-eye:hover,
+.tree-item-gear:hover {
+    color: var(--c-text);
+    background: var(--c-row-active);
+    border-color: var(--c-border);
 }
 
 /* Package list ------------------------------------------------------ */

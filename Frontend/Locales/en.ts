@@ -291,5 +291,7 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     'Name contains non-ASCII characters — homoglyph attack': 'Name contains non-ASCII characters — homoglyph attack',
     'Contains non-ASCII characters and resembles popular "{name}"': 'Contains non-ASCII characters and resembles popular "{name}"',
     'Contains non-ASCII characters — npm names are ASCII-only': 'Contains non-ASCII characters — npm names are ASCII-only',
-    'Looks similar to popular "{name}" — possible typosquat': 'Looks similar to popular "{name}" — possible typosquat'
+    'Looks similar to popular "{name}" — possible typosquat': 'Looks similar to popular "{name}" — possible typosquat',
+    'Show in cross-project matrix': 'Show in cross-project matrix',
+    'Hide from cross-project matrix': 'Hide from cross-project matrix'
 };

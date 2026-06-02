@@ -15,6 +15,8 @@ import {Registry, RegistryPackage} from '../Registry/Registry.js';
  */
 class FakeProject implements Project {
 
+    private _hidden = false;
+
     constructor(
         private readonly _name: string,
         private readonly _manifests: PackageManifest[]
@@ -39,6 +41,10 @@ class FakeProject implements Project {
     public getKey() {
         return `local:fake:${this._name}`;
     }
+
+    public isHidden() { return this._hidden; }
+    public setHidden(v: boolean) { this._hidden = v; }
+    public getConfigIndex() { return -1; }
 }
 
 /**
@@ -102,6 +108,21 @@ describe('MatrixBuilder.build', () => {
         const matrix = await MatrixBuilder.build(projects, new FakeRegistry({}));
 
         expect(matrix.rows.map((r) => r.name).sort()).toEqual(['bar', 'baz', 'foo']);
+    });
+
+    it('skips hidden projects from columns and from the row union', async () => {
+        const visible = new FakeProject('visible', [manifest('visible', {shared: '^1', only: '^2'})]);
+        const hidden = new FakeProject('hidden', [manifest('hidden', {shared: '^1', secret: '^3'})]);
+        hidden.setHidden(true);
+
+        const projects = new Map<string, Project>([['1', visible], ['2', hidden]]);
+        const matrix = await MatrixBuilder.build(projects, new FakeRegistry({}));
+
+        // Only one project column survives.
+        expect(matrix.projects).toHaveLength(1);
+        expect(matrix.projects[0].name).toBe('visible');
+        // The hidden project's exclusive package never appears.
+        expect(matrix.rows.map((r) => r.name).sort()).toEqual(['only', 'shared']);
     });
 
     it('marks the row as aligned when all cells equal latest', async () => {
@@ -172,7 +193,10 @@ describe('MatrixBuilder.build', () => {
             loadManifests: async () => {
                 throw new Error('boom');
             },
-            loadLockfile: async () => null
+            loadLockfile: async () => null,
+            isHidden: () => false,
+            setHidden: () => {},
+            getConfigIndex: () => -1
         };
         const good = new FakeProject('good', [manifest('g', {x: '^1'})]);
         const projects = new Map<string, Project>([['1', broken], ['2', good]]);

@@ -286,6 +286,26 @@ export class Nppm {
             }
         });
 
+        this._treeview.onVisibilityToggle(async (project, hidden) => {
+            try {
+                await Api.setProjectVisibility(project.unid, hidden);
+                // Re-fetch the project list so the eye icon flips
+                // everywhere; the matrix refresh below reads the
+                // new flag.
+                const response = await Api.listProjects();
+                this._projects = response.projects;
+                this._treeview.render(response.projects);
+                // If the matrix is currently displayed, refresh it
+                // so the just-hidden project disappears (or the
+                // just-shown one appears).
+                if (this._view === View.matrix) {
+                    void this._loadMatrix();
+                }
+            } catch (e) {
+                console.error('Visibility toggle failed', e);
+            }
+        });
+
         this._matrix.onProjectClick((unid) => {
             const project = this._projects.find((p) => p.unid === unid);
             if (project) {

@@ -13,12 +13,15 @@ export enum ConfigProjectType {
 
 /**
  * Local directory project — `path` is resolved against the nppm process
- * root.
+ * root. `hidden: true` excludes the project from the cross-project
+ * matrix but keeps it visible in the treeview so per-project drill-down
+ * still works.
  */
 export const SchemaConfigProjectLocal = Vts.object({
     name: Vts.optional(Vts.string()),
     type: Vts.equal(ConfigProjectType.local),
-    path: Vts.string()
+    path: Vts.string(),
+    hidden: Vts.optional(Vts.boolean())
 });
 
 /**
@@ -29,7 +32,8 @@ export const SchemaConfigProjectGithub = Vts.object({
     type: Vts.equal(ConfigProjectType.github),
     repo: Vts.string(),
     ref: Vts.optional(Vts.string()),
-    token: Vts.optional(Vts.string())
+    token: Vts.optional(Vts.string()),
+    hidden: Vts.optional(Vts.boolean())
 });
 
 /**
@@ -40,7 +44,8 @@ export const SchemaConfigProjectGitea = Vts.object({
     type: Vts.equal(ConfigProjectType.gitea),
     url: Vts.string(),
     ref: Vts.optional(Vts.string()),
-    token: Vts.optional(Vts.string())
+    token: Vts.optional(Vts.string()),
+    hidden: Vts.optional(Vts.boolean())
 });
 
 /**

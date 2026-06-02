@@ -30,6 +30,13 @@ export type ApiProject = {
      * (their files aren't on the user's machine).
      */
     root?: string;
+    /**
+     * `true` when the project is excluded from the cross-project
+     * matrix (per-project drill-down still works). Toggled via
+     * `PATCH /api/projects/:id/visibility`; persisted as
+     * `hidden: true` in nppm.json.
+     */
+    hidden?: boolean;
     error?: string;
 };
 

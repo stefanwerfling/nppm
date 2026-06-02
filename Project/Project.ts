@@ -47,4 +47,22 @@ export interface Project {
      * "couldn't read".
      */
     loadLockfile(): Promise<Lockfile|null>;
+
+    /**
+     * Hidden projects stay in the treeview (so per-project drill-down
+     * keeps working) but are excluded from the cross-project matrix.
+     * Persisted as `hidden: true` in nppm.json.
+     */
+    isHidden(): boolean;
+
+    /** In-memory flip; the route handler also writes through to nppm.json. */
+    setHidden(hidden: boolean): void;
+
+    /**
+     * Index of this project's entry in `nppm.json`'s `projects` array.
+     * Used by the visibility / edit routes to address the right config
+     * row when writing back. `-1` for projects that bypassed the loader
+     * (test harnesses).
+     */
+    getConfigIndex(): number;
 }

@@ -31,14 +31,34 @@ export class ProjectLocal implements Project {
 
     private readonly _root: string;
     private readonly _name: string;
+    private _hidden: boolean;
+    private _configIndex: number;
 
-    constructor(absoluteRoot: string, configName?: string) {
+    constructor(
+        absoluteRoot: string,
+        configName?: string,
+        opts: {hidden?: boolean; configIndex?: number} = {}
+    ) {
         this._root = absoluteRoot;
         this._name = configName ?? path.basename(absoluteRoot);
+        this._hidden = opts.hidden === true;
+        this._configIndex = opts.configIndex ?? -1;
     }
 
     public getName(): string {
         return this._name;
+    }
+
+    public isHidden(): boolean {
+        return this._hidden;
+    }
+
+    public setHidden(hidden: boolean): void {
+        this._hidden = hidden;
+    }
+
+    public getConfigIndex(): number {
+        return this._configIndex;
     }
 
     /**

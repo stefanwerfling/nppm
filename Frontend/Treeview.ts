@@ -8,6 +8,9 @@ import {I18n} from './I18n.js';
  */
 export type TreeviewSelectHandler = (project: ApiProject) => void;
 
+/** Fired when the user clicks the eye toggle on a project row. */
+export type TreeviewVisibilityHandler = (project: ApiProject, hidden: boolean) => void;
+
 /**
  * Renders the configured projects as a flat list grouped by source
  * kind. Phase 1 only has `local`, but the grouping is in place so
@@ -18,6 +21,7 @@ export class Treeview {
     private readonly _root: HTMLElement;
     private _selected: string|null = null;
     private _onSelect: TreeviewSelectHandler|null = null;
+    private _onVisibility: TreeviewVisibilityHandler|null = null;
 
     constructor(root: HTMLElement) {
         this._root = root;
@@ -25,6 +29,10 @@ export class Treeview {
 
     public onSelect(handler: TreeviewSelectHandler): void {
         this._onSelect = handler;
+    }
+
+    public onVisibilityToggle(handler: TreeviewVisibilityHandler): void {
+        this._onVisibility = handler;
     }
 
     /**
@@ -101,6 +109,9 @@ export class Treeview {
         const item = document.createElement('div');
         item.className = 'tree-item';
         item.dataset.unid = project.unid;
+        if (project.hidden) {
+            item.classList.add('tree-item-hidden');
+        }
 
         if (project.unid === this._selected) {
             item.classList.add('tree-item-active');
@@ -126,6 +137,15 @@ export class Treeview {
             }
 
             item.appendChild(meta);
+
+            // Per-row action strip: eye-toggle for matrix visibility.
+            // The gear / edit affordance lives here too once the form
+            // modal lands; the strip is rendered now so the layout
+            // stays stable.
+            const actions = document.createElement('div');
+            actions.className = 'tree-item-actions';
+            actions.appendChild(this._renderEyeToggle(project));
+            item.appendChild(actions);
         }
 
         item.addEventListener('click', () => {
@@ -141,6 +161,41 @@ export class Treeview {
 
         return item;
     }
+
+    /**
+     * Eye-icon toggle for the cross-project matrix visibility.
+     * Renders the open eye when the project is shown, a slashed
+     * eye when hidden. Click stops propagation so the row's
+     * selection handler doesn't also fire.
+     */
+    private _renderEyeToggle(project: ApiProject): HTMLElement {
+        const btn = document.createElement('button');
+        btn.className = 'tree-item-eye';
+        btn.type = 'button';
+        btn.innerHTML = project.hidden ? Treeview._EYE_OFF_SVG : Treeview._EYE_SVG;
+        btn.title = project.hidden
+            ? I18n.t('Show in cross-project matrix')
+            : I18n.t('Hide from cross-project matrix');
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._onVisibility?.(project, !project.hidden);
+        });
+        return btn;
+    }
+
+    /** 14×14 outline eye — feather-style. */
+    private static readonly _EYE_SVG =
+        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>'
+        + '<circle cx="12" cy="12" r="3"/>'
+        + '</svg>';
+
+    /** 14×14 outline eye-off — feather-style. */
+    private static readonly _EYE_OFF_SVG =
+        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>'
+        + '<line x1="1" y1="1" x2="23" y2="23"/>'
+        + '</svg>';
 
     private static _typeLabel(type: ConfigProjectType): string {
         switch (type) {

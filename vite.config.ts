@@ -188,7 +188,8 @@ class Server {
                             type: project.getType(),
                             packageCount: total,
                             workspaceCount: manifests.length - 1,
-                            root
+                            root,
+                            hidden: project.isHidden()
                         });
                     } catch (e) {
                         result.push({
@@ -198,6 +199,7 @@ class Server {
                             packageCount: 0,
                             workspaceCount: 0,
                             root,
+                            hidden: project.isHidden(),
                             error: (e as Error).message
                         });
                     }
@@ -205,6 +207,44 @@ class Server {
 
                 const response: ApiProjectsResponse = {projects: result, editor};
                 res.status(200).json(response);
+            });
+
+            // -------------------------------------------------------------
+            // PATCH /api/projects/:id/visibility — toggle the hidden
+            // flag both in memory and back into nppm.json. Body:
+            // `{hidden: boolean}`. The flag affects whether the
+            // project shows up in the cross-project matrix; the
+            // treeview always renders the project regardless so
+            // per-project drill-down keeps working.
+            // -------------------------------------------------------------
+            app.patch('/api/projects/:id/visibility', async (req, res) => {
+                const project = projects.get(req.params.id);
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+
+                const body = req.body as {hidden?: unknown};
+                const hidden = body?.hidden === true;
+
+                try {
+                    Server._mutateConfig(configFile, (cfg) => {
+                        const idx = project.getConfigIndex();
+                        if (!Array.isArray(cfg.projects) || idx < 0 || idx >= cfg.projects.length) {
+                            throw new Error('Project entry not found in nppm.json (stale index)');
+                        }
+                        const entry = cfg.projects[idx] as {hidden?: boolean};
+                        if (hidden) {
+                            entry.hidden = true;
+                        } else {
+                            delete entry.hidden;
+                        }
+                    });
+                    project.setHidden(hidden);
+                    res.status(200).json({success: true, hidden});
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
             });
 
             // -------------------------------------------------------------
@@ -1891,6 +1931,32 @@ class Server {
             server.middlewares.use(app);
             }
         };
+    }
+
+    /**
+     * Read → mutate → write helper for nppm.json. Used by the
+     * visibility, add, and edit routes so all three follow the
+     * same atomic-write pattern: read fresh from disk, hand the
+     * parsed object to `mutator`, then serialise with 2-space
+     * indent and trailing newline. Throws when no config file
+     * path is configured (the CLI can run with an inline rawConfig
+     * but no on-disk file; mutations against that combination
+     * fail loudly rather than silently dropping the change).
+     */
+    private static _mutateConfig(
+        configFile: string|undefined,
+        mutator: (cfg: {projects?: unknown[]} & Record<string, unknown>) => void
+    ): void {
+        if (!configFile) {
+            throw new Error('nppm.json path not configured — cannot persist changes');
+        }
+        if (!fs.existsSync(configFile)) {
+            throw new Error(`nppm.json not found at ${configFile}`);
+        }
+        const raw = fs.readFileSync(configFile, 'utf-8');
+        const cfg = JSON.parse(raw) as {projects?: unknown[]} & Record<string, unknown>;
+        mutator(cfg);
+        fs.writeFileSync(configFile, JSON.stringify(cfg, null, 2) + '\n', 'utf-8');
     }
 
     /**

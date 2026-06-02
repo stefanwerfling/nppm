@@ -282,5 +282,7 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'Name contains non-ASCII characters — homoglyph attack': 'Name enthält Nicht-ASCII-Zeichen — Homoglyph-Attacke',
     'Contains non-ASCII characters and resembles popular "{name}"': 'Enthält Nicht-ASCII-Zeichen und ähnelt dem populären "{name}"',
     'Contains non-ASCII characters — npm names are ASCII-only': 'Enthält Nicht-ASCII-Zeichen — npm-Namen sind ASCII-only',
-    'Looks similar to popular "{name}" — possible typosquat': 'Ähnelt dem populären "{name}" — möglicher Typosquat'
+    'Looks similar to popular "{name}" — possible typosquat': 'Ähnelt dem populären "{name}" — möglicher Typosquat',
+    'Show in cross-project matrix': 'In der projektübergreifenden Matrix anzeigen',
+    'Hide from cross-project matrix': 'Aus der projektübergreifenden Matrix ausblenden'
 };

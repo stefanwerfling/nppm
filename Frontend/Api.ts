@@ -39,6 +39,22 @@ export class Api {
         return Api._json<ApiProjectsResponse>('/api/projects');
     }
 
+    /**
+     * Toggle the visibility flag for one project. The matrix excludes
+     * hidden projects on its next refresh; the treeview keeps showing
+     * them so per-project drill-down keeps working.
+     */
+    public static async setProjectVisibility(unid: string, hidden: boolean): Promise<void> {
+        const res = await fetch(`/api/projects/${unid}/visibility`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({hidden})
+        });
+        if (!res.ok) {
+            throw new Error(`/api/projects/${unid}/visibility → ${res.status} ${res.statusText}`);
+        }
+    }
+
     public static async listPackages(projectUnid: string): Promise<ApiPackagesResponse> {
         return Api._json<ApiPackagesResponse>(`/api/projects/${projectUnid}/packages`);
     }

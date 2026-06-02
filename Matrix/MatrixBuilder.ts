@@ -128,6 +128,14 @@ export class MatrixBuilder {
         const allPackageNames = new Set<string>();
 
         for (const [unid, project] of registeredProjects.entries()) {
+            // Hidden projects skip the cross-project matrix entirely
+            // — they're still in the treeview and have working per-
+            // project routes, but they don't pollute the matrix
+            // columns or pull registry metadata that nobody asked
+            // about.
+            if (project.isHidden()) {
+                continue;
+            }
             const meta: MatrixProject = {
                 unid,
                 name: project.getName(),

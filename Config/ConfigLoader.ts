@@ -213,11 +213,14 @@ export class ConfigLoader {
         const bundlephobiaFetcher = new BundlephobiaFetcher(bundleCache);
 
         const projects: Project[] = [];
-        for (const entry of (cfg.projects ?? []) as Array<{type: ConfigProjectType}>) {
+        const rawProjects = (cfg.projects ?? []) as Array<{type: ConfigProjectType; hidden?: boolean}>;
+        for (let i = 0; i < rawProjects.length; i++) {
+            const entry = rawProjects[i];
+            const hidden = entry.hidden === true;
             if (entry.type === ConfigProjectType.local) {
                 const local = entry as {type: ConfigProjectType.local; path: string; name?: string};
                 const absRoot = path.resolve(projectRoot, local.path);
-                const project = new ProjectLocal(absRoot, local.name);
+                const project = new ProjectLocal(absRoot, local.name, {hidden, configIndex: i});
                 projects.push(project);
                 hooks.onProjectLoaded?.(project);
             } else if (entry.type === ConfigProjectType.github) {
@@ -233,7 +236,8 @@ export class ConfigLoader {
                     gh.name ?? gh.repo,
                     gh.ref,
                     ConfigLoader.expandEnv(gh.token),
-                    remoteCache
+                    remoteCache,
+                    {hidden, configIndex: i}
                 );
                 projects.push(project);
                 hooks.onProjectLoaded?.(project);
@@ -251,7 +255,8 @@ export class ConfigLoader {
                         ge.name ?? ge.url,
                         ge.ref,
                         ConfigLoader.expandEnv(ge.token),
-                        remoteCache
+                        remoteCache,
+                        {hidden, configIndex: i}
                     );
                     projects.push(project);
                     hooks.onProjectLoaded?.(project);

@@ -327,5 +327,12 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     '(default: unknown)': '(Standard: unknown)',
     'Unused-deps detector': 'Unbenutzte-Deps-Detektor',
     'Allowlist (one package name per line)': 'Allowlist (ein Paketname pro Zeile)',
-    'Dev path globs (one per line, replaces defaults)': 'Dev-Pfad-Globs (einer pro Zeile, ersetzt Standard)'
+    'Dev path globs (one per line, replaces defaults)': 'Dev-Pfad-Globs (einer pro Zeile, ersetzt Standard)',
+    'Browse …': 'Durchsuchen …',
+    'Select a directory': 'Verzeichnis auswählen',
+    'Select this directory': 'Dieses Verzeichnis übernehmen',
+    'Parent directory': 'Übergeordnetes Verzeichnis',
+    'Show hidden files': 'Versteckte Dateien anzeigen',
+    '(empty directory)': '(leeres Verzeichnis)',
+    'Loading …': 'Laden …'
 };

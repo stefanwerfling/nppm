@@ -335,5 +335,12 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     '(default: unknown)': '(default: unknown)',
     'Unused-deps detector': 'Unused-deps detector',
     'Allowlist (one package name per line)': 'Allowlist (one package name per line)',
-    'Dev path globs (one per line, replaces defaults)': 'Dev path globs (one per line, replaces defaults)'
+    'Dev path globs (one per line, replaces defaults)': 'Dev path globs (one per line, replaces defaults)',
+    'Browse …': 'Browse …',
+    'Select a directory': 'Select a directory',
+    'Select this directory': 'Select this directory',
+    'Parent directory': 'Parent directory',
+    'Show hidden files': 'Show hidden files',
+    '(empty directory)': '(empty directory)',
+    'Loading …': 'Loading …'
 };

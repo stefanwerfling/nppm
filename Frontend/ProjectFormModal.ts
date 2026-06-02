@@ -1,5 +1,6 @@
 import {ApiProject, ApiProjectMutationRequest, ApiProjectMutationResponse} from '../Api/ApiTypes.js';
 import {ConfigProjectType} from '../Config/Config.js';
+import {DirectoryPickerModal} from './DirectoryPickerModal.js';
 import {I18n} from './I18n.js';
 
 /**
@@ -194,7 +195,7 @@ export class ProjectFormModal {
         wrap.className = 'pfm-typefields';
 
         if (initial.type === ConfigProjectType.local) {
-            wrap.appendChild(this._field('pfm-path', I18n.t('Path'), initial.path ?? '', I18n.t('absolute or relative to nppm.json')));
+            wrap.appendChild(this._pathFieldWithBrowse(initial.path ?? ''));
         } else if (initial.type === ConfigProjectType.github) {
             wrap.appendChild(this._field('pfm-repo', I18n.t('Repo (owner/name)'), initial.repo ?? '', 'OpenSourcePKG/nppm'));
             wrap.appendChild(this._field('pfm-ref', I18n.t('Ref (optional)'), initial.ref ?? '', 'main'));
@@ -220,6 +221,49 @@ export class ProjectFormModal {
         input.value = value;
         input.placeholder = placeholder;
         row.appendChild(input);
+        return row;
+    }
+
+    /**
+     * The `Path` field with a "Browse…" sibling button. The button
+     * opens `DirectoryPickerModal` seeded with the current input
+     * value (when set + valid on the backend); the picker writes
+     * the picked absolute path straight back into the input on
+     * select. Only used for `local`-type projects — remote sources
+     * (github/gitea) have repo/url fields, not a filesystem path.
+     */
+    private _pathFieldWithBrowse(value: string): HTMLElement {
+        const row = document.createElement('div');
+        row.className = 'pfm-row';
+        const lab = document.createElement('label');
+        lab.className = 'pfm-label';
+        lab.textContent = I18n.t('Path');
+        row.appendChild(lab);
+
+        const inputRow = document.createElement('div');
+        inputRow.className = 'pfm-path-row';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'pfm-path pfm-input';
+        input.value = value;
+        input.placeholder = I18n.t('absolute or relative to nppm.json');
+        inputRow.appendChild(input);
+
+        const browse = document.createElement('button');
+        browse.type = 'button';
+        browse.className = 'pfm-browse';
+        browse.textContent = I18n.t('Browse …');
+        browse.addEventListener('click', () => {
+            const picker = new DirectoryPickerModal();
+            picker.seedPath(input.value.trim() || undefined);
+            picker.onPicked((p) => {
+                input.value = p;
+            });
+            picker.open();
+        });
+        inputRow.appendChild(browse);
+
+        row.appendChild(inputRow);
         return row;
     }
 

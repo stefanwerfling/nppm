@@ -420,6 +420,127 @@ html, body {
     min-height: 60px;
 }
 
+/* Directory picker modal ------------------------------------------- */
+
+.dpm-backdrop {
+    /* Stack above the ProjectFormModal that opened us. */
+    z-index: 1100;
+}
+
+.dpm-panel {
+    width: min(640px, 90vw);
+    gap: 10px;
+}
+
+.dpm-pathbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dpm-up {
+    padding: 4px 10px;
+}
+
+.dpm-current {
+    flex: 1;
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--c-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dpm-entries {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    background: var(--c-bg);
+    max-height: 50vh;
+    overflow-y: auto;
+    min-height: 200px;
+}
+
+.dpm-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--c-text);
+    border-bottom: 1px solid var(--c-border);
+}
+
+.dpm-row:last-child {
+    border-bottom: none;
+}
+
+.dpm-row-dir {
+    cursor: pointer;
+}
+
+.dpm-row-dir:hover {
+    background: var(--c-row-hover);
+}
+
+.dpm-row-file {
+    color: var(--c-muted);
+    cursor: default;
+}
+
+.dpm-icon {
+    font-size: 12px;
+    line-height: 1;
+    width: 16px;
+    text-align: center;
+}
+
+.dpm-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dpm-hidden-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--c-muted);
+    cursor: pointer;
+}
+
+.pfm-path-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.pfm-path-row .pfm-input {
+    flex: 1;
+}
+
+.pfm-browse {
+    background: var(--c-panel);
+    color: var(--c-text);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    padding: 0 12px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.pfm-browse:hover {
+    background: var(--c-row-hover);
+}
+
 /* Package list ------------------------------------------------------ */
 
 .list-placeholder,

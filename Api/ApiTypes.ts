@@ -138,6 +138,29 @@ export type ApiConfigMutationResponse = {
 };
 
 /**
+ * One directory entry returned by `GET /api/fs/browse`. The picker
+ * navigates only into `dir` entries; `file` rows show up as
+ * visual context (when `?withFiles=1`) and are not actionable.
+ */
+export type ApiFsBrowseEntry = {
+    name: string;
+    type: 'dir'|'file';
+};
+
+/**
+ * Response shape of `GET /api/fs/browse?path=<absolute>[&showHidden=1]`.
+ * `path` echoes the absolute directory we just listed; `parent` is its
+ * absolute parent or `null` at the filesystem root. Entries are sorted
+ * case-insensitively by name; per-entry EACCES errors are swallowed so
+ * the row simply disappears rather than failing the whole request.
+ */
+export type ApiFsBrowseResponse = {
+    path: string;
+    parent: string|null;
+    entries: ApiFsBrowseEntry[];
+};
+
+/**
  * One manifest as returned by `GET /api/projects/:id/packages`. Workspace
  * is omitted for the root manifest.
  */

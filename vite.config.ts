@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import {defineConfig, Plugin} from 'vite';
 import {SchemaErrors} from 'vts';
@@ -16,6 +17,8 @@ import {
     ApiConfigMutationResponse,
     ApiConfigResponse,
     ApiFingerprintDiffResponse,
+    ApiFsBrowseEntry,
+    ApiFsBrowseResponse,
     ApiFingerprintResponse,
     ApiHistoryResponse,
     ApiIntegrityResponse,
@@ -430,6 +433,56 @@ class Server {
                     res.status(200).json(response);
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/fs/browse?path=<absolute>[&showHidden=1] — list
+            // the directory at `path` so the frontend directory picker
+            // can navigate the user's filesystem. The dev server runs
+            // on the user's box (bound to localhost), so the user
+            // already has full filesystem access via their shell —
+            // no traversal guard required; `path` must just be
+            // absolute (a relative path would be ambiguous w.r.t the
+            // server cwd).
+            //
+            // Defaults to `process.cwd()` when `path` is omitted (matches
+            // the initial-state the picker wants on first open).
+            //
+            // Per-entry EACCES is swallowed silently — the offending
+            // row just disappears from the list rather than failing the
+            // whole request.
+            // -------------------------------------------------------------
+            app.get('/api/fs/browse', async (req, res) => {
+                const requested = typeof req.query.path === 'string' && req.query.path.length > 0
+                    ? req.query.path
+                    : process.cwd();
+                const showHidden = req.query.showHidden === '1';
+
+                if (!path.isAbsolute(requested)) {
+                    res.status(400).json({success: false, msg: `path must be absolute, got "${requested}"`});
+                    return;
+                }
+
+                try {
+                    const response = await Server._listDirectory(requested, showHidden);
+                    res.status(200).json(response);
+                } catch (e) {
+                    const err = e as NodeJS.ErrnoException;
+                    if (err.code === 'ENOENT') {
+                        // Fall back to home directory when the
+                        // requested path doesn't exist — most likely
+                        // a stale value from the form field.
+                        try {
+                            const fallback = await Server._listDirectory(os.homedir(), showHidden);
+                            res.status(200).json(fallback);
+                            return;
+                        } catch (e2) {
+                            res.status(500).json({success: false, msg: (e2 as Error).message});
+                            return;
+                        }
+                    }
+                    res.status(500).json({success: false, msg: err.message});
                 }
             });
 
@@ -2116,6 +2169,54 @@ class Server {
 
             server.middlewares.use(app);
             }
+        };
+    }
+
+    /**
+     * Walk a directory and produce the `ApiFsBrowseResponse` for it.
+     * Hidden entries (dot-prefix) are filtered by default; symlinks
+     * are followed to classify the target as dir/file; broken links
+     * and other per-entry errors are swallowed so the row simply
+     * disappears. Used by `GET /api/fs/browse` for the directory
+     * picker; lifted out of the handler so the ENOENT-fallback can
+     * reuse the same enumeration logic against the home directory.
+     */
+    private static async _listDirectory(absPath: string, showHidden: boolean): Promise<ApiFsBrowseResponse> {
+        const dirents = await fs.promises.readdir(absPath, {withFileTypes: true});
+        const entries: ApiFsBrowseEntry[] = [];
+        for (const d of dirents) {
+            if (!showHidden && d.name.startsWith('.')) {
+                continue;
+            }
+            let kind: 'dir'|'file'|null = null;
+            if (d.isDirectory()) {
+                kind = 'dir';
+            } else if (d.isFile()) {
+                kind = 'file';
+            } else if (d.isSymbolicLink()) {
+                try {
+                    const stat = await fs.promises.stat(path.join(absPath, d.name));
+                    kind = stat.isDirectory() ? 'dir' : 'file';
+                } catch {
+                    continue;
+                }
+            }
+            if (kind === null) {
+                continue;
+            }
+            entries.push({name: d.name, type: kind});
+        }
+        entries.sort((a, b) => {
+            if (a.type !== b.type) {
+                return a.type === 'dir' ? -1 : 1;
+            }
+            return a.name.localeCompare(b.name, undefined, {sensitivity: 'base'});
+        });
+        const parent = path.dirname(absPath);
+        return {
+            path: absPath,
+            parent: parent === absPath ? null : parent,
+            entries
         };
     }
 

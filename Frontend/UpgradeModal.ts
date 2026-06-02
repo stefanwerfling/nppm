@@ -44,6 +44,19 @@ export class UpgradeModal {
     private _logEl: HTMLElement|null = null;
     private _seed: UpgradeRequestSeed|null = null;
     private _activeAbort: AbortController|null = null;
+    private _onAfterApply: (() => void)|null = null;
+
+    /**
+     * Register a callback that fires after a successful apply.
+     * Triggered once per `open()` cycle — either after `edit-done`
+     * (mode = edit, no install follows) or after the install `end`
+     * event (mode = install). Nppm uses this to reload the
+     * per-project matrix so the user sees the bumped range without
+     * having to re-navigate.
+     */
+    public onAfterApply(handler: () => void): void {
+        this._onAfterApply = handler;
+    }
 
     public async open(seed: UpgradeRequestSeed): Promise<void> {
         this._seed = seed;
@@ -362,6 +375,11 @@ export class UpgradeModal {
                     this._appendLog(`✓ Edited ${data.rel}\n`);
                     if (mode === 'edit') {
                         this._appendLog(`\n${I18n.t('Run `{cmd}` once you\'re ready to install.', {cmd: 'npm install'})}\n`);
+                        // Edit-only path completes here — no install
+                        // follows, so this is the right moment to
+                        // notify the orchestrator. The install path
+                        // fires on `end` below instead.
+                        this._onAfterApply?.();
                     }
                 },
                 start: (data: {command: string; cwd: string}) => {
@@ -373,6 +391,7 @@ export class UpgradeModal {
                     this._appendLog(`\n${I18n.t('Install finished (exit {code})', {code: data.exitCode ?? 'null'})}\n`);
                     if (mode === 'install') {
                         void this._loadLifecycleScripts(preview);
+                        this._onAfterApply?.();
                     }
                 },
                 error: (data: {msg: string}) => {

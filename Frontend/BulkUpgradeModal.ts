@@ -26,6 +26,17 @@ export class BulkUpgradeModal {
     private _logEl: HTMLElement|null = null;
     private _picks: ApiBulkUpgradePick[] = [];
     private _activeAbort: AbortController|null = null;
+    private _onAfterApply: (() => void)|null = null;
+
+    /**
+     * Register a callback that fires once a bulk apply has finished
+     * (after the `done` SSE event). Nppm uses this to reload the
+     * matrix so the just-bumped versions are reflected without the
+     * user having to manually refresh.
+     */
+    public onAfterApply(handler: () => void): void {
+        this._onAfterApply = handler;
+    }
 
     public async open(picks: ApiBulkUpgradePick[]): Promise<void> {
         this._picks = picks;
@@ -379,6 +390,7 @@ export class BulkUpgradeModal {
                     this._appendLog(
                         `\n${I18n.t('Bulk update finished — {n} project(s) processed', {n: d.totalProjects})}\n`
                     );
+                    this._onAfterApply?.();
                 }
             });
         } catch (e) {

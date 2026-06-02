@@ -19,6 +19,7 @@ import {PrReviewView} from './PrReviewView.js';
 import {VulnerabilityTimelineView} from './VulnerabilityTimelineView.js';
 import {ProjectFormModal} from './ProjectFormModal.js';
 import {WhyModal} from './WhyModal.js';
+import {WorkspaceDriftModal} from './WorkspaceDriftModal.js';
 
 /**
  * Active right-pane view. `packages` and `installed` are two flavours
@@ -65,6 +66,7 @@ export class Nppm {
     private readonly _upgradeModal: UpgradeModal;
     private readonly _bulkUpgradeModal: BulkUpgradeModal;
     private readonly _whyModal: WhyModal;
+    private readonly _workspaceDriftModal: WorkspaceDriftModal;
     private readonly _projectFormModal: ProjectFormModal;
     private readonly _listRoot: HTMLElement;
     private _matrixHost: HTMLElement|null = null;
@@ -140,6 +142,7 @@ export class Nppm {
         this._upgradeModal = new UpgradeModal();
         this._bulkUpgradeModal = new BulkUpgradeModal();
         this._whyModal = new WhyModal();
+        this._workspaceDriftModal = new WorkspaceDriftModal();
         this._projectFormModal = new ProjectFormModal();
         this._projectFormModal.onSaved(() => {
             // Re-fetch and re-render the project list so the new /
@@ -389,6 +392,34 @@ export class Nppm {
 
         this._matrix.onBulkUpgradeClick((picks) => {
             void this._bulkUpgradeModal.open(picks);
+        });
+
+        this._matrix.onWorkspaceDriftClick((unid, projectName, pkg) => {
+            void this._workspaceDriftModal.open(unid, projectName, pkg);
+        });
+
+        this._workspaceDriftModal.onOpenProjectMatrix((unid) => {
+            const proj = this._projects.find((p) => p.unid === unid);
+            if (proj) {
+                this._treeview.setSelected(unid);
+                void this._loadProjectMatrix(proj);
+            }
+        });
+
+        this._bulkUpgradeModal.onAfterApply(() => {
+            void this._loadMatrix();
+        });
+
+        this._upgradeModal.onAfterApply(() => {
+            // Single-project upgrade was triggered from the
+            // per-project matrix; reload it so the just-bumped range
+            // shows up without the user having to navigate away and
+            // back.
+            const unid = this._currentProjectUnid;
+            const proj = unid ? this._projects.find((p) => p.unid === unid) : undefined;
+            if (proj) {
+                void this._projectMatrixView.show(proj.unid, proj.name);
+            }
         });
     }
 

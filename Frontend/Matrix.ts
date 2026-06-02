@@ -142,6 +142,7 @@ export class Matrix {
     private _search: string = '';
     private _onProjectClick: ((unid: string) => void)|null = null;
     private _onCellClick: ((pkg: string, version: string, latest: string|null) => void)|null = null;
+    private _onWorkspaceDriftClick: ((projectUnid: string, projectName: string, packageName: string) => void)|null = null;
     private _onSecurityClick: ((pkg: string, version: string) => void)|null = null;
     private _onBulkUpgradeClick: ((picks: ApiBulkUpgradePick[]) => void)|null = null;
     // Multi-select state for the cross-project Bulk-Upgrade Wizard.
@@ -274,6 +275,12 @@ export class Matrix {
 
     public onCellClick(handler: (pkg: string, version: string, latest: string|null) => void): void {
         this._onCellClick = handler;
+    }
+
+    public onWorkspaceDriftClick(
+        handler: (projectUnid: string, projectName: string, packageName: string) => void
+    ): void {
+        this._onWorkspaceDriftClick = handler;
     }
 
     public onSecurityClick(handler: (pkg: string, version: string) => void): void {
@@ -902,14 +909,22 @@ export class Matrix {
                     this._onCellClick?.(row.name, cellData.version, row.latest);
                 });
 
-                // Bulk-Upgrade checkbox: only for outdated rows on
+                // Bulk-Upgrade checkbox: outdated OR drift rows on
                 // local projects with a known registry `latest` and a
-                // non-git installation. Click is stopped so it doesn't
-                // also open the detail panel.
-                if (
+                // non-git installation. Drift rows are included so
+                // the wizard can unify projects pinned to different
+                // versions; `internalDrift` cells stay blocked because
+                // a single pick can only target one workspace and the
+                // partial-update would be misleading. Click is
+                // stopped so it doesn't also open the detail panel.
+                const eligibleStatus =
                     row.status === MatrixRowStatus.outdated
+                    || row.status === MatrixRowStatus.drift;
+                if (
+                    eligibleStatus
                     && row.latest
                     && !cellData.installedVersion
+                    && !cellData.internalDrift
                     && project.type === ConfigProjectType.local
                 ) {
                     const key = Matrix._pickKey(project.unid, row.name);
@@ -923,7 +938,7 @@ export class Matrix {
                         if (check.checked) {
                             this._selected.set(key, {
                                 projectUnid: project.unid,
-                                workspace: '',
+                                workspace: cellData.workspace ?? '',
                                 name: row.name,
                                 depType: Matrix._toApiDepType(cellData.types[0]),
                                 fromRange: cellData.version,
@@ -960,8 +975,12 @@ export class Matrix {
                 if (cellData.internalDrift) {
                     const badge = document.createElement('span');
                     badge.className = 'matrix-badge matrix-badge-drift';
-                    badge.title = I18n.t('Workspaces of this project declared different versions');
+                    badge.title = I18n.t('Workspaces of this project declared different versions — click for details');
                     badge.textContent = 'WS';
+                    badge.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this._onWorkspaceDriftClick?.(project.unid, project.name, row.name);
+                    });
                     td.appendChild(badge);
                 }
 

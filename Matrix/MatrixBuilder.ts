@@ -37,6 +37,16 @@ export type MatrixCell = {
      * readable to show next to the raw URL.
      */
     installedVersion?: string;
+    /**
+     * Workspace path the displayed `version` was taken from, relative
+     * to the project root. `undefined` means the root manifest. The
+     * Bulk-Upgrade Wizard uses this to target the correct
+     * `package.json` — without it, a workspace-only dep like
+     * `webpack` declared in `<proj>/frontend/package.json` would get
+     * a bulk-upgrade pick aimed at the root, where the dep doesn't
+     * exist, and the apply would silently skip.
+     */
+    workspace?: string;
 };
 
 export type MatrixRow = {
@@ -235,7 +245,14 @@ export class MatrixBuilder {
     private static _buildProjectCells(manifests: PackageManifest[]): Map<string, MatrixCell> {
         const out = new Map<string, MatrixCell>();
 
-        const collected = new Map<string, {versions: Set<string>; types: Set<DependencyType>; rootVersion: string|null}>();
+        type CollectedEntry = {
+            versions: Set<string>;
+            types: Set<DependencyType>;
+            rootVersion: string|null;
+            /** First workspace path that declared the dep (when root didn't). */
+            firstWorkspace: string|undefined;
+        };
+        const collected = new Map<string, CollectedEntry>();
 
         for (const manifest of manifests) {
             const isRoot = manifest.workspace === undefined;
@@ -244,7 +261,7 @@ export class MatrixBuilder {
                 let entry = collected.get(dep.name);
 
                 if (!entry) {
-                    entry = {versions: new Set(), types: new Set(), rootVersion: null};
+                    entry = {versions: new Set(), types: new Set(), rootVersion: null, firstWorkspace: undefined};
                     collected.set(dep.name, entry);
                 }
 
@@ -253,6 +270,8 @@ export class MatrixBuilder {
 
                 if (isRoot) {
                     entry.rootVersion = dep.version;
+                } else if (entry.firstWorkspace === undefined) {
+                    entry.firstWorkspace = manifest.workspace;
                 }
             }
         }
@@ -262,11 +281,17 @@ export class MatrixBuilder {
             // user sees what the "project as a whole" is pinning; if
             // there's no root manifest declaration, pick any.
             const display = entry.rootVersion ?? Array.from(entry.versions)[0];
+            // Bulk-Upgrade targeting: root if root declared the dep,
+            // otherwise the first workspace that did. Without this,
+            // workspace-only deps would route the pick to the root
+            // `package.json` and silently no-op.
+            const workspace = entry.rootVersion !== null ? undefined : entry.firstWorkspace;
 
             out.set(name, {
                 version: display,
                 types: Array.from(entry.types),
-                internalDrift: entry.versions.size > 1
+                internalDrift: entry.versions.size > 1,
+                workspace
             });
         }
 

@@ -1609,6 +1609,52 @@ html, body {
     background: rgba(232, 90, 90, 0.2);
     color: #e85a5a;
     border: 1px solid rgba(232, 90, 90, 0.5);
+    cursor: pointer;
+}
+
+.matrix-badge-drift:hover {
+    filter: brightness(1.2);
+}
+
+.wdm-panel {
+    min-width: 480px;
+    max-width: min(720px, 90vw);
+}
+
+.wdm-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 8px;
+}
+
+.wdm-table th,
+.wdm-table td {
+    border: 1px solid var(--c-border);
+    padding: 4px 8px;
+    text-align: left;
+}
+
+.wdm-table th {
+    background: var(--c-bg);
+    color: var(--c-muted);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+}
+
+.wdm-ws {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.wdm-v {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    color: var(--c-text);
+}
+
+.wdm-t {
+    color: var(--c-muted);
+    font-size: 11px;
 }
 
 .matrix-badge-cve {

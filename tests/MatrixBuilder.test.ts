@@ -208,6 +208,28 @@ describe('MatrixBuilder.build', () => {
         expect(cell.internalDrift).toBe(true);
         // displayed version prefers the root manifest
         expect(cell.version).toBe('^1.0.0');
+        // workspace is `undefined` because root declared the dep
+        expect(cell.workspace).toBeUndefined();
+    });
+
+    it('records the workspace on the cell when a dep lives only in a workspace', async () => {
+        // The webpack / bulk-upgrade case: webpack is declared in
+        // <proj>/frontend/package.json but not in the root. Without
+        // the workspace marker the Bulk-Upgrade Wizard would aim its
+        // pick at root/package.json and silently skip.
+        const root = manifest('root', {});
+        const front = manifest('front', {webpack: '^5.97.1'}, 'frontend');
+        const a = new FakeProject('a', [root, front]);
+
+        const projects = new Map<string, Project>([['1', a]]);
+        const matrix = await MatrixBuilder.build(projects, new FakeRegistry({
+            webpack: {name: 'webpack', latest: '5.99.0', versions: ['5.97.1', '5.99.0']}
+        }));
+
+        const cell = matrix.rows[0].cells['1'];
+        expect(cell.workspace).toBe('frontend');
+        expect(cell.internalDrift).toBe(false);
+        expect(cell.version).toBe('^5.97.1');
     });
 
     it('surfaces a per-project error without breaking the rest', async () => {

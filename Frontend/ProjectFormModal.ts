@@ -1,0 +1,317 @@
+import {ApiProject, ApiProjectMutationRequest, ApiProjectMutationResponse} from '../Api/ApiTypes.js';
+import {ConfigProjectType} from '../Config/Config.js';
+import {I18n} from './I18n.js';
+
+/**
+ * What triggered the modal. `add` opens with empty fields;
+ * `edit` pre-fills from the provided `ApiProject` (the form also
+ * needs the type-specific fields, which the modal recovers via the
+ * `existing` parameter — the backend's GET /api/projects already
+ * returns enough metadata for `name`/`type`/`root`).
+ */
+export type ProjectFormMode =
+    | {kind: 'add'}
+    | {kind: 'edit'; project: ApiProject; extras: ApiProjectMutationRequest};
+
+/**
+ * Modal form for adding or editing a project in `nppm.json`.
+ * Renders a type selector + per-type field set; submitting fires
+ * `POST /api/projects` (add) or `PUT /api/projects/:id` (edit) and
+ * yields the resulting `ApiProject` to the caller via the
+ * `onSaved` callback so the treeview / matrix can refresh.
+ *
+ * Re-uses the `umd-*` modal CSS for shell consistency with the
+ * other modals (`UpgradeModal`, `WhyModal`).
+ */
+export class ProjectFormModal {
+
+    private _backdrop: HTMLElement|null = null;
+    private _panel: HTMLElement|null = null;
+    private _mode: ProjectFormMode = {kind: 'add'};
+    private _onSaved: ((project: ApiProject) => void)|null = null;
+
+    public onSaved(handler: (project: ApiProject) => void): void {
+        this._onSaved = handler;
+    }
+
+    public open(mode: ProjectFormMode): void {
+        this._mode = mode;
+        this._mount();
+        this._render();
+    }
+
+    public close(): void {
+        this._backdrop?.remove();
+        this._backdrop = null;
+        this._panel = null;
+        document.removeEventListener('keydown', this._onKeyDown);
+    }
+
+    private _mount(): void {
+        if (this._backdrop) {
+            this._backdrop.remove();
+        }
+        const backdrop = document.createElement('div');
+        backdrop.className = 'umd-backdrop';
+        backdrop.addEventListener('click', (e) => {
+            if (e.target === backdrop) {
+                this.close();
+            }
+        });
+        document.body.appendChild(backdrop);
+        this._backdrop = backdrop;
+
+        const panel = document.createElement('div');
+        panel.className = 'umd-panel';
+        backdrop.appendChild(panel);
+        this._panel = panel;
+
+        document.addEventListener('keydown', this._onKeyDown);
+    }
+
+    private readonly _onKeyDown = (e: KeyboardEvent): void => {
+        if (e.key === 'Escape') {
+            this.close();
+        }
+    };
+
+    private _render(): void {
+        if (!this._panel) {
+            return;
+        }
+        this._panel.innerHTML = '';
+        this._panel.appendChild(this._renderHeader());
+
+        const initial = this._initialValues();
+        const form = document.createElement('form');
+        form.className = 'pfm-form';
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            void this._submit(form);
+        });
+
+        form.appendChild(this._renderTypeSelector(initial.type));
+        form.appendChild(this._renderNameField(initial.name));
+        form.appendChild(this._renderTypeFields(initial));
+
+        const actions = document.createElement('div');
+        actions.className = 'umd-actions';
+
+        const save = document.createElement('button');
+        save.type = 'submit';
+        save.className = 'umd-btn umd-btn-primary';
+        save.textContent = I18n.t('Save');
+        actions.appendChild(save);
+
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'umd-btn';
+        cancel.textContent = I18n.t('Cancel');
+        cancel.addEventListener('click', () => this.close());
+        actions.appendChild(cancel);
+
+        form.appendChild(actions);
+
+        this._panel.appendChild(form);
+        // Re-render type-specific fields when the selector changes.
+        const select = form.querySelector<HTMLSelectElement>('.pfm-type');
+        select?.addEventListener('change', () => {
+            const dyn = form.querySelector('.pfm-typefields');
+            if (dyn && dyn.parentElement) {
+                dyn.parentElement.replaceChild(
+                    this._renderTypeFields({...this._readForm(form), type: select.value as ConfigProjectType}),
+                    dyn
+                );
+            }
+        });
+    }
+
+    private _renderHeader(): HTMLElement {
+        const head = document.createElement('div');
+        head.className = 'umd-head';
+
+        const title = document.createElement('div');
+        title.className = 'umd-title';
+        title.textContent = this._mode.kind === 'add'
+            ? I18n.t('Add project')
+            : I18n.t('Edit project: {name}', {name: this._mode.project.name});
+        head.appendChild(title);
+
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'umd-close';
+        close.textContent = '×';
+        close.title = I18n.t('Close');
+        close.addEventListener('click', () => this.close());
+        head.appendChild(close);
+
+        return head;
+    }
+
+    private _renderTypeSelector(current: ConfigProjectType): HTMLElement {
+        const row = document.createElement('div');
+        row.className = 'pfm-row';
+
+        const label = document.createElement('label');
+        label.className = 'pfm-label';
+        label.textContent = I18n.t('Type');
+        row.appendChild(label);
+
+        const select = document.createElement('select');
+        select.className = 'pfm-type pfm-input';
+        for (const t of [ConfigProjectType.local, ConfigProjectType.github, ConfigProjectType.gitea]) {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            if (t === current) {
+                opt.selected = true;
+            }
+            select.appendChild(opt);
+        }
+        row.appendChild(select);
+
+        return row;
+    }
+
+    private _renderNameField(current: string|undefined): HTMLElement {
+        const row = document.createElement('div');
+        row.className = 'pfm-row';
+        const label = document.createElement('label');
+        label.className = 'pfm-label';
+        label.textContent = I18n.t('Name (optional)');
+        row.appendChild(label);
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'pfm-name pfm-input';
+        input.value = current ?? '';
+        input.placeholder = I18n.t('falls back to path basename / repo slug');
+        row.appendChild(input);
+        return row;
+    }
+
+    private _renderTypeFields(initial: ReturnType<ProjectFormModal['_initialValues']>): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'pfm-typefields';
+
+        if (initial.type === ConfigProjectType.local) {
+            wrap.appendChild(this._field('pfm-path', I18n.t('Path'), initial.path ?? '', I18n.t('absolute or relative to nppm.json')));
+        } else if (initial.type === ConfigProjectType.github) {
+            wrap.appendChild(this._field('pfm-repo', I18n.t('Repo (owner/name)'), initial.repo ?? '', 'OpenSourcePKG/nppm'));
+            wrap.appendChild(this._field('pfm-ref', I18n.t('Ref (optional)'), initial.ref ?? '', 'main'));
+            wrap.appendChild(this._field('pfm-token', I18n.t('Token (optional, $ENV_VAR supported)'), initial.token ?? '', '$GH_TOKEN'));
+        } else if (initial.type === ConfigProjectType.gitea) {
+            wrap.appendChild(this._field('pfm-url', I18n.t('Gitea repo URL'), initial.url ?? '', 'https://gitea.example.com/group/repo'));
+            wrap.appendChild(this._field('pfm-ref', I18n.t('Ref (optional)'), initial.ref ?? '', 'main'));
+            wrap.appendChild(this._field('pfm-token', I18n.t('Token (optional, $ENV_VAR supported)'), initial.token ?? '', '$GITEA_TOKEN'));
+        }
+        return wrap;
+    }
+
+    private _field(cls: string, label: string, value: string, placeholder: string): HTMLElement {
+        const row = document.createElement('div');
+        row.className = 'pfm-row';
+        const lab = document.createElement('label');
+        lab.className = 'pfm-label';
+        lab.textContent = label;
+        row.appendChild(lab);
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = `${cls} pfm-input`;
+        input.value = value;
+        input.placeholder = placeholder;
+        row.appendChild(input);
+        return row;
+    }
+
+    private _initialValues(): {
+        type: ConfigProjectType;
+        name?: string;
+        path?: string;
+        repo?: string;
+        url?: string;
+        ref?: string;
+        token?: string;
+    } {
+        if (this._mode.kind === 'add') {
+            return {type: ConfigProjectType.local};
+        }
+        const {project, extras} = this._mode;
+        return {
+            type: project.type,
+            name: extras.name ?? project.name,
+            path: extras.path,
+            repo: extras.repo,
+            url: extras.url,
+            ref: extras.ref,
+            token: extras.token
+        };
+    }
+
+    /**
+     * Pull current field values out of the form DOM. Returns a
+     * partial mutation request — the submit path completes it with
+     * the selected `type`.
+     */
+    private _readForm(form: HTMLFormElement): ApiProjectMutationRequest {
+        const get = (sel: string): string|undefined => {
+            const el = form.querySelector<HTMLInputElement>(sel);
+            const v = el?.value.trim();
+            return v && v.length > 0 ? v : undefined;
+        };
+        const type = (form.querySelector<HTMLSelectElement>('.pfm-type')?.value
+            ?? ConfigProjectType.local) as ConfigProjectType;
+        return {
+            type,
+            name: get('.pfm-name'),
+            path: get('.pfm-path'),
+            repo: get('.pfm-repo'),
+            url: get('.pfm-url'),
+            ref: get('.pfm-ref'),
+            token: get('.pfm-token')
+        };
+    }
+
+    private async _submit(form: HTMLFormElement): Promise<void> {
+        const body = this._readForm(form);
+        try {
+            const res = await fetch(this._endpoint(), {
+                method: this._mode.kind === 'add' ? 'POST' : 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                this._renderError(`HTTP ${res.status} — ${text}`);
+                return;
+            }
+            const data = await res.json() as ApiProjectMutationResponse;
+            if (!data.success || !data.project) {
+                this._renderError(data.msg ?? 'unknown error');
+                return;
+            }
+            this._onSaved?.(data.project);
+            this.close();
+        } catch (e) {
+            this._renderError((e as Error).message);
+        }
+    }
+
+    private _endpoint(): string {
+        if (this._mode.kind === 'add') {
+            return '/api/projects';
+        }
+        return `/api/projects/${this._mode.project.unid}`;
+    }
+
+    private _renderError(msg: string): void {
+        if (!this._panel) {
+            return;
+        }
+        const existing = this._panel.querySelector('.umd-error');
+        existing?.remove();
+        const err = document.createElement('div');
+        err.className = 'umd-error';
+        err.textContent = msg;
+        this._panel.appendChild(err);
+    }
+}

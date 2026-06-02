@@ -11,6 +11,12 @@ export type TreeviewSelectHandler = (project: ApiProject) => void;
 /** Fired when the user clicks the eye toggle on a project row. */
 export type TreeviewVisibilityHandler = (project: ApiProject, hidden: boolean) => void;
 
+/** Fired when the user clicks the "+" button at the top of the treeview. */
+export type TreeviewAddHandler = () => void;
+
+/** Fired when the user clicks the gear icon on a project row. */
+export type TreeviewEditHandler = (project: ApiProject) => void;
+
 /**
  * Renders the configured projects as a flat list grouped by source
  * kind. Phase 1 only has `local`, but the grouping is in place so
@@ -22,6 +28,8 @@ export class Treeview {
     private _selected: string|null = null;
     private _onSelect: TreeviewSelectHandler|null = null;
     private _onVisibility: TreeviewVisibilityHandler|null = null;
+    private _onAdd: TreeviewAddHandler|null = null;
+    private _onEdit: TreeviewEditHandler|null = null;
 
     constructor(root: HTMLElement) {
         this._root = root;
@@ -33,6 +41,14 @@ export class Treeview {
 
     public onVisibilityToggle(handler: TreeviewVisibilityHandler): void {
         this._onVisibility = handler;
+    }
+
+    public onAddProject(handler: TreeviewAddHandler): void {
+        this._onAdd = handler;
+    }
+
+    public onEditProject(handler: TreeviewEditHandler): void {
+        this._onEdit = handler;
     }
 
     /**
@@ -54,6 +70,19 @@ export class Treeview {
 
     public render(projects: ApiProject[]): void {
         this._root.innerHTML = '';
+
+        // "+ Add project" pinned to the very top so the action is
+        // discoverable even when the project list is empty.
+        const addBar = document.createElement('div');
+        addBar.className = 'tree-addbar';
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'tree-add-btn';
+        addBtn.title = I18n.t('Add project');
+        addBtn.innerHTML = '<span class="tree-add-plus">+</span> ' + I18n.t('Add project');
+        addBtn.addEventListener('click', () => this._onAdd?.());
+        addBar.appendChild(addBtn);
+        this._root.appendChild(addBar);
 
         // Always-present "Matrix" entry on top — its UUID is a sentinel
         // the parent component routes specially.
@@ -138,12 +167,10 @@ export class Treeview {
 
             item.appendChild(meta);
 
-            // Per-row action strip: eye-toggle for matrix visibility.
-            // The gear / edit affordance lives here too once the form
-            // modal lands; the strip is rendered now so the layout
-            // stays stable.
+            // Per-row action strip: gear + eye-toggle.
             const actions = document.createElement('div');
             actions.className = 'tree-item-actions';
+            actions.appendChild(this._renderGearButton(project));
             actions.appendChild(this._renderEyeToggle(project));
             item.appendChild(actions);
         }
@@ -160,6 +187,23 @@ export class Treeview {
         });
 
         return item;
+    }
+
+    /**
+     * Gear-icon edit affordance. Clicking it opens the project
+     * form modal in edit mode for this project.
+     */
+    private _renderGearButton(project: ApiProject): HTMLElement {
+        const btn = document.createElement('button');
+        btn.className = 'tree-item-gear';
+        btn.type = 'button';
+        btn.innerHTML = Treeview._GEAR_SVG;
+        btn.title = I18n.t('Edit project settings');
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._onEdit?.(project);
+        });
+        return btn;
     }
 
     /**
@@ -182,6 +226,13 @@ export class Treeview {
         });
         return btn;
     }
+
+    /** 14×14 outline gear — feather-style. */
+    private static readonly _GEAR_SVG =
+        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        + '<circle cx="12" cy="12" r="3"/>'
+        + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>'
+        + '</svg>';
 
     /** 14×14 outline eye — feather-style. */
     private static readonly _EYE_SVG =

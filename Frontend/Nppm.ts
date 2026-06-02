@@ -15,6 +15,7 @@ import {UnusedView} from './UnusedView.js';
 import {UpgradeModal} from './UpgradeModal.js';
 import {PrReviewView} from './PrReviewView.js';
 import {VulnerabilityTimelineView} from './VulnerabilityTimelineView.js';
+import {ProjectFormModal} from './ProjectFormModal.js';
 import {WhyModal} from './WhyModal.js';
 
 /**
@@ -58,6 +59,7 @@ export class Nppm {
     private readonly _upgradeModal: UpgradeModal;
     private readonly _bulkUpgradeModal: BulkUpgradeModal;
     private readonly _whyModal: WhyModal;
+    private readonly _projectFormModal: ProjectFormModal;
     private readonly _listRoot: HTMLElement;
     private _matrixHost: HTMLElement|null = null;
     private _packageHost: HTMLElement|null = null;
@@ -128,6 +130,13 @@ export class Nppm {
         this._upgradeModal = new UpgradeModal();
         this._bulkUpgradeModal = new BulkUpgradeModal();
         this._whyModal = new WhyModal();
+        this._projectFormModal = new ProjectFormModal();
+        this._projectFormModal.onSaved(() => {
+            // Re-fetch and re-render the project list so the new /
+            // edited entry shows up; if the matrix is currently the
+            // active view, also refresh it.
+            void this._refreshProjects();
+        });
 
         new Resizer(resizer, controls);
 
@@ -286,6 +295,19 @@ export class Nppm {
             }
         });
 
+        this._treeview.onAddProject(() => {
+            this._projectFormModal.open({kind: 'add'});
+        });
+
+        this._treeview.onEditProject(async (project) => {
+            try {
+                const extras = await Api.getProjectConfig(project.unid);
+                this._projectFormModal.open({kind: 'edit', project, extras});
+            } catch (e) {
+                console.error('Loading project config failed', e);
+            }
+        });
+
         this._treeview.onVisibilityToggle(async (project, hidden) => {
             try {
                 await Api.setProjectVisibility(project.unid, hidden);
@@ -339,6 +361,24 @@ export class Nppm {
             await this._loadMatrix();
         } catch (e) {
             this._matrix.renderError((e as Error).message);
+        }
+    }
+
+    /**
+     * Re-fetch the project list (e.g. after add / edit) and refresh
+     * the treeview + matrix when the matrix is the current view.
+     */
+    private async _refreshProjects(): Promise<void> {
+        try {
+            const response = await Api.listProjects();
+            this._projects = response.projects;
+            this._installedView.setEditor(response.editor);
+            this._treeview.render(response.projects);
+            if (this._view === View.matrix) {
+                void this._loadMatrix();
+            }
+        } catch (e) {
+            console.error('Refreshing project list failed', e);
         }
     }
 

@@ -267,6 +267,77 @@ html, body {
     border-color: var(--c-border);
 }
 
+.tree-addbar {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--c-border);
+    background: var(--c-bg);
+}
+
+.tree-add-btn {
+    width: 100%;
+    background: var(--c-panel);
+    color: var(--c-accent);
+    border: 1px dashed rgba(53, 116, 240, 0.5);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+}
+
+.tree-add-btn:hover {
+    background: var(--c-row-hover);
+    border-style: solid;
+}
+
+.tree-add-plus {
+    font-weight: 700;
+    margin-right: 4px;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.pfm-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pfm-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pfm-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--c-muted);
+}
+
+.pfm-input {
+    background: var(--c-bg);
+    color: var(--c-text);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 12px;
+}
+
+.pfm-input:focus {
+    outline: none;
+    border-color: var(--c-accent);
+}
+
+.pfm-typefields {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
 /* Package list ------------------------------------------------------ */
 
 .list-placeholder,

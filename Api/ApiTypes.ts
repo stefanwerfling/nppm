@@ -51,6 +51,41 @@ export type ApiProjectsResponse = {
 };
 
 /**
+ * Body shape for `POST /api/projects` and `PUT /api/projects/:id`.
+ * The `type` discriminator decides which other fields are required;
+ * unused-for-the-type fields are ignored by the backend so the
+ * frontend can keep them in the form without consequence.
+ */
+export type ApiProjectMutationRequest = {
+    type: ConfigProjectType;
+    name?: string;
+    hidden?: boolean;
+    // local
+    path?: string;
+    // github
+    repo?: string;
+    // gitea
+    url?: string;
+    // remote-shared
+    ref?: string;
+    token?: string;
+};
+
+/**
+ * Full raw config entry for one project — used by the edit modal
+ * to pre-fill its fields. Type-specific keys are present per the
+ * project's `type`; everything is optional so the wire shape is
+ * stable across types.
+ */
+export type ApiProjectConfigResponse = ApiProjectMutationRequest;
+
+export type ApiProjectMutationResponse = {
+    success: boolean;
+    project?: ApiProject;
+    msg?: string;
+};
+
+/**
  * One manifest as returned by `GET /api/projects/:id/packages`. Workspace
  * is omitted for the root manifest.
  */

@@ -25,6 +25,9 @@ import {
     ApiMatrixSecurityResponse,
     ApiPackagesResponse,
     ApiProject,
+    ApiProjectConfigResponse,
+    ApiProjectMutationRequest,
+    ApiProjectMutationResponse,
     ApiProjectsResponse,
     ApiReleasesResponse,
     ApiSecurityResponse,
@@ -54,6 +57,8 @@ import {PackageJsonEditor} from './Upgrade/PackageJsonEditor.js';
 import {Upgrader} from './Upgrade/Upgrader.js';
 import {IntegrityScanner} from './Security/IntegrityScanner.js';
 import {PrReviewBuilder} from './PrReview/PrReviewBuilder.js';
+import {ProjectGitea} from './Project/ProjectGitea.js';
+import {ProjectGithub} from './Project/ProjectGithub.js';
 import {ProjectLocal} from './Project/ProjectLocal.js';
 import {ProjectRemote} from './Project/ProjectRemote.js';
 import {TimelineBuilder} from './Vulnerability/TimelineBuilder.js';
@@ -125,6 +130,7 @@ class Server {
                 cacheDir,
                 cacheTtlMinutes,
                 registry,
+                remoteCache,
                 fingerprintBuilder,
                 osvClient,
                 securityCache,
@@ -207,6 +213,120 @@ class Server {
 
                 const response: ApiProjectsResponse = {projects: result, editor};
                 res.status(200).json(response);
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/projects/:id/config — return the raw nppm.json
+            // entry for one project (including the token, when set).
+            // Used by the edit modal to pre-fill its form. The dev
+            // server is bound to localhost; the token round-trip
+            // never leaves the user's machine.
+            // -------------------------------------------------------------
+            app.get('/api/projects/:id/config', async (req, res) => {
+                const project = projects.get(req.params.id);
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+                try {
+                    const idx = project.getConfigIndex();
+                    if (!configFile || !fs.existsSync(configFile)) {
+                        res.status(404).json({success: false, msg: 'nppm.json not found'});
+                        return;
+                    }
+                    const cfg = JSON.parse(fs.readFileSync(configFile, 'utf-8')) as {projects?: unknown[]};
+                    const entry = (cfg.projects ?? [])[idx];
+                    if (!entry || typeof entry !== 'object') {
+                        res.status(404).json({success: false, msg: 'Project entry not found in nppm.json'});
+                        return;
+                    }
+                    const response: ApiProjectConfigResponse = entry as ApiProjectConfigResponse;
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // POST /api/projects — add a new project. Body shape is the
+            // discriminated union over local/github/gitea; unused-for-
+            // the-type fields are tolerated and ignored. Persists to
+            // nppm.json and registers the new project in the live map
+            // under a fresh UUID — no server restart needed.
+            // -------------------------------------------------------------
+            app.post('/api/projects', async (req, res) => {
+                const body = req.body as ApiProjectMutationRequest;
+                const validation = Server._validateProjectBody(body);
+                if (validation !== null) {
+                    res.status(400).json({success: false, msg: validation});
+                    return;
+                }
+                try {
+                    let newIndex = 0;
+                    Server._mutateConfig(configFile, (cfg) => {
+                        if (!Array.isArray(cfg.projects)) {
+                            cfg.projects = [];
+                        }
+                        const entry = Server._projectEntryFromBody(body);
+                        cfg.projects.push(entry);
+                        newIndex = cfg.projects.length - 1;
+                    });
+                    const project = Server._instantiateProject(
+                        body, projectRoot, remoteCache, newIndex
+                    );
+                    const unid = crypto.randomUUID();
+                    projects.set(unid, project);
+
+                    const response: ApiProjectMutationResponse = {
+                        success: true,
+                        project: await Server._toApiProject(unid, project)
+                    };
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // PUT /api/projects/:id — edit an existing project's
+            // settings. The body fully describes the new shape; the
+            // type may change (e.g. from `local` to `github`). The
+            // UUID stays stable so any open browser tab continues to
+            // address the same project.
+            // -------------------------------------------------------------
+            app.put('/api/projects/:id', async (req, res) => {
+                const existing = projects.get(req.params.id);
+                if (!existing) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+                const body = req.body as ApiProjectMutationRequest;
+                const validation = Server._validateProjectBody(body);
+                if (validation !== null) {
+                    res.status(400).json({success: false, msg: validation});
+                    return;
+                }
+                try {
+                    const idx = existing.getConfigIndex();
+                    Server._mutateConfig(configFile, (cfg) => {
+                        if (!Array.isArray(cfg.projects) || idx < 0 || idx >= cfg.projects.length) {
+                            throw new Error('Project entry not found in nppm.json (stale index)');
+                        }
+                        cfg.projects[idx] = Server._projectEntryFromBody(body);
+                    });
+                    const project = Server._instantiateProject(
+                        body, projectRoot, remoteCache, idx
+                    );
+                    projects.set(req.params.id, project);
+
+                    const response: ApiProjectMutationResponse = {
+                        success: true,
+                        project: await Server._toApiProject(req.params.id, project)
+                    };
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
             });
 
             // -------------------------------------------------------------
@@ -1957,6 +2077,146 @@ class Server {
         const cfg = JSON.parse(raw) as {projects?: unknown[]} & Record<string, unknown>;
         mutator(cfg);
         fs.writeFileSync(configFile, JSON.stringify(cfg, null, 2) + '\n', 'utf-8');
+    }
+
+    /**
+     * Validate a project-mutation body. Returns `null` when the
+     * body is acceptable, or a human-readable error string when it
+     * isn't. Each project type has its own required-field rule.
+     */
+    private static _validateProjectBody(body: ApiProjectMutationRequest): string|null {
+        if (!body || typeof body !== 'object') {
+            return 'request body required';
+        }
+        switch (body.type) {
+            case ConfigProjectType.local:
+                if (!body.path || typeof body.path !== 'string') {
+                    return 'path is required for local projects';
+                }
+                return null;
+            case ConfigProjectType.github:
+                if (!body.repo || typeof body.repo !== 'string') {
+                    return 'repo is required for github projects';
+                }
+                return null;
+            case ConfigProjectType.gitea:
+                if (!body.url || typeof body.url !== 'string') {
+                    return 'url is required for gitea projects';
+                }
+                return null;
+            default:
+                return `unknown project type "${body.type as string}"`;
+        }
+    }
+
+    /**
+     * Build the JSON entry that should be appended / overwritten in
+     * `nppm.json`'s `projects` array. Only the type-relevant fields
+     * are kept so the on-disk shape stays clean.
+     */
+    private static _projectEntryFromBody(body: ApiProjectMutationRequest): Record<string, unknown> {
+        const out: Record<string, unknown> = {type: body.type};
+        if (body.name && body.name.length > 0) {
+            out.name = body.name;
+        }
+        if (body.type === ConfigProjectType.local) {
+            out.path = body.path;
+        } else if (body.type === ConfigProjectType.github) {
+            out.repo = body.repo;
+            if (body.ref) {
+                out.ref = body.ref;
+            }
+            if (body.token) {
+                out.token = body.token;
+            }
+        } else if (body.type === ConfigProjectType.gitea) {
+            out.url = body.url;
+            if (body.ref) {
+                out.ref = body.ref;
+            }
+            if (body.token) {
+                out.token = body.token;
+            }
+        }
+        if (body.hidden === true) {
+            out.hidden = true;
+        }
+        return out;
+    }
+
+    /**
+     * Construct a live `Project` instance from the mutation body.
+     * The shared `remoteCache` is the same one the loader hands out
+     * at boot, so freshly-added remote projects warm into the same
+     * cache pocket without extra plumbing.
+     */
+    private static _instantiateProject(
+        body: ApiProjectMutationRequest,
+        projectRoot: string,
+        remoteCache: import('./Cache/JsonCache.js').JsonCache,
+        configIndex: number
+    ): import('./Project/Project.js').Project {
+        const hidden = body.hidden === true;
+        if (body.type === ConfigProjectType.local) {
+            const absRoot = path.resolve(projectRoot, body.path!);
+            return new ProjectLocal(absRoot, body.name, {hidden, configIndex});
+        }
+        if (body.type === ConfigProjectType.github) {
+            return new ProjectGithub(
+                body.repo!,
+                body.name ?? body.repo!,
+                body.ref,
+                ConfigLoader.expandEnv(body.token),
+                remoteCache,
+                {hidden, configIndex}
+            );
+        }
+        return new ProjectGitea(
+            body.url!,
+            body.name ?? body.url!,
+            body.ref,
+            ConfigLoader.expandEnv(body.token),
+            remoteCache,
+            {hidden, configIndex}
+        );
+    }
+
+    /**
+     * Build the `ApiProject` summary for one fresh / edited project
+     * — mirrors what `GET /api/projects` would return for that
+     * single entry. Pulls `packageCount` + `workspaceCount` via the
+     * same `loadManifests` path so the frontend's treeview row
+     * renders with real numbers immediately.
+     */
+    private static async _toApiProject(
+        unid: string,
+        project: import('./Project/Project.js').Project
+    ): Promise<ApiProject> {
+        const root = project instanceof ProjectLocal ? project.getRoot() : undefined;
+        try {
+            const manifests = await project.loadManifests();
+            const total = manifests.reduce((sum, m) => sum + m.dependencies.length, 0);
+            return {
+                unid,
+                name: project.getName(),
+                type: project.getType(),
+                packageCount: total,
+                workspaceCount: manifests.length - 1,
+                root,
+                hidden: project.isHidden()
+            };
+        } catch (e) {
+            return {
+                unid,
+                name: project.getName(),
+                type: project.getType(),
+                packageCount: 0,
+                workspaceCount: 0,
+                root,
+                hidden: project.isHidden(),
+                error: (e as Error).message
+            };
+        }
     }
 
     /**

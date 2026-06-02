@@ -293,5 +293,15 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     'Contains non-ASCII characters — npm names are ASCII-only': 'Contains non-ASCII characters — npm names are ASCII-only',
     'Looks similar to popular "{name}" — possible typosquat': 'Looks similar to popular "{name}" — possible typosquat',
     'Show in cross-project matrix': 'Show in cross-project matrix',
-    'Hide from cross-project matrix': 'Hide from cross-project matrix'
+    'Hide from cross-project matrix': 'Hide from cross-project matrix',
+    'Add project': 'Add project',
+    'Edit project settings': 'Edit project settings',
+    'Edit project: {name}': 'Edit project: {name}',
+    'Name (optional)': 'Name (optional)',
+    'falls back to path basename / repo slug': 'falls back to path basename / repo slug',
+    'absolute or relative to nppm.json': 'absolute or relative to nppm.json',
+    'Repo (owner/name)': 'Repo (owner/name)',
+    'Ref (optional)': 'Ref (optional)',
+    'Token (optional, $ENV_VAR supported)': 'Token (optional, $ENV_VAR supported)',
+    'Gitea repo URL': 'Gitea repo URL'
 };

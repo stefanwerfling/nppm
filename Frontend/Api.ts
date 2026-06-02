@@ -9,6 +9,9 @@ import {
     ApiLockfileResponse,
     ApiBundlesRequest,
     ApiBundlesResponse,
+    ApiProjectConfigResponse,
+    ApiProjectMutationRequest,
+    ApiProjectMutationResponse,
     ApiMatrixHeuristicsRequest,
     ApiMatrixHeuristicsResponse,
     ApiMatrixIntegrityResponse,
@@ -44,6 +47,34 @@ export class Api {
      * hidden projects on its next refresh; the treeview keeps showing
      * them so per-project drill-down keeps working.
      */
+    public static async getProjectConfig(unid: string): Promise<ApiProjectConfigResponse> {
+        return Api._json<ApiProjectConfigResponse>(`/api/projects/${unid}/config`);
+    }
+
+    public static async addProject(body: ApiProjectMutationRequest): Promise<ApiProjectMutationResponse> {
+        const res = await fetch('/api/projects', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            throw new Error(`/api/projects → ${res.status} ${res.statusText}`);
+        }
+        return (await res.json()) as ApiProjectMutationResponse;
+    }
+
+    public static async editProject(unid: string, body: ApiProjectMutationRequest): Promise<ApiProjectMutationResponse> {
+        const res = await fetch(`/api/projects/${unid}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            throw new Error(`/api/projects/${unid} → ${res.status} ${res.statusText}`);
+        }
+        return (await res.json()) as ApiProjectMutationResponse;
+    }
+
     public static async setProjectVisibility(unid: string, hidden: boolean): Promise<void> {
         const res = await fetch(`/api/projects/${unid}/visibility`, {
             method: 'PATCH',

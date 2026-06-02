@@ -284,5 +284,15 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'Contains non-ASCII characters — npm names are ASCII-only': 'Enthält Nicht-ASCII-Zeichen — npm-Namen sind ASCII-only',
     'Looks similar to popular "{name}" — possible typosquat': 'Ähnelt dem populären "{name}" — möglicher Typosquat',
     'Show in cross-project matrix': 'In der projektübergreifenden Matrix anzeigen',
-    'Hide from cross-project matrix': 'Aus der projektübergreifenden Matrix ausblenden'
+    'Hide from cross-project matrix': 'Aus der projektübergreifenden Matrix ausblenden',
+    'Add project': 'Projekt hinzufügen',
+    'Edit project settings': 'Projekteinstellungen bearbeiten',
+    'Edit project: {name}': 'Projekt bearbeiten: {name}',
+    'Name (optional)': 'Name (optional)',
+    'falls back to path basename / repo slug': 'Fallback: Pfad-Basisname / Repo-Slug',
+    'absolute or relative to nppm.json': 'absolut oder relativ zur nppm.json',
+    'Repo (owner/name)': 'Repo (owner/name)',
+    'Ref (optional)': 'Ref (optional)',
+    'Token (optional, $ENV_VAR supported)': 'Token (optional, $ENV_VAR möglich)',
+    'Gitea repo URL': 'Gitea-Repo-URL'
 };

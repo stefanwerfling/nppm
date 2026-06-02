@@ -131,6 +131,7 @@ nppm/
 │   ├── TemplateView.ts     per-project right-pane tab showing the compliance diff
 │   ├── TemplateApplyModal.ts  pick-checkbox modal + SSE log for `POST .../compliance/apply`
 │   ├── TemplateFormModal.ts  tabbed editor (General/Packages/Forbidden/Root/Files) backing the CRUD endpoints
+│   ├── WorkspaceDriftModal.ts  per-project breakdown for the matrix `WS` badge + "Open project matrix" jump
 │   ├── EditorUrl.ts        URL-handler templates for vscode/vscodium/cursor/phpstorm/webstorm/idea/subl
 │   ├── GlobalScanView.ts   SSE-driven global scan results
 │   ├── PackageDetailPanel.ts  modal w/ 5 tabs (Files/Deps/Diff/Releases/Security)
@@ -154,12 +155,14 @@ nppm/
 | GET    | `/api/projects`                                       | list configured projects + counts |
 | GET    | `/api/config`                                         | non-`projects` sections of nppm.json (drives SettingsModal) |
 | PUT    | `/api/config`                                         | full replacement of non-`projects` sections (validated vs `SchemaConfig`) |
+| POST   | `/api/cache/clear`                                    | wipe every file under `cacheDir`; preserves dirs so in-memory JsonCache instances keep writing |
 | GET    | `/api/fs/browse?path=&showHidden=`                    | directory listing for the DirectoryPickerModal (absolute paths only) |
 | GET    | `/api/templates`                                      | catalogue summary (drives the Templates view header) |
 | GET    | `/api/templates/:id`                                  | one template (guarded against `:id === "matrix"`, since /matrix is registered after) |
 | POST   | `/api/templates`                                      | create a new local template (id format `[a-z0-9][a-z0-9-]{0,63}`) |
 | PUT    | `/api/templates/:id`                                  | full-replace local template (body id must match URL; 403 if id is remote) |
 | DELETE | `/api/templates/:id`                                  | remove local template dir (403 if id is remote) |
+| POST   | `/api/templates/sources`                              | append URL to `templateSources` in nppm.json + refresh remote cache |
 | GET    | `/api/templates/matrix`                               | cross-project compliance matrix |
 | GET    | `/api/projects/:id/compliance`                        | per-project compliance findings (packages + root + files + workspaces) |
 | POST   | `/api/projects/:id/compliance/apply`                  | SSE: apply selected finding targets to disk (one backup snapshot before any write) |
@@ -214,7 +217,7 @@ returns IDs only, no per-vuln severity — matches `npm audit`'s
 | GET    | `/api/fingerprint`                                    | one `pkg@version` fingerprint |
 | GET    | `/api/fingerprint/diff`                               | file-level diff between two versions |
 | GET    | `/api/security`                                       | aggregated SecurityReport for one `pkg@version` |
-| GET    | `/api/releases`                                       | registry + GitHub-merged release list |
+| GET    | `/api/releases?name=&version=`                        | registry + GitHub-merged release list; `version` triggers git-skip (empty timeline for git URLs) |
 
 ## Storage
 
@@ -253,6 +256,20 @@ returns IDs only, no per-vuln severity — matches `npm audit`'s
   `nppm-templates/<id>/` wins. CRUD endpoints (`POST`/`PUT`/`DELETE
   /api/templates/:id`) refuse with `403` for ids whose source is
   remote — remote templates are read-only mirrors.
+- **Git-version skip for name-keyed lookups.** When a dep version
+  matches `GitResolver.isGitVersion()` (`git+`, `git://`, `git@`,
+  `github:`, `gitlab:`, `bitbucket:`), every scanner that fetches
+  data by *name* from the npm registry must return `null` for that
+  package — OSV / Maintainer / Churn / Integrity already do, plus
+  `SecurityScanner._cadence/_freshnessSummary` and
+  `/api/releases?version=`. The reason is collision: a user's
+  private git dep (`git+https://.../figtree.git#claude`) shares a
+  name with an unrelated public `figtree@0.0.0` from someone else.
+  `MatrixBuilder.build` forces `latest = null` for rows where every
+  cell is a git URL, and `Frontend/Matrix.setData` excludes git-only
+  rows from the `/api/matrix/heuristics` batch entirely. The
+  fingerprint path still works because `FingerprintBuilder` resolves
+  git URLs via `GitResolver.resolveTarball` instead of the registry.
 
 ## Tests
 

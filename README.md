@@ -39,7 +39,10 @@ Backend lives inside a Vite dev server, frontend is plain TypeScript + DOM
 - **Cross-project matrix** — packages as rows, projects as columns, traffic
   lights for `aligned / outdated / drift / unknown`. Workspaces collapse to
   one column per project (with a `WS` badge when the project's own
-  workspaces disagree).
+  workspaces disagree — clicking the badge opens a per-workspace
+  breakdown with a jump to the per-project matrix). Git-only rows are
+  recognised: no fake `latest` from a same-named registry collision,
+  the Latest column shows `git` with the actual refs in the tooltip.
 - **Per-project matrix** — workspaces split into individual columns so you
   see drift inside one project at a glance.
 - **Project sub-views** for each configured project: `Declared`
@@ -150,6 +153,37 @@ Backend lives inside a Vite dev server, frontend is plain TypeScript + DOM
 - **Git dependencies** — `git+https://`, `git@host:`, `github:` / `gitlab:`
   / `bitbucket:` shorthand all fetch tarballs from the right host and feed
   the same scanners.
+- **Templates / standards enforcement** — declare which packages
+  (and which versions) a project *should* have, plus root metadata
+  (`engines`, `scripts`, `type`, `packageManager`), plus shipped
+  files (`.editorconfig`, `tsconfig.base.json`, …) with three
+  per-file modes (`create` / `merge-json` / `report-only`). The
+  Templates view renders a cross-project compliance matrix; the
+  per-project Template tab shows the full diff grouped by
+  severity, with a one-click "Apply selected" that writes a
+  timestamped backup first. Templates live as JSON files at
+  `nppm-templates/<id>/template.json` and / or come from remote
+  URLs via the top-level `templateSources: string[]` (refresh on
+  boot or via "+ Add remote source" in the Templates view).
+  Supports `extends` for inheritance, two modes (`additive` /
+  `strict`), `forbidden` lists, and per-workspace overrides.
+  Project ↔ template assignment lives in the project form modal
+  as a checkbox picker.
+- **Health ring per project** — every project entry in the
+  treeview carries a small SVG progress ring with a 0–100 % score.
+  Aggregates the per-package severity scores (CVEs, scripts,
+  patterns, maintainer, integrity, freshness, cadence, typosquat)
+  capped at the "risk" tier so a single loud package can't dominate,
+  averaged across the project. Tiers: ≥80 green, ≥60 amber, <60
+  red. Fills in live as the asynchronous matrix data settles.
+- **Settings dialog + cache rebuild** — gear button in the topbar
+  opens a tabbed editor over the non-`projects` sections of
+  `nppm.json` (validated against the same VTS schema as the
+  backend uses on load). The Cache section ships a "Clear cache
+  now" button that wipes every pocket on disk, warms the registry
+  via a fresh matrix walk, then re-runs the global OSV scan so
+  the next interaction is against fresh data. `.nppm-history/` is
+  kept.
 - **i18n** — English by default, German included. Add a third language by
   dropping `Frontend/Locales/<id>.ts` and registering it in `I18n.ts`.
 
@@ -336,6 +370,17 @@ Cache pockets under `.nppm-cache/` (configurable):
   (permanent — published `pkg@version` is immutable)
 - `security/` — OSV.dev responses (TTL)
 - `releases/` — GitHub Releases API responses (TTL)
+- `bundlephobia/` — gzip / minified size + transitive count per
+  `pkg@version` (permanent)
+- `npm-user/` — npm user-doc enrichment (2FA flag + account-creation
+  date) keyed by username (TTL)
+- `templates-remote/` — remote template bodies fetched from
+  `templateSources` URLs
+
+The Settings dialog ships a "Clear cache now" button that wipes
+every pocket in one shot (preserves the directory layout so the
+in-memory `JsonCache` instances keep working) and re-warms the
+registry + OSV cache afterwards.
 
 History is **not** in the cache — it lives in `.nppm-history/` next to
 `nppm.json` so you can commit / inspect it independently.

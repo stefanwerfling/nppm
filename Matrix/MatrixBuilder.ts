@@ -198,7 +198,18 @@ export class MatrixBuilder {
                 }
             }
 
-            const reg = registryHits.get(pkgName) ?? null;
+            // Git-only rows: every declaration points at a git URL, so
+            // the registry entry of the same name is either missing
+            // or — worse — an unrelated package that happens to
+            // share the name (the figtree / fundon collision). Force
+            // `latest = null` so the UI shows "git" instead of the
+            // foreign latest, and so the row status comes out as
+            // drift / unknown rather than a fake "outdated" against
+            // a version that doesn't belong to this package.
+            const allCellsGit = Object.values(rowCells).every(
+                (c) => GitResolver.isGitVersion(c.version)
+            );
+            const reg = allCellsGit ? null : (registryHits.get(pkgName) ?? null);
             const latest = reg?.latest ?? null;
             const latestPublishedAt = (latest && reg?.time?.[latest]) ?? null;
 

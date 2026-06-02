@@ -97,6 +97,35 @@ describe('SecurityScanner.scanHeuristicsBatch', () => {
         expect(entries[0].patterns.maxSeverity).toBeNull();
     });
 
+    it('skips cadence + freshness for git-installed versions', async () => {
+        // The user's `figtree` is a git dep, but npm has an unrelated
+        // 11-year-old `figtree` from another author. The matrix must
+        // not flag the git install as STALE / NEW based on that
+        // collision — both summaries should report `level: null`.
+        const builder = new FingerprintBuilder(null, async () => null);
+        const osv = new OsvClient(null, async () => ({vulns: []}));
+        const cache = new JsonCache('/tmp/nppm-noop-' + Math.random().toString(36).slice(2), 60);
+        await cache.set('reg_figtree', {
+            data: {
+                name: 'figtree',
+                'dist-tags': {latest: '0.0.0'},
+                versions: {},
+                time: {created: '2015-01-03T13:21:21.270Z', '0.0.0': '2015-01-03T13:21:21.270Z'}
+            }
+        });
+        const registry = new Registry('http://unused', cache);
+        const scanner = new SecurityScanner(osv, builder, registry);
+
+        const entries = await scanner.scanHeuristicsBatch([
+            {name: 'figtree', version: 'github:user/figtree'}
+        ]);
+
+        expect(entries[0].cadence.level).toBeNull();
+        expect(entries[0].cadence.daysSinceLastRelease).toBeNull();
+        expect(entries[0].freshness.level).toBeNull();
+        expect(entries[0].freshness.packageAgeDays).toBeNull();
+    });
+
     it('respects the concurrency bound (does not fire all in parallel)', async () => {
         let inflight = 0;
         let peak = 0;

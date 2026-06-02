@@ -15,6 +15,7 @@ import {TyposquatLevel, TyposquatSummary} from '../Security/TyposquatScanner.js'
 import {PatternSummary, ScriptSummary} from '../Security/SecurityScanner.js';
 import {Api} from './Api.js';
 import {I18n} from './I18n.js';
+import {GitResolver} from '../Fingerprint/GitResolver.js';
 import {Version} from './Version.js';
 
 /**
@@ -315,9 +316,23 @@ export class Matrix {
         const gen = ++this._securityGen;
         const packages: {name: string; version: string}[] = [];
         for (const row of data.rows) {
-            if (row.latest) {
-                packages.push({name: row.name, version: Version.cleanRange(row.latest)});
+            if (!row.latest) {
+                continue;
             }
+            // Skip git-only rows. `row.latest` here is the registry's
+            // latest for `row.name`, which is meaningless when every
+            // declared cell is a git URL — the registry entry is an
+            // unrelated package with the same name (the figtree /
+            // fundon case). Querying CVE / cadence / freshness /
+            // maintainer for that registry entry would mis-attribute
+            // its data to the user's git dep.
+            const allGit = Object.values(row.cells).every(
+                (c) => GitResolver.isGitVersion(c.version)
+            );
+            if (allGit) {
+                continue;
+            }
+            packages.push({name: row.name, version: Version.cleanRange(row.latest)});
         }
 
         // CVE lookup is fast (OSV batch); the fingerprint-derived
@@ -968,7 +983,30 @@ export class Matrix {
 
         const latestTd = document.createElement('td');
         latestTd.className = 'matrix-cell-latest';
-        latestTd.textContent = row.latest ?? '?';
+        if (row.latest) {
+            latestTd.textContent = row.latest;
+        } else {
+            const allCellsGit = Object.values(row.cells).every(
+                (c) => GitResolver.isGitVersion(c.version)
+            );
+            if (allCellsGit) {
+                // Collect the distinct git refs so the user can see which
+                // branches/tags are in play across projects without
+                // hovering each cell separately.
+                const refs = new Set<string>();
+                for (const c of Object.values(row.cells)) {
+                    const m = c.version.match(/#(.+)$/);
+                    refs.add(m ? m[1] : 'HEAD');
+                }
+                latestTd.textContent = 'git';
+                latestTd.classList.add('matrix-cell-latest-git');
+                latestTd.title = I18n.t('Git-only dependency — refs: {refs}', {
+                    refs: Array.from(refs).join(', ')
+                });
+            } else {
+                latestTd.textContent = '?';
+            }
+        }
         tr.appendChild(latestTd);
 
         return tr;

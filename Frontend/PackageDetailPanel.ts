@@ -588,8 +588,9 @@ export class PackageDetailPanel {
         }
         this._releasesInflight = true;
         const name = this._fingerprint.name;
+        const version = this._fingerprint.version;
 
-        void Api.releases(name).then((response) => {
+        void Api.releases(name, version).then((response) => {
             this._releasesInflight = false;
             this._releases = response;
             if (this._activeTab === Tab.releases) {

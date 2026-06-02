@@ -1,4 +1,5 @@
 import {FingerprintBuilder} from '../Fingerprint/FingerprintBuilder.js';
+import {GitResolver} from '../Fingerprint/GitResolver.js';
 import {Registry} from '../Registry/Registry.js';
 import {
     BinaryFinding,
@@ -206,11 +207,18 @@ export class SecurityScanner {
         // agnostic). Both fall back to `null` if neither is present.
         const spdx = fingerprint?.manifest?.license ?? reg?.license ?? null;
         const provenance = ProvenanceScanner.classify(reg?.dist?.[version]);
-        const freshness = FreshnessScanner.classify({
+        // Git-installed packages don't correspond to the registry
+        // entry of the same name — the npm-published `figtree` could
+        // be a 10-year-old unrelated package while the user installs
+        // from `github:owner/figtree`. Skip the name-keyed scanners
+        // (cadence + freshness) so the matrix doesn't flag a
+        // brand-new git dep as abandoned.
+        const isGit = GitResolver.isGitVersion(version);
+        const freshness = isGit ? null : FreshnessScanner.classify({
             firstPublishedAt: reg?.time?.created ?? null,
             maintainerCreatedAt: maintainer?.currentPublisherCreatedAt ?? null
         });
-        const cadence = CadenceScanner.classify(reg?.time);
+        const cadence = isGit ? null : CadenceScanner.classify(reg?.time);
         const ignoreScripts = IgnoreScriptsScanner.classify(scriptFindings);
         const typosquat = TyposquatScanner.classify(name);
 
@@ -346,7 +354,11 @@ export class SecurityScanner {
         firstPublishedAt: string|null,
         maintainerCreatedAt: string|null
     ): FreshnessSummary {
-        const finding = FreshnessScanner.classify({firstPublishedAt, maintainerCreatedAt});
+        // Git-installed packages: registry data is for an unrelated
+        // npm name-collision (see scan() for the figtree example).
+        const finding = GitResolver.isGitVersion(version)
+            ? null
+            : FreshnessScanner.classify({firstPublishedAt, maintainerCreatedAt});
         return {
             name,
             version,
@@ -375,7 +387,9 @@ export class SecurityScanner {
         version: string,
         timeMap: Record<string, string>|undefined
     ): CadenceSummary {
-        const finding = CadenceScanner.classify(timeMap);
+        const finding = GitResolver.isGitVersion(version)
+            ? null
+            : CadenceScanner.classify(timeMap);
         return {
             name,
             version,

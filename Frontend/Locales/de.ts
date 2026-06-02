@@ -295,6 +295,7 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'Ref (optional)': 'Ref (optional)',
     'Token (optional, $ENV_VAR supported)': 'Token (optional, $ENV_VAR möglich)',
     'Gitea repo URL': 'Gitea-Repo-URL',
+    'Git-only dependency — refs: {refs}': 'Nur-Git-Abhängigkeit — Refs: {refs}',
     'Settings': 'Einstellungen',
     'Save': 'Speichern',
     'Loading settings …': 'Einstellungen werden geladen …',

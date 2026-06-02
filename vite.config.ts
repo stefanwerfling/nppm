@@ -60,6 +60,7 @@ import {JsonCache} from './Cache/JsonCache.js';
 import {ConfigProjectType, SchemaConfig} from './Config/Config.js';
 import {ConfigLoader} from './Config/ConfigLoader.js';
 import {FingerprintDiffer} from './Fingerprint/FingerprintDiff.js';
+import {GitResolver} from './Fingerprint/GitResolver.js';
 import {GitHistoryBackfill} from './History/GitHistoryBackfill.js';
 import {HistoryStore} from './History/HistoryStore.js';
 import {RemoteGitHistoryBackfill} from './History/RemoteGitHistoryBackfill.js';
@@ -2479,14 +2480,29 @@ class Server {
             });
 
             // -------------------------------------------------------------
-            // GET /api/releases?name=... — merged release timeline:
-            // registry-known versions + (when github.com) GitHub
-            // release titles / bodies. Newest first.
+            // GET /api/releases?name=...[&version=...] — merged release
+            // timeline: registry-known versions + (when github.com)
+            // GitHub release titles / bodies. Newest first.
+            //
+            // When `version` is a git URL (`github:...`, `git+...`,
+            // etc.) the registry's `name` entry is an unrelated
+            // package — return an empty timeline so the UI doesn't
+            // mis-attribute another author's releases to the user's
+            // git dep.
             // -------------------------------------------------------------
             app.get('/api/releases', async (req, res) => {
                 const name = typeof req.query.name === 'string' ? req.query.name : '';
+                const version = typeof req.query.version === 'string' ? req.query.version : '';
                 if (!name) {
                     res.status(400).json({success: false, msg: 'name query param is required'});
+                    return;
+                }
+                if (version && GitResolver.isGitVersion(version)) {
+                    const response: ApiReleasesResponse = {
+                        name,
+                        releases: []
+                    };
+                    res.status(200).json(response);
                     return;
                 }
                 try {

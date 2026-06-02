@@ -194,8 +194,11 @@ export class Api {
         return '/api/matrix/upgrade/apply';
     }
 
-    public static async releases(name: string): Promise<ApiReleasesResponse> {
+    public static async releases(name: string, version?: string): Promise<ApiReleasesResponse> {
         const qs = new URLSearchParams({name});
+        if (version) {
+            qs.set('version', version);
+        }
         return Api._json<ApiReleasesResponse>(`/api/releases?${qs.toString()}`);
     }
 

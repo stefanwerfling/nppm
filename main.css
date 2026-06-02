@@ -1899,6 +1899,11 @@ html, body {
     font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
+.matrix-cell-latest-git {
+    color: #4a9fff;
+    font-style: italic;
+}
+
 .matrix-empty {
     text-align: center;
     color: var(--c-muted);

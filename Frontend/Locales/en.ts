@@ -304,6 +304,7 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     'Ref (optional)': 'Ref (optional)',
     'Token (optional, $ENV_VAR supported)': 'Token (optional, $ENV_VAR supported)',
     'Gitea repo URL': 'Gitea repo URL',
+    'Git-only dependency — refs: {refs}': 'Git-only dependency — refs: {refs}',
     'Settings': 'Settings',
     'Loading settings …': 'Loading settings …',
     'Most settings only take effect after restarting the dev server.': 'Most settings only take effect after restarting the dev server.',

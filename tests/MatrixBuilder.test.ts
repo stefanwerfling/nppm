@@ -162,6 +162,30 @@ describe('MatrixBuilder.build', () => {
         expect(matrix.rows[0].status).toBe(MatrixRowStatus.drift);
     });
 
+    it('forces latest=null for git-only rows even when the registry has an unrelated package with the same name', async () => {
+        // The figtree / fundon collision: the user's `figtree` is a
+        // git dep, but `figtree@0.0.0` exists on npm (by a different
+        // author). Without the git-only guard the matrix would
+        // mis-attribute fundon's 0.0.0 as "latest" and flag the row
+        // as outdated against a foreign package.
+        const a = new FakeProject('a', [manifest('a', {
+            figtree: 'git+https://github.com/me/figtree.git#main'
+        })]);
+        const b = new FakeProject('b', [manifest('b', {
+            figtree: 'git+https://github.com/me/figtree.git#claude'
+        })]);
+
+        const projects = new Map<string, Project>([['1', a], ['2', b]]);
+        const matrix = await MatrixBuilder.build(projects, new FakeRegistry({
+            figtree: {name: 'figtree', latest: '0.0.0', versions: ['0.0.0']}
+        }));
+
+        expect(matrix.rows[0].latest).toBeNull();
+        expect(matrix.rows[0].latestPublishedAt).toBeNull();
+        // Two different refs → drift (not outdated against a foreign latest).
+        expect(matrix.rows[0].status).toBe(MatrixRowStatus.drift);
+    });
+
     it('marks the row as unknown when registry has no data', async () => {
         const a = new FakeProject('a', [manifest('a', {foo: '^1'})]);
         const projects = new Map<string, Project>([['1', a]]);

@@ -86,6 +86,58 @@ export type ApiProjectMutationResponse = {
 };
 
 /**
+ * The non-`projects` sections of `nppm.json`, surfaced verbatim by
+ * `GET /api/config` and accepted as a full replacement by
+ * `PUT /api/config`. Everything is optional so omitting a section
+ * (or a single field) clears it from `nppm.json` on write.
+ */
+export type ApiConfigSettings = {
+    server?: {
+        port?: number;
+        limit?: string;
+    };
+    browser?: {
+        open?: boolean;
+    };
+    registry?: {
+        url?: string;
+        auth?: string;
+    };
+    cache?: {
+        dir?: string;
+        ttlMinutes?: number;
+    };
+    actions?: {
+        allowInstall?: boolean;
+        editor?: string;
+    };
+    security?: {
+        maintainer?: {
+            quickHandoverDays?: number;
+            suspiciousGapDays?: number;
+            matureVersions?: number;
+            trustWindow?: number;
+        };
+        license?: {
+            allowlist?: string[];
+            denylist?: string[];
+            treatUnknownAs?: string;
+        };
+        unused?: {
+            allowlist?: string[];
+            devPathGlobs?: string[];
+        };
+    };
+};
+
+export type ApiConfigResponse = ApiConfigSettings;
+export type ApiConfigMutationRequest = ApiConfigSettings;
+export type ApiConfigMutationResponse = {
+    success: boolean;
+    msg?: string;
+};
+
+/**
  * One manifest as returned by `GET /api/projects/:id/packages`. Workspace
  * is omitted for the root manifest.
  */

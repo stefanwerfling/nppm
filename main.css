@@ -81,6 +81,24 @@ html, body {
     background: var(--c-bg);
 }
 
+.topbar-gear {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    padding: 3px 5px;
+    cursor: pointer;
+    color: var(--c-muted);
+    margin-left: 4px;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+}
+
+.topbar-gear:hover {
+    color: var(--c-text);
+    border-color: var(--c-border);
+}
+
 .topbar-btn {
     background: var(--c-accent);
     color: white;
@@ -336,6 +354,70 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 12px;
+}
+
+/* Settings modal --------------------------------------------------- */
+
+.sm-panel {
+    gap: 10px;
+}
+
+.sm-tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--c-border);
+}
+
+.sm-tab {
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    padding: 6px 12px;
+    color: var(--c-muted);
+    cursor: pointer;
+    font-size: 12px;
+    position: relative;
+    top: 1px;
+}
+
+.sm-tab:hover {
+    color: var(--c-text);
+}
+
+.sm-tab-active {
+    color: var(--c-text);
+    border-color: var(--c-border);
+    background: var(--c-panel);
+}
+
+.sm-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.sm-checkbox-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.sm-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--c-text);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.sm-textarea {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    resize: vertical;
+    min-height: 60px;
 }
 
 /* Package list ------------------------------------------------------ */

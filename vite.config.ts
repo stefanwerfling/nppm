@@ -12,6 +12,9 @@ import {
     ApiBulkUpgradePreviewResult,
     ApiBundlesRequest,
     ApiBundlesResponse,
+    ApiConfigMutationRequest,
+    ApiConfigMutationResponse,
+    ApiConfigResponse,
     ApiFingerprintDiffResponse,
     ApiFingerprintResponse,
     ApiHistoryResponse,
@@ -362,6 +365,69 @@ class Server {
                     });
                     project.setHidden(hidden);
                     res.status(200).json({success: true, hidden});
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/config — the non-`projects` sections of nppm.json
+            // (server / browser / registry / cache / actions / security)
+            // verbatim from disk. The settings modal reads this on open
+            // so unsaved disk-side edits don't get clobbered.
+            // -------------------------------------------------------------
+            app.get('/api/config', async (_req, res) => {
+                try {
+                    if (!configFile || !fs.existsSync(configFile)) {
+                        res.status(404).json({success: false, msg: 'nppm.json not found'});
+                        return;
+                    }
+                    const cfg = JSON.parse(fs.readFileSync(configFile, 'utf-8')) as Record<string, unknown>;
+                    const {projects: _ignored, ...rest} = cfg;
+                    const response: ApiConfigResponse = rest as ApiConfigResponse;
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // PUT /api/config — full replacement of the non-`projects`
+            // sections in nppm.json. The `projects` array is left
+            // untouched (managed by /api/projects routes). Body is
+            // validated against `SchemaConfig` after merge so partial
+            // shapes that violate the schema are rejected.
+            //
+            // Most settings only take effect on a dev-server restart
+            // (port, registry URL, cache dir, …). `actions.editor` and
+            // `actions.allowInstall` are read fresh per request so they
+            // pick up live — but the frontend should still surface a
+            // "restart" hint for the others.
+            // -------------------------------------------------------------
+            app.put('/api/config', async (req, res) => {
+                const body = req.body as ApiConfigMutationRequest;
+                if (!body || typeof body !== 'object' || Array.isArray(body)) {
+                    res.status(400).json({success: false, msg: 'request body required'});
+                    return;
+                }
+                try {
+                    Server._mutateConfig(configFile, (cfg) => {
+                        // Replace every known section explicitly; absent
+                        // keys in `body` drop the section entirely so
+                        // the on-disk shape stays clean.
+                        for (const key of ['server', 'browser', 'registry', 'cache', 'actions', 'security']) {
+                            delete cfg[key];
+                        }
+                        for (const [key, value] of Object.entries(body)) {
+                            cfg[key] = value;
+                        }
+                        const errors: SchemaErrors = [];
+                        if (!SchemaConfig.validate(cfg, errors)) {
+                            throw new Error(`Invalid config: ${JSON.stringify(errors)}`);
+                        }
+                    });
+                    const response: ApiConfigMutationResponse = {success: true};
+                    res.status(200).json(response);
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});
                 }

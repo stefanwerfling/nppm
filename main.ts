@@ -2,6 +2,7 @@ import 'normalize.css';
 import './main.css';
 import {I18n, LANGUAGES} from './Frontend/I18n.js';
 import {Nppm} from './Frontend/Nppm.js';
+import {SettingsModal} from './Frontend/SettingsModal.js';
 
 /**
  * Topbar language picker. Static `mount()` builds the DOM from the
@@ -41,6 +42,26 @@ class LanguagePicker {
 }
 
 LanguagePicker.mount();
+
+/**
+ * Mount the gear button → SettingsModal handler. The button itself
+ * lives in `index.html` (so the markup-side title attribute is
+ * static); here we translate the title to the active locale and
+ * wire the click. One-shot at boot — the button never moves.
+ */
+function mountSettingsButton(): void {
+    const btn = document.getElementById('topbar-settings');
+    if (!btn) {
+        return;
+    }
+    btn.title = I18n.t('Settings');
+    btn.setAttribute('aria-label', I18n.t('Settings'));
+    btn.addEventListener('click', () => {
+        new SettingsModal().open();
+    });
+}
+
+mountSettingsButton();
 
 const app = new Nppm();
 void app.start();

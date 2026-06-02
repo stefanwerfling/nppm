@@ -152,15 +152,23 @@ async function captureLanguage(browser, baseUrl, lang) {
 
     await shot(page, `01_matrix${suffix}.png`);
 
-    // Pick the first configured project from the treeview.
-    const firstProject = await page.evaluate(() => {
+    // Pick the first configured project from the treeview — i.e. the
+    // first row that isn't a sentinel (Matrix / Templates / ...).
+    const firstProjectUnid = await page.evaluate(() => {
         const items = Array.from(document.querySelectorAll('.tree-item'));
-        const hit = items.find((el) => !el.textContent?.includes('Matrix'));
-        return hit?.textContent?.trim() ?? null;
+        const hit = items.find((el) => {
+            const unid = el.getAttribute('data-unid') ?? '';
+            return unid && !unid.startsWith('__');
+        });
+        return hit?.getAttribute('data-unid') ?? null;
     });
 
-    if (firstProject) {
-        await clickTreeProject(page, firstProject);
+    if (firstProjectUnid) {
+        await page.evaluate((unid) => {
+            const it = document.querySelector(`.tree-item[data-unid="${unid}"]`);
+            it?.click();
+        }, firstProjectUnid);
+        await sleep(800);
         await shot(page, `02_declared${suffix}.png`);
 
         await clickToggle(page, lang === 'de' ? 'Installiert' : 'Installed');
@@ -217,8 +225,7 @@ async function captureLanguage(browser, baseUrl, lang) {
 
     // Click a matrix cell to capture the detail panel.
     await page.evaluate(() => {
-        const treeMatrix = Array.from(document.querySelectorAll('.tree-item'))
-            .find((el) => el.textContent?.trim() === 'Matrix');
+        const treeMatrix = document.querySelector('.tree-item[data-unid="__matrix__"]');
         treeMatrix?.click();
     });
     await sleep(1500);
@@ -260,6 +267,9 @@ async function captureLanguage(browser, baseUrl, lang) {
     await shot(page, `10_panel_security${suffix}.png`);
 
     await captureBulkWizard(page, lang, suffix, ROOT_DEP_NAMES);
+    await captureWorkspaceDrift(page, lang, suffix);
+    await captureTemplatesViews(page, lang, suffix);
+    await captureSettingsDialog(page, lang, suffix);
 
     await page.close();
 }
@@ -281,8 +291,7 @@ async function captureBulkWizard(page, lang, suffix, rootDepNames) {
 
     // Switch back to the global matrix view.
     await page.evaluate(() => {
-        const item = Array.from(document.querySelectorAll('.tree-item'))
-            .find((el) => el.textContent?.trim() === 'Matrix');
+        const item = document.querySelector('.tree-item[data-unid="__matrix__"]');
         item?.click();
     });
     await sleep(1500);
@@ -396,6 +405,148 @@ async function captureBulkWizard(page, lang, suffix, rootDepNames) {
     await shot(page, `12_bulk_modal${suffix}.png`);
 
     // Close the modal so the next iteration starts clean.
+    await page.keyboard.press('Escape');
+    await sleep(300);
+}
+
+/**
+ * WS-badge → WorkspaceDriftModal. Goes back to the global matrix,
+ * scans for the first cell that carries a `.matrix-badge-drift`
+ * (which means at least one project has internal-workspace drift on
+ * that package), clicks it, and shoots the dialog.
+ */
+async function captureWorkspaceDrift(page, lang, suffix) {
+    await page.keyboard.press('Escape');
+    await sleep(300);
+
+    await page.evaluate(() => {
+        const item = document.querySelector('.tree-item[data-unid="__matrix__"]');
+        item?.click();
+    });
+    await sleep(1500);
+    await waitForMatrix(page);
+
+    const clicked = await page.evaluate(() => {
+        const badge = document.querySelector('.matrix-badge-drift');
+        if (badge) {
+            badge.click();
+            badge.scrollIntoView({block: 'center'});
+            return true;
+        }
+        return false;
+    });
+
+    if (!clicked) {
+        console.log('  · No WS badges found — skipping workspace-drift shot');
+        return;
+    }
+
+    try {
+        await page.waitForSelector('.wdm-table', {timeout: 10_000});
+    } catch {
+        console.log('  · Workspace-drift modal never rendered table — skipping shot');
+        await page.keyboard.press('Escape');
+        return;
+    }
+    await sleep(500);
+    await shot(page, `17_workspace_drift${suffix}.png`);
+    await page.keyboard.press('Escape');
+    await sleep(300);
+}
+
+/**
+ * Templates sentinel row → cross-project compliance matrix, then
+ * the per-project Template tab. The per-project tab needs a project
+ * whose nppm.json carries a `templates: […]` entry; we pick the
+ * first such tree item by checking the project-config response live.
+ */
+async function captureTemplatesViews(page, lang, suffix) {
+    await page.keyboard.press('Escape');
+    await sleep(300);
+
+    const opened = await page.evaluate(() => {
+        const item = document.querySelector('.tree-item[data-unid="__templates__"]');
+        if (item) {
+            item.click();
+            return true;
+        }
+        return false;
+    });
+
+    if (!opened) {
+        console.log('  · Templates sentinel row not found — skipping templates shots');
+        return;
+    }
+    try {
+        await page.waitForSelector('.tpv-table, .tpv-titlebar', {timeout: 10_000});
+    } catch {
+        // continue anyway
+    }
+    await sleep(1500);
+    await shot(page, `15_templates_matrix${suffix}.png`);
+
+    // Find a project that has templates assigned via /api/projects.
+    // We POST nothing here — just check the config endpoint per
+    // project until one comes back with a non-empty templates array.
+    const projectWithTemplates = await page.evaluate(async () => {
+        const r = await fetch('/api/projects');
+        if (!r.ok) {
+            return null;
+        }
+        const list = await r.json();
+        for (const p of list.projects ?? []) {
+            const c = await fetch(`/api/projects/${p.unid}/config`);
+            if (!c.ok) {
+                continue;
+            }
+            const cfg = await c.json();
+            if (Array.isArray(cfg.templates) && cfg.templates.length > 0) {
+                return p.unid;
+            }
+        }
+        return null;
+    });
+
+    if (!projectWithTemplates) {
+        console.log('  · No project in nppm.json has templates assigned — skipping per-project Template tab');
+        return;
+    }
+    await page.evaluate((unid) => {
+        const item = document.querySelector(`.tree-item[data-unid="${unid}"]`);
+        item?.click();
+    }, projectWithTemplates);
+    await sleep(1500);
+    await clickToggle(page, 'Template');
+    await sleep(2000);
+    await shot(page, `16_template_view${suffix}.png`);
+}
+
+/**
+ * Topbar gear → SettingsModal on the General tab.
+ */
+async function captureSettingsDialog(page, lang, suffix) {
+    await page.keyboard.press('Escape');
+    await sleep(300);
+    const opened = await page.evaluate(() => {
+        const btn = document.getElementById('topbar-settings');
+        if (btn) {
+            btn.click();
+            return true;
+        }
+        return false;
+    });
+    if (!opened) {
+        console.log('  · Topbar gear not found — skipping settings shot');
+        return;
+    }
+    try {
+        await page.waitForSelector('.sm-tabs', {timeout: 10_000});
+    } catch {
+        console.log('  · Settings modal never rendered tabs — skipping shot');
+        return;
+    }
+    await sleep(800);
+    await shot(page, `18_settings${suffix}.png`);
     await page.keyboard.press('Escape');
     await sleep(300);
 }

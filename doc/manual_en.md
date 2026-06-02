@@ -48,6 +48,10 @@ time the UI changes.
 9. [Vulnerability Timeline](#9-vulnerability-timeline)
 10. [PR Review](#10-pr-review)
 11. [Switching language](#11-switching-language)
+12. [Templates (standards enforcement)](#12-templates-standards-enforcement)
+13. [Settings dialog + cache rebuild](#13-settings-dialog--cache-rebuild)
+14. [Workspace drift drill-down](#14-workspace-drift-drill-down)
+15. [Per-project health ring](#15-per-project-health-ring)
 
 ---
 
@@ -83,10 +87,16 @@ aggregated security score.
   account-takeover profile — see the maintainer scanner below).
 - `GPL` / `UNLIC` / `LIC?` — license classification: strong-copyleft /
   proprietary / unknown (see the License tab below).
-- `WS` — workspaces within one project disagreed.
+- `WS` — workspaces within one project disagreed. Click it to open a
+  [workspace drift drill-down](#14-workspace-drift-drill-down).
 
 **Git-pinned dependencies** show the *installed* version as the cell
-value plus a small `git` chip; hovering reveals the original URL.
+value plus a small `git` chip; hovering reveals the original URL. The
+**Latest** column for rows where *every* declaration is a git URL
+renders `git` instead of a registry version — the npm-published
+package of the same name is treated as unrelated, so cadence /
+freshness / maintainer / CVE / bundle scans are skipped to avoid
+mis-attribution.
 
 Clicking a cell opens the [package detail panel](#3-package-detail-panel).
 Clicking a project column header drills into that project.
@@ -705,3 +715,129 @@ edit — see [`CLAUDE.md`](../CLAUDE.md) for the procedure.
 
 Language choice is remembered in `localStorage` (`nppm.lang`) and
 applies on the next page load.
+
+---
+
+## 12. Templates (standards enforcement)
+
+A template is a JSON file that declares what a project *should* look
+like — which packages in which version, which root metadata
+(`engines`, `scripts`, `type`, `packageManager`), and which files
+(`.editorconfig`, `tsconfig.base.json`, …) should be shipped. Every
+project can be checked against one or more templates and reported
+on as a compliance diff.
+
+Open the **Templates** sentinel row in the left treeview to land on
+the cross-project compliance matrix — rows are templates, columns
+are projects, cell colour collapses the per-project findings to a
+single tier (`risk` / `warn` / `info` / clean).
+
+![Templates compliance matrix](screenshots/15_templates_matrix.png)
+
+Two action buttons sit in the title bar:
+
+- **+ Add template** — open the form modal (General / Packages /
+  Forbidden / Root / Files tabs) and write the result to
+  `nppm-templates/<id>/template.json` on disk.
+- **+ Add remote source** — paste a URL pointing at a raw
+  `template.json` file. It's appended to the top-level
+  `templateSources: string[]` in `nppm.json`, fetched into
+  `.nppm-cache/templates-remote/<id>/`, and shows up immediately
+  with a green `REMOTE` badge. Edit and delete are disabled on
+  remote templates (the source is read-only); to change one,
+  edit the upstream file and refresh.
+
+Clicking a cell jumps into the per-project **Template** tab in the
+right pane:
+
+![Per-project template diff](screenshots/16_template_view.png)
+
+The diff is grouped by severity. Each finding is one of: package
+missing / divergent / forbidden / extra (strict mode) / bucket-wrong;
+root field missing / divergent; file missing / file drift;
+workspace missing.
+
+The **Apply selected** button opens a pick-checkbox modal — risk +
+warn findings are pre-selected, info entries are opt-in. The applier
+writes a timestamped snapshot of every touched file to
+`.nppm-backups/<timestamp>/` *before* the first edit. `merge-json`
+mode deep-merges JSON files (the existing keys win on conflict);
+`create` mode writes files only when they're missing and never
+overwrites; `report-only` files never touch disk.
+
+Project ↔ template assignment lives in the project form modal —
+the "Edit project" dialog grows a Templates section with a
+checkbox per available template, pre-selected for the ids the
+project already lists. Multiple templates merge in order (later
+wins).
+
+---
+
+## 13. Settings dialog + cache rebuild
+
+The gear icon in the topbar opens a tabbed editor over the
+non-`projects` sections of `nppm.json`:
+
+![Settings dialog — General tab](screenshots/18_settings.png)
+
+Tabs: **General** (server port, body limit, browser open-on-start,
+cache directory, cache TTL), **Registry** (URL + bearer token, with
+`$ENV_VAR` expansion), **Actions** (allow-install gate +
+open-in-IDE editor), **Security** (maintainer thresholds, license
+allow / deny lists, unused-deps tuning).
+
+Most fields only take effect after a dev-server restart — there's
+a heads-up note above the action row. `actions.editor` and
+`actions.allowInstall` are read fresh per request so they pick up
+live.
+
+The General tab's Cache section ships a **Clear cache now** button
+that wipes every pocket on disk (registry / fingerprint /
+releases / OSV / bundlephobia / npm-user / templates-remote),
+keeping the directory structure so the in-memory `JsonCache`
+instances stay valid. Right after the clear it walks
+`/api/matrix` (warm-up of the registry pocket) and streams
+`/api/lockfile/analyze-all` (warm-up of the OSV pocket) so the
+next interaction hits a populated cache. The button status line
+reflects each phase. `.nppm-history/` is **not** under
+`cacheDir` and is never touched.
+
+---
+
+## 14. Workspace drift drill-down
+
+When a project's own workspaces declared the same package with
+different ranges, the cross-project matrix cell gets a `WS` badge.
+Clicking it opens a drill-down dialog:
+
+![Workspace drift dialog](screenshots/17_workspace_drift.png)
+
+The table lists every workspace that declared the package, with
+its version range and dep type. The **Open project matrix**
+button jumps the right pane straight to the per-project matrix
+for that project so you can see the columns side by side and fix
+the disagreement.
+
+---
+
+## 15. Per-project health ring
+
+Every project entry in the left treeview carries a small SVG
+progress ring with a 0–100 % health score in the centre. The
+score aggregates the matrix's per-package severity numbers (CVE
+count, lifecycle scripts, code patterns, binaries, maintainer
+risk, integrity, freshness, cadence, typosquatting); each
+package's contribution is capped at the risk-tier weight so a
+single loud package can't dominate, then averaged across the
+project. The percentage inverts to a health figure:
+
+- **≥ 80 % — green** — broadly clean.
+- **60 – 79 % — amber** — multiple warn-tier issues or a couple
+  of risks.
+- **< 60 % — red** — substantial findings.
+
+The ring renders a grey "…" placeholder before the asynchronous
+matrix scans have settled — once each badge loader (CVE batch,
+heuristic batch, integrity check) returns, the ring re-fills with
+the new score. Sentinel rows (Matrix / Templates) carry no ring
+because they aren't projects.

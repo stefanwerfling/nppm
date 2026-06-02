@@ -411,6 +411,38 @@ html, body {
     font-size: 12px;
 }
 
+.pfm-templates {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    background: var(--c-bg);
+    padding: 6px 8px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.pfm-templates-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--c-text);
+}
+
+.pfm-templates-name {
+    flex: 1;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.pfm-templates-loading,
+.pfm-templates-empty {
+    font-size: 11px;
+    color: var(--c-muted);
+}
+
 .pfm-input:focus {
     outline: none;
     border-color: var(--c-accent);

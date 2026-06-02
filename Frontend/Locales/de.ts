@@ -355,6 +355,7 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'Templates': 'Templates',
     'Template': 'Template',
     'Loading templates …': 'Templates werden geladen …',
+    'No templates configured yet.': 'Noch keine Templates konfiguriert.',
     'Loading template compliance …': 'Template-Compliance wird geladen …',
     'No templates configured. Create one by adding a folder at <code>nppm-templates/&lt;id&gt;/template.json</code>.': 'Keine Templates konfiguriert. Lege eines an unter <code>nppm-templates/&lt;id&gt;/template.json</code>.',
     'No templates assigned to this project. Edit the project to attach one.': 'Dem Projekt sind keine Templates zugeordnet. Im Projekt-Edit-Dialog zuweisen.',

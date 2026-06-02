@@ -3,6 +3,7 @@ import {
     ApiBulkUpgradePick,
     ApiBulkUpgradePreviewRequest,
     ApiBulkUpgradePreviewResponse,
+    ApiTemplatesResponse,
     ApiCacheClearResponse,
     ApiDepGraphResponse,
     ApiFingerprintDiffResponse,
@@ -42,6 +43,10 @@ export class Api {
 
     public static async listProjects(): Promise<ApiProjectsResponse> {
         return Api._json<ApiProjectsResponse>('/api/projects');
+    }
+
+    public static async templates(): Promise<ApiTemplatesResponse> {
+        return Api._json<ApiTemplatesResponse>('/api/templates');
     }
 
     public static async addTemplateSource(url: string): Promise<ApiAddTemplateSourceResponse> {

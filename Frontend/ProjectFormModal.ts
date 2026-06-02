@@ -1,5 +1,6 @@
-import {ApiProject, ApiProjectMutationRequest, ApiProjectMutationResponse} from '../Api/ApiTypes.js';
+import {ApiProject, ApiProjectMutationRequest, ApiProjectMutationResponse, ApiTemplateSummary} from '../Api/ApiTypes.js';
 import {ConfigProjectType} from '../Config/Config.js';
+import {Api} from './Api.js';
 import {DirectoryPickerModal} from './DirectoryPickerModal.js';
 import {I18n} from './I18n.js';
 
@@ -94,6 +95,9 @@ export class ProjectFormModal {
         form.appendChild(this._renderTypeSelector(initial.type));
         form.appendChild(this._renderNameField(initial.name));
         form.appendChild(this._renderTypeFields(initial));
+        const tplField = this._renderTemplatesField(initial.templates ?? []);
+        form.appendChild(tplField);
+        void this._loadTemplates(tplField, initial.templates ?? []);
 
         const actions = document.createElement('div');
         actions.className = 'umd-actions';
@@ -267,6 +271,85 @@ export class ProjectFormModal {
         return row;
     }
 
+    /**
+     * "Templates" pickbox row. Renders a loading placeholder
+     * synchronously so the form layout is stable; the available
+     * template ids are fetched asynchronously via `_loadTemplates`
+     * and replace the placeholder when ready. The container keeps
+     * the `pfm-templates` class throughout so `_readForm` can find
+     * the checkboxes regardless of load state.
+     */
+    private _renderTemplatesField(_initial: string[]): HTMLElement {
+        const row = document.createElement('div');
+        row.className = 'pfm-row';
+        const lab = document.createElement('label');
+        lab.className = 'pfm-label';
+        lab.textContent = I18n.t('Templates');
+        row.appendChild(lab);
+
+        const box = document.createElement('div');
+        box.className = 'pfm-templates';
+        const loading = document.createElement('div');
+        loading.className = 'pfm-templates-loading';
+        loading.textContent = I18n.t('Loading templates …');
+        box.appendChild(loading);
+        row.appendChild(box);
+
+        return row;
+    }
+
+    private async _loadTemplates(field: HTMLElement, initial: string[]): Promise<void> {
+        const box = field.querySelector<HTMLElement>('.pfm-templates');
+        if (!box) {
+            return;
+        }
+        try {
+            const response = await Api.templates();
+            box.replaceChildren();
+            if (response.templates.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'pfm-templates-empty';
+                empty.textContent = I18n.t('No templates configured yet.');
+                box.appendChild(empty);
+                return;
+            }
+            for (const t of response.templates) {
+                box.appendChild(this._renderTemplateOption(t, initial.includes(t.id)));
+            }
+        } catch (e) {
+            box.replaceChildren();
+            const err = document.createElement('div');
+            err.className = 'pfm-templates-empty';
+            err.textContent = (e as Error).message;
+            box.appendChild(err);
+        }
+    }
+
+    private _renderTemplateOption(t: ApiTemplateSummary, checked: boolean): HTMLElement {
+        const label = document.createElement('label');
+        label.className = 'pfm-templates-row';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = t.id;
+        cb.className = 'pfm-template-check';
+        cb.checked = checked;
+        label.appendChild(cb);
+        const text = document.createElement('span');
+        text.className = 'pfm-templates-name';
+        text.textContent = t.name && t.name !== t.id ? `${t.id} — ${t.name}` : t.id;
+        label.appendChild(text);
+        if (t.source === 'remote') {
+            const badge = document.createElement('span');
+            badge.className = 'tpv-tpl-remote';
+            badge.textContent = 'REMOTE';
+            if (t.sourceUrl) {
+                badge.title = t.sourceUrl;
+            }
+            label.appendChild(badge);
+        }
+        return label;
+    }
+
     private _initialValues(): {
         type: ConfigProjectType;
         name?: string;
@@ -275,6 +358,7 @@ export class ProjectFormModal {
         url?: string;
         ref?: string;
         token?: string;
+        templates?: string[];
     } {
         if (this._mode.kind === 'add') {
             return {type: ConfigProjectType.local};
@@ -287,7 +371,8 @@ export class ProjectFormModal {
             repo: extras.repo,
             url: extras.url,
             ref: extras.ref,
-            token: extras.token
+            token: extras.token,
+            templates: extras.templates
         };
     }
 
@@ -304,6 +389,12 @@ export class ProjectFormModal {
         };
         const type = (form.querySelector<HTMLSelectElement>('.pfm-type')?.value
             ?? ConfigProjectType.local) as ConfigProjectType;
+        const templates: string[] = [];
+        for (const cb of Array.from(form.querySelectorAll<HTMLInputElement>('.pfm-template-check'))) {
+            if (cb.checked) {
+                templates.push(cb.value);
+            }
+        }
         return {
             type,
             name: get('.pfm-name'),
@@ -311,7 +402,8 @@ export class ProjectFormModal {
             repo: get('.pfm-repo'),
             url: get('.pfm-url'),
             ref: get('.pfm-ref'),
-            token: get('.pfm-token')
+            token: get('.pfm-token'),
+            templates: templates.length > 0 ? templates : undefined
         };
     }
 

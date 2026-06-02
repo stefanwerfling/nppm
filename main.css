@@ -214,10 +214,14 @@ html, body {
 }
 
 .tree-item {
-    padding: 6px 12px;
+    padding: 6px 50px 6px 12px;
     cursor: pointer;
     border-left: 2px solid transparent;
     position: relative;
+}
+
+.tree-item-sentinel {
+    padding-right: 12px;
 }
 
 .tree-item:hover {
@@ -267,6 +271,40 @@ html, body {
     color: var(--c-accent);
 }
 
+.tree-item-score {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    line-height: 0;
+    pointer-events: none;
+}
+
+.tree-score-ring .tree-score-bg {
+    stroke: rgba(255, 255, 255, 0.08);
+    stroke-width: 3;
+}
+
+.tree-score-ring .tree-score-fg {
+    stroke-width: 3;
+    transition: stroke-dasharray 0.3s ease;
+}
+
+.tree-score-ring .tree-score-text {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 700;
+    fill: var(--c-text);
+}
+
+.tree-score-good .tree-score-fg { stroke: #4caf50; }
+.tree-score-warn .tree-score-fg { stroke: #f0b400; }
+.tree-score-risk .tree-score-fg { stroke: #e85a5a; }
+
+.tree-score-loading .tree-score-text {
+    fill: var(--c-muted);
+}
+
 .tree-item-meta {
     margin-top: 2px;
     font-size: 11px;
@@ -280,7 +318,7 @@ html, body {
 .tree-item-actions {
     position: absolute;
     top: 6px;
-    right: 8px;
+    right: 48px;
     display: flex;
     gap: 4px;
     opacity: 0;

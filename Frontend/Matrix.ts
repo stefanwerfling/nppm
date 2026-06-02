@@ -143,6 +143,7 @@ export class Matrix {
     private _onProjectClick: ((unid: string) => void)|null = null;
     private _onCellClick: ((pkg: string, version: string, latest: string|null) => void)|null = null;
     private _onWorkspaceDriftClick: ((projectUnid: string, projectName: string, packageName: string) => void)|null = null;
+    private _onScoresChanged: ((scores: Map<string, number>) => void)|null = null;
     private _onSecurityClick: ((pkg: string, version: string) => void)|null = null;
     private _onBulkUpgradeClick: ((picks: ApiBulkUpgradePick[]) => void)|null = null;
     // Multi-select state for the cross-project Bulk-Upgrade Wizard.
@@ -283,6 +284,63 @@ export class Matrix {
         this._onWorkspaceDriftClick = handler;
     }
 
+    /**
+     * Fires every time the matrix re-renders with fresh security or
+     * heuristic data — i.e. as the asynchronous CVE / script /
+     * pattern / maintainer / integrity / … badge loaders settle. The
+     * Treeview consumes the scores to render the per-project health
+     * ring; firing on every update gives a live "filling in" effect
+     * instead of one blocking wait.
+     */
+    public onScoresChanged(handler: (scores: Map<string, number>) => void): void {
+        this._onScoresChanged = handler;
+    }
+
+    /**
+     * Aggregate per-package severity scores into a 0–100 health
+     * value per project. The package score is capped at 30 (the
+     * "risk" tier weight in `_severityScore`) so a single very
+     * loud package can't dominate the whole project's number, then
+     * averaged across the project's package count. The result
+     * inverts to "health %": 100 = every package clean, 0 = every
+     * package capped at risk.
+     *
+     * Returns an empty map when matrix data hasn't loaded yet —
+     * callers should keep the previous scores visible until the
+     * next emit.
+     */
+    public computeProjectScores(): Map<string, number> {
+        const out = new Map<string, number>();
+        if (!this._data) {
+            return out;
+        }
+        const totals = new Map<string, {score: number; count: number}>();
+        for (const project of this._data.projects) {
+            totals.set(project.unid, {score: 0, count: 0});
+        }
+        const PACKAGE_CAP = 30;
+        for (const row of this._data.rows) {
+            const rowScore = Math.min(this._scoreFor(row), PACKAGE_CAP);
+            for (const unid of Object.keys(row.cells)) {
+                const t = totals.get(unid);
+                if (!t) {
+                    continue;
+                }
+                t.score += rowScore;
+                t.count += 1;
+            }
+        }
+        for (const [unid, t] of totals) {
+            if (t.count === 0) {
+                continue;
+            }
+            const cap = t.count * PACKAGE_CAP;
+            const health = Math.round(100 * Math.max(0, 1 - t.score / cap));
+            out.set(unid, health);
+        }
+        return out;
+    }
+
     public onSecurityClick(handler: (pkg: string, version: string) => void): void {
         this._onSecurityClick = handler;
     }
@@ -319,6 +377,7 @@ export class Matrix {
         this._bundlesByName = new Map();
         this._integrityByName = new Map();
         this._render();
+        this._emitScores();
 
         const gen = ++this._securityGen;
         const packages: {name: string; version: string}[] = [];
@@ -582,6 +641,13 @@ export class Matrix {
 
         wrap.innerHTML = '';
         wrap.appendChild(this._renderTable());
+        this._emitScores();
+    }
+
+    private _emitScores(): void {
+        if (this._onScoresChanged) {
+            this._onScoresChanged(this.computeProjectScores());
+        }
     }
 
     private _renderStats(): HTMLElement {

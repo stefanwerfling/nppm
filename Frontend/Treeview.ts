@@ -30,6 +30,7 @@ export class Treeview {
     private _onVisibility: TreeviewVisibilityHandler|null = null;
     private _onAdd: TreeviewAddHandler|null = null;
     private _onEdit: TreeviewEditHandler|null = null;
+    private _scores: Map<string, number> = new Map();
 
     constructor(root: HTMLElement) {
         this._root = root;
@@ -49,6 +50,28 @@ export class Treeview {
 
     public onEditProject(handler: TreeviewEditHandler): void {
         this._onEdit = handler;
+    }
+
+    /**
+     * Update the per-project health rings in place. Walks each
+     * existing project item (sentinels are skipped — they have no
+     * package set) and replaces its score slot with a fresh SVG.
+     * `setData()` style: incremental, doesn't trigger a full
+     * re-render of the treeview.
+     */
+    public setProjectScores(scores: Map<string, number>): void {
+        this._scores = scores;
+        for (const item of Array.from(this._root.querySelectorAll<HTMLElement>('.tree-item'))) {
+            const unid = item.dataset.unid;
+            if (!unid || Treeview._sentinelIcon(unid) !== null) {
+                continue;
+            }
+            const slot = item.querySelector('.tree-item-score');
+            if (!slot) {
+                continue;
+            }
+            slot.replaceChildren(Treeview._renderScoreRing(scores.get(unid)));
+        }
     }
 
     /**
@@ -201,6 +224,13 @@ export class Treeview {
             actions.appendChild(this._renderGearButton(project));
             actions.appendChild(this._renderEyeToggle(project));
             item.appendChild(actions);
+
+            // Health score ring — filled in asynchronously by
+            // `setProjectScores()` once the matrix heuristics arrive.
+            const scoreSlot = document.createElement('div');
+            scoreSlot.className = 'tree-item-score';
+            scoreSlot.appendChild(Treeview._renderScoreRing(this._scores.get(project.unid)));
+            item.appendChild(scoreSlot);
         }
 
         item.addEventListener('click', () => {
@@ -289,6 +319,62 @@ export class Treeview {
             return '◈';
         }
         return null;
+    }
+
+    /**
+     * SVG progress-ring with the health percentage in the centre.
+     * `health` may be `undefined` while the matrix data is still
+     * loading — in that case the ring renders neutral grey with a
+     * dash placeholder so the layout doesn't jump when the real
+     * score arrives.
+     *
+     * Tiers: ≥80 green, ≥60 amber, <60 red.
+     */
+    private static _renderScoreRing(health: number|undefined): SVGElement {
+        const svgNs = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNs, 'svg');
+        svg.setAttribute('viewBox', '0 0 36 36');
+        svg.setAttribute('width', '32');
+        svg.setAttribute('height', '32');
+        const tier = health === undefined
+            ? 'loading'
+            : health >= 80 ? 'good' : health >= 60 ? 'warn' : 'risk';
+        svg.setAttribute('class', `tree-score-ring tree-score-${tier}`);
+
+        const bg = document.createElementNS(svgNs, 'circle');
+        bg.setAttribute('class', 'tree-score-bg');
+        bg.setAttribute('cx', '18');
+        bg.setAttribute('cy', '18');
+        bg.setAttribute('r', '15');
+        bg.setAttribute('fill', 'none');
+        svg.appendChild(bg);
+
+        if (health !== undefined) {
+            const fg = document.createElementNS(svgNs, 'circle');
+            fg.setAttribute('class', 'tree-score-fg');
+            fg.setAttribute('cx', '18');
+            fg.setAttribute('cy', '18');
+            fg.setAttribute('r', '15');
+            fg.setAttribute('fill', 'none');
+            // 2πr ≈ 94.25 for r=15. Dasharray "<percent>, 100" uses
+            // pathLength=100 so we don't have to compute the
+            // circumference — modern browsers handle it.
+            fg.setAttribute('pathLength', '100');
+            fg.setAttribute('stroke-dasharray', `${health}, 100`);
+            fg.setAttribute('stroke-linecap', 'round');
+            fg.setAttribute('transform', 'rotate(-90 18 18)');
+            svg.appendChild(fg);
+        }
+
+        const text = document.createElementNS(svgNs, 'text');
+        text.setAttribute('class', 'tree-score-text');
+        text.setAttribute('x', '18');
+        text.setAttribute('y', '22');
+        text.setAttribute('text-anchor', 'middle');
+        text.textContent = health === undefined ? '…' : String(health);
+        svg.appendChild(text);
+
+        return svg;
     }
 
     private static _typeLabel(type: ConfigProjectType): string {

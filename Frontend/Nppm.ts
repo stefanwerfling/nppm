@@ -398,6 +398,10 @@ export class Nppm {
             void this._workspaceDriftModal.open(unid, projectName, pkg);
         });
 
+        this._matrix.onScoresChanged((scores) => {
+            this._treeview.setProjectScores(scores);
+        });
+
         this._workspaceDriftModal.onOpenProjectMatrix((unid) => {
             const proj = this._projects.find((p) => p.unid === unid);
             if (proj) {

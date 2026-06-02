@@ -1,4 +1,5 @@
 import {
+    ApiAddTemplateSourceResponse,
     ApiBulkUpgradePick,
     ApiBulkUpgradePreviewRequest,
     ApiBulkUpgradePreviewResponse,
@@ -41,6 +42,19 @@ export class Api {
 
     public static async listProjects(): Promise<ApiProjectsResponse> {
         return Api._json<ApiProjectsResponse>('/api/projects');
+    }
+
+    public static async addTemplateSource(url: string): Promise<ApiAddTemplateSourceResponse> {
+        const res = await fetch('/api/templates/sources', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({url})
+        });
+        if (!res.ok) {
+            const j = await res.json().catch(() => ({}));
+            throw new Error((j as {msg?: string}).msg ?? `${res.status} ${res.statusText}`);
+        }
+        return (await res.json()) as ApiAddTemplateSourceResponse;
     }
 
     public static async clearCache(): Promise<ApiCacheClearResponse> {

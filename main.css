@@ -239,6 +239,34 @@ html, body {
     font-weight: 500;
 }
 
+.tree-item-sentinel {
+    background: var(--c-bg);
+    border-bottom: 1px solid var(--c-border);
+}
+
+.tree-item-sentinel .tree-item-name {
+    color: var(--c-text);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tree-item-sentinel.tree-item-active {
+    background: var(--c-row-active);
+}
+
+.tree-item-icon {
+    font-size: 24px;
+    line-height: 1;
+    width: 28px;
+    text-align: center;
+    color: var(--c-accent);
+}
+
 .tree-item-meta {
     margin-top: 2px;
     font-size: 11px;
@@ -301,7 +329,7 @@ html, body {
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    text-align: left;
+    text-align: center;
 }
 
 .tree-add-btn:hover {

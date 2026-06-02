@@ -366,6 +366,28 @@ export type ApiTemplateDeleteResponse = {
 };
 
 /**
+ * Body of `POST /api/templates/sources` — append a URL to the
+ * `templateSources` array in nppm.json and trigger a refresh. The
+ * URL must point at a raw `template.json` file (http(s)).
+ */
+export type ApiAddTemplateSourceRequest = {
+    url: string;
+};
+
+/**
+ * Response of `POST /api/templates/sources`. `templateId` is the id
+ * the loader resolved from the fetched body — `null` when the URL
+ * was stored but the body didn't validate against `SchemaTemplate`
+ * (the source stays in nppm.json so the user can fix the upstream
+ * file without re-typing the URL).
+ */
+export type ApiAddTemplateSourceResponse = {
+    success: boolean;
+    templateId?: string|null;
+    msg?: string;
+};
+
+/**
  * One manifest as returned by `GET /api/projects/:id/packages`. Workspace
  * is omitted for the root manifest.
  */

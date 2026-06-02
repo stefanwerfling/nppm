@@ -154,13 +154,29 @@ export class Treeview {
             item.classList.add('tree-item-hidden');
         }
 
+        // Sentinel entries (Matrix, Templates) get their own class so
+        // the user can spot them at a glance — they aren't projects
+        // and behave differently when clicked.
+        const sentinel = Treeview._sentinelIcon(project.unid);
+        if (sentinel) {
+            item.classList.add('tree-item-sentinel');
+        }
+
         if (project.unid === this._selected) {
             item.classList.add('tree-item-active');
         }
 
         const name = document.createElement('div');
         name.className = 'tree-item-name';
-        name.textContent = project.name;
+        if (sentinel) {
+            const icon = document.createElement('span');
+            icon.className = 'tree-item-icon';
+            icon.textContent = sentinel;
+            name.appendChild(icon);
+        }
+        const label = document.createElement('span');
+        label.textContent = project.name;
+        name.appendChild(label);
         item.appendChild(name);
 
         if (!hideMeta) {
@@ -259,6 +275,21 @@ export class Treeview {
         + '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>'
         + '<line x1="1" y1="1" x2="23" y2="23"/>'
         + '</svg>';
+
+    /**
+     * Icon character for the Matrix / Templates sentinel rows in the
+     * treeview. Returns `null` for normal project entries so the
+     * caller can branch on its presence.
+     */
+    private static _sentinelIcon(unid: string): string|null {
+        if (unid === '__matrix__') {
+            return '▦';
+        }
+        if (unid === '__templates__') {
+            return '◈';
+        }
+        return null;
+    }
 
     private static _typeLabel(type: ConfigProjectType): string {
         switch (type) {

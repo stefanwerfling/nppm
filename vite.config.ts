@@ -10,6 +10,8 @@ import {
     ApiBulkUpgradePick,
     ApiBulkUpgradePreviewRequest,
     ApiBulkUpgradePreviewResponse,
+    ApiAddTemplateSourceRequest,
+    ApiAddTemplateSourceResponse,
     ApiBulkUpgradePreviewResult,
     ApiBundlesRequest,
     ApiBundlesResponse,
@@ -662,6 +664,50 @@ class Server {
                     fs.rmSync(dir, {recursive: true, force: true});
                     templates = templateLoader.loadAll();
                     const response: ApiTemplateDeleteResponse = {success: true};
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // POST /api/templates/sources — append a remote template
+            // source URL to nppm.json's `templateSources` array and
+            // immediately refresh the remote cache so the new
+            // template shows up without restarting the dev server.
+            // -------------------------------------------------------------
+            app.post('/api/templates/sources', async (req, res) => {
+                const body = req.body as Partial<ApiAddTemplateSourceRequest>;
+                const url = typeof body?.url === 'string' ? body.url.trim() : '';
+                if (!url || !/^https?:\/\//i.test(url)) {
+                    res.status(400).json({success: false, msg: 'http(s) URL required'});
+                    return;
+                }
+                try {
+                    Server._mutateConfig(configFile, (cfg) => {
+                        const existing = Array.isArray(cfg.templateSources)
+                            ? (cfg.templateSources as string[])
+                            : [];
+                        if (existing.includes(url)) {
+                            throw new Error(`URL already configured: ${url}`);
+                        }
+                        cfg.templateSources = [...existing, url];
+                    });
+                    const cfg = JSON.parse(fs.readFileSync(configFile!, 'utf-8')) as Record<string, unknown>;
+                    const urls = Array.isArray(cfg.templateSources)
+                        ? (cfg.templateSources as string[]).filter((u): u is string => typeof u === 'string')
+                        : [];
+                    await templateLoader.refreshRemote(urls);
+                    templates = templateLoader.loadAll();
+                    let templateId: string|null = null;
+                    for (const id of templates.keys()) {
+                        const src = templateLoader.getSource(id);
+                        if (src?.kind === 'remote' && src.url === url) {
+                            templateId = id;
+                            break;
+                        }
+                    }
+                    const response: ApiAddTemplateSourceResponse = {success: true, templateId};
                     res.status(200).json(response);
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});

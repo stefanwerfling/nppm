@@ -1,4 +1,5 @@
 import {ApiTemplatesMatrixResponse, ApiTemplatesMatrixRow} from '../Api/ApiTypes.js';
+import {Api} from './Api.js';
 import {I18n} from './I18n.js';
 import {TemplateFormModal} from './TemplateFormModal.js';
 
@@ -82,6 +83,12 @@ export class TemplatesView {
             void modal.open({kind: 'add'}, data.rows.map((r) => r.template.id));
         });
         titleBar.appendChild(add);
+        const addRemote = document.createElement('button');
+        addRemote.type = 'button';
+        addRemote.className = 'umd-btn tpv-add';
+        addRemote.textContent = I18n.t('+ Add remote source');
+        addRemote.addEventListener('click', () => this._openRemoteSourceModal());
+        titleBar.appendChild(addRemote);
         this._root.appendChild(titleBar);
 
         if (data.rows.length === 0) {
@@ -227,5 +234,102 @@ export class TemplatesView {
         }
 
         return tr;
+    }
+
+    /**
+     * Small URL-prompt modal triggered by "+ Add remote source".
+     * Persists the URL to `templateSources` in nppm.json and asks
+     * the loader to refresh — on success the templates matrix is
+     * reloaded so the new entry shows up with its REMOTE badge.
+     */
+    private _openRemoteSourceModal(): void {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'umd-backdrop';
+        backdrop.addEventListener('click', (e) => {
+            if (e.target === backdrop) {
+                backdrop.remove();
+            }
+        });
+
+        const panel = document.createElement('div');
+        panel.className = 'umd-panel';
+        panel.style.minWidth = '480px';
+        backdrop.appendChild(panel);
+
+        const head = document.createElement('div');
+        head.className = 'umd-head';
+        const title = document.createElement('div');
+        title.className = 'umd-title';
+        title.textContent = I18n.t('Add remote template source');
+        head.appendChild(title);
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'umd-close';
+        close.textContent = '×';
+        close.addEventListener('click', () => backdrop.remove());
+        head.appendChild(close);
+        panel.appendChild(head);
+
+        const body = document.createElement('div');
+        body.className = 'sm-body';
+        const note = document.createElement('div');
+        note.className = 'umd-note';
+        note.textContent = I18n.t(
+            'URL to a raw template.json file (http or https). Persists to templateSources in nppm.json.'
+        );
+        body.appendChild(note);
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'pfm-input';
+        input.placeholder = 'https://raw.githubusercontent.com/owner/repo/main/template.json';
+        body.appendChild(input);
+        const status = document.createElement('div');
+        status.className = 'sm-cache-clear-status';
+        body.appendChild(status);
+        panel.appendChild(body);
+
+        const actions = document.createElement('div');
+        actions.className = 'umd-actions';
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'umd-btn umd-btn-primary';
+        addBtn.textContent = I18n.t('Add');
+        addBtn.addEventListener('click', async () => {
+            const url = input.value.trim();
+            if (!url) {
+                status.textContent = I18n.t('URL is required');
+                return;
+            }
+            addBtn.disabled = true;
+            status.textContent = I18n.t('Fetching template …');
+            try {
+                const out = await Api.addTemplateSource(url);
+                if (out.templateId) {
+                    status.textContent = I18n.t('Added remote template: {id}', {id: out.templateId});
+                } else {
+                    status.textContent = I18n.t(
+                        'URL stored, but the body did not load — check the file at the URL.'
+                    );
+                }
+                window.setTimeout(() => {
+                    backdrop.remove();
+                    void this.show();
+                }, 700);
+            } catch (e) {
+                status.textContent = (e as Error).message;
+                addBtn.disabled = false;
+            }
+        });
+        actions.appendChild(addBtn);
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'umd-btn';
+        cancel.textContent = I18n.t('Cancel');
+        cancel.addEventListener('click', () => backdrop.remove());
+        actions.appendChild(cancel);
+        panel.appendChild(actions);
+
+        document.body.appendChild(backdrop);
+        input.focus();
     }
 }

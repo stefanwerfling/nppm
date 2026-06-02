@@ -105,6 +105,13 @@ nppm/
 │   ├── PrReview.ts         PrDepChange / PrSummary / PrReviewReport
 │   └── PrReviewBuilder.ts  diff package.json + lockfile at two refs + OSV batch
 │
+├── Templates/              project-standards / standards-enforcement
+│   ├── Template.ts                       Vts schema + types (Template / ResolvedTemplate / ComplianceFinding)
+│   ├── TemplateLoader.ts                 reads nppm-templates/<id>/template.json + files/ per folder
+│   ├── TemplateResolver.ts               flattens `extends` graph + per-project chain (later wins)
+│   ├── TemplateComplianceChecker.ts      diff resolved template × project → ComplianceReport (packages, root, files, workspaces)
+│   └── TemplateApplier.ts                applies selected findings to disk (package.json edits + file copies + merge-json) with BackupStore snapshot
+│
 ├── Frontend/               every browser-side module
 │   ├── Nppm.ts             top-level orchestrator (panes, routing)
 │   ├── Matrix.ts           global matrix view
@@ -118,6 +125,12 @@ nppm/
 │   ├── PrReviewView.ts     diffs package.json + lockfile between two git refs
 │   ├── UpgradeModal.ts     overlay: preview → edit/install → lifecycle-scripts list + Run buttons
 │   ├── BulkUpgradeModal.ts cross-project bulk wizard: grouped preview + per-project SSE install log
+│   ├── SettingsModal.ts    tabbed editor for the non-projects sections of nppm.json
+│   ├── DirectoryPickerModal.ts  backend-driven filesystem picker for the ProjectFormModal Path field
+│   ├── TemplatesView.ts    cross-project compliance matrix (Templates treeview entry)
+│   ├── TemplateView.ts     per-project right-pane tab showing the compliance diff
+│   ├── TemplateApplyModal.ts  pick-checkbox modal + SSE log for `POST .../compliance/apply`
+│   ├── TemplateFormModal.ts  tabbed editor (General/Packages/Forbidden/Root/Files) backing the CRUD endpoints
 │   ├── EditorUrl.ts        URL-handler templates for vscode/vscodium/cursor/phpstorm/webstorm/idea/subl
 │   ├── GlobalScanView.ts   SSE-driven global scan results
 │   ├── PackageDetailPanel.ts  modal w/ 5 tabs (Files/Deps/Diff/Releases/Security)
@@ -139,6 +152,17 @@ nppm/
 | Method | Path                                                  | Purpose |
 |--------|-------------------------------------------------------|---------|
 | GET    | `/api/projects`                                       | list configured projects + counts |
+| GET    | `/api/config`                                         | non-`projects` sections of nppm.json (drives SettingsModal) |
+| PUT    | `/api/config`                                         | full replacement of non-`projects` sections (validated vs `SchemaConfig`) |
+| GET    | `/api/fs/browse?path=&showHidden=`                    | directory listing for the DirectoryPickerModal (absolute paths only) |
+| GET    | `/api/templates`                                      | catalogue summary (drives the Templates view header) |
+| GET    | `/api/templates/:id`                                  | one template (guarded against `:id === "matrix"`, since /matrix is registered after) |
+| POST   | `/api/templates`                                      | create a new local template (id format `[a-z0-9][a-z0-9-]{0,63}`) |
+| PUT    | `/api/templates/:id`                                  | full-replace local template (body id must match URL; 403 if id is remote) |
+| DELETE | `/api/templates/:id`                                  | remove local template dir (403 if id is remote) |
+| GET    | `/api/templates/matrix`                               | cross-project compliance matrix |
+| GET    | `/api/projects/:id/compliance`                        | per-project compliance findings (packages + root + files + workspaces) |
+| POST   | `/api/projects/:id/compliance/apply`                  | SSE: apply selected finding targets to disk (one backup snapshot before any write) |
 | GET    | `/api/projects/:id/packages`                          | flat manifest list of one project |
 | GET    | `/api/projects/:id/lockfile`                          | parsed lockfile (or `node_modules` fallback) |
 | GET    | `/api/projects/:id/lockfile/analyze`                  | SSE per-project OSV scan |
@@ -223,6 +247,12 @@ returns IDs only, no per-vuln severity — matches `npm audit`'s
   rely on the en-fallback for a while).
 - **No new framework dependency.** D3 is the only client lib; everything
   else is hand-rolled DOM.
+- **Templates: local-overrides-remote.** `templateSources: string[]` in
+  nppm.json fetches `template.json` files into
+  `.nppm-cache/templates-remote/<id>/`. On id conflict the local
+  `nppm-templates/<id>/` wins. CRUD endpoints (`POST`/`PUT`/`DELETE
+  /api/templates/:id`) refuse with `403` for ids whose source is
+  remote — remote templates are read-only mirrors.
 
 ## Tests
 

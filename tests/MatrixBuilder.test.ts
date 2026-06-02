@@ -45,6 +45,7 @@ class FakeProject implements Project {
     public isHidden() { return this._hidden; }
     public setHidden(v: boolean) { this._hidden = v; }
     public getConfigIndex() { return -1; }
+    public getTemplates() { return []; }
 }
 
 /**
@@ -196,7 +197,8 @@ describe('MatrixBuilder.build', () => {
             loadLockfile: async () => null,
             isHidden: () => false,
             setHidden: () => {},
-            getConfigIndex: () => -1
+            getConfigIndex: () => -1,
+            getTemplates: () => []
         };
         const good = new FakeProject('good', [manifest('g', {x: '^1'})]);
         const projects = new Map<string, Project>([['1', broken], ['2', good]]);

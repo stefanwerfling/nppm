@@ -10,6 +10,8 @@ import {PackageDetailPanel} from './PackageDetailPanel.js';
 import {PackageList} from './PackageList.js';
 import {ProjectMatrixView} from './ProjectMatrixView.js';
 import {Resizer} from './Resizer.js';
+import {TemplatesView} from './TemplatesView.js';
+import {TemplateView} from './TemplateView.js';
 import {Treeview} from './Treeview.js';
 import {UnusedView} from './UnusedView.js';
 import {UpgradeModal} from './UpgradeModal.js';
@@ -35,6 +37,8 @@ enum View {
     unused = 'unused',
     vulns = 'vulns',
     pr = 'pr',
+    templates = 'templates',
+    template = 'template',
     global = 'global'
 }
 
@@ -54,6 +58,8 @@ export class Nppm {
     private readonly _unusedView: UnusedView;
     private readonly _vulnerabilityTimelineView: VulnerabilityTimelineView;
     private readonly _prReviewView: PrReviewView;
+    private readonly _templatesView: TemplatesView;
+    private readonly _templateView: TemplateView;
     private readonly _globalScanView: GlobalScanView;
     private readonly _detailPanel: PackageDetailPanel;
     private readonly _upgradeModal: UpgradeModal;
@@ -70,6 +76,8 @@ export class Nppm {
     private _unusedHost: HTMLElement|null = null;
     private _vulnsHost: HTMLElement|null = null;
     private _prHost: HTMLElement|null = null;
+    private _templatesHost: HTMLElement|null = null;
+    private _templateHost: HTMLElement|null = null;
     private _globalHost: HTMLElement|null = null;
     private _view: View = View.matrix;
     private _projects: ApiProject[] = [];
@@ -105,6 +113,8 @@ export class Nppm {
         this._unusedView = new UnusedView(this._unusedHost!);
         this._vulnerabilityTimelineView = new VulnerabilityTimelineView(this._vulnsHost!);
         this._prReviewView = new PrReviewView(this._prHost!);
+        this._templatesView = new TemplatesView(this._templatesHost!);
+        this._templateView = new TemplateView(this._templateHost!);
 
         // Topbar wiring for the global scan. These elements live in
         // index.html so non-pane components can drive them.
@@ -194,6 +204,12 @@ export class Nppm {
                 void this._loadProjectPr(p);
             }
         };
+        const wireTemplate = (unid: string): void => {
+            const p = findProject(unid);
+            if (p) {
+                void this._loadProjectTemplate(p);
+            }
+        };
 
         this._packageList.onShowInstalled(wireInstalled);
         this._packageList.onShowHistory(wireHistory);
@@ -202,6 +218,7 @@ export class Nppm {
         this._packageList.onShowUnused(wireUnused);
         this._packageList.onShowVulns(wireVulns);
         this._packageList.onShowPr(wirePr);
+        this._packageList.onShowTemplate(wireTemplate);
 
         this._installedView.onShowDeclared(wireDeclared);
         this._installedView.onShowHistory(wireHistory);
@@ -210,6 +227,7 @@ export class Nppm {
         this._installedView.onShowUnused(wireUnused);
         this._installedView.onShowVulns(wireVulns);
         this._installedView.onShowPr(wirePr);
+        this._installedView.onShowTemplate(wireTemplate);
         this._installedView.onWhy((unid, name, version) => {
             void this._whyModal.open(unid, name, version);
         });
@@ -221,6 +239,7 @@ export class Nppm {
         this._historyView.onShowUnused(wireUnused);
         this._historyView.onShowVulns(wireVulns);
         this._historyView.onShowPr(wirePr);
+        this._historyView.onShowTemplate(wireTemplate);
 
         this._projectMatrixView.onShowDeclared(wireDeclared);
         this._projectMatrixView.onShowInstalled(wireInstalled);
@@ -229,6 +248,7 @@ export class Nppm {
         this._projectMatrixView.onShowUnused(wireUnused);
         this._projectMatrixView.onShowVulns(wireVulns);
         this._projectMatrixView.onShowPr(wirePr);
+        this._projectMatrixView.onShowTemplate(wireTemplate);
         this._projectMatrixView.onCellClick((pkg, version, latest) => {
             void this._detailPanel.open(pkg, version, latest);
         });
@@ -256,6 +276,7 @@ export class Nppm {
         this._depTreeView.onShowUnused(wireUnused);
         this._depTreeView.onShowVulns(wireVulns);
         this._depTreeView.onShowPr(wirePr);
+        this._depTreeView.onShowTemplate(wireTemplate);
 
         this._unusedView.onShowDeclared(wireDeclared);
         this._unusedView.onShowInstalled(wireInstalled);
@@ -264,6 +285,7 @@ export class Nppm {
         this._unusedView.onShowTree(wireTree);
         this._unusedView.onShowVulns(wireVulns);
         this._unusedView.onShowPr(wirePr);
+        this._unusedView.onShowTemplate(wireTemplate);
 
         this._vulnerabilityTimelineView.onShowDeclared(wireDeclared);
         this._vulnerabilityTimelineView.onShowInstalled(wireInstalled);
@@ -272,9 +294,19 @@ export class Nppm {
         this._vulnerabilityTimelineView.onShowTree(wireTree);
         this._vulnerabilityTimelineView.onShowUnused(wireUnused);
         this._vulnerabilityTimelineView.onShowPr(wirePr);
+        this._vulnerabilityTimelineView.onShowTemplate(wireTemplate);
         this._vulnerabilityTimelineView.onExposureClick((pkg, version) => {
             void this._detailPanel.openOnSecurity(pkg, version, version);
         });
+
+        this._templateView.onShowDeclared(wireDeclared);
+        this._templateView.onShowInstalled(wireInstalled);
+        this._templateView.onShowHistory(wireHistory);
+        this._templateView.onShowMatrix(wireMatrix);
+        this._templateView.onShowTree(wireTree);
+        this._templateView.onShowUnused(wireUnused);
+        this._templateView.onShowVulns(wireVulns);
+        this._templateView.onShowPr(wirePr);
 
         this._prReviewView.onShowDeclared(wireDeclared);
         this._prReviewView.onShowInstalled(wireInstalled);
@@ -283,6 +315,7 @@ export class Nppm {
         this._prReviewView.onShowTree(wireTree);
         this._prReviewView.onShowUnused(wireUnused);
         this._prReviewView.onShowVulns(wireVulns);
+        this._prReviewView.onShowTemplate(wireTemplate);
         this._prReviewView.onDepClick((pkg, version) => {
             void this._detailPanel.openOnSecurity(pkg, version, version);
         });
@@ -290,8 +323,18 @@ export class Nppm {
         this._treeview.onSelect((project) => {
             if (project.unid === '__matrix__') {
                 this._switchTo(View.matrix);
+            } else if (project.unid === '__templates__') {
+                void this._loadTemplates();
             } else {
                 void this._loadProject(project);
+            }
+        });
+
+        this._templatesView.onCellClick((unid) => {
+            const proj = findProject(unid);
+            if (proj) {
+                this._treeview.setSelected(unid);
+                void this._loadProjectTemplate(proj);
             }
         });
 
@@ -443,6 +486,17 @@ export class Nppm {
         await this._prReviewView.show(project.unid, project.name, project.type);
     }
 
+    private async _loadTemplates(): Promise<void> {
+        this._switchTo(View.templates);
+        await this._templatesView.show();
+    }
+
+    private async _loadProjectTemplate(project: ApiProject): Promise<void> {
+        this._switchTo(View.template);
+        this._currentProjectUnid = project.unid;
+        await this._templateView.show(project.unid, project.name);
+    }
+
     /**
      * Carve the existing #list element into four stacked panes — matrix,
      * declared package list, installed (lockfile) view, and the global
@@ -488,6 +542,14 @@ export class Nppm {
         this._prHost.className = 'pane pane-pr';
         this._listRoot.appendChild(this._prHost);
 
+        this._templatesHost = document.createElement('div');
+        this._templatesHost.className = 'pane pane-templates';
+        this._listRoot.appendChild(this._templatesHost);
+
+        this._templateHost = document.createElement('div');
+        this._templateHost.className = 'pane pane-template';
+        this._listRoot.appendChild(this._templateHost);
+
         this._globalHost = document.createElement('div');
         this._globalHost.className = 'pane pane-global';
         this._listRoot.appendChild(this._globalHost);
@@ -499,7 +561,8 @@ export class Nppm {
         if (!this._matrixHost || !this._packageHost || !this._installedHost
             || !this._historyHost || !this._projectMatrixHost
             || !this._depTreeHost || !this._unusedHost || !this._vulnsHost
-            || !this._prHost || !this._globalHost) {
+            || !this._prHost || !this._templatesHost || !this._templateHost
+            || !this._globalHost) {
             return;
         }
 
@@ -512,6 +575,8 @@ export class Nppm {
         this._unusedHost.style.display = view === View.unused ? '' : 'none';
         this._vulnsHost.style.display = view === View.vulns ? '' : 'none';
         this._prHost.style.display = view === View.pr ? '' : 'none';
+        this._templatesHost.style.display = view === View.templates ? '' : 'none';
+        this._templateHost.style.display = view === View.template ? '' : 'none';
         this._globalHost.style.display = view === View.global ? '' : 'none';
     }
 }

@@ -60,6 +60,12 @@ export type ApiProjectMutationRequest = {
     type: ConfigProjectType;
     name?: string;
     hidden?: boolean;
+    /**
+     * Ordered list of template ids the project should be checked
+     * against. Phase-1 Templates feature — empty / absent means no
+     * compliance check.
+     */
+    templates?: string[];
     // local
     path?: string;
     // github
@@ -158,6 +164,190 @@ export type ApiFsBrowseResponse = {
     path: string;
     parent: string|null;
     entries: ApiFsBrowseEntry[];
+};
+
+/**
+ * Lightweight summary of one template as listed by `GET /api/templates`.
+ * Carries just enough to render the Templates view header (id / name /
+ * `extends`); the full rule set is only relevant once the user drills
+ * into per-project compliance.
+ */
+export type ApiTemplateSummary = {
+    id: string;
+    name: string;
+    extends: string[];
+    mode: 'additive'|'strict';
+    runtimeCount: number;
+    devCount: number;
+    peerCount: number;
+    optionalCount: number;
+    forbiddenCount: number;
+    hasRoot: boolean;
+    /**
+     * Where the template was loaded from. `remote` templates are
+     * read-only — the UI hides Edit/Delete and CRUD routes refuse
+     * to mutate them. `sourceUrl` is the URL the loader fetched
+     * the body from (only set when `source === 'remote'`).
+     */
+    source: 'local'|'remote';
+    sourceUrl?: string;
+};
+
+export type ApiTemplatesResponse = {
+    templates: ApiTemplateSummary[];
+};
+
+/**
+ * One finding from the compliance check. Mirrors `ComplianceFinding`
+ * 1:1 — kept as its own type so the API surface stays explicit.
+ */
+export type ApiComplianceFinding = {
+    kind: 'missing'|'divergent'|'forbidden'|'extra'|'bucket-wrong'
+        |'root-missing'|'root-divergent'
+        |'file-missing'|'file-drift'|'workspace-missing';
+    severity: 'info'|'warn'|'risk';
+    target: string;
+    expected?: string;
+    actual?: string;
+    sourceId: string;
+};
+
+/**
+ * Response of `GET /api/projects/:id/compliance`. `templateIds` is the
+ * resolved chain (after extends-flatten + per-project merge order);
+ * `findings` is the flat list (UI groups by `kind` + `severity`).
+ * `worst` collapses to a single matrix-badge tier.
+ */
+export type ApiComplianceResponse = {
+    project: {unid: string; name: string};
+    templateIds: string[];
+    findings: ApiComplianceFinding[];
+    worst: 'info'|'warn'|'risk'|null;
+    /**
+     * `true` when the project lists template ids that the catalogue
+     * couldn't resolve (typo / template deleted on disk). The UI
+     * renders an error banner; non-resolvable means the compliance
+     * check ran with the empty template set.
+     */
+    unresolvedIds: string[];
+};
+
+/**
+ * One cell of the Templates cross-project matrix. `projectUnid`
+ * addresses one project; `worst` collapses the project's full
+ * compliance findings to the matrix-cell badge (`null` = green).
+ */
+export type ApiTemplatesMatrixCell = {
+    projectUnid: string;
+    projectName: string;
+    /** Template ids that ran against the project (may be subset of the row). */
+    matchedTemplateIds: string[];
+    worst: 'info'|'warn'|'risk'|null;
+    findingCount: number;
+};
+
+/**
+ * One row of the Templates cross-project matrix — a template plus
+ * the per-project compliance outcome. Projects that don't list the
+ * template id in their `templates` array show up with `worst: null`
+ * and `findingCount: 0` (template not applicable to this project).
+ */
+export type ApiTemplatesMatrixRow = {
+    template: ApiTemplateSummary;
+    cells: ApiTemplatesMatrixCell[];
+};
+
+export type ApiTemplatesMatrixResponse = {
+    rows: ApiTemplatesMatrixRow[];
+};
+
+/**
+ * Body of `POST /api/projects/:id/compliance/apply`. The frontend
+ * picks a subset of `ComplianceFinding.target` strings via checkbox;
+ * the backend re-derives the action from the target shape.
+ */
+export type ApiComplianceApplyRequest = {
+    targets: string[];
+};
+
+/**
+ * SSE event payloads for `POST /api/projects/:id/compliance/apply`.
+ * Sequence:
+ *   start    { count, backupDir? }
+ *   progress { current, total, target, status, msg? }   (× count)
+ *   end      { applied, skipped, errored }
+ *   | error  { msg }
+ */
+export type ApiComplianceApplyStartEvent = {
+    count: number;
+    backupDir: string|null;
+};
+
+export type ApiComplianceApplyProgressEvent = {
+    current: number;
+    total: number;
+    target: string;
+    status: 'applied'|'skipped'|'error';
+    msg?: string;
+};
+
+export type ApiComplianceApplyEndEvent = {
+    applied: number;
+    skipped: number;
+    errored: number;
+};
+
+export type ApiComplianceApplyErrorEvent = {
+    msg: string;
+};
+
+/**
+ * Full template body — the wire shape mirrors the on-disk
+ * `template.json` 1:1 so the form modal can round-trip it without
+ * lossy translation. `files` content stays on disk per
+ * `nppm-templates/<id>/files/<path>`; the form lets the user edit
+ * metadata (path + mode) only.
+ */
+export type ApiTemplateBody = {
+    id: string;
+    name?: string;
+    extends?: string[];
+    mode?: 'additive'|'strict';
+    packages?: {
+        runtime?: Record<string, {version?: string; required?: boolean}>;
+        dev?: Record<string, {version?: string; required?: boolean}>;
+        peer?: Record<string, {version?: string; required?: boolean}>;
+        optional?: Record<string, {version?: string; required?: boolean}>;
+    };
+    forbidden?: string[];
+    root?: {
+        engines?: Record<string, string>;
+        scripts?: Record<string, string>;
+        private?: boolean;
+        type?: string;
+        packageManager?: string;
+    };
+    files?: {path: string; mode?: 'create'|'merge-json'|'report-only'}[];
+    workspaces?: {
+        path: string;
+        packages?: ApiTemplateBody['packages'];
+        forbidden?: string[];
+        root?: ApiTemplateBody['root'];
+        files?: ApiTemplateBody['files'];
+    }[];
+};
+
+export type ApiTemplateMutationRequest = ApiTemplateBody;
+
+export type ApiTemplateMutationResponse = {
+    success: boolean;
+    template?: ApiTemplateSummary;
+    msg?: string;
+};
+
+export type ApiTemplateDeleteResponse = {
+    success: boolean;
+    msg?: string;
 };
 
 /**

@@ -33,6 +33,7 @@ export class PrReviewView {
     private _onShowTree: ((unid: string) => void)|null = null;
     private _onShowUnused: ((unid: string) => void)|null = null;
     private _onShowVulns: ((unid: string) => void)|null = null;
+    private _onShowTemplate: ((unid: string) => void)|null = null;
     private _onDepClick: ((name: string, version: string) => void)|null = null;
 
     constructor(root: HTMLElement) {
@@ -46,6 +47,7 @@ export class PrReviewView {
     public onShowTree(handler: (unid: string) => void): void { this._onShowTree = handler; }
     public onShowUnused(handler: (unid: string) => void): void { this._onShowUnused = handler; }
     public onShowVulns(handler: (unid: string) => void): void { this._onShowVulns = handler; }
+    public onShowTemplate(handler: (unid: string) => void): void { this._onShowTemplate = handler; }
 
     /**
      * Click handler for a dep change row — opens the package detail
@@ -460,6 +462,16 @@ export class PrReviewView {
         pr.className = 'installed-toggle-btn installed-toggle-btn-active';
         pr.textContent = I18n.t('PR');
         toggle.appendChild(pr);
+
+        const template = document.createElement('button');
+        template.className = 'installed-toggle-btn';
+        template.textContent = I18n.t('Template');
+        template.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowTemplate) {
+                this._onShowTemplate(this._projectUnid);
+            }
+        });
+        toggle.appendChild(template);
 
         header.appendChild(toggle);
         return header;

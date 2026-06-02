@@ -13,12 +13,25 @@ import {
     ApiBulkUpgradePreviewResult,
     ApiBundlesRequest,
     ApiBundlesResponse,
+    ApiComplianceApplyEndEvent,
+    ApiComplianceApplyProgressEvent,
+    ApiComplianceApplyRequest,
+    ApiComplianceApplyStartEvent,
+    ApiComplianceResponse,
     ApiConfigMutationRequest,
+    ApiTemplateDeleteResponse,
+    ApiTemplateMutationRequest,
+    ApiTemplateMutationResponse,
     ApiConfigMutationResponse,
     ApiConfigResponse,
     ApiFingerprintDiffResponse,
     ApiFsBrowseEntry,
     ApiFsBrowseResponse,
+    ApiTemplateSummary,
+    ApiTemplatesMatrixCell,
+    ApiTemplatesMatrixResponse,
+    ApiTemplatesMatrixRow,
+    ApiTemplatesResponse,
     ApiFingerprintResponse,
     ApiHistoryResponse,
     ApiIntegrityResponse,
@@ -67,6 +80,12 @@ import {ProjectGitea} from './Project/ProjectGitea.js';
 import {ProjectGithub} from './Project/ProjectGithub.js';
 import {ProjectLocal} from './Project/ProjectLocal.js';
 import {ProjectRemote} from './Project/ProjectRemote.js';
+import {SchemaTemplate, Template} from './Templates/Template.js';
+import {TemplateApplier} from './Templates/TemplateApplier.js';
+import {TemplateComplianceChecker} from './Templates/TemplateComplianceChecker.js';
+import {TemplateLoader} from './Templates/TemplateLoader.js';
+import {TemplateResolver} from './Templates/TemplateResolver.js';
+import {BackupStore} from './Upgrade/BackupStore.js';
 import {TimelineBuilder} from './Vulnerability/TimelineBuilder.js';
 
 /**
@@ -171,6 +190,27 @@ class Server {
             const timelineBuilder = new TimelineBuilder(securityCache);
             const prReviewBuilder = new PrReviewBuilder(osvClient);
             const integrityScanner = new IntegrityScanner(registry);
+
+            // Templates catalogue. Lives next to nppm.json in
+            // `nppm-templates/<id>/template.json` (one folder per
+            // template). CRUD routes refresh on every read so user
+            // edits are picked up live. Remote sources are fetched
+            // once at boot into `.nppm-cache/templates-remote/` and
+            // surfaced as read-only entries in the loader.
+            const templatesDir = path.join(projectRoot, 'nppm-templates');
+            const remoteTemplatesDir = path.join(cacheDir, 'templates-remote');
+            const templateLoader = new TemplateLoader(templatesDir, remoteTemplatesDir);
+            const templateSources = (rawConfig as {templateSources?: unknown}).templateSources;
+            if (Array.isArray(templateSources) && templateSources.length > 0) {
+                const urls = templateSources.filter((u): u is string => typeof u === 'string');
+                templateLoader.refreshRemote(urls).then(() => {
+                    console.log(`📥 Remote templates refreshed (${urls.length} sources)`);
+                }).catch((e) => {
+                    console.warn(`nppm: remote-template refresh failed: ${(e as Error).message}`);
+                });
+            }
+            let templates: Map<string, Template> = templateLoader.loadAll();
+            const templateChecker = new TemplateComplianceChecker();
 
             // -------------------------------------------------------------
             // GET /api/projects — one row per configured project, with a
@@ -434,6 +474,362 @@ class Server {
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});
                 }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/templates — catalogue summary. Drives the
+            // "Templates" treeview entry's cross-project matrix
+            // header. Reloads the on-disk catalogue first so the
+            // user sees freshly-edited templates without bouncing
+            // the server.
+            // -------------------------------------------------------------
+            app.get('/api/templates', async (_req, res) => {
+                templates = templateLoader.loadAll();
+                const response: ApiTemplatesResponse = {
+                    templates: [...templates.values()].map((t) => Server._toTemplateSummary(t, templateLoader))
+                };
+                res.status(200).json(response);
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/templates/:id — raw template body for the
+            // edit modal. Mirrors the on-disk `template.json` 1:1
+            // (no `files/` content — only metadata).
+            // -------------------------------------------------------------
+            app.get('/api/templates/:id', async (req, res, next) => {
+                // `/api/templates/matrix` is a sibling route registered
+                // later; let it through so express keeps matching.
+                if (req.params.id === 'matrix') {
+                    return next();
+                }
+                templates = templateLoader.loadAll();
+                const tpl = templates.get(req.params.id);
+                if (!tpl) {
+                    res.status(404).json({success: false, msg: `Unknown template ${req.params.id}`});
+                    return;
+                }
+                res.status(200).json(tpl);
+            });
+
+            // -------------------------------------------------------------
+            // POST /api/templates — create a new template. Body =
+            // full template JSON. Writes
+            // `nppm-templates/<id>/template.json`. Refuses if a
+            // template with the same id already exists; the user
+            // either edits via PUT or picks a new id.
+            // -------------------------------------------------------------
+            app.post('/api/templates', async (req, res) => {
+                const body = req.body as ApiTemplateMutationRequest;
+                const error = Server._validateTemplateBody(body);
+                if (error) {
+                    res.status(400).json({success: false, msg: error});
+                    return;
+                }
+                const errors: SchemaErrors = [];
+                if (!SchemaTemplate.validate(body, errors)) {
+                    res.status(400).json({success: false, msg: `Invalid template: ${JSON.stringify(errors)}`});
+                    return;
+                }
+                templates = templateLoader.loadAll();
+                if (templates.has(body.id)) {
+                    res.status(409).json({success: false, msg: `Template "${body.id}" already exists`});
+                    return;
+                }
+                try {
+                    Server._writeTemplate(templatesDir, body);
+                    templates = templateLoader.loadAll();
+                    const saved = templates.get(body.id);
+                    if (!saved) {
+                        throw new Error('failed to read back the saved template');
+                    }
+                    const response: ApiTemplateMutationResponse = {
+                        success: true,
+                        template: Server._toTemplateSummary(saved, templateLoader)
+                    };
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // PUT /api/templates/:id — full replacement of the
+            // template body. The id in the URL is authoritative —
+            // body.id is required to match (defends against the form
+            // accidentally renaming the template through edit; rename
+            // is a delete + create dance).
+            // -------------------------------------------------------------
+            app.put('/api/templates/:id', async (req, res) => {
+                const body = req.body as ApiTemplateMutationRequest;
+                if (body?.id !== req.params.id) {
+                    res.status(400).json({success: false, msg: 'id in body must match id in URL'});
+                    return;
+                }
+                const error = Server._validateTemplateBody(body);
+                if (error) {
+                    res.status(400).json({success: false, msg: error});
+                    return;
+                }
+                const errors: SchemaErrors = [];
+                if (!SchemaTemplate.validate(body, errors)) {
+                    res.status(400).json({success: false, msg: `Invalid template: ${JSON.stringify(errors)}`});
+                    return;
+                }
+                templates = templateLoader.loadAll();
+                if (!templates.has(body.id)) {
+                    res.status(404).json({success: false, msg: `Unknown template ${body.id}`});
+                    return;
+                }
+                const src = templateLoader.getSource(body.id);
+                if (src?.kind === 'remote') {
+                    res.status(403).json({success: false, msg: `Template "${body.id}" is remote (read-only)`});
+                    return;
+                }
+                try {
+                    Server._writeTemplate(templatesDir, body);
+                    templates = templateLoader.loadAll();
+                    const saved = templates.get(body.id);
+                    if (!saved) {
+                        throw new Error('failed to read back the saved template');
+                    }
+                    const response: ApiTemplateMutationResponse = {
+                        success: true,
+                        template: Server._toTemplateSummary(saved, templateLoader)
+                    };
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // DELETE /api/templates/:id — remove the entire
+            // `nppm-templates/<id>/` directory (including any
+            // `files/` content). Projects that still reference the
+            // id keep their config but compliance reports it as
+            // `unresolvedIds[]` on the next read.
+            // -------------------------------------------------------------
+            app.delete('/api/templates/:id', async (req, res) => {
+                templates = templateLoader.loadAll();
+                if (!templates.has(req.params.id)) {
+                    res.status(404).json({success: false, msg: `Unknown template ${req.params.id}`});
+                    return;
+                }
+                const src = templateLoader.getSource(req.params.id);
+                if (src?.kind === 'remote') {
+                    res.status(403).json({success: false, msg: `Template "${req.params.id}" is remote (read-only)`});
+                    return;
+                }
+                try {
+                    const dir = path.join(templatesDir, req.params.id);
+                    fs.rmSync(dir, {recursive: true, force: true});
+                    templates = templateLoader.loadAll();
+                    const response: ApiTemplateDeleteResponse = {success: true};
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/projects/:id/compliance — diff one project
+            // against its configured template chain. Empty
+            // `templateIds` → empty findings; unknown templates are
+            // surfaced in `unresolvedIds` so the user can see the typo.
+            // -------------------------------------------------------------
+            app.get('/api/projects/:id/compliance', async (req, res) => {
+                const project = projects.get(req.params.id);
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+                try {
+                    templates = templateLoader.loadAll();
+                    const requestedIds = project.getTemplates();
+                    const knownIds = requestedIds.filter((id) => templates.has(id));
+                    const unresolvedIds = requestedIds.filter((id) => !templates.has(id));
+                    const resolver = new TemplateResolver(
+                        templates,
+                        (id) => templateLoader.getFilesDir(id)
+                    );
+                    const resolved = resolver.resolve(knownIds);
+                    const manifests = await project.loadManifests();
+                    const projectRoot = project instanceof ProjectLocal
+                        ? project.getRoot()
+                        : undefined;
+                    const report = templateChecker.check(manifests, resolved, {projectRoot});
+                    const response: ApiComplianceResponse = {
+                        project: {unid: req.params.id, name: project.getName()},
+                        templateIds: report.templateIds,
+                        findings: report.findings,
+                        worst: report.worst,
+                        unresolvedIds
+                    };
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // POST /api/projects/:id/compliance/apply — SSE stream that
+            // applies the selected compliance findings to disk. The
+            // body is `{targets: string[]}` (subset of the finding
+            // target strings from `GET .../compliance`). A single
+            // backup snapshot is written first; every per-target
+            // outcome is streamed back so the UI can render a live
+            // log + final counter.
+            //
+            // Only local projects are eligible — remote projects (no
+            // on-disk root) get a 400 response. `actions.allowInstall`
+            // is *not* gated against the apply path: this only edits
+            // package.json / config files, never runs `npm install`.
+            // -------------------------------------------------------------
+            app.post('/api/projects/:id/compliance/apply', async (req, res) => {
+                const project = projects.get(req.params.id);
+                if (!project) {
+                    res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
+                    return;
+                }
+                if (!(project instanceof ProjectLocal)) {
+                    res.status(400).json({success: false, msg: 'Template apply only supports local projects'});
+                    return;
+                }
+                const body = req.body as ApiComplianceApplyRequest;
+                const targets = Array.isArray(body?.targets) ? body.targets : [];
+                if (targets.length === 0) {
+                    res.status(400).json({success: false, msg: 'targets array required'});
+                    return;
+                }
+
+                res.set({
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'X-Accel-Buffering': 'no'
+                });
+                res.flushHeaders();
+
+                const send = (event: string, data: object): void => {
+                    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+                };
+
+                try {
+                    templates = templateLoader.loadAll();
+                    const requestedIds = project.getTemplates();
+                    const knownIds = requestedIds.filter((id) => templates.has(id));
+                    const resolver = new TemplateResolver(
+                        templates,
+                        (id) => templateLoader.getFilesDir(id)
+                    );
+                    const resolved = resolver.resolve(knownIds);
+                    const manifests = await project.loadManifests();
+                    const projectRoot = project.getRoot();
+                    const backupStore = new BackupStore(path.join(projectRoot, '.nppm-backups'));
+                    const applier = new TemplateApplier();
+
+                    const start: ApiComplianceApplyStartEvent = {count: targets.length, backupDir: null};
+                    send('start', start);
+
+                    const result = applier.apply({
+                        projectRoot,
+                        manifests,
+                        template: resolved,
+                        selectedTargets: targets,
+                        backupStore,
+                        onProgress: (i, total, outcome) => {
+                            const ev: ApiComplianceApplyProgressEvent = {
+                                current: i,
+                                total,
+                                target: outcome.target,
+                                status: outcome.status,
+                                msg: outcome.msg
+                            };
+                            send('progress', ev);
+                        }
+                    });
+
+                    if (result.backup) {
+                        const startUpdate: ApiComplianceApplyStartEvent = {
+                            count: targets.length,
+                            backupDir: result.backup.dir
+                        };
+                        send('backup', startUpdate);
+                    }
+
+                    const applied = result.outcomes.filter((o) => o.status === 'applied').length;
+                    const skipped = result.outcomes.filter((o) => o.status === 'skipped').length;
+                    const errored = result.outcomes.filter((o) => o.status === 'error').length;
+                    const end: ApiComplianceApplyEndEvent = {applied, skipped, errored};
+                    send('end', end);
+                } catch (e) {
+                    send('error', {msg: (e as Error).message});
+                } finally {
+                    res.end();
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/templates/matrix — cross-project compliance
+            // overview. One row per template, one cell per project.
+            // Cells for projects that don't list the template id stay
+            // null (template not applicable). Used by the Templates
+            // treeview entry's main view.
+            // -------------------------------------------------------------
+            app.get('/api/templates/matrix', async (_req, res) => {
+                templates = templateLoader.loadAll();
+                const resolver = new TemplateResolver(
+                    templates,
+                    (id) => templateLoader.getFilesDir(id)
+                );
+                const rows: ApiTemplatesMatrixRow[] = [];
+                for (const tpl of templates.values()) {
+                    const cells: ApiTemplatesMatrixCell[] = [];
+                    for (const [unid, project] of projects.entries()) {
+                        const declared = project.getTemplates();
+                        if (!declared.includes(tpl.id)) {
+                            cells.push({
+                                projectUnid: unid,
+                                projectName: project.getName(),
+                                matchedTemplateIds: [],
+                                worst: null,
+                                findingCount: 0
+                            });
+                            continue;
+                        }
+                        try {
+                            const knownIds = declared.filter((id) => templates.has(id));
+                            const resolved = resolver.resolve(knownIds);
+                            const manifests = await project.loadManifests();
+                            const projectRoot = project instanceof ProjectLocal
+                                ? project.getRoot()
+                                : undefined;
+                            const report = templateChecker.check(manifests, resolved, {projectRoot});
+                            cells.push({
+                                projectUnid: unid,
+                                projectName: project.getName(),
+                                matchedTemplateIds: report.templateIds,
+                                worst: report.worst,
+                                findingCount: report.findings.length
+                            });
+                        } catch (e) {
+                            cells.push({
+                                projectUnid: unid,
+                                projectName: project.getName(),
+                                matchedTemplateIds: declared,
+                                worst: 'risk',
+                                findingCount: 0
+                            });
+                            console.warn(`nppm: template matrix failed for ${project.getName()}: ${(e as Error).message}`);
+                        }
+                    }
+                    rows.push({
+                        template: Server._toTemplateSummary(tpl, templateLoader),
+                        cells
+                    });
+                }
+                const response: ApiTemplatesMatrixResponse = {rows};
+                res.status(200).json(response);
             });
 
             // -------------------------------------------------------------
@@ -2181,6 +2577,88 @@ class Server {
      * picker; lifted out of the handler so the ENOENT-fallback can
      * reuse the same enumeration logic against the home directory.
      */
+    /**
+     * Validate a template-mutation body before handing it to the VTS
+     * schema. The id format check + reserved-name check are easier
+     * to express as code than to encode in VTS; everything else is
+     * delegated to `SchemaTemplate.validate()`.
+     */
+    private static _validateTemplateBody(body: unknown): string|null {
+        if (!body || typeof body !== 'object') {
+            return 'request body required';
+        }
+        const id = (body as {id?: unknown}).id;
+        if (typeof id !== 'string' || id.length === 0) {
+            return 'id is required';
+        }
+        if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(id)) {
+            return `id "${id}" must be lower-case alphanumerics + hyphens (max 64 chars)`;
+        }
+        return null;
+    }
+
+    /**
+     * Write `<dir>/<id>/template.json` with 2-space indent + trailing
+     * newline. Creates the parent folder if it doesn't exist. Leaves
+     * `<dir>/<id>/files/` untouched — file content is managed
+     * out-of-band by the user.
+     */
+    private static _writeTemplate(dir: string, body: ApiTemplateMutationRequest): void {
+        const tplDir = path.join(dir, body.id);
+        fs.mkdirSync(tplDir, {recursive: true});
+        const file = path.join(tplDir, 'template.json');
+        const clean = Server._stripEmpty(body);
+        fs.writeFileSync(file, JSON.stringify(clean, null, 2) + '\n');
+    }
+
+    /**
+     * Drop empty arrays / objects / undefineds from the body so the
+     * on-disk template.json stays minimal. Keeps the file diff-clean
+     * after edits — every save would otherwise produce noise from
+     * empty-bucket scaffolding the user didn't actually fill in.
+     */
+    private static _stripEmpty(body: ApiTemplateMutationRequest): Record<string, unknown> {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(body)) {
+            if (v === undefined || v === null) {
+                continue;
+            }
+            if (Array.isArray(v) && v.length === 0) {
+                continue;
+            }
+            if (typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0) {
+                continue;
+            }
+            out[k] = v;
+        }
+        return out;
+    }
+
+    /**
+     * Collapse a parsed `Template` into the lightweight summary the
+     * Templates view + matrix consume. Counts pre-compute per-bucket
+     * sizes so the UI can show "+12 runtime, +5 dev" without loading
+     * the full rule body.
+     */
+    private static _toTemplateSummary(t: Template, loader: TemplateLoader): ApiTemplateSummary {
+        const pkgs = t.packages;
+        const src = loader.getSource(t.id);
+        return {
+            id: t.id,
+            name: t.name ?? t.id,
+            extends: t.extends ?? [],
+            mode: (t.mode === 'strict' ? 'strict' : 'additive'),
+            runtimeCount: pkgs?.runtime ? Object.keys(pkgs.runtime).length : 0,
+            devCount: pkgs?.dev ? Object.keys(pkgs.dev).length : 0,
+            peerCount: pkgs?.peer ? Object.keys(pkgs.peer).length : 0,
+            optionalCount: pkgs?.optional ? Object.keys(pkgs.optional).length : 0,
+            forbiddenCount: t.forbidden?.length ?? 0,
+            hasRoot: t.root !== undefined && Object.keys(t.root).length > 0,
+            source: src?.kind === 'remote' ? 'remote' : 'local',
+            sourceUrl: src?.kind === 'remote' ? src.url : undefined
+        };
+    }
+
     private static async _listDirectory(absPath: string, showHidden: boolean): Promise<ApiFsBrowseResponse> {
         const dirents = await fs.promises.readdir(absPath, {withFileTypes: true});
         const entries: ApiFsBrowseEntry[] = [];
@@ -2308,6 +2786,9 @@ class Server {
         if (body.hidden === true) {
             out.hidden = true;
         }
+        if (Array.isArray(body.templates) && body.templates.length > 0) {
+            out.templates = body.templates;
+        }
         return out;
     }
 
@@ -2324,9 +2805,10 @@ class Server {
         configIndex: number
     ): import('./Project/Project.js').Project {
         const hidden = body.hidden === true;
+        const templates = Array.isArray(body.templates) ? body.templates : [];
         if (body.type === ConfigProjectType.local) {
             const absRoot = path.resolve(projectRoot, body.path!);
-            return new ProjectLocal(absRoot, body.name, {hidden, configIndex});
+            return new ProjectLocal(absRoot, body.name, {hidden, configIndex, templates});
         }
         if (body.type === ConfigProjectType.github) {
             return new ProjectGithub(
@@ -2335,7 +2817,7 @@ class Server {
                 body.ref,
                 ConfigLoader.expandEnv(body.token),
                 remoteCache,
-                {hidden, configIndex}
+                {hidden, configIndex, templates}
             );
         }
         return new ProjectGitea(
@@ -2344,7 +2826,7 @@ class Server {
             body.ref,
             ConfigLoader.expandEnv(body.token),
             remoteCache,
-            {hidden, configIndex}
+            {hidden, configIndex, templates}
         );
     }
 

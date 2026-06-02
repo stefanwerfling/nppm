@@ -21,7 +21,8 @@ export const SchemaConfigProjectLocal = Vts.object({
     name: Vts.optional(Vts.string()),
     type: Vts.equal(ConfigProjectType.local),
     path: Vts.string(),
-    hidden: Vts.optional(Vts.boolean())
+    hidden: Vts.optional(Vts.boolean()),
+    templates: Vts.optional(Vts.array(Vts.string()))
 });
 
 /**
@@ -33,7 +34,8 @@ export const SchemaConfigProjectGithub = Vts.object({
     repo: Vts.string(),
     ref: Vts.optional(Vts.string()),
     token: Vts.optional(Vts.string()),
-    hidden: Vts.optional(Vts.boolean())
+    hidden: Vts.optional(Vts.boolean()),
+    templates: Vts.optional(Vts.array(Vts.string()))
 });
 
 /**
@@ -45,7 +47,8 @@ export const SchemaConfigProjectGitea = Vts.object({
     url: Vts.string(),
     ref: Vts.optional(Vts.string()),
     token: Vts.optional(Vts.string()),
-    hidden: Vts.optional(Vts.boolean())
+    hidden: Vts.optional(Vts.boolean()),
+    templates: Vts.optional(Vts.array(Vts.string()))
 });
 
 /**
@@ -175,7 +178,15 @@ export const SchemaConfig = Vts.object({
     registry: Vts.optional(SchemaConfigRegistry),
     cache: Vts.optional(SchemaConfigCache),
     security: Vts.optional(SchemaConfigSecurity),
-    actions: Vts.optional(SchemaConfigActions)
+    actions: Vts.optional(SchemaConfigActions),
+    /**
+     * Remote template-catalogue URLs. Each entry must serve a
+     * `template.json`-shaped JSON body. Fetched + validated at server
+     * boot, cached in `.nppm-cache/templates-remote/<id>/`. Remote
+     * templates are read-only in the UI (CRUD routes refuse to mutate
+     * them).
+     */
+    templateSources: Vts.optional(Vts.array(Vts.string()))
 });
 
 export type Config = ExtractSchemaResultType<typeof SchemaConfig>;

@@ -101,6 +101,18 @@ export class Treeview {
         matrixGroup.appendChild(matrixEl);
         this._root.appendChild(matrixGroup);
 
+        // Sibling "Templates" sentinel — opens the cross-project
+        // compliance matrix in the right pane.
+        const templatesItem: ApiProject = {
+            unid: '__templates__',
+            name: I18n.t('Templates'),
+            type: ConfigProjectType.local,
+            packageCount: 0,
+            workspaceCount: 0
+        };
+        const templatesEl = this._renderItem(templatesItem, true);
+        matrixGroup.appendChild(templatesEl);
+
         if (projects.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'tree-empty';

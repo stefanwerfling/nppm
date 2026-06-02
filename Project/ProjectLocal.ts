@@ -19,6 +19,10 @@ type RawPackageJson = {
     optionalDependencies?: unknown;
     workspaces?: unknown;
     scripts?: unknown;
+    engines?: unknown;
+    private?: unknown;
+    type?: unknown;
+    packageManager?: unknown;
 };
 
 /**
@@ -33,16 +37,18 @@ export class ProjectLocal implements Project {
     private readonly _name: string;
     private _hidden: boolean;
     private _configIndex: number;
+    private readonly _templates: string[];
 
     constructor(
         absoluteRoot: string,
         configName?: string,
-        opts: {hidden?: boolean; configIndex?: number} = {}
+        opts: {hidden?: boolean; configIndex?: number; templates?: string[]} = {}
     ) {
         this._root = absoluteRoot;
         this._name = configName ?? path.basename(absoluteRoot);
         this._hidden = opts.hidden === true;
         this._configIndex = opts.configIndex ?? -1;
+        this._templates = opts.templates ?? [];
     }
 
     public getName(): string {
@@ -59,6 +65,10 @@ export class ProjectLocal implements Project {
 
     public getConfigIndex(): number {
         return this._configIndex;
+    }
+
+    public getTemplates(): string[] {
+        return this._templates;
     }
 
     /**
@@ -160,7 +170,30 @@ export class ProjectLocal implements Project {
             ...ProjectLocal._extractDeps(raw.optionalDependencies, DependencyType.optional, workspace)
         ];
 
-        return {name, version, workspace, dependencies: deps, scripts: ProjectLocal._extractScripts(raw.scripts)};
+        return {
+            name,
+            version,
+            workspace,
+            dependencies: deps,
+            scripts: ProjectLocal._extractScripts(raw.scripts),
+            engines: ProjectLocal._extractStringMap(raw.engines),
+            isPrivate: typeof raw.private === 'boolean' ? raw.private : undefined,
+            moduleType: typeof raw.type === 'string' ? raw.type : undefined,
+            packageManager: typeof raw.packageManager === 'string' ? raw.packageManager : undefined
+        };
+    }
+
+    private static _extractStringMap(raw: unknown): Record<string, string>|undefined {
+        if (!raw || typeof raw !== 'object') {
+            return undefined;
+        }
+        const out: Record<string, string> = {};
+        for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+            if (typeof v === 'string') {
+                out[k] = v;
+            }
+        }
+        return Object.keys(out).length > 0 ? out : undefined;
     }
 
     private static _extractScripts(raw: unknown): Record<string, string> {

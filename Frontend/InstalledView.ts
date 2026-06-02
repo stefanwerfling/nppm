@@ -42,6 +42,7 @@ export class InstalledView {
     private _onShowUnused: ((unid: string) => void)|null = null;
     private _onShowVulns: ((unid: string) => void)|null = null;
     private _onShowPr: ((unid: string) => void)|null = null;
+    private _onShowTemplate: ((unid: string) => void)|null = null;
     private _onWhy: ((unid: string, name: string, version: string) => void)|null = null;
     private _lockfile: Lockfile|null = null;
     // Inflight SSE stream — kept so we can close it on view switch /
@@ -93,6 +94,10 @@ export class InstalledView {
 
     public onShowPr(handler: (unid: string) => void): void {
         this._onShowPr = handler;
+    }
+
+    public onShowTemplate(handler: (unid: string) => void): void {
+        this._onShowTemplate = handler;
     }
 
     public onWhy(handler: (unid: string, name: string, version: string) => void): void {
@@ -683,6 +688,15 @@ export class InstalledView {
             }
         });
 
+        const template = document.createElement('button');
+        template.className = 'installed-toggle-btn';
+        template.textContent = I18n.t('Template');
+        template.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowTemplate) {
+                this._onShowTemplate(this._projectUnid);
+            }
+        });
+
         toggle.appendChild(declared);
         toggle.appendChild(installed);
         toggle.appendChild(history);
@@ -691,6 +705,7 @@ export class InstalledView {
         toggle.appendChild(unused);
         toggle.appendChild(vulns);
         toggle.appendChild(pr);
+        toggle.appendChild(template);
         header.appendChild(toggle);
 
         return header;

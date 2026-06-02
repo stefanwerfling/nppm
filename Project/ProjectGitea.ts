@@ -51,7 +51,7 @@ export class ProjectGitea extends ProjectRemote {
         ref?: string,
         token?: string,
         cache?: JsonCache,
-        opts: {hidden?: boolean; configIndex?: number} = {}
+        opts: {hidden?: boolean; configIndex?: number; templates?: string[]} = {}
     ) {
         super(displayName, opts);
         this._apiBase = ProjectGitea._toApiBase(repoUrl);

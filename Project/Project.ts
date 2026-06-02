@@ -65,4 +65,13 @@ export interface Project {
      * (test harnesses).
      */
     getConfigIndex(): number;
+
+    /**
+     * Ordered list of template ids the project is bound to. The
+     * Templates compliance checker resolves these against the
+     * loaded catalogue (later entries override earlier ones on
+     * conflict). Empty when the project hasn't opted into any
+     * template.
+     */
+    getTemplates(): string[];
 }

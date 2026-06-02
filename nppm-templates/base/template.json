@@ -1,0 +1,24 @@
+{
+    "id": "base",
+    "name": "Base Standards",
+    "mode": "additive",
+    "packages": {
+        "runtime": {
+            "express": {"version": "^5.1.0"}
+        },
+        "dev": {
+            "typescript": {"version": "^5.8.0", "required": true},
+            "vitest": {"version": "^4.1.0"}
+        }
+    },
+    "forbidden": ["moment", "request"],
+    "root": {
+        "engines": {"node": ">=20"},
+        "scripts": {"test": "vitest run"},
+        "type": "module"
+    },
+    "files": [
+        {"path": ".editorconfig", "mode": "create"},
+        {"path": "tsconfig.base.json", "mode": "merge-json"}
+    ]
+}

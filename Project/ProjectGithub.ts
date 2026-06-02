@@ -52,7 +52,7 @@ export class ProjectGithub extends ProjectRemote {
         ref?: string,
         token?: string,
         cache?: JsonCache,
-        opts: {hidden?: boolean; configIndex?: number} = {}
+        opts: {hidden?: boolean; configIndex?: number; templates?: string[]} = {}
     ) {
         super(displayName, opts);
         this._repo = repo;

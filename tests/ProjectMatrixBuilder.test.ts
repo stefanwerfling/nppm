@@ -46,6 +46,7 @@ class FakeProject implements Project {
     public isHidden() { return false; }
     public setHidden(_v: boolean) {}
     public getConfigIndex() { return -1; }
+    public getTemplates() { return []; }
 }
 
 class FakeRegistry extends Registry {

@@ -42,4 +42,26 @@ export type PackageManifest = {
      * any scripts.
      */
     scripts: Record<string, string>;
+    /**
+     * Root-`package.json` metadata fields the Templates compliance
+     * checker enforces against. Only the root manifest (workspace =
+     * undefined) typically populates these; per-workspace package.json
+     * may also set them — the checker only inspects the root.
+     */
+    engines?: Record<string, string>;
+    /**
+     * `private: true|false` flag from package.json. Undefined when
+     * the package.json omits it entirely.
+     */
+    isPrivate?: boolean;
+    /**
+     * `"type"` field (`"module"` / `"commonjs"`). Undefined when
+     * absent.
+     */
+    moduleType?: string;
+    /**
+     * `"packageManager"` field (e.g. `"npm@10.5.0"`). Undefined when
+     * absent.
+     */
+    packageManager?: string;
 };

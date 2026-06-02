@@ -144,6 +144,21 @@ export type ApiConfigMutationResponse = {
 };
 
 /**
+ * Response of `POST /api/cache/clear` — deletes every file in the
+ * cache directory (registry / fingerprint / releases / security /
+ * osv / bundlephobia / templates-remote / …) while preserving the
+ * directory structure so the in-memory JsonCache instances keep
+ * working. `.nppm-history/` lives outside the cache and is never
+ * touched.
+ */
+export type ApiCacheClearResponse = {
+    success: boolean;
+    /** Number of files removed across all cache pockets. */
+    removed: number;
+    msg?: string;
+};
+
+/**
  * One directory entry returned by `GET /api/fs/browse`. The picker
  * navigates only into `dir` entries; `file` rows show up as
  * visual context (when `?withFiles=1`) and are not actionable.

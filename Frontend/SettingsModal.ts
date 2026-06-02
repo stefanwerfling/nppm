@@ -4,6 +4,7 @@ import {
     ApiConfigResponse,
     ApiConfigSettings
 } from '../Api/ApiTypes.js';
+import {Api} from './Api.js';
 import {I18n} from './I18n.js';
 
 type TabId = 'general'|'registry'|'actions'|'security';
@@ -207,6 +208,113 @@ export class SettingsModal {
         body.appendChild(this._sectionHead(I18n.t('Cache')));
         body.appendChild(this._textField('sm-cdir', I18n.t('Cache directory'), c.dir, '.nppm-cache'));
         body.appendChild(this._numberField('sm-cttl', I18n.t('Cache TTL (minutes)'), c.ttlMinutes, '60'));
+        body.appendChild(this._cacheClearRow());
+    }
+
+    /**
+     * "Clear cache now" row in the Cache section. Wipes every file in
+     * the on-disk cache (registry / fingerprint / releases / OSV /
+     * bundlephobia / templates-remote / …) across all projects so the
+     * next scan rebuilds against fresh registry data. `.nppm-history/`
+     * is preserved — it's the user's audit log, not a cache.
+     */
+    private _cacheClearRow(): HTMLElement {
+        const row = document.createElement('div');
+        row.className = 'pfm-row sm-cache-clear';
+
+        const lab = document.createElement('label');
+        lab.className = 'pfm-label';
+        lab.textContent = I18n.t('Rebuild cache');
+        row.appendChild(lab);
+
+        const right = document.createElement('div');
+        right.className = 'sm-cache-clear-right';
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'umd-btn';
+        btn.textContent = I18n.t('Clear cache now');
+        right.appendChild(btn);
+
+        const status = document.createElement('span');
+        status.className = 'sm-cache-clear-status';
+        status.textContent = I18n.t(
+            'Wipes every cache pocket across all projects. History (.nppm-history/) is kept.'
+        );
+        right.appendChild(status);
+
+        btn.addEventListener('click', () => {
+            void this._clearAndRebuild(btn, status);
+        });
+
+        row.appendChild(right);
+        return row;
+    }
+
+    /**
+     * Click handler for the "Clear cache now" button. Three phases:
+     *   1. POST /api/cache/clear — wipe every cache file
+     *   2. GET /api/matrix — re-walk every project + warm the
+     *      registry/bundle/integrity caches
+     *   3. SSE /api/lockfile/analyze-all — re-warm the OSV cache for
+     *      every unique `name@version` across all projects
+     * Phases 2 + 3 are best-effort: a network blip during rebuild
+     * doesn't surface as an error to the user because the clear
+     * itself already succeeded. Fingerprint + heuristic caches are
+     * deliberately not pre-warmed (slow tarball downloads — they
+     * fill in lazily as the user opens matrix cells).
+     */
+    private async _clearAndRebuild(btn: HTMLButtonElement, status: HTMLElement): Promise<void> {
+        btn.disabled = true;
+        status.textContent = I18n.t('Clearing cache …');
+
+        let cleared = 0;
+        try {
+            const out = await Api.clearCache();
+            cleared = out.removed;
+        } catch (e) {
+            status.textContent = (e as Error).message;
+            btn.disabled = false;
+            return;
+        }
+
+        status.textContent = I18n.t('Cache cleared ({n} files). Warming registry …', {n: String(cleared)});
+        try {
+            await fetch('/api/matrix', {cache: 'no-store'});
+        } catch {
+            // Best-effort — proceed to OSV warmup regardless.
+        }
+
+        status.textContent = I18n.t('Cache cleared ({n} files). Re-running OSV scan …', {n: String(cleared)});
+        await new Promise<void>((resolve) => {
+            const es = new EventSource('/api/lockfile/analyze-all');
+            let progress = 0;
+            es.addEventListener('progress', () => {
+                progress++;
+                if (progress % 25 === 0) {
+                    status.textContent = I18n.t('Cache cleared ({n} files). Re-running OSV scan ({p} done) …', {
+                        n: String(cleared),
+                        p: String(progress)
+                    });
+                }
+            });
+            es.addEventListener('end', () => {
+                es.close();
+                resolve();
+            });
+            es.addEventListener('error', () => {
+                // Connection drop or end-of-stream. Treat both as
+                // "done with whatever we got".
+                es.close();
+                resolve();
+            });
+        });
+
+        status.textContent = I18n.t(
+            'Cache rebuilt — {n} file(s) cleared, registry + OSV re-warmed across all projects.',
+            {n: String(cleared)}
+        );
+        btn.disabled = false;
     }
 
     private _renderRegistry(body: HTMLElement): void {

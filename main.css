@@ -420,6 +420,18 @@ html, body {
     min-height: 60px;
 }
 
+.sm-cache-clear-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.sm-cache-clear-status {
+    font-size: 11px;
+    color: var(--c-muted);
+}
+
 /* Directory picker modal ------------------------------------------- */
 
 .dpm-backdrop {

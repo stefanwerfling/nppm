@@ -2,6 +2,7 @@ import {
     ApiBulkUpgradePick,
     ApiBulkUpgradePreviewRequest,
     ApiBulkUpgradePreviewResponse,
+    ApiCacheClearResponse,
     ApiDepGraphResponse,
     ApiFingerprintDiffResponse,
     ApiFingerprintResponse,
@@ -40,6 +41,14 @@ export class Api {
 
     public static async listProjects(): Promise<ApiProjectsResponse> {
         return Api._json<ApiProjectsResponse>('/api/projects');
+    }
+
+    public static async clearCache(): Promise<ApiCacheClearResponse> {
+        const res = await fetch('/api/cache/clear', {method: 'POST'});
+        if (!res.ok) {
+            throw new Error(`/api/cache/clear → ${res.status} ${res.statusText}`);
+        }
+        return (await res.json()) as ApiCacheClearResponse;
     }
 
     /**

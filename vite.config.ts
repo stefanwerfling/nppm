@@ -13,6 +13,7 @@ import {
     ApiBulkUpgradePreviewResult,
     ApiBundlesRequest,
     ApiBundlesResponse,
+    ApiCacheClearResponse,
     ApiComplianceApplyEndEvent,
     ApiComplianceApplyProgressEvent,
     ApiComplianceApplyRequest,
@@ -471,6 +472,41 @@ class Server {
                         }
                     });
                     const response: ApiConfigMutationResponse = {success: true};
+                    res.status(200).json(response);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // POST /api/cache/clear — wipe every cache pocket
+            // (registry / fingerprint / releases / security / osv /
+            // bundlephobia / npm-user / npm-2fa / templates-remote /
+            // remote …) for all projects in one shot. The .nppm-cache
+            // directory itself + its subdirectories stay in place so
+            // the JsonCache instances spun up at boot keep writing
+            // successfully; only the files are removed. The
+            // .nppm-history/ store lives at projectRoot, not under
+            // cacheDir, so it is never touched.
+            // -------------------------------------------------------------
+            app.post('/api/cache/clear', async (_req, res) => {
+                try {
+                    let removed = 0;
+                    if (fs.existsSync(cacheDir)) {
+                        const walk = (dir: string): void => {
+                            for (const e of fs.readdirSync(dir, {withFileTypes: true})) {
+                                const full = path.join(dir, e.name);
+                                if (e.isDirectory()) {
+                                    walk(full);
+                                } else {
+                                    fs.unlinkSync(full);
+                                    removed++;
+                                }
+                            }
+                        };
+                        walk(cacheDir);
+                    }
+                    const response: ApiCacheClearResponse = {success: true, removed};
                     res.status(200).json(response);
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});

@@ -4,6 +4,16 @@
 
 # nppm — Node Project Package Manager
 
+<p align="center">
+  <a href="https://github.com/stefanwerfling/nppm/actions/workflows/nppm-scan.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/stefanwerfling/nppm/nppm-scan.yml?branch=main&label=CI&logo=github" /></a>
+  <a href="https://github.com/stefanwerfling/nppm/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/stefanwerfling/nppm?color=blue" /></a>
+  <a href="https://github.com/stefanwerfling/nppm/releases"><img alt="Release" src="https://img.shields.io/github/v/release/stefanwerfling/nppm?include_prereleases&label=release&sort=semver" /></a>
+  <img alt="Node ≥ 20" src="https://img.shields.io/node/v/nppm?label=node&color=43853d" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-641%20passing-success" />
+  <img alt="Scanners" src="https://img.shields.io/badge/scanners-21-blueviolet" />
+  <a href="https://github.com/stefanwerfling/nppm/blob/main/SECURITY.md"><img alt="Security policy" src="https://img.shields.io/badge/security-disclosure-red?logo=github" /></a>
+</p>
+
 A local-first dashboard that compares npm dependency versions across many
 projects at once and surfaces drift, outdated packages, CVEs, install-time
 risks, lockfile integrity drift, retroactive CVE exposure timelines,

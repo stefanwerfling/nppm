@@ -1,0 +1,67 @@
+name: Feature request
+description: Propose a new scanner, view, integration, or other nppm capability
+title: "[feat] "
+labels: ["enhancement", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. Two things tend to make feature
+        requests land: a clear "why" (the gap it closes) and a hint at
+        scope (small / medium / large). Bonus points for naming a
+        comparable feature in another tool.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem you're trying to solve
+      description: |
+        What do you find yourself doing manually that nppm could
+        automate? What does the current workflow look like?
+      placeholder: |
+        e.g. "After every dependency update I manually check which of my
+        packages now depend on `axios` indirectly. nppm's Impact modal
+        does this on-demand but I'd like a CI check that fails the
+        build when a high-risk package joins the tree."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: |
+        How would the feature behave from the user's perspective?
+        Sketch a UI element, a CLI flag, an `nppm.json` config block —
+        whatever fits.
+      placeholder: |
+        e.g. "A new `--watch-package=axios` flag for `nppm scan` that
+        exits non-zero when any project pulls in `axios` (directly or
+        transitively). Outputs the shortest paths."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      placeholder: |
+        e.g. "Wrote a bash script around `nppm sbom --format=cyclonedx`
+        + jq. Works but every project has to maintain its own copy."
+  - type: dropdown
+    id: scope
+    attributes:
+      label: How large do you think this is?
+      options:
+        - Small — under 200 lines, one module
+        - Medium — touches multiple modules, new tests
+        - Large — new view / new external integration / new scanner family
+        - I have no idea
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched existing issues + the roadmap in CLAUDE.md
+          required: true
+        - label: I'd be willing to discuss design tradeoffs before implementation
+          required: true

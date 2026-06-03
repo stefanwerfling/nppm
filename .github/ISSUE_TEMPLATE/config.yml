@@ -1,0 +1,17 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/stefanwerfling/nppm/security/advisories/new
+    about: |
+      Please report security issues privately via GitHub Security
+      Advisories — see SECURITY.md.
+  - name: Question / discussion
+    url: https://github.com/stefanwerfling/nppm/discussions
+    about: |
+      Open-ended questions, "how do I…" requests, and design
+      brainstorming belong in Discussions, not Issues.
+  - name: User manual
+    url: https://github.com/stefanwerfling/nppm/blob/main/doc/manual_en.md
+    about: |
+      The walkthrough covers every view in nppm with screenshots —
+      check before filing a usage question.

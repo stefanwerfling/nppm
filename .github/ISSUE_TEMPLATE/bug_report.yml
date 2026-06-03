@@ -1,0 +1,100 @@
+name: Bug report
+description: Something is wrong with nppm — incorrect scan verdict, crash, UI glitch
+title: "[bug] "
+labels: ["bug", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The more concrete the
+        repro, the faster a fix lands. For **security-relevant** issues
+        (incorrect verdict that could mask a real attack, code execution
+        in the dev server, …) please use
+        [GitHub Security Advisories](https://github.com/stefanwerfling/nppm/security/advisories/new)
+        instead — see [`SECURITY.md`](https://github.com/stefanwerfling/nppm/blob/main/SECURITY.md).
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Plain-English summary of the bug.
+      placeholder: |
+        e.g. "The matrix shows `STALE!` for a package the registry
+        released a new version of two weeks ago. The cadence scanner
+        must be reading a stale `time.created` value somewhere."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: |
+        Step-by-step from a clean clone. A minimal `nppm.json` + the
+        package name(s) involved is almost always enough.
+      placeholder: |
+        1. `git clone https://github.com/stefanwerfling/nppm`
+        2. `cd nppm && npm install`
+        3. Add `axios@0.21.0` to a test project's `package.json`
+        4. `npm run dev`
+        5. Open the matrix → click the axios cell → ...
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: "The Maintainer card should expand because the latest version is risk-tier."
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: "The Maintainer card stays collapsed even though the badge is red."
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: nppm version
+      description: The output of `node ./cli/nppm.js --help | head -1`, or the commit SHA from `git rev-parse HEAD`.
+      placeholder: "1.0.0 (commit abc1234)"
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      placeholder: "v20.10.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - WSL
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: |
+        Dev-server console output, browser DevTools console errors, or
+        screenshots of the misbehaving UI go here. Wrap multi-line
+        output in triple backticks.
+      render: shell
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched existing issues for duplicates
+          required: true
+        - label: I am on `main` or a recent release (no fix already landed)
+          required: true

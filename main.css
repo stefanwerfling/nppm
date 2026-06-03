@@ -2212,6 +2212,63 @@ html, body {
     margin-bottom: 6px;
 }
 
+/* Collapsible card around each security section. `.pdp-card` replaces
+   the bare `.pdp-section` look — visible border, distinct header
+   that triggers collapse, and a body that folds away. The original
+   `.pdp-section-head` is replaced at runtime with `.pdp-card-head`,
+   so its style above is left untouched for any other consumer. */
+
+.pdp-card {
+    margin-top: 10px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--c-bg);
+    padding-top: 0;
+}
+
+.pdp-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--c-panel);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s ease;
+}
+
+.pdp-card-head:hover {
+    background: var(--c-row-hover);
+}
+
+.pdp-card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--c-text);
+    letter-spacing: 0.02em;
+}
+
+.pdp-card-chevron {
+    color: var(--c-muted);
+    font-size: 11px;
+    line-height: 1;
+    transition: transform 0.18s ease;
+}
+
+.pdp-card-collapsed .pdp-card-chevron {
+    transform: rotate(-90deg);
+}
+
+.pdp-card-body {
+    padding: 10px 12px;
+    border-top: 1px solid var(--c-border);
+}
+
+.pdp-card-collapsed .pdp-card-body {
+    display: none;
+}
+
 .pdp-list {
     font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
     font-size: 12px;

@@ -795,18 +795,117 @@ export class PackageDetailPanel {
             return wrap;
         }
 
-        wrap.appendChild(this._renderVulnsSection(report.vulns));
-        wrap.appendChild(this._renderScriptsSection(report.scriptFindings));
+        // Each scanner section becomes its own collapsible card. The
+        // ignoreScripts banner stays inline (it's a recommendation, not
+        // a finding) so the user sees the verdict next to the scripts
+        // it relates to. Cards default-collapse when their findings
+        // lack risk/warn signals — caller can override via `hasIssue`
+        // for sections whose body doesn't carry an unambiguous
+        // severity class (e.g. CVEs, where "any" hit is interesting).
+        const card = (
+            node: HTMLElement,
+            opts: {hasIssue?: boolean} = {}
+        ): HTMLElement => PackageDetailPanel._makeCollapsibleCard(node, opts);
+
+        wrap.appendChild(card(
+            this._renderVulnsSection(report.vulns),
+            {hasIssue: vulnCount > 0}
+        ));
+        wrap.appendChild(card(
+            this._renderScriptsSection(report.scriptFindings),
+            {hasIssue: scriptCount > 0}
+        ));
         wrap.appendChild(this._renderIgnoreScriptsBanner(report.ignoreScripts));
-        wrap.appendChild(this._renderPatternsSection(report.patternFindings));
-        wrap.appendChild(this._renderBinariesSection(report.binaryFindings));
-        wrap.appendChild(this._renderChurnSection(report.churn));
-        wrap.appendChild(this._renderMaintainerSection(report.maintainer));
-        wrap.appendChild(this._renderProvenanceSection(report.provenance));
-        wrap.appendChild(this._renderFreshnessSection(report.freshness));
-        wrap.appendChild(this._renderCadenceSection(report.cadence));
-        wrap.appendChild(this._renderTyposquatSection(report.typosquat));
+        wrap.appendChild(card(
+            this._renderPatternsSection(report.patternFindings),
+            {hasIssue: patternCount > 0}
+        ));
+        wrap.appendChild(card(
+            this._renderBinariesSection(report.binaryFindings),
+            {hasIssue: binaryCount > 0}
+        ));
+        wrap.appendChild(card(
+            this._renderChurnSection(report.churn),
+            {hasIssue: !!interestingChurn}
+        ));
+        wrap.appendChild(card(
+            this._renderMaintainerSection(report.maintainer),
+            {hasIssue: !!interestingMaintainer}
+        ));
+        wrap.appendChild(card(this._renderProvenanceSection(report.provenance)));
+        wrap.appendChild(card(this._renderFreshnessSection(report.freshness)));
+        wrap.appendChild(card(this._renderCadenceSection(report.cadence)));
+        wrap.appendChild(card(this._renderTyposquatSection(report.typosquat)));
         return wrap;
+    }
+
+    /**
+     * Wrap a `.pdp-section`-shaped element in a collapsible card —
+     * the section head becomes the click handle, the rest folds into
+     * a body div, and a chevron rotates to show state. Sections that
+     * aren't `.pdp-section` (the inline ignoreScripts banner, the
+     * hidden empty div the Typosquat scanner returns for clean
+     * verdicts) are returned unchanged so the caller can keep chaining.
+     *
+     * Default state:
+     *   • `opts.hasIssue` explicit → that wins
+     *   • otherwise: auto-detect via any descendant carrying a
+     *     `-warn` / `-risk` severity class, expand if found
+     *
+     * Sections with nothing flagged collapse on first render — the
+     * user opens what they want to inspect.
+     */
+    private static _makeCollapsibleCard(
+        section: HTMLElement,
+        opts: {hasIssue?: boolean} = {}
+    ): HTMLElement {
+        if (!section.classList.contains('pdp-section')) {
+            return section;
+        }
+        const head = section.querySelector('.pdp-section-head');
+        if (!head) {
+            return section;
+        }
+        section.classList.add('pdp-card');
+
+        const hasIssue = opts.hasIssue !== undefined
+            ? opts.hasIssue
+            : !!section.querySelector(
+                '.pdp-sev-risk, .pdp-sev-warn, [class*="-risk"], [class*="-warn"]'
+            );
+
+        const body = document.createElement('div');
+        body.className = 'pdp-card-body';
+        let next = head.nextSibling;
+        while (next) {
+            const cur = next;
+            next = cur.nextSibling;
+            body.appendChild(cur);
+        }
+
+        const newHead = document.createElement('div');
+        newHead.className = 'pdp-card-head';
+        const title = document.createElement('span');
+        title.className = 'pdp-card-title';
+        title.textContent = head.textContent ?? '';
+        newHead.appendChild(title);
+        const chevron = document.createElement('span');
+        chevron.className = 'pdp-card-chevron';
+        chevron.textContent = '▾';
+        newHead.appendChild(chevron);
+
+        section.replaceChild(newHead, head);
+        section.appendChild(body);
+
+        if (!hasIssue) {
+            section.classList.add('pdp-card-collapsed');
+        }
+
+        newHead.addEventListener('click', () => {
+            section.classList.toggle('pdp-card-collapsed');
+        });
+
+        return section;
     }
 
     /**

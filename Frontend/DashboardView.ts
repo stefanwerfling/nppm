@@ -373,6 +373,7 @@ export class DashboardView {
             case 'scripts': return I18n.t('Install scripts');
             case 'patterns': return I18n.t('Code patterns');
             case 'binaries': return I18n.t('Binaries');
+            case 'obfuscation': return I18n.t('Obfuscation');
             case 'maintainer': return I18n.t('Maintainer');
             case 'churn': return I18n.t('Churn');
             case 'cadence': return I18n.t('Cadence');
@@ -533,6 +534,12 @@ export class DashboardView {
                 // Cube
                 return s('<path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/>'
                     + '<polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/>');
+            case 'obfuscation':
+                // Eye-off — hidden / masked code
+                return s('<path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 4.22-5.21"/>'
+                    + '<path d="M10.58 5.08A10.43 10.43 0 0 1 12 5c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>'
+                    + '<path d="M9.88 9.88a3 3 0 0 0 4.24 4.24"/>'
+                    + '<line x1="3" y1="3" x2="21" y2="21"/>');
             case 'maintainer':
                 // Person
                 return s('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>'
@@ -604,6 +611,8 @@ export class DashboardView {
                 return I18n.t('Regex-scans tarball JavaScript for risky patterns: eval / Function / child_process / base64-decoded eval, etc.');
             case 'binaries':
                 return I18n.t('Classifies binary files inside the tarball by extension and whether they sit on the bin/ path (executables the publisher exposes to npm install).');
+            case 'obfuscation':
+                return I18n.t('Looks for code-obfuscation fingerprints inside JS files: obfuscator.io _0x identifiers, eval(atob(...)) chains, hex-string arrays, and pathologically long lines outside of dist/min paths.');
             case 'maintainer':
                 return I18n.t('Spots publisher handovers on mature packages. A short gap between the previous and current publisher on a long-lived package matches the event-stream / ua-parser-js takeover pattern.');
             case 'churn':
@@ -650,6 +659,7 @@ export class DashboardView {
             case 'scripts':
             case 'patterns':
             case 'binaries':
+            case 'obfuscation':
             case 'maintainer':
             case 'churn':
             case 'cadence':

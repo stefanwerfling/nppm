@@ -21,7 +21,8 @@ function heuristic(name: string, version: string): HeuristicsBatchEntry {
         cadence: {name, version, level: null, daysSinceLastRelease: null, medianCadenceDays: null},
         typosquat: {name, version, level: null, closestMatch: null, hasConfusables: false},
         external: {name, version, level: null, count: 0},
-        deprecation: {name, version, level: null}
+        deprecation: {name, version, level: null},
+        obfuscation: {name, version, maxSeverity: null, count: 0}
     };
 }
 

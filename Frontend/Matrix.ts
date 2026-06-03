@@ -13,6 +13,7 @@ import {ProvenanceLevel, ProvenanceSummary} from '../Security/ProvenanceScanner.
 import {ScriptSeverity} from '../Security/ScriptScanner.js';
 import {DeprecationLevel, DeprecationSummary} from '../Security/DeprecationScanner.js';
 import {ExternalSeverity, ExternalSummary} from '../Security/ExternalSourcesScanner.js';
+import {ObfuscationSeverity, ObfuscationSummary} from '../Security/ObfuscationScanner.js';
 import {TyposquatLevel, TyposquatSummary} from '../Security/TyposquatScanner.js';
 import {PatternSummary, ScriptSummary} from '../Security/SecurityScanner.js';
 import {Api} from './Api.js';
@@ -129,6 +130,12 @@ const DEPRECATION_WEIGHT: Record<DeprecationLevel, number> = {
     [DeprecationLevel.risk]: 18
 };
 
+const OBFUSCATION_WEIGHT: Record<ObfuscationSeverity, number> = {
+    [ObfuscationSeverity.info]: 0,
+    [ObfuscationSeverity.warn]: 8,
+    [ObfuscationSeverity.risk]: 25
+};
+
 /**
  * Persisted UI state — keeps filter, sort, and search across reloads
  * via localStorage. Stored as one JSON blob so we can extend later
@@ -182,6 +189,7 @@ export class Matrix {
     private _typosquatByName: Map<string, TyposquatSummary> = new Map();
     private _externalByName: Map<string, ExternalSummary> = new Map();
     private _deprecationByName: Map<string, DeprecationSummary> = new Map();
+    private _obfuscationByName: Map<string, ObfuscationSummary> = new Map();
     // Bundlephobia size keyed by package name (we always query against
     // `latest`, so the version is implicit). `null` means asked-and-
     // unbuildable; missing key means not yet asked.
@@ -250,7 +258,8 @@ export class Matrix {
         cadence: CadenceSummary|undefined,
         typosquat: TyposquatSummary|undefined,
         external: ExternalSummary|undefined,
-        deprecation: DeprecationSummary|undefined
+        deprecation: DeprecationSummary|undefined,
+        obfuscation: ObfuscationSummary|undefined
     ): number {
         let score = 0;
         if (vulnIds && vulnIds.length > 0) {
@@ -290,6 +299,9 @@ export class Matrix {
         }
         if (deprecation && deprecation.level !== null) {
             score += DEPRECATION_WEIGHT[deprecation.level];
+        }
+        if (obfuscation && obfuscation.maxSeverity !== null) {
+            score += OBFUSCATION_WEIGHT[obfuscation.maxSeverity];
         }
         return score;
     }
@@ -400,6 +412,7 @@ export class Matrix {
         this._typosquatByName = new Map();
         this._externalByName = new Map();
         this._deprecationByName = new Map();
+        this._obfuscationByName = new Map();
         this._bundlesByName = new Map();
         this._integrityByName = new Map();
         this._render();
@@ -536,6 +549,7 @@ export class Matrix {
                 this._typosquatByName.set(entry.name, entry.typosquat);
                 this._externalByName.set(entry.name, entry.external);
                 this._deprecationByName.set(entry.name, entry.deprecation);
+                this._obfuscationByName.set(entry.name, entry.obfuscation);
                 if (entry.scripts.maxSeverity !== null
                     || entry.patterns.maxSeverity !== null
                     || entry.binaries.maxSeverity !== null
@@ -552,7 +566,9 @@ export class Matrix {
                     || entry.external.level === ExternalSeverity.risk
                     || entry.external.level === ExternalSeverity.warn
                     || entry.deprecation.level === DeprecationLevel.risk
-                    || entry.deprecation.level === DeprecationLevel.warn) {
+                    || entry.deprecation.level === DeprecationLevel.warn
+                    || entry.obfuscation.maxSeverity === ObfuscationSeverity.risk
+                    || entry.obfuscation.maxSeverity === ObfuscationSeverity.warn) {
                     anyHit = true;
                 }
             }
@@ -1010,6 +1026,26 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
+        // Obfuscation badge — risk = code-obfuscation fingerprints in
+        // a non-build path; warn = same in a build path or weaker
+        // signal in source. Info (legit minification in dist/) stays
+        // silent.
+        const obfuscation = this._obfuscationByName.get(row.name);
+        if (obfuscation && (obfuscation.maxSeverity === ObfuscationSeverity.risk
+                            || obfuscation.maxSeverity === ObfuscationSeverity.warn)) {
+            const badge = document.createElement('span');
+            badge.className = `matrix-badge matrix-badge-obfuscation matrix-badge-obfuscation-${obfuscation.maxSeverity}`;
+            badge.textContent = obfuscation.maxSeverity === ObfuscationSeverity.risk ? 'OBF!' : 'OBF?';
+            badge.title = I18n.t('Obfuscation signals detected in {n} file(s)', {n: obfuscation.count});
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (row.latest) {
+                    this._onSecurityClick?.(row.name, row.latest);
+                }
+            });
+            nameCell.appendChild(badge);
+        }
+
         // Deprecation badge — risk = installed version itself is
         // deprecated; warn = registry latest is deprecated.
         // info-only ("some older versions were deprecated") stays
@@ -1184,7 +1220,8 @@ export class Matrix {
             this._cadenceByName.get(row.name),
             this._typosquatByName.get(row.name),
             this._externalByName.get(row.name),
-            this._deprecationByName.get(row.name)
+            this._deprecationByName.get(row.name),
+            this._obfuscationByName.get(row.name)
         );
     }
 

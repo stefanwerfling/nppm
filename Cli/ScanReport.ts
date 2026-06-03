@@ -2,6 +2,7 @@ import {ConfigProjectType} from '../Config/Config.js';
 import {BinarySeverity} from '../Security/BinaryScanner.js';
 import {DeprecationLevel} from '../Security/DeprecationScanner.js';
 import {ExternalSeverity} from '../Security/ExternalSourcesScanner.js';
+import {ObfuscationSeverity} from '../Security/ObfuscationScanner.js';
 import {LicenseSeverity} from '../Security/LicenseScanner.js';
 import {MaintainerSeverity} from '../Security/MaintainerScanner.js';
 import {PatternSeverity} from '../Security/PatternScanner.js';
@@ -32,7 +33,7 @@ export const UNIFIED_RANK: Record<UnifiedSeverity, number> = {
  * unified ladder so the threshold check is a single integer compare.
  */
 export type ScanFinding = {
-    category: 'vuln'|'script'|'pattern'|'binary'|'maintainer'|'license'|'unused'|'misplaced'|'missing'|'external'|'deprecation';
+    category: 'vuln'|'script'|'pattern'|'binary'|'maintainer'|'license'|'unused'|'misplaced'|'missing'|'external'|'deprecation'|'obfuscation';
     severity: UnifiedSeverity;
     name: string;
     version?: string;
@@ -208,6 +209,22 @@ export class ScanReportBuilder {
                         });
                     }
                 }
+                // Obfuscation — info drops (legitimate minification
+                // in `dist/`), warn/risk fire. The aggregated max
+                // severity is enough for the gate; per-file detail
+                // lives in the panel.
+                if (h.obfuscation.maxSeverity !== null) {
+                    const sev = ScanReportBuilder._obfuscationToUnified(h.obfuscation.maxSeverity);
+                    if (sev !== null) {
+                        findings.push({
+                            category: 'obfuscation',
+                            severity: sev,
+                            name: h.name,
+                            version: h.version,
+                            message: `${h.obfuscation.count} obfuscated file(s)`
+                        });
+                    }
+                }
                 // Deprecation — info-only ("only older versions
                 // deprecated") drops out, same convention as license
                 // permissive + external info.
@@ -360,6 +377,19 @@ export class ScanReportBuilder {
             case DeprecationLevel.info: return null;
             case DeprecationLevel.warn: return UnifiedSeverity.warn;
             case DeprecationLevel.risk: return UnifiedSeverity.risk;
+        }
+    }
+
+    /**
+     * Obfuscation `info` typically means a `dist/*.min.js` build
+     * artifact — legit minification, not an actionable finding. warn
+     * and risk feed the gate verbatim.
+     */
+    private static _obfuscationToUnified(s: ObfuscationSeverity): UnifiedSeverity|null {
+        switch (s) {
+            case ObfuscationSeverity.info: return null;
+            case ObfuscationSeverity.warn: return UnifiedSeverity.warn;
+            case ObfuscationSeverity.risk: return UnifiedSeverity.risk;
         }
     }
 }

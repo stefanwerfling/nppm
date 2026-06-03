@@ -2114,13 +2114,13 @@ class Server {
                                 // surfaces concrete labels in the FindingsModal.
                                 const perScanner: Record<string, (ReturnType<typeof DashboardBuilder.cveSeverity>)[]> = {
                                     cve: [], license: [], scripts: [], patterns: [],
-                                    binaries: [], maintainer: [], churn: [], cadence: [],
+                                    binaries: [], obfuscation: [], maintainer: [], churn: [], cadence: [],
                                     freshness: [], ignoreScripts: [], typosquat: [], provenance: [],
                                     external: [], deprecation: []
                                 };
                                 const perFindings: Record<string, CellFinding[]> = {
                                     cve: [], license: [], scripts: [], patterns: [],
-                                    binaries: [], maintainer: [], churn: [], cadence: [],
+                                    binaries: [], obfuscation: [], maintainer: [], churn: [], cadence: [],
                                     freshness: [], ignoreScripts: [], typosquat: [], provenance: [],
                                     external: [], deprecation: []
                                 };
@@ -2159,6 +2159,11 @@ class Server {
                                     const bin = DashboardBuilder.binariesSeverity(h.binaries);
                                     perScanner.binaries.push(bin);
                                     pushFinding('binaries', label, bin, `${h.binaries.totalCount} file(s)`);
+
+                                    const obf = DashboardBuilder.obfuscationSeverity(h.obfuscation);
+                                    perScanner.obfuscation.push(obf);
+                                    pushFinding('obfuscation', label, obf,
+                                        h.obfuscation.count > 0 ? `${h.obfuscation.count} file(s)` : undefined);
 
                                     const main = DashboardBuilder.maintainerSeverity(h.maintainer);
                                     perScanner.maintainer.push(main);
@@ -2227,7 +2232,7 @@ class Server {
                                 // findings list is sorted + capped inside the
                                 // builder.
                                 const perPackageScanners: ScannerId[] = [
-                                    'cve', 'license', 'scripts', 'patterns', 'binaries',
+                                    'cve', 'license', 'scripts', 'patterns', 'binaries', 'obfuscation',
                                     'maintainer', 'churn', 'cadence', 'freshness',
                                     'ignoreScripts', 'typosquat', 'provenance', 'deprecation'
                                 ];

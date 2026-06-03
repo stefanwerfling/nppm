@@ -126,6 +126,11 @@ export class SarifBuilder {
             name: 'Deprecated package version',
             description: 'The installed version or the registry latest carries an `npm deprecate` marker.',
             defaultLevel: 'warning'
+        },
+        obfuscation: {
+            name: 'Obfuscated JS source',
+            description: 'JS file(s) inside the tarball look intentionally obfuscated (obfuscator.io identifiers, eval(atob(...)) chains, hex-string arrays, or pathologically long lines outside of dist/min paths).',
+            defaultLevel: 'warning'
         }
     };
 

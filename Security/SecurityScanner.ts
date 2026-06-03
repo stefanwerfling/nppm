@@ -56,6 +56,11 @@ import {
     TyposquatScanner,
     TyposquatSummary
 } from './TyposquatScanner.js';
+import {
+    ObfuscationFinding,
+    ObfuscationScanner,
+    ObfuscationSummary
+} from './ObfuscationScanner.js';
 import {OsvClient, OsvVulnerability} from './OsvClient.js';
 import {PatternFinding, PatternScanner, PatternSeverity} from './PatternScanner.js';
 import {ScriptFinding, ScriptScanner, ScriptSeverity} from './ScriptScanner.js';
@@ -118,6 +123,14 @@ export type SecurityReport = {
      * registry, churn, maintainer, and license passes.
      */
     deprecation: DeprecationFinding|null;
+    /**
+     * Per-file obfuscation findings, derived from the same tarball
+     * fingerprint the pattern + binary scanners read. `[]` is the
+     * boring case (every JS file looks like normal source); a
+     * minified `dist/*.min.js` shows up here too but lands as info
+     * since legitimate minification is the default.
+     */
+    obfuscation: ObfuscationFinding[];
 };
 
 /**
@@ -159,6 +172,7 @@ export type HeuristicsBatchEntry = {
     typosquat: TyposquatSummary;
     external: ExternalSummary;
     deprecation: DeprecationSummary;
+    obfuscation: ObfuscationSummary;
 };
 
 /**
@@ -244,6 +258,7 @@ export class SecurityScanner {
         const scriptFindings = ScriptScanner.scan(fingerprint?.manifest ?? null);
         const patternFindings = fingerprint ? PatternScanner.scan(fingerprint.files) : [];
         const binaryFindings = fingerprint ? BinaryScanner.scan(fingerprint.files) : [];
+        const obfuscationFindings = fingerprint ? ObfuscationScanner.scan(fingerprint.files) : [];
 
         // Prefer the manifest license (per-version, can differ between
         // releases) over the packument license (top-level, version-
@@ -282,7 +297,8 @@ export class SecurityScanner {
             ignoreScripts,
             typosquat,
             external,
-            deprecation
+            deprecation,
+            obfuscation: obfuscationFindings
         };
     }
 
@@ -378,6 +394,7 @@ export class SecurityScanner {
                 const patternFindings = fingerprint ? PatternScanner.scan(fingerprint.files) : [];
                 const binaryFindings = fingerprint ? BinaryScanner.scan(fingerprint.files) : [];
                 const binSummary = BinaryScanner.summarise(binaryFindings);
+                const obfuscationFindings = fingerprint ? ObfuscationScanner.scan(fingerprint.files) : [];
 
                 result[i] = {
                     name: pkg.name,
@@ -430,7 +447,8 @@ export class SecurityScanner {
                     ),
                     typosquat: SecurityScanner._typosquatSummary(pkg.name, pkg.version),
                     external: ExternalSourcesScanner.summarise(external),
-                    deprecation: SecurityScanner._deprecationSummary(pkg.name, pkg.version, reg)
+                    deprecation: SecurityScanner._deprecationSummary(pkg.name, pkg.version, reg),
+                    obfuscation: ObfuscationScanner.summarise(pkg.name, pkg.version, obfuscationFindings)
                 };
             }
         };

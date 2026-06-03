@@ -15,6 +15,7 @@ import {TyposquatFinding, TyposquatLevel} from '../Security/TyposquatScanner.js'
 import {MaintainerFinding, MaintainerSeverity} from '../Security/MaintainerScanner.js';
 import {DeprecationFinding, DeprecationLevel} from '../Security/DeprecationScanner.js';
 import {ExternalFinding, ExternalSeverity, ExternalSource, ExternalSourceFinding} from '../Security/ExternalSourcesScanner.js';
+import {ObfuscationFinding, ObfuscationSeverity} from '../Security/ObfuscationScanner.js';
 import {ProvenanceFinding, ProvenanceLevel} from '../Security/ProvenanceScanner.js';
 import {OsvVulnerability} from '../Security/OsvClient.js';
 import {PatternFinding, PatternSeverity} from '../Security/PatternScanner.js';
@@ -777,6 +778,9 @@ export class PackageDetailPanel {
         const scriptCount = report.scriptFindings.length;
         const patternCount = report.patternFindings.length;
         const binaryCount = report.binaryFindings.length;
+        const obfuscationInteresting = report.obfuscation.some(
+            (f) => f.severity === ObfuscationSeverity.warn || f.severity === ObfuscationSeverity.risk
+        );
         const interestingChurn = report.churn && report.churn.severity !== ChurnSeverity.info;
         const interestingMaintainer = report.maintainer && report.maintainer.severity !== MaintainerSeverity.info;
 
@@ -797,7 +801,7 @@ export class PackageDetailPanel {
         // carry severity classes, so a truly clean package shows the
         // banner + five collapsed rows below.
         if (vulnCount === 0 && scriptCount === 0 && patternCount === 0 && binaryCount === 0
-            && !interestingChurn && !interestingMaintainer && report.vulns !== null) {
+            && !interestingChurn && !interestingMaintainer && !obfuscationInteresting && report.vulns !== null) {
             const ok = document.createElement('div');
             ok.className = 'pdp-placeholder';
             ok.textContent = I18n.t('No known CVEs (OSV.dev), no suspicious install scripts, no notable file churn, no known code patterns and no binary files.');
@@ -832,6 +836,10 @@ export class PackageDetailPanel {
         wrap.appendChild(card(
             this._renderBinariesSection(report.binaryFindings),
             {hasIssue: binaryCount > 0}
+        ));
+        wrap.appendChild(card(
+            this._renderObfuscationSection(report.obfuscation),
+            {hasIssue: obfuscationInteresting}
         ));
         wrap.appendChild(card(
             this._renderChurnSection(report.churn),
@@ -1583,6 +1591,84 @@ export class PackageDetailPanel {
 
     private static _isGitVersion(v: string): boolean {
         return /^(git\+|git:\/\/|git@|github:|gitlab:|bitbucket:)/i.test(v.trim());
+    }
+
+    /**
+     * Obfuscation section. Lists the offending files with their
+     * signals + detail; build-artifact paths (e.g. `dist/*.min.js`)
+     * are shown with an info tier so the user sees them but doesn't
+     * read them as malicious.
+     */
+    private _renderObfuscationSection(findings: ObfuscationFinding[]): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdp-section';
+
+        const heading = document.createElement('div');
+        heading.className = 'pdp-section-head';
+        heading.textContent = `${I18n.t('Obfuscation')} (${findings.length})`;
+        wrap.appendChild(heading);
+
+        if (findings.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-placeholder';
+            empty.textContent = I18n.t('No obfuscation signals — all source files look like normal code.');
+            wrap.appendChild(empty);
+            return wrap;
+        }
+
+        const list = document.createElement('div');
+        list.className = 'pdp-scripts';
+
+        // Risk first, warn next, info last — same convention as the
+        // other per-file scanners. Within a tier we keep input order
+        // (file walk order from the fingerprint).
+        const rank: Record<ObfuscationSeverity, number> = {
+            [ObfuscationSeverity.risk]: 0,
+            [ObfuscationSeverity.warn]: 1,
+            [ObfuscationSeverity.info]: 2
+        };
+        const sorted = findings.slice().sort((a, b) => rank[a.severity] - rank[b.severity]);
+
+        for (const f of sorted) {
+            const cardEl = document.createElement('div');
+            cardEl.className = `pdp-script pdp-sev-${f.severity}`;
+
+            const head = document.createElement('div');
+            head.className = 'pdp-script-head';
+
+            const sev = document.createElement('span');
+            sev.className = `pdp-sev pdp-sev-${f.severity}`;
+            sev.textContent = f.severity;
+            head.appendChild(sev);
+
+            const pathEl = document.createElement('span');
+            pathEl.className = 'pdp-script-hook';
+            pathEl.textContent = f.path;
+            head.appendChild(pathEl);
+
+            if (f.isBuildArtifact) {
+                const tag = document.createElement('span');
+                tag.className = 'pdp-script-reason';
+                tag.textContent = I18n.t('build artifact');
+                head.appendChild(tag);
+            }
+            cardEl.appendChild(head);
+
+            const detail = document.createElement('div');
+            detail.className = 'pdp-script-reason';
+            detail.textContent = f.detail;
+            cardEl.appendChild(detail);
+
+            const signals = document.createElement('code');
+            signals.className = 'pdp-script-body';
+            signals.textContent = f.signals.join(' · ');
+            cardEl.appendChild(signals);
+
+            list.appendChild(cardEl);
+        }
+
+        wrap.appendChild(list);
+        return wrap;
     }
 
     private _renderPatternsSection(findings: PatternFinding[]): HTMLElement {

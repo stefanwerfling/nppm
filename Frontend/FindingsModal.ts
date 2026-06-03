@@ -257,6 +257,7 @@ export class FindingsModal {
             case 'provenance':
             case 'external':
             case 'deprecation':
+            case 'obfuscation':
             case 'integrity':
                 return true;
             case 'unused':

@@ -217,9 +217,9 @@ describe('DashboardBuilder.unusedCell', () => {
 });
 
 describe('SCANNER_IDS catalogue', () => {
-    it('contains all 17 expected scanners in stable order', () => {
+    it('contains all 18 expected scanners in stable order', () => {
         expect(SCANNER_IDS).toEqual([
-            'cve', 'license', 'scripts', 'patterns', 'binaries',
+            'cve', 'license', 'scripts', 'patterns', 'binaries', 'obfuscation',
             'maintainer', 'churn', 'cadence', 'freshness',
             'ignoreScripts', 'typosquat', 'provenance', 'external', 'deprecation',
             'integrity', 'unused', 'template'

@@ -1982,6 +1982,32 @@ html, body {
     background: rgba(200, 100, 60, 0.75);
 }
 
+.matrix-badge-obfuscation {
+    margin-left: 6px;
+    cursor: pointer;
+}
+
+.matrix-badge-obfuscation-warn {
+    background: rgba(90, 130, 200, 0.35);
+    color: #b8d0ff;
+    border: 1px solid rgba(90, 130, 200, 0.7);
+}
+
+.matrix-badge-obfuscation-warn:hover {
+    background: rgba(90, 130, 200, 0.55);
+}
+
+.matrix-badge-obfuscation-risk {
+    background: rgba(70, 110, 220, 0.55);
+    color: #e0eaff;
+    border: 1px solid rgba(70, 110, 220, 0.9);
+    font-weight: 700;
+}
+
+.matrix-badge-obfuscation-risk:hover {
+    background: rgba(70, 110, 220, 0.75);
+}
+
 .matrix-bundle {
     margin-left: 6px;
     padding: 0 5px;

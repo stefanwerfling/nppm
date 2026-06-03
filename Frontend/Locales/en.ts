@@ -391,6 +391,12 @@ export const TRANSLATIONS_EN: Record<string, string> = {
         'Reads the per-version `deprecated` flag from the npm packument. Flags packages where the installed version, or the registry latest, was marked deprecated by the maintainer.',
     'Installed version deprecated = risk, latest deprecated = warn, only older versions deprecated = info.':
         'Installed version deprecated = risk, latest deprecated = warn, only older versions deprecated = info.',
+    'Obfuscation': 'Obfuscation',
+    'No obfuscation signals — all source files look like normal code.': 'No obfuscation signals — all source files look like normal code.',
+    'Obfuscation signals detected in {n} file(s)': 'Obfuscation signals detected in {n} file(s)',
+    'build artifact': 'build artifact',
+    'Looks for code-obfuscation fingerprints inside JS files: obfuscator.io _0x identifiers, eval(atob(...)) chains, hex-string arrays, and pathologically long lines outside of dist/min paths.':
+        'Looks for code-obfuscation fingerprints inside JS files: obfuscator.io _0x identifiers, eval(atob(...)) chains, hex-string arrays, and pathologically long lines outside of dist/min paths.',
     'Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.':
         'Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.',
     'Per-source severity (socket overall <50 = risk, <80 = warn; OpenSSF <5 = risk, <7 = warn; deps.dev = info only) reduced to worst-of-three per package.':

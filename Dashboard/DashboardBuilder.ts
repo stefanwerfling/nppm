@@ -4,6 +4,7 @@ import {CadenceLevel, CadenceSummary} from '../Security/CadenceScanner.js';
 import {ChurnFinding, ChurnSeverity} from '../Security/ChurnScanner.js';
 import {DeprecationLevel, DeprecationSummary} from '../Security/DeprecationScanner.js';
 import {ExternalSeverity, ExternalSummary} from '../Security/ExternalSourcesScanner.js';
+import {ObfuscationSeverity, ObfuscationSummary} from '../Security/ObfuscationScanner.js';
 import {FreshnessLevel, FreshnessSummary} from '../Security/FreshnessScanner.js';
 import {IgnoreScriptsLevel} from '../Security/IgnoreScriptsScanner.js';
 import {IntegrityFinding, IntegritySeverity} from '../Security/IntegrityScanner.js';
@@ -48,6 +49,7 @@ export const SCANNER_IDS = [
     'scripts',
     'patterns',
     'binaries',
+    'obfuscation',
     'maintainer',
     'churn',
     'cadence',
@@ -264,6 +266,10 @@ export class DashboardBuilder {
         return DashboardBuilder._passthrough<BinarySeverity>(s.maxSeverity);
     }
 
+    public static obfuscationSeverity(s: ObfuscationSummary): UnifiedSeverity|null {
+        return DashboardBuilder._passthrough<ObfuscationSeverity>(s.maxSeverity);
+    }
+
     public static maintainerSeverity(s: MaintainerSummary): UnifiedSeverity|null {
         return DashboardBuilder._passthrough<MaintainerSeverity>(s.severity);
     }
@@ -393,7 +399,8 @@ export class DashboardBuilder {
             typosquat: DashboardBuilder.typosquatSeverity(h.typosquat),
             provenance: DashboardBuilder.provenanceSeverity(h.provenance),
             external: DashboardBuilder.externalSeverity(h.external),
-            deprecation: DashboardBuilder.deprecationSeverity(h.deprecation)
+            deprecation: DashboardBuilder.deprecationSeverity(h.deprecation),
+            obfuscation: DashboardBuilder.obfuscationSeverity(h.obfuscation)
         };
     }
 

@@ -10,6 +10,17 @@ import {I18n} from './I18n.js';
 export type FindingsDrillHandler = (projectUnid: string, scanner: ScannerId) => void;
 
 /**
+ * Click handler for an individual finding row. Wired by `Nppm` for
+ * scanners whose label is a `name@version` coordinate that maps
+ * cleanly onto the PackageDetailPanel — the user gets a one-click
+ * jump from the modal's row list into the per-package details
+ * (currently used for the external-sources scanner; the Security
+ * tab already renders the per-source breakdown the modal can't show
+ * inline).
+ */
+export type FindingsRowClickHandler = (name: string, version: string) => void;
+
+/**
  * Generic findings modal — opened on Dashboard cell click. Shows the
  * scanner label + project name + score + severity counts + the
  * top-N findings carried in the cell payload, sorted risk → warn →
@@ -24,9 +35,14 @@ export class FindingsModal {
 
     private _backdrop: HTMLElement|null = null;
     private _onDrill: FindingsDrillHandler|null = null;
+    private _onRowClick: FindingsRowClickHandler|null = null;
 
     public onDrill(handler: FindingsDrillHandler): void {
         this._onDrill = handler;
+    }
+
+    public onRowClick(handler: FindingsRowClickHandler): void {
+        this._onRowClick = handler;
     }
 
     public open(
@@ -78,7 +94,7 @@ export class FindingsModal {
 
         panel.appendChild(this._renderHeader(scannerLabel, projectName));
         panel.appendChild(this._renderSummary(cell));
-        panel.appendChild(this._renderList(cell.findings, cell));
+        panel.appendChild(this._renderList(cell.findings, cell, scanner));
 
         const drillBtn = FindingsModal._drillScanner(scanner);
         if (drillBtn && this._onDrill) {
@@ -147,7 +163,7 @@ export class FindingsModal {
         return wrap;
     }
 
-    private _renderList(findings: CellFinding[], cell: DashboardCell): HTMLElement {
+    private _renderList(findings: CellFinding[], cell: DashboardCell, scanner: ScannerId): HTMLElement {
         const wrap = document.createElement('div');
         wrap.className = 'fmd-list-wrap';
 
@@ -169,6 +185,15 @@ export class FindingsModal {
                 {n: String(findings.length), total: String(totalFlagged)});
             wrap.appendChild(cap);
         }
+
+        // Scanners whose findings are keyed by `name@version` (every
+        // per-package one) get clickable rows that jump straight into
+        // the PackageDetailPanel — the modal lists the *which*, the
+        // detail panel shows the *what*. External is the explicit
+        // motivator: each row's detail is just "N source(s)", so the
+        // user needs to drill in to see what socket/OpenSSF/deps.dev
+        // actually returned.
+        const rowsClickable = FindingsModal._rowsAreClickable(scanner) && this._onRowClick !== null;
 
         const list = document.createElement('div');
         list.className = 'fmd-list';
@@ -192,10 +217,70 @@ export class FindingsModal {
                 detail.textContent = f.detail;
                 row.appendChild(detail);
             }
+
+            if (rowsClickable) {
+                const parsed = FindingsModal._parseLabel(f.label);
+                if (parsed) {
+                    row.classList.add('fmd-row-clickable');
+                    row.title = I18n.t('Open package details');
+                    row.addEventListener('click', () => {
+                        this._onRowClick?.(parsed.name, parsed.version);
+                        this.close();
+                    });
+                }
+            }
             list.appendChild(row);
         }
         wrap.appendChild(list);
         return wrap;
+    }
+
+    /**
+     * Whether finding rows for `scanner` carry a `name@version`
+     * label that the PackageDetailPanel can resolve. Per-project
+     * scanners (unused/template) use a different label shape and
+     * stay non-clickable.
+     */
+    private static _rowsAreClickable(scanner: ScannerId): boolean {
+        switch (scanner) {
+            case 'cve':
+            case 'license':
+            case 'scripts':
+            case 'patterns':
+            case 'binaries':
+            case 'maintainer':
+            case 'churn':
+            case 'cadence':
+            case 'freshness':
+            case 'ignoreScripts':
+            case 'typosquat':
+            case 'provenance':
+            case 'external':
+            case 'integrity':
+                return true;
+            case 'unused':
+            case 'template':
+                return false;
+        }
+    }
+
+    /**
+     * Split a `name@version` label back into its pieces. Scoped names
+     * (`@scope/pkg@1.2.3`) split on the *last* `@` — `name` keeps the
+     * leading `@scope/`. Returns `null` for labels that don't carry
+     * a version at all.
+     */
+    private static _parseLabel(label: string): {name: string; version: string}|null {
+        const at = label.lastIndexOf('@');
+        if (at <= 0) {
+            return null;
+        }
+        const name = label.slice(0, at);
+        const version = label.slice(at + 1);
+        if (!name || !version) {
+            return null;
+        }
+        return {name, version};
     }
 
     private _renderDrillFooter(scanner: ScannerId, projectUnid: string, viewLabel: string): HTMLElement {

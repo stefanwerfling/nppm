@@ -377,6 +377,8 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     'deps.dev (info only)': 'deps.dev (info only)',
     'No external source returned a verdict — scanner disabled, no API key, or all three sources had no data for this package.':
         'No external source returned a verdict — scanner disabled, no API key, or all three sources had no data for this package.',
+    'External sources flagged this package ({n} source(s))': 'External sources flagged this package ({n} source(s))',
+    'Open package details': 'Open package details',
     'Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.':
         'Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.',
     'Per-source severity (socket overall <50 = risk, <80 = warn; OpenSSF <5 = risk, <7 = warn; deps.dev = info only) reduced to worst-of-three per package.':

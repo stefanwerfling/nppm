@@ -362,6 +362,13 @@ export class Nppm {
         this._dashboardView.onCellClick((unid, projectName, scanner, scannerLabel, cell) => {
             this._findingsModal.open(scanner, scannerLabel, unid, projectName, cell);
         });
+        this._findingsModal.onRowClick((pkg, version) => {
+            // Same hook the Matrix uses for its security badges — opens
+            // the PackageDetailPanel on the Security tab so the user
+            // lands directly on the External-sources card and the rest
+            // of the per-package signals.
+            void this._detailPanel.openOnSecurity(pkg, version, version);
+        });
         this._findingsModal.onDrill((unid, scanner) => {
             const p = findProject(unid);
             if (!p) {

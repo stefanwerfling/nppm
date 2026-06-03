@@ -11,6 +11,7 @@ import {MaintainerSeverity, MaintainerSummary} from '../Security/MaintainerScann
 import {PatternSeverity} from '../Security/PatternScanner.js';
 import {ProvenanceLevel, ProvenanceSummary} from '../Security/ProvenanceScanner.js';
 import {ScriptSeverity} from '../Security/ScriptScanner.js';
+import {ExternalSeverity, ExternalSummary} from '../Security/ExternalSourcesScanner.js';
 import {TyposquatLevel, TyposquatSummary} from '../Security/TyposquatScanner.js';
 import {PatternSummary, ScriptSummary} from '../Security/SecurityScanner.js';
 import {Api} from './Api.js';
@@ -115,6 +116,12 @@ const TYPOSQUAT_WEIGHT: Record<TyposquatLevel, number> = {
     [TyposquatLevel.risk]: 35
 };
 
+const EXTERNAL_WEIGHT: Record<ExternalSeverity, number> = {
+    [ExternalSeverity.info]: 0,
+    [ExternalSeverity.warn]: 4,
+    [ExternalSeverity.risk]: 15
+};
+
 /**
  * Persisted UI state — keeps filter, sort, and search across reloads
  * via localStorage. Stored as one JSON blob so we can extend later
@@ -166,6 +173,7 @@ export class Matrix {
     private _freshnessByName: Map<string, FreshnessSummary> = new Map();
     private _cadenceByName: Map<string, CadenceSummary> = new Map();
     private _typosquatByName: Map<string, TyposquatSummary> = new Map();
+    private _externalByName: Map<string, ExternalSummary> = new Map();
     // Bundlephobia size keyed by package name (we always query against
     // `latest`, so the version is implicit). `null` means asked-and-
     // unbuildable; missing key means not yet asked.
@@ -232,7 +240,8 @@ export class Matrix {
         integrity: ApiMatrixIntegrityEntry|undefined,
         freshness: FreshnessSummary|undefined,
         cadence: CadenceSummary|undefined,
-        typosquat: TyposquatSummary|undefined
+        typosquat: TyposquatSummary|undefined,
+        external: ExternalSummary|undefined
     ): number {
         let score = 0;
         if (vulnIds && vulnIds.length > 0) {
@@ -266,6 +275,9 @@ export class Matrix {
         }
         if (typosquat && typosquat.level !== null) {
             score += TYPOSQUAT_WEIGHT[typosquat.level];
+        }
+        if (external && external.level !== null) {
+            score += EXTERNAL_WEIGHT[external.level];
         }
         return score;
     }
@@ -374,6 +386,7 @@ export class Matrix {
         this._freshnessByName = new Map();
         this._cadenceByName = new Map();
         this._typosquatByName = new Map();
+        this._externalByName = new Map();
         this._bundlesByName = new Map();
         this._integrityByName = new Map();
         this._render();
@@ -508,6 +521,7 @@ export class Matrix {
                 this._freshnessByName.set(entry.name, entry.freshness);
                 this._cadenceByName.set(entry.name, entry.cadence);
                 this._typosquatByName.set(entry.name, entry.typosquat);
+                this._externalByName.set(entry.name, entry.external);
                 if (entry.scripts.maxSeverity !== null
                     || entry.patterns.maxSeverity !== null
                     || entry.binaries.maxSeverity !== null
@@ -520,7 +534,9 @@ export class Matrix {
                     || entry.cadence.level === CadenceLevel.risk
                     || entry.cadence.level === CadenceLevel.warn
                     || entry.typosquat.level === TyposquatLevel.risk
-                    || entry.typosquat.level === TyposquatLevel.warn) {
+                    || entry.typosquat.level === TyposquatLevel.warn
+                    || entry.external.level === ExternalSeverity.risk
+                    || entry.external.level === ExternalSeverity.warn) {
                     anyHit = true;
                 }
             }
@@ -958,6 +974,26 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
+        // External-sources badge — aggregated worst-of-three across
+        // socket.dev / OpenSSF Scorecard / deps.dev. Renders only at
+        // warn/risk; info-only contributions (typical deps.dev) stay
+        // silent so the badge actually means "look at this".
+        const external = this._externalByName.get(row.name);
+        if (external && (external.level === ExternalSeverity.risk
+                         || external.level === ExternalSeverity.warn)) {
+            const badge = document.createElement('span');
+            badge.className = `matrix-badge matrix-badge-external matrix-badge-external-${external.level}`;
+            badge.textContent = external.level === ExternalSeverity.risk ? 'EXT!' : 'EXT?';
+            badge.title = I18n.t('External sources flagged this package ({n} source(s))', {n: external.count});
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (row.latest) {
+                    this._onSecurityClick?.(row.name, row.latest);
+                }
+            });
+            nameCell.appendChild(badge);
+        }
+
         tr.appendChild(nameCell);
 
         for (const project of this._data!.projects) {
@@ -1107,7 +1143,8 @@ export class Matrix {
             this._integrityByName.get(row.name),
             this._freshnessByName.get(row.name),
             this._cadenceByName.get(row.name),
-            this._typosquatByName.get(row.name)
+            this._typosquatByName.get(row.name),
+            this._externalByName.get(row.name)
         );
     }
 

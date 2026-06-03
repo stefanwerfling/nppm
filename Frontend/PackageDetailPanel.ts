@@ -787,13 +787,20 @@ export class PackageDetailPanel {
             wrap.appendChild(supplyChainBanner);
         }
 
+        // "Boring" path — none of the high-noise core scanners turned
+        // anything up. Show it as an info banner *above* the section
+        // list rather than short-circuiting the render: the user still
+        // needs to see Provenance / Freshness / Cadence / Typosquat /
+        // External-source verdicts, which are independent of the five
+        // tested here. Cards default-collapse when their bodies don't
+        // carry severity classes, so a truly clean package shows the
+        // banner + five collapsed rows below.
         if (vulnCount === 0 && scriptCount === 0 && patternCount === 0 && binaryCount === 0
             && !interestingChurn && !interestingMaintainer && report.vulns !== null) {
             const ok = document.createElement('div');
             ok.className = 'pdp-placeholder';
             ok.textContent = I18n.t('No known CVEs (OSV.dev), no suspicious install scripts, no notable file churn, no known code patterns and no binary files.');
             wrap.appendChild(ok);
-            return wrap;
         }
 
         // Each scanner section becomes its own collapsible card. The

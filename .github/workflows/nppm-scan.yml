@@ -14,6 +14,14 @@ permissions:
   security-events: write
   pull-requests: write
 
+# Opt the third-party JS actions into the Node 24 runtime now.
+# Node 20 inside JS actions is deprecated starting 2026-06-16 and
+# removed 2026-09-16; the env var is GitHub's official opt-in to
+# the new runtime while we wait for actions/{checkout,cache,setup-
+# node}@v5 to ship.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   nppm:
     runs-on: ubuntu-latest
@@ -23,7 +31,10 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 22 is the current Node LTS as of mid-2026; Node 20 LTS
+          # ended 2026-04-30. Stays under the package.json `engines`
+          # range (`>=20`).
+          node-version: '22'
           cache: npm
       - uses: actions/cache@v4
         with:

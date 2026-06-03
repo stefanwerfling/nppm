@@ -1,0 +1,18 @@
+{
+  "projects": [
+    {
+      "type": "local",
+      "name": "nppm",
+      "path": "."
+    }
+  ],
+  "cache": {
+    "dir": ".nppm-cache",
+    "ttlMinutes": 60
+  },
+  "security": {
+    "external": {
+      "enabled": false
+    }
+  }
+}

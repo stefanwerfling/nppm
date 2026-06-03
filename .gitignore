@@ -3,6 +3,5 @@
 .nppm-history
 node_modules/
 nppm.json
-package-lock.json
 /doc/todo.txt
 /doc/marketplace_listing_de.md

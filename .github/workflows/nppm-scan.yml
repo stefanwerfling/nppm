@@ -34,8 +34,12 @@ jobs:
       - id: nppm
         uses: ./.github/actions/scan
         with:
+          # Real users keep their nppm.json gitignored. The dogfood
+          # workflow ships a minimal CI-only config that scans
+          # nppm's own dep tree.
+          config-path: .github/nppm.ci.json
           fail-on: warn
-      - uses: github/codeql-action/upload-sarif@v3
-        if: always()
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always() && steps.nppm.outputs.sarif-path != ''
         with:
           sarif_file: ${{ steps.nppm.outputs.sarif-path }}

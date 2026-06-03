@@ -2,6 +2,7 @@ import {ConfigProjectType} from '../Config/Config.js';
 import {BinarySeverity, BinarySummary} from '../Security/BinaryScanner.js';
 import {CadenceLevel, CadenceSummary} from '../Security/CadenceScanner.js';
 import {ChurnFinding, ChurnSeverity} from '../Security/ChurnScanner.js';
+import {DeprecationLevel, DeprecationSummary} from '../Security/DeprecationScanner.js';
 import {ExternalSeverity, ExternalSummary} from '../Security/ExternalSourcesScanner.js';
 import {FreshnessLevel, FreshnessSummary} from '../Security/FreshnessScanner.js';
 import {IgnoreScriptsLevel} from '../Security/IgnoreScriptsScanner.js';
@@ -55,6 +56,7 @@ export const SCANNER_IDS = [
     'typosquat',
     'provenance',
     'external',
+    'deprecation',
     'integrity',
     'unused',
     'template'
@@ -346,6 +348,15 @@ export class DashboardBuilder {
         return DashboardBuilder._passthrough<ExternalSeverity>(s.level);
     }
 
+    /**
+     * Deprecation passthrough — the scanner's level already lives on
+     * the unified ladder (`info | warn | risk`) so it maps verbatim.
+     * `null` means no version of the package carries a marker.
+     */
+    public static deprecationSeverity(s: DeprecationSummary): UnifiedSeverity|null {
+        return DashboardBuilder._passthrough<DeprecationLevel>(s.level);
+    }
+
     public static integritySeverity(f: IntegrityFinding): UnifiedSeverity {
         return DashboardBuilder._passthrough<IntegritySeverity>(f.severity) ?? 'info';
     }
@@ -381,7 +392,8 @@ export class DashboardBuilder {
             freshness: DashboardBuilder.freshnessSeverity(h.freshness),
             typosquat: DashboardBuilder.typosquatSeverity(h.typosquat),
             provenance: DashboardBuilder.provenanceSeverity(h.provenance),
-            external: DashboardBuilder.externalSeverity(h.external)
+            external: DashboardBuilder.externalSeverity(h.external),
+            deprecation: DashboardBuilder.deprecationSeverity(h.deprecation)
         };
     }
 

@@ -2116,13 +2116,13 @@ class Server {
                                     cve: [], license: [], scripts: [], patterns: [],
                                     binaries: [], maintainer: [], churn: [], cadence: [],
                                     freshness: [], ignoreScripts: [], typosquat: [], provenance: [],
-                                    external: []
+                                    external: [], deprecation: []
                                 };
                                 const perFindings: Record<string, CellFinding[]> = {
                                     cve: [], license: [], scripts: [], patterns: [],
                                     binaries: [], maintainer: [], churn: [], cadence: [],
                                     freshness: [], ignoreScripts: [], typosquat: [], provenance: [],
-                                    external: []
+                                    external: [], deprecation: []
                                 };
 
                                 const pushFinding = (scanner: ScannerId, label: string,
@@ -2213,6 +2213,14 @@ class Server {
                                     perScanner.external.push(ext);
                                     pushFinding('external', label, ext,
                                         h.external.count > 0 ? `${h.external.count} source(s)` : undefined);
+
+                                    const dep = DashboardBuilder.deprecationSeverity(h.deprecation);
+                                    perScanner.deprecation.push(dep);
+                                    pushFinding('deprecation', label, dep,
+                                        dep === 'risk' ? 'this version deprecated'
+                                            : dep === 'warn' ? 'latest deprecated'
+                                                : dep === 'info' ? 'older version(s) deprecated'
+                                                    : undefined);
                                 }
 
                                 // Per-package cells (12 scanners). Each one's
@@ -2221,7 +2229,7 @@ class Server {
                                 const perPackageScanners: ScannerId[] = [
                                     'cve', 'license', 'scripts', 'patterns', 'binaries',
                                     'maintainer', 'churn', 'cadence', 'freshness',
-                                    'ignoreScripts', 'typosquat', 'provenance'
+                                    'ignoreScripts', 'typosquat', 'provenance', 'deprecation'
                                 ];
                                 for (const id of perPackageScanners) {
                                     emitCell(id, DashboardBuilder.scorePerPackage(

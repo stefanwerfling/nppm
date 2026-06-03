@@ -26,6 +26,12 @@ import {
     CadenceSummary
 } from './CadenceScanner.js';
 import {
+    DeprecationFinding,
+    DeprecationLevel,
+    DeprecationScanner,
+    DeprecationSummary
+} from './DeprecationScanner.js';
+import {
     ExternalFinding,
     ExternalSourcesScanner,
     ExternalSummary
@@ -105,6 +111,13 @@ export type SecurityReport = {
      * fetcher declined.
      */
     external: ExternalFinding;
+    /**
+     * Deprecation status (installed version / latest / other). `null`
+     * when no version of the package carries a deprecation marker.
+     * Cheap — derived from the packument already cached for the
+     * registry, churn, maintainer, and license passes.
+     */
+    deprecation: DeprecationFinding|null;
 };
 
 /**
@@ -145,6 +158,7 @@ export type HeuristicsBatchEntry = {
     cadence: CadenceSummary;
     typosquat: TyposquatSummary;
     external: ExternalSummary;
+    deprecation: DeprecationSummary;
 };
 
 /**
@@ -250,6 +264,7 @@ export class SecurityScanner {
         const cadence = isGit ? null : CadenceScanner.classify(reg?.time);
         const ignoreScripts = IgnoreScriptsScanner.classify(scriptFindings);
         const typosquat = TyposquatScanner.classify(name);
+        const deprecation = isGit ? null : DeprecationScanner.classify(version, reg);
 
         return {
             name,
@@ -266,7 +281,8 @@ export class SecurityScanner {
             cadence,
             ignoreScripts,
             typosquat,
-            external
+            external,
+            deprecation
         };
     }
 
@@ -413,7 +429,8 @@ export class SecurityScanner {
                         pkg.name, pkg.version, reg?.time
                     ),
                     typosquat: SecurityScanner._typosquatSummary(pkg.name, pkg.version),
-                    external: ExternalSourcesScanner.summarise(external)
+                    external: ExternalSourcesScanner.summarise(external),
+                    deprecation: SecurityScanner._deprecationSummary(pkg.name, pkg.version, reg)
                 };
             }
         };
@@ -460,6 +477,17 @@ export class SecurityScanner {
             closestMatch: finding.closestMatch,
             hasConfusables: finding.hasConfusables
         };
+    }
+
+    private static _deprecationSummary(
+        name: string,
+        version: string,
+        pkg: import('../Registry/Registry.js').RegistryPackage|null
+    ): DeprecationSummary {
+        const finding = GitResolver.isGitVersion(version)
+            ? null
+            : DeprecationScanner.classify(version, pkg);
+        return {name, version, level: finding?.level ?? null};
     }
 
     private static _cadenceSummary(

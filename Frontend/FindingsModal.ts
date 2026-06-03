@@ -256,6 +256,7 @@ export class FindingsModal {
             case 'typosquat':
             case 'provenance':
             case 'external':
+            case 'deprecation':
             case 'integrity':
                 return true;
             case 'unused':

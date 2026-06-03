@@ -121,6 +121,11 @@ export class SarifBuilder {
             name: 'External-sources verdict',
             description: 'Aggregated reputation signal from socket.dev / OpenSSF Scorecard / deps.dev — worst-of-three per package.',
             defaultLevel: 'warning'
+        },
+        deprecation: {
+            name: 'Deprecated package version',
+            description: 'The installed version or the registry latest carries an `npm deprecate` marker.',
+            defaultLevel: 'warning'
         }
     };
 

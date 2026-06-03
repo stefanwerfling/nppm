@@ -381,6 +381,7 @@ export class DashboardView {
             case 'typosquat': return I18n.t('Typosquat');
             case 'provenance': return I18n.t('Provenance');
             case 'external': return I18n.t('External sources');
+            case 'deprecation': return I18n.t('Deprecation');
             case 'integrity': return I18n.t('Integrity');
             case 'unused': return I18n.t('Unused deps');
             case 'template': return I18n.t('Template compliance');
@@ -563,6 +564,11 @@ export class DashboardView {
                 return s('<circle cx="12" cy="12" r="9"/>'
                     + '<line x1="3" y1="12" x2="21" y2="12"/>'
                     + '<path d="M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18"/>');
+            case 'deprecation':
+                // Crossed-out package — old release the maintainer
+                // wants users to move off
+                return s('<path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/>'
+                    + '<line x1="5" y1="5" x2="19" y2="19"/>');
             case 'integrity':
                 // Lock
                 return s('<rect x="4" y="11" width="16" height="10" rx="2"/>'
@@ -614,6 +620,8 @@ export class DashboardView {
                 return I18n.t('Reads the registry dist record for SLSA / sigstore attestation. Provenance + signed land in the no-finding bucket; unsigned counts as info.');
             case 'external':
                 return I18n.t('Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.');
+            case 'deprecation':
+                return I18n.t('Reads the per-version `deprecated` flag from the npm packument. Flags packages where the installed version, or the registry latest, was marked deprecated by the maintainer.');
             case 'integrity':
                 return I18n.t('Cross-checks the lockfile `resolved` URL + `integrity` hash against what the registry currently serves. Mismatches and mirror redirects are surfaced.');
             case 'unused':
@@ -659,6 +667,9 @@ export class DashboardView {
                 break;
             case 'external':
                 specific = I18n.t('Per-source severity (socket overall <50 = risk, <80 = warn; OpenSSF <5 = risk, <7 = warn; deps.dev = info only) reduced to worst-of-three per package.');
+                break;
+            case 'deprecation':
+                specific = I18n.t('Installed version deprecated = risk, latest deprecated = warn, only older versions deprecated = info.');
                 break;
             case 'integrity':
                 specific = I18n.t('Per-finding info / warn / risk applied; total is divided by the package count for the score.');

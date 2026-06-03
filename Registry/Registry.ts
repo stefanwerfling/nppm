@@ -87,6 +87,16 @@ export type RegistryPackage = {
      * "registry data unavailable" until the TTL refresh fills it in.
      */
     dist?: Record<string, RegistryDist>;
+    /**
+     * Per-version `deprecated` string — the maintainer's reason for
+     * deprecating the release. Present on every npm version object
+     * after `npm deprecate <pkg>@<version> "<reason>"`. Used by
+     * `DeprecationScanner` to flag installed deprecated versions and
+     * to warn on `latest` being deprecated. Missing for non-deprecated
+     * versions; the field is absent on cache entries written before it
+     * was added.
+     */
+    deprecations?: Record<string, string>;
 };
 
 /**
@@ -150,7 +160,8 @@ export class Registry {
                 homepage: typeof raw.homepage === 'string' ? raw.homepage : undefined,
                 license: Registry._extractLicense(raw.license, raw.licenses),
                 publishers: Registry._extractPublishers(raw.versions),
-                dist: Registry._extractDist(raw.versions)
+                dist: Registry._extractDist(raw.versions),
+                deprecations: Registry._extractDeprecations(raw.versions)
             };
 
             this._cache.set(name, pkg);
@@ -311,6 +322,33 @@ export class Registry {
             any = true;
         }
 
+        return any ? out : undefined;
+    }
+
+    /**
+     * Pull the per-version `deprecated` string out of each version
+     * object. npm stores the maintainer's reason verbatim (set via
+     * `npm deprecate <pkg>@<ver> "<reason>"`). Empty strings count
+     * — npm publishes them as "" when the maintainer cleared a
+     * prior deprecation, so the scanner can treat that as "not
+     * deprecated" by leaving the entry out of the map.
+     */
+    private static _extractDeprecations(versions: unknown): Record<string, string>|undefined {
+        if (!versions || typeof versions !== 'object') {
+            return undefined;
+        }
+        const out: Record<string, string> = {};
+        let any = false;
+        for (const [version, entry] of Object.entries(versions as Record<string, unknown>)) {
+            if (!entry || typeof entry !== 'object') {
+                continue;
+            }
+            const dep = (entry as {deprecated?: unknown}).deprecated;
+            if (typeof dep === 'string' && dep.length > 0) {
+                out[version] = dep;
+                any = true;
+            }
+        }
         return any ? out : undefined;
     }
 

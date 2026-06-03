@@ -60,6 +60,7 @@ nppm/
 │   ├── LicenseScanner.ts   SPDX classifier (permissive/weak/strong/proprietary/unknown) + mini expr parser
 │   ├── IntegrityScanner.ts lockfile `resolved+integrity` vs registry `dist` cross-check
 │   ├── ImpactAnalyzer.ts   cross-project blast-radius: BFS shortest path from root deps to a queried name(+version)
+│   ├── DeprecationScanner.ts   reads per-version `deprecated` from the packument — risk (installed) / warn (latest) / info (only older)
 │   ├── ExternalSourcesScanner.ts  aggregator over three third-party reputation APIs (socket.dev + OpenSSF Scorecard + deps.dev), worst-of-three severity per package
 │   ├── External/SocketDevFetcher.ts  per-package socket.dev score (needs API key)
 │   ├── External/OpenSsfFetcher.ts   OpenSSF Scorecard fetch + npm `repository` → host/owner/repo parser

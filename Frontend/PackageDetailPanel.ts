@@ -13,6 +13,7 @@ import {FreshnessFinding, FreshnessLevel} from '../Security/FreshnessScanner.js'
 import {IgnoreScriptsFinding, IgnoreScriptsLevel} from '../Security/IgnoreScriptsScanner.js';
 import {TyposquatFinding, TyposquatLevel} from '../Security/TyposquatScanner.js';
 import {MaintainerFinding, MaintainerSeverity} from '../Security/MaintainerScanner.js';
+import {DeprecationFinding, DeprecationLevel} from '../Security/DeprecationScanner.js';
 import {ExternalFinding, ExternalSeverity, ExternalSource, ExternalSourceFinding} from '../Security/ExternalSourcesScanner.js';
 import {ProvenanceFinding, ProvenanceLevel} from '../Security/ProvenanceScanner.js';
 import {OsvVulnerability} from '../Security/OsvClient.js';
@@ -849,6 +850,78 @@ export class PackageDetailPanel {
             {hasIssue: report.external.level === ExternalSeverity.warn
                     || report.external.level === ExternalSeverity.risk}
         ));
+        wrap.appendChild(card(
+            this._renderDeprecationSection(report.deprecation),
+            {hasIssue: !!report.deprecation
+                    && (report.deprecation.level === DeprecationLevel.warn
+                        || report.deprecation.level === DeprecationLevel.risk)}
+        ));
+        return wrap;
+    }
+
+    /**
+     * Deprecation section. Renders the maintainer's reason verbatim
+     * when the installed version or latest is deprecated; "older
+     * versions were deprecated" stays as an info hint. `null`
+     * (nothing deprecated across the whole package) shows a small
+     * placeholder so the collapsed card still has content when the
+     * user opens it.
+     */
+    private _renderDeprecationSection(finding: DeprecationFinding|null): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdp-section';
+
+        const heading = document.createElement('div');
+        heading.className = 'pdp-section-head';
+        heading.textContent = I18n.t('Deprecation');
+        wrap.appendChild(heading);
+
+        if (!finding) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-placeholder';
+            empty.textContent = I18n.t('No version of this package carries a deprecation marker.');
+            wrap.appendChild(empty);
+            return wrap;
+        }
+
+        const card = document.createElement('div');
+        card.className = `pdp-script pdp-sev-${finding.level} pdp-deprecation-${finding.level}`;
+
+        const head = document.createElement('div');
+        head.className = 'pdp-script-head';
+
+        const pill = document.createElement('span');
+        pill.className = `pdp-tfa pdp-deprecation-pill-${finding.level}`;
+        pill.textContent = finding.level === DeprecationLevel.risk
+            ? 'DEPRECATED'
+            : finding.level === DeprecationLevel.warn ? 'LATEST DEPRECATED' : 'PRIOR DEPRECATED';
+        head.appendChild(pill);
+        card.appendChild(head);
+
+        const reason = document.createElement('div');
+        reason.className = 'pdp-script-reason';
+        if (finding.level === DeprecationLevel.risk && finding.installedReason) {
+            reason.textContent = I18n.t('Maintainer note: {reason}', {reason: finding.installedReason});
+        } else if (finding.level === DeprecationLevel.warn && finding.latestReason) {
+            reason.textContent = I18n.t('Latest {version}: {reason}',
+                {version: finding.latestVersion ?? '—', reason: finding.latestReason});
+        } else if (finding.level === DeprecationLevel.info) {
+            reason.textContent = I18n.t('{n} earlier version(s) deprecated — installed and latest are clean.',
+                {n: finding.otherDeprecatedCount});
+        } else {
+            reason.textContent = finding.installedReason ?? finding.latestReason ?? '';
+        }
+        card.appendChild(reason);
+
+        if (finding.otherDeprecatedCount > 0 && finding.level !== DeprecationLevel.info) {
+            const extra = document.createElement('div');
+            extra.className = 'pdp-script-body';
+            extra.textContent = I18n.t('Additionally {n} other version(s) were marked deprecated.',
+                {n: finding.otherDeprecatedCount});
+            card.appendChild(extra);
+        }
+
+        wrap.appendChild(card);
         return wrap;
     }
 

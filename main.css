@@ -1956,6 +1956,32 @@ html, body {
     background: rgba(180, 80, 200, 0.75);
 }
 
+.matrix-badge-deprecation {
+    margin-left: 6px;
+    cursor: pointer;
+}
+
+.matrix-badge-deprecation-warn {
+    background: rgba(180, 130, 60, 0.35);
+    color: #ffd29a;
+    border: 1px solid rgba(180, 130, 60, 0.7);
+}
+
+.matrix-badge-deprecation-warn:hover {
+    background: rgba(180, 130, 60, 0.55);
+}
+
+.matrix-badge-deprecation-risk {
+    background: rgba(200, 100, 60, 0.55);
+    color: #ffe0d0;
+    border: 1px solid rgba(200, 100, 60, 0.9);
+    font-weight: 700;
+}
+
+.matrix-badge-deprecation-risk:hover {
+    background: rgba(200, 100, 60, 0.75);
+}
+
 .matrix-bundle {
     margin-left: 6px;
     padding: 0 5px;

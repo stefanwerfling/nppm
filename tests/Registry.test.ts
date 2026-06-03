@@ -177,6 +177,40 @@ describe('Registry', () => {
         expect(pkg!.license).toBe('(MIT OR Apache-2.0)');
     });
 
+    it('extracts per-version deprecated reasons into the deprecations map', async () => {
+        vi.stubGlobal('fetch', makeFetch({
+            'https://registry.example/foo': {
+                name: 'foo',
+                'dist-tags': {latest: '2.0.0'},
+                versions: {
+                    '1.0.0': {deprecated: 'use 2.x'},
+                    '2.0.0': {},
+                    '0.9.0': {deprecated: ''}
+                }
+            }
+        }));
+        const r = new Registry('https://registry.example', new JsonCache(dir, 60));
+        const pkg = await r.fetchOne('foo');
+        expect(pkg!.deprecations).toBeDefined();
+        expect(pkg!.deprecations!['1.0.0']).toBe('use 2.x');
+        // Empty string is npm's way of clearing a deprecation — must not enter the map.
+        expect(pkg!.deprecations!['0.9.0']).toBeUndefined();
+        expect(pkg!.deprecations!['2.0.0']).toBeUndefined();
+    });
+
+    it('omits the deprecations field when no version carries one', async () => {
+        vi.stubGlobal('fetch', makeFetch({
+            'https://registry.example/clean': {
+                name: 'clean',
+                'dist-tags': {latest: '1.0.0'},
+                versions: {'1.0.0': {}}
+            }
+        }));
+        const r = new Registry('https://registry.example', new JsonCache(dir, 60));
+        const pkg = await r.fetchOne('clean');
+        expect(pkg!.deprecations).toBeUndefined();
+    });
+
     it('omits the publishers field when no version has `_npmUser`', async () => {
         vi.stubGlobal('fetch', makeFetch({
             'https://registry.example/old': {

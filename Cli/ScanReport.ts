@@ -1,5 +1,6 @@
 import {ConfigProjectType} from '../Config/Config.js';
 import {BinarySeverity} from '../Security/BinaryScanner.js';
+import {DeprecationLevel} from '../Security/DeprecationScanner.js';
 import {ExternalSeverity} from '../Security/ExternalSourcesScanner.js';
 import {LicenseSeverity} from '../Security/LicenseScanner.js';
 import {MaintainerSeverity} from '../Security/MaintainerScanner.js';
@@ -31,7 +32,7 @@ export const UNIFIED_RANK: Record<UnifiedSeverity, number> = {
  * unified ladder so the threshold check is a single integer compare.
  */
 export type ScanFinding = {
-    category: 'vuln'|'script'|'pattern'|'binary'|'maintainer'|'license'|'unused'|'misplaced'|'missing'|'external';
+    category: 'vuln'|'script'|'pattern'|'binary'|'maintainer'|'license'|'unused'|'misplaced'|'missing'|'external'|'deprecation';
     severity: UnifiedSeverity;
     name: string;
     version?: string;
@@ -207,6 +208,23 @@ export class ScanReportBuilder {
                         });
                     }
                 }
+                // Deprecation — info-only ("only older versions
+                // deprecated") drops out, same convention as license
+                // permissive + external info.
+                if (h.deprecation.level !== null) {
+                    const sev = ScanReportBuilder._deprecationToUnified(h.deprecation.level);
+                    if (sev !== null) {
+                        findings.push({
+                            category: 'deprecation',
+                            severity: sev,
+                            name: h.name,
+                            version: h.version,
+                            message: sev === UnifiedSeverity.risk
+                                ? 'installed version deprecated'
+                                : 'latest version deprecated'
+                        });
+                    }
+                }
             }
         }
 
@@ -329,6 +347,19 @@ export class ScanReportBuilder {
             case ExternalSeverity.info: return null;
             case ExternalSeverity.warn: return UnifiedSeverity.warn;
             case ExternalSeverity.risk: return UnifiedSeverity.risk;
+        }
+    }
+
+    /**
+     * Same convention: info-only deprecation (an *older* version was
+     * deprecated) is informational context, not a CI-blocker. Only
+     * warn/risk feed the gate.
+     */
+    private static _deprecationToUnified(s: DeprecationLevel): UnifiedSeverity|null {
+        switch (s) {
+            case DeprecationLevel.info: return null;
+            case DeprecationLevel.warn: return UnifiedSeverity.warn;
+            case DeprecationLevel.risk: return UnifiedSeverity.risk;
         }
     }
 }

@@ -335,7 +335,13 @@ export class Nppm {
             if (project.unid === '__dashboard__') {
                 this._loadDashboard();
             } else if (project.unid === '__matrix__') {
+                // Always re-fetch so the matrix is populated even
+                // when the session started on the Dashboard (no
+                // initial _loadMatrix from start()) and so a stale
+                // view picks up freshly added projects.
                 this._switchTo(View.matrix);
+                this._matrix.renderLoading();
+                void this._loadMatrix();
             } else if (project.unid === '__templates__') {
                 void this._loadTemplates();
             } else {

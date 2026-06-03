@@ -38,6 +38,38 @@ export type PackageFingerprintManifest = {
      * no license info at all.
      */
     license?: string;
+    /**
+     * Free-text `description` from `package.json`. Empty / missing
+     * descriptions are a soft red-flag (correlates with throwaway
+     * typosquats); the ManifestRedFlagsScanner uses it.
+     */
+    description?: string;
+    /**
+     * Files / globs the manifest declares for npm-publish. When
+     * present and non-empty, npm only ships matching paths;
+     * absent means everything not in `.npmignore` is included,
+     * which the red-flag scanner treats as a soft signal.
+     */
+    files?: string[];
+    /**
+     * `bin` entries — npm accepts either `bin: "path/to/cli"` (single
+     * default-named binary) or `bin: {name: path, …}`. Coerced into
+     * the map form by `_extractManifest`. Many bin entries = many
+     * commands the package exposes to `npm install -g` / PATH.
+     */
+    bin?: Record<string, string>;
+    /**
+     * `engines` map (`{node: ">=14", npm: ">=8"}`). The red-flag
+     * scanner flags packages whose declared support range is wildly
+     * out of date relative to the running Node version.
+     */
+    engines?: Record<string, string>;
+    /**
+     * Whether the tarball ships a `README.*` file alongside
+     * `package.json`. Derived at fingerprint time from the file list
+     * so the scanner doesn't need to re-walk the tarball.
+     */
+    hasReadme?: boolean;
 };
 
 /**

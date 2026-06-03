@@ -2008,6 +2008,58 @@ html, body {
     background: rgba(70, 110, 220, 0.75);
 }
 
+.matrix-badge-manifestRedFlags {
+    margin-left: 6px;
+    cursor: pointer;
+}
+
+.matrix-badge-manifestRedFlags-warn {
+    background: rgba(150, 150, 80, 0.35);
+    color: #e8e8aa;
+    border: 1px solid rgba(150, 150, 80, 0.7);
+}
+
+.matrix-badge-manifestRedFlags-warn:hover {
+    background: rgba(150, 150, 80, 0.55);
+}
+
+.matrix-badge-manifestRedFlags-risk {
+    background: rgba(180, 170, 60, 0.55);
+    color: #fff5d0;
+    border: 1px solid rgba(180, 170, 60, 0.9);
+    font-weight: 700;
+}
+
+.matrix-badge-manifestRedFlags-risk:hover {
+    background: rgba(180, 170, 60, 0.75);
+}
+
+.matrix-badge-capability {
+    margin-left: 6px;
+    cursor: pointer;
+}
+
+.matrix-badge-capability-warn {
+    background: rgba(80, 170, 140, 0.35);
+    color: #b0e5cc;
+    border: 1px solid rgba(80, 170, 140, 0.7);
+}
+
+.matrix-badge-capability-warn:hover {
+    background: rgba(80, 170, 140, 0.55);
+}
+
+.matrix-badge-capability-risk {
+    background: rgba(50, 180, 130, 0.55);
+    color: #d8ffec;
+    border: 1px solid rgba(50, 180, 130, 0.9);
+    font-weight: 700;
+}
+
+.matrix-badge-capability-risk:hover {
+    background: rgba(50, 180, 130, 0.75);
+}
+
 .matrix-bundle {
     margin-left: 6px;
     padding: 0 5px;

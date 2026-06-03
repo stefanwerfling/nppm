@@ -84,6 +84,7 @@ import {LifecycleScriptScanner} from './Upgrade/LifecycleScriptScanner.js';
 import {PackageJsonEditor} from './Upgrade/PackageJsonEditor.js';
 import {Upgrader} from './Upgrade/Upgrader.js';
 import {IntegrityScanner} from './Security/IntegrityScanner.js';
+import {MutableResolutionScanner} from './Security/MutableResolutionScanner.js';
 import {PrReviewBuilder} from './PrReview/PrReviewBuilder.js';
 import {ProjectGitea} from './Project/ProjectGitea.js';
 import {ProjectGithub} from './Project/ProjectGithub.js';
@@ -2114,13 +2115,15 @@ class Server {
                                 // surfaces concrete labels in the FindingsModal.
                                 const perScanner: Record<string, (ReturnType<typeof DashboardBuilder.cveSeverity>)[]> = {
                                     cve: [], license: [], scripts: [], patterns: [],
-                                    binaries: [], obfuscation: [], maintainer: [], churn: [], cadence: [],
+                                    binaries: [], obfuscation: [], manifestRedFlags: [], capability: [],
+                                    maintainer: [], churn: [], cadence: [],
                                     freshness: [], ignoreScripts: [], typosquat: [], provenance: [],
                                     external: [], deprecation: []
                                 };
                                 const perFindings: Record<string, CellFinding[]> = {
                                     cve: [], license: [], scripts: [], patterns: [],
-                                    binaries: [], obfuscation: [], maintainer: [], churn: [], cadence: [],
+                                    binaries: [], obfuscation: [], manifestRedFlags: [], capability: [],
+                                    maintainer: [], churn: [], cadence: [],
                                     freshness: [], ignoreScripts: [], typosquat: [], provenance: [],
                                     external: [], deprecation: []
                                 };
@@ -2164,6 +2167,16 @@ class Server {
                                     perScanner.obfuscation.push(obf);
                                     pushFinding('obfuscation', label, obf,
                                         h.obfuscation.count > 0 ? `${h.obfuscation.count} file(s)` : undefined);
+
+                                    const mrf = DashboardBuilder.manifestRedFlagsSeverity(h.manifestRedFlags);
+                                    perScanner.manifestRedFlags.push(mrf);
+                                    pushFinding('manifestRedFlags', label, mrf,
+                                        h.manifestRedFlags.count > 0 ? `${h.manifestRedFlags.count} flag(s)` : undefined);
+
+                                    const cap = DashboardBuilder.capabilitySeverity(h.capability);
+                                    perScanner.capability.push(cap);
+                                    pushFinding('capability', label, cap,
+                                        h.capability.count > 0 ? `${h.capability.count} capability(ies)` : undefined);
 
                                     const main = DashboardBuilder.maintainerSeverity(h.maintainer);
                                     perScanner.maintainer.push(main);
@@ -2233,6 +2246,7 @@ class Server {
                                 // builder.
                                 const perPackageScanners: ScannerId[] = [
                                     'cve', 'license', 'scripts', 'patterns', 'binaries', 'obfuscation',
+                                    'manifestRedFlags', 'capability',
                                     'maintainer', 'churn', 'cadence', 'freshness',
                                     'ignoreScripts', 'typosquat', 'provenance', 'deprecation'
                                 ];
@@ -2278,6 +2292,19 @@ class Server {
                                 emitCell('integrity', DashboardBuilder.scorePerProject(
                                     integritySevs, packageCount, integrityCellFindings
                                 ));
+
+                                // Mutable resolution — flags lockfile entries with
+                                // mutable git refs, missing integrity hashes, or
+                                // file:/link: protocols. Synthesized lockfiles
+                                // (walked from node_modules) surface as N/A.
+                                send('progress', {
+                                    current: cellsDone,
+                                    total: totalCells,
+                                    projectName,
+                                    scanner: 'mutableResolution' as ScannerId
+                                });
+                                const mutableResolutionReport = MutableResolutionScanner.scan(lockfile);
+                                emitCell('mutableResolution', DashboardBuilder.mutableResolutionCell(mutableResolutionReport));
 
                                 // Unused — only on local projects; remote sources
                                 // surface as N/A via the detector's `supported`

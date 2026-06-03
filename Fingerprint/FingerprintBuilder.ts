@@ -263,13 +263,53 @@ export class FingerprintBuilder {
                 }
             }
 
+            // `bin` is either a string ("path/to/cli", named after
+            // the package itself) or a `{name: path}` object. Coerce
+            // both into the map form so consumers have one shape.
+            let bin: Record<string, string>|undefined;
+            if (typeof parsed.bin === 'string' && parsed.bin.length > 0) {
+                const pkgName = typeof parsed.name === 'string' ? parsed.name : 'cli';
+                // Scoped names use the unscoped tail as the bin name.
+                const slash = pkgName.lastIndexOf('/');
+                const key = slash >= 0 ? pkgName.slice(slash + 1) : pkgName;
+                bin = {[key]: parsed.bin};
+            } else if (parsed.bin && typeof parsed.bin === 'object') {
+                bin = asMap(parsed.bin);
+            }
+
+            const filesField = Array.isArray(parsed.files)
+                ? parsed.files.filter((f): f is string => typeof f === 'string')
+                : undefined;
+
+            const description = typeof parsed.description === 'string'
+                && parsed.description.trim().length > 0
+                ? parsed.description
+                : undefined;
+
+            const engines = parsed.engines && typeof parsed.engines === 'object'
+                ? asMap(parsed.engines)
+                : undefined;
+
+            // README presence: any sibling-of-package.json file whose
+            // basename starts with `README` (case-insensitive). Tarball
+            // entries are already top-level-stripped, so a plain
+            // `path === 'README'`/`'README.md'` etc. is what we look for.
+            const hasReadme = entries.some((e) =>
+                /^readme(\.[a-z0-9]+)?$/i.test(e.path)
+            );
+
             return {
                 dependencies: asMap(parsed.dependencies),
                 devDependencies: asMap(parsed.devDependencies),
                 peerDependencies: asMap(parsed.peerDependencies),
                 optionalDependencies: asMap(parsed.optionalDependencies),
                 scripts: asMap(parsed.scripts),
-                license
+                license,
+                description,
+                files: filesField && filesField.length > 0 ? filesField : undefined,
+                bin: bin && Object.keys(bin).length > 0 ? bin : undefined,
+                engines: engines && Object.keys(engines).length > 0 ? engines : undefined,
+                hasReadme
             };
         } catch {
             return null;
@@ -291,8 +331,12 @@ export class FingerprintBuilder {
      *        (coerced from the legacy `{type, url}` / `licenses[]`
      *        shapes). Old v4 entries would feed a `null` to the
      *        LicenseScanner forever.
+     *   v6 — PackageFingerprintManifest gains `description`, `files`,
+     *        `bin`, `engines`, `hasReadme` — fields the
+     *        ManifestRedFlagsScanner reads. Old v5 entries lack them
+     *        and would yield empty red-flag scans, so we re-fetch.
      */
     private static _cacheKey(name: string, version: string): string {
-        return `fp_v5_${name}@${version}`;
+        return `fp_v6_${name}@${version}`;
     }
 }

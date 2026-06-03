@@ -62,6 +62,9 @@ nppm/
 │   ├── ImpactAnalyzer.ts   cross-project blast-radius: BFS shortest path from root deps to a queried name(+version)
 │   ├── DeprecationScanner.ts   reads per-version `deprecated` from the packument — risk (installed) / warn (latest) / info (only older)
 │   ├── ObfuscationScanner.ts   per-JS-file heuristic over the tarball fingerprint — eval(atob(...)) / _0x density / hex-string arrays / long lines, with `dist/`/min path classification so legit minification stays at info
+│   ├── ManifestRedFlagsScanner.ts  pure heuristics over the fingerprint manifest — no README / no description / no files[] / many bins / native+postinstall combo / dated engines
+│   ├── CapabilityScanner.ts    per-package capability inventory (fs read/write, network, raw socket, child_process, credential-shaped env, native bindings, eval); severity by *combination*
+│   ├── MutableResolutionScanner.ts  per-project lockfile sweep — mutable git refs / missing integrity / file:/link: protocols
 │   ├── ExternalSourcesScanner.ts  aggregator over three third-party reputation APIs (socket.dev + OpenSSF Scorecard + deps.dev), worst-of-three severity per package
 │   ├── External/SocketDevFetcher.ts  per-package socket.dev score (needs API key)
 │   ├── External/OpenSsfFetcher.ts   OpenSSF Scorecard fetch + npm `repository` → host/owner/repo parser

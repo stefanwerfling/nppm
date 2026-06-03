@@ -1,7 +1,9 @@
 import {ConfigProjectType} from '../Config/Config.js';
 import {BinarySeverity} from '../Security/BinaryScanner.js';
+import {CapabilitySeverity} from '../Security/CapabilityScanner.js';
 import {DeprecationLevel} from '../Security/DeprecationScanner.js';
 import {ExternalSeverity} from '../Security/ExternalSourcesScanner.js';
+import {ManifestRedFlagSeverity} from '../Security/ManifestRedFlagsScanner.js';
 import {ObfuscationSeverity} from '../Security/ObfuscationScanner.js';
 import {LicenseSeverity} from '../Security/LicenseScanner.js';
 import {MaintainerSeverity} from '../Security/MaintainerScanner.js';
@@ -33,7 +35,7 @@ export const UNIFIED_RANK: Record<UnifiedSeverity, number> = {
  * unified ladder so the threshold check is a single integer compare.
  */
 export type ScanFinding = {
-    category: 'vuln'|'script'|'pattern'|'binary'|'maintainer'|'license'|'unused'|'misplaced'|'missing'|'external'|'deprecation'|'obfuscation';
+    category: 'vuln'|'script'|'pattern'|'binary'|'maintainer'|'license'|'unused'|'misplaced'|'missing'|'external'|'deprecation'|'obfuscation'|'manifestRedFlags'|'capability';
     severity: UnifiedSeverity;
     name: string;
     version?: string;
@@ -225,6 +227,33 @@ export class ScanReportBuilder {
                         });
                     }
                 }
+                // Manifest red-flags — single-flag info drops out.
+                if (h.manifestRedFlags.severity !== null) {
+                    const sev = ScanReportBuilder._manifestRedFlagsToUnified(h.manifestRedFlags.severity);
+                    if (sev !== null) {
+                        findings.push({
+                            category: 'manifestRedFlags',
+                            severity: sev,
+                            name: h.name,
+                            version: h.version,
+                            message: `${h.manifestRedFlags.count} manifest red-flag(s)`
+                        });
+                    }
+                }
+                // Capability — single-capability info drops out;
+                // dangerous combinations fire.
+                if (h.capability.severity !== null) {
+                    const sev = ScanReportBuilder._capabilityToUnified(h.capability.severity);
+                    if (sev !== null) {
+                        findings.push({
+                            category: 'capability',
+                            severity: sev,
+                            name: h.name,
+                            version: h.version,
+                            message: `${h.capability.count} capabilities`
+                        });
+                    }
+                }
                 // Deprecation — info-only ("only older versions
                 // deprecated") drops out, same convention as license
                 // permissive + external info.
@@ -390,6 +419,22 @@ export class ScanReportBuilder {
             case ObfuscationSeverity.info: return null;
             case ObfuscationSeverity.warn: return UnifiedSeverity.warn;
             case ObfuscationSeverity.risk: return UnifiedSeverity.risk;
+        }
+    }
+
+    private static _manifestRedFlagsToUnified(s: ManifestRedFlagSeverity): UnifiedSeverity|null {
+        switch (s) {
+            case ManifestRedFlagSeverity.info: return null;
+            case ManifestRedFlagSeverity.warn: return UnifiedSeverity.warn;
+            case ManifestRedFlagSeverity.risk: return UnifiedSeverity.risk;
+        }
+    }
+
+    private static _capabilityToUnified(s: CapabilitySeverity): UnifiedSeverity|null {
+        switch (s) {
+            case CapabilitySeverity.info: return null;
+            case CapabilitySeverity.warn: return UnifiedSeverity.warn;
+            case CapabilitySeverity.risk: return UnifiedSeverity.risk;
         }
     }
 }

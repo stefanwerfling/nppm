@@ -258,8 +258,11 @@ export class FindingsModal {
             case 'external':
             case 'deprecation':
             case 'obfuscation':
+            case 'manifestRedFlags':
+            case 'capability':
             case 'integrity':
                 return true;
+            case 'mutableResolution':
             case 'unused':
             case 'template':
                 return false;

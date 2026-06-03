@@ -4,6 +4,12 @@ import {CadenceLevel, CadenceSummary} from '../Security/CadenceScanner.js';
 import {ChurnFinding, ChurnSeverity} from '../Security/ChurnScanner.js';
 import {DeprecationLevel, DeprecationSummary} from '../Security/DeprecationScanner.js';
 import {ExternalSeverity, ExternalSummary} from '../Security/ExternalSourcesScanner.js';
+import {CapabilitySeverity, CapabilitySummary} from '../Security/CapabilityScanner.js';
+import {ManifestRedFlagSeverity, ManifestRedFlagsSummary} from '../Security/ManifestRedFlagsScanner.js';
+import {
+    MutableResolutionReport,
+    MutableResolutionSeverity
+} from '../Security/MutableResolutionScanner.js';
 import {ObfuscationSeverity, ObfuscationSummary} from '../Security/ObfuscationScanner.js';
 import {FreshnessLevel, FreshnessSummary} from '../Security/FreshnessScanner.js';
 import {IgnoreScriptsLevel} from '../Security/IgnoreScriptsScanner.js';
@@ -50,6 +56,8 @@ export const SCANNER_IDS = [
     'patterns',
     'binaries',
     'obfuscation',
+    'manifestRedFlags',
+    'capability',
     'maintainer',
     'churn',
     'cadence',
@@ -60,6 +68,7 @@ export const SCANNER_IDS = [
     'external',
     'deprecation',
     'integrity',
+    'mutableResolution',
     'unused',
     'template'
 ] as const;
@@ -270,6 +279,14 @@ export class DashboardBuilder {
         return DashboardBuilder._passthrough<ObfuscationSeverity>(s.maxSeverity);
     }
 
+    public static manifestRedFlagsSeverity(s: ManifestRedFlagsSummary): UnifiedSeverity|null {
+        return DashboardBuilder._passthrough<ManifestRedFlagSeverity>(s.severity);
+    }
+
+    public static capabilitySeverity(s: CapabilitySummary): UnifiedSeverity|null {
+        return DashboardBuilder._passthrough<CapabilitySeverity>(s.severity);
+    }
+
     public static maintainerSeverity(s: MaintainerSummary): UnifiedSeverity|null {
         return DashboardBuilder._passthrough<MaintainerSeverity>(s.severity);
     }
@@ -400,8 +417,29 @@ export class DashboardBuilder {
             provenance: DashboardBuilder.provenanceSeverity(h.provenance),
             external: DashboardBuilder.externalSeverity(h.external),
             deprecation: DashboardBuilder.deprecationSeverity(h.deprecation),
-            obfuscation: DashboardBuilder.obfuscationSeverity(h.obfuscation)
+            obfuscation: DashboardBuilder.obfuscationSeverity(h.obfuscation),
+            manifestRedFlags: DashboardBuilder.manifestRedFlagsSeverity(h.manifestRedFlags),
+            capability: DashboardBuilder.capabilitySeverity(h.capability)
         };
+    }
+
+    /**
+     * Aggregate the MutableResolution report into a single per-project
+     * cell. Supports the `synthesized lockfile` N/A case via the
+     * existing `naCell` helper.
+     */
+    public static mutableResolutionCell(report: MutableResolutionReport): DashboardCell {
+        if (!report.supported) {
+            return DashboardBuilder.naCell(report.unsupportedReason ?? 'mutable-resolution scanner not supported');
+        }
+        const sevs: UnifiedSeverity[] = [];
+        const findings: CellFinding[] = [];
+        for (const f of report.findings) {
+            const sev = DashboardBuilder._passthrough<MutableResolutionSeverity>(f.severity) ?? 'info';
+            sevs.push(sev);
+            findings.push({label: `${f.name}@${f.version}`, severity: sev, detail: f.kind});
+        }
+        return DashboardBuilder.scorePerProject(sevs, report.packagesScanned, findings);
     }
 
     /**

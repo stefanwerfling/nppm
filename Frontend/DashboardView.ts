@@ -374,6 +374,8 @@ export class DashboardView {
             case 'patterns': return I18n.t('Code patterns');
             case 'binaries': return I18n.t('Binaries');
             case 'obfuscation': return I18n.t('Obfuscation');
+            case 'manifestRedFlags': return I18n.t('Manifest red-flags');
+            case 'capability': return I18n.t('Capabilities');
             case 'maintainer': return I18n.t('Maintainer');
             case 'churn': return I18n.t('Churn');
             case 'cadence': return I18n.t('Cadence');
@@ -384,6 +386,7 @@ export class DashboardView {
             case 'external': return I18n.t('External sources');
             case 'deprecation': return I18n.t('Deprecation');
             case 'integrity': return I18n.t('Integrity');
+            case 'mutableResolution': return I18n.t('Mutable resolution');
             case 'unused': return I18n.t('Unused deps');
             case 'template': return I18n.t('Template compliance');
         }
@@ -540,6 +543,14 @@ export class DashboardView {
                     + '<path d="M10.58 5.08A10.43 10.43 0 0 1 12 5c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>'
                     + '<path d="M9.88 9.88a3 3 0 0 0 4.24 4.24"/>'
                     + '<line x1="3" y1="3" x2="21" y2="21"/>');
+            case 'manifestRedFlags':
+                // Flag — a manifest-level signal
+                return s('<line x1="4" y1="22" x2="4" y2="3"/>'
+                    + '<path d="M4 4h13l-2 4 2 4H4"/>');
+            case 'capability':
+                // Key — what does the package have permission to do
+                return s('<circle cx="7" cy="14" r="4"/>'
+                    + '<path d="M10 14l11-11"/><path d="M17 7l3 3"/><path d="M19 5l2 2"/>');
             case 'maintainer':
                 // Person
                 return s('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>'
@@ -580,6 +591,11 @@ export class DashboardView {
                 // Lock
                 return s('<rect x="4" y="11" width="16" height="10" rx="2"/>'
                     + '<path d="M8 11V7a4 4 0 0 1 8 0v4"/>');
+            case 'mutableResolution':
+                // Link with broken middle — non-reproducible resolution
+                return s('<path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07L11.5 4.5"/>'
+                    + '<path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07L12.5 19.5"/>'
+                    + '<line x1="3" y1="3" x2="21" y2="21"/>');
             case 'unused':
                 // Trash
                 return s('<polyline points="3 6 5 6 21 6"/>'
@@ -613,6 +629,10 @@ export class DashboardView {
                 return I18n.t('Classifies binary files inside the tarball by extension and whether they sit on the bin/ path (executables the publisher exposes to npm install).');
             case 'obfuscation':
                 return I18n.t('Looks for code-obfuscation fingerprints inside JS files: obfuscator.io _0x identifiers, eval(atob(...)) chains, hex-string arrays, and pathologically long lines outside of dist/min paths.');
+            case 'manifestRedFlags':
+                return I18n.t('Pure heuristics over `package.json`: missing README, missing description, missing files[] allowlist, many bin entries, the native-build+postinstall combo, or an engines.node range that excludes modern Node.');
+            case 'capability':
+                return I18n.t('Per-package capability inventory: which APIs the JS files touch (fs read/write, http/fetch, raw sockets, child_process, credential-shaped env vars, native bindings, eval). Severity is by combination, not by individual capability.');
             case 'maintainer':
                 return I18n.t('Spots publisher handovers on mature packages. A short gap between the previous and current publisher on a long-lived package matches the event-stream / ua-parser-js takeover pattern.');
             case 'churn':
@@ -633,6 +653,8 @@ export class DashboardView {
                 return I18n.t('Reads the per-version `deprecated` flag from the npm packument. Flags packages where the installed version, or the registry latest, was marked deprecated by the maintainer.');
             case 'integrity':
                 return I18n.t('Cross-checks the lockfile `resolved` URL + `integrity` hash against what the registry currently serves. Mismatches and mirror redirects are surfaced.');
+            case 'mutableResolution':
+                return I18n.t('Walks the lockfile for entries that can\'t be reproduced deterministically: mutable git refs (branch/tag instead of SHA), missing integrity hashes on registry tarballs, file:/link: local protocols.');
             case 'unused':
                 return I18n.t('Walks project source files for unused declared deps, misplaced (dev imports under runtime), and missing (imported but undeclared) packages.');
             case 'template':
@@ -660,6 +682,8 @@ export class DashboardView {
             case 'patterns':
             case 'binaries':
             case 'obfuscation':
+            case 'manifestRedFlags':
+            case 'capability':
             case 'maintainer':
             case 'churn':
             case 'cadence':
@@ -683,6 +707,9 @@ export class DashboardView {
                 break;
             case 'integrity':
                 specific = I18n.t('Per-finding info / warn / risk applied; total is divided by the package count for the score.');
+                break;
+            case 'mutableResolution':
+                specific = I18n.t('Mutable git ref = risk, missing integrity hash = warn, file:/link: protocol = info. Synthesized lockfiles render N/A.');
                 break;
             case 'unused':
                 specific = I18n.t('Each unused entry uses its own severity. Misplaced and missing each count as warn.');

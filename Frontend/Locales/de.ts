@@ -388,6 +388,24 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'build artifact': 'Build-Artefakt',
     'Looks for code-obfuscation fingerprints inside JS files: obfuscator.io _0x identifiers, eval(atob(...)) chains, hex-string arrays, and pathologically long lines outside of dist/min paths.':
         'Sucht nach Obfuskations-Fingerprints in JS-Dateien: obfuscator.io _0x-Bezeichner, eval(atob(...))-Ketten, Hex-String-Arrays und ungewöhnlich lange Zeilen außerhalb von dist/min-Pfaden.',
+    'Manifest red-flags': 'Manifest-Red-Flags',
+    'Capabilities': 'Fähigkeiten',
+    'Mutable resolution': 'Mutable Auflösung',
+    'No manifest red-flags — README, description, files[] and engines all look normal.':
+        'Keine Manifest-Red-Flags — README, Description, files[] und Engines sehen normal aus.',
+    'No platform APIs touched — pure logic / utility code.': 'Keine Plattform-APIs berührt — reiner Logik-/Utility-Code.',
+    '{n} flag(s)': '{n} Flag(s)',
+    '{n} capability(ies)': '{n} Fähigkeit(en)',
+    '{n} manifest red-flag(s)': '{n} Manifest-Red-Flag(s)',
+    '{n} capability(ies) detected': '{n} Fähigkeit(en) erkannt',
+    'Pure heuristics over `package.json`: missing README, missing description, missing files[] allowlist, many bin entries, the native-build+postinstall combo, or an engines.node range that excludes modern Node.':
+        'Reine Heuristiken über `package.json`: fehlende README, fehlende Description, fehlende files[]-Allowlist, viele bin-Einträge, Native-Build+Postinstall-Kombination oder eine engines.node-Range, die moderne Node ausschließt.',
+    'Per-package capability inventory: which APIs the JS files touch (fs read/write, http/fetch, raw sockets, child_process, credential-shaped env vars, native bindings, eval). Severity is by combination, not by individual capability.':
+        'Pro-Paket Fähigkeits-Inventar: welche APIs die JS-Dateien anfassen (fs read/write, http/fetch, raw sockets, child_process, credential-artige Env-Vars, Native-Bindings, eval). Severity ergibt sich aus der Kombination, nicht der Einzel-Fähigkeit.',
+    'Walks the lockfile for entries that can\'t be reproduced deterministically: mutable git refs (branch/tag instead of SHA), missing integrity hashes on registry tarballs, file:/link: local protocols.':
+        'Durchsucht das Lockfile nach Einträgen, die nicht deterministisch reproduzierbar sind: mutable Git-Refs (Branch/Tag statt SHA), fehlende Integrity-Hashes bei Registry-Tarballs, file:/link: lokale Protokolle.',
+    'Mutable git ref = risk, missing integrity hash = warn, file:/link: protocol = info. Synthesized lockfiles render N/A.':
+        'Mutable Git-Ref = risk, fehlender Integrity-Hash = warn, file:/link:-Protokoll = info. Synthetisierte Lockfiles rendern N/A.',
     'Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.':
         'Bündelt Reputations-Signale Dritter: socket.dev (Supply-Chain-Risiko), OpenSSF Scorecard (Repo-Entwicklungspraktiken), deps.dev (Google Package-Index). Pro Paket worst-of-three.',
     'Per-source severity (socket overall <50 = risk, <80 = warn; OpenSSF <5 = risk, <7 = warn; deps.dev = info only) reduced to worst-of-three per package.':

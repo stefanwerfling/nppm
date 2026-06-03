@@ -57,6 +57,16 @@ import {
     TyposquatSummary
 } from './TyposquatScanner.js';
 import {
+    CapabilityFinding,
+    CapabilityScanner,
+    CapabilitySummary
+} from './CapabilityScanner.js';
+import {
+    ManifestRedFlagsFinding,
+    ManifestRedFlagsScanner,
+    ManifestRedFlagsSummary
+} from './ManifestRedFlagsScanner.js';
+import {
     ObfuscationFinding,
     ObfuscationScanner,
     ObfuscationSummary
@@ -131,6 +141,18 @@ export type SecurityReport = {
      * since legitimate minification is the default.
      */
     obfuscation: ObfuscationFinding[];
+    /**
+     * Manifest red-flags (no README / no description / no files /
+     * many bins / native+postinstall combo / dated engines). `null`
+     * when none fire.
+     */
+    manifestRedFlags: ManifestRedFlagsFinding|null;
+    /**
+     * Aggregated capability inventory (fs/network/child_process/...).
+     * `null` when every JS file is pure logic (lookup tables,
+     * algorithms, no platform API touched).
+     */
+    capability: CapabilityFinding|null;
 };
 
 /**
@@ -173,6 +195,8 @@ export type HeuristicsBatchEntry = {
     external: ExternalSummary;
     deprecation: DeprecationSummary;
     obfuscation: ObfuscationSummary;
+    manifestRedFlags: ManifestRedFlagsSummary;
+    capability: CapabilitySummary;
 };
 
 /**
@@ -259,6 +283,8 @@ export class SecurityScanner {
         const patternFindings = fingerprint ? PatternScanner.scan(fingerprint.files) : [];
         const binaryFindings = fingerprint ? BinaryScanner.scan(fingerprint.files) : [];
         const obfuscationFindings = fingerprint ? ObfuscationScanner.scan(fingerprint.files) : [];
+        const manifestRedFlags = ManifestRedFlagsScanner.classify(fingerprint?.manifest ?? null);
+        const capability = fingerprint ? CapabilityScanner.scan(fingerprint.files) : null;
 
         // Prefer the manifest license (per-version, can differ between
         // releases) over the packument license (top-level, version-
@@ -298,7 +324,9 @@ export class SecurityScanner {
             typosquat,
             external,
             deprecation,
-            obfuscation: obfuscationFindings
+            obfuscation: obfuscationFindings,
+            manifestRedFlags,
+            capability
         };
     }
 
@@ -395,6 +423,8 @@ export class SecurityScanner {
                 const binaryFindings = fingerprint ? BinaryScanner.scan(fingerprint.files) : [];
                 const binSummary = BinaryScanner.summarise(binaryFindings);
                 const obfuscationFindings = fingerprint ? ObfuscationScanner.scan(fingerprint.files) : [];
+                const manifestRedFlags = ManifestRedFlagsScanner.classify(fingerprint?.manifest ?? null);
+                const capability = fingerprint ? CapabilityScanner.scan(fingerprint.files) : null;
 
                 result[i] = {
                     name: pkg.name,
@@ -448,7 +478,9 @@ export class SecurityScanner {
                     typosquat: SecurityScanner._typosquatSummary(pkg.name, pkg.version),
                     external: ExternalSourcesScanner.summarise(external),
                     deprecation: SecurityScanner._deprecationSummary(pkg.name, pkg.version, reg),
-                    obfuscation: ObfuscationScanner.summarise(pkg.name, pkg.version, obfuscationFindings)
+                    obfuscation: ObfuscationScanner.summarise(pkg.name, pkg.version, obfuscationFindings),
+                    manifestRedFlags: ManifestRedFlagsScanner.summarise(pkg.name, pkg.version, manifestRedFlags),
+                    capability: CapabilityScanner.summarise(pkg.name, pkg.version, capability)
                 };
             }
         };

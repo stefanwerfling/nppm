@@ -13,6 +13,8 @@ import {ProvenanceLevel, ProvenanceSummary} from '../Security/ProvenanceScanner.
 import {ScriptSeverity} from '../Security/ScriptScanner.js';
 import {DeprecationLevel, DeprecationSummary} from '../Security/DeprecationScanner.js';
 import {ExternalSeverity, ExternalSummary} from '../Security/ExternalSourcesScanner.js';
+import {CapabilitySeverity, CapabilitySummary} from '../Security/CapabilityScanner.js';
+import {ManifestRedFlagSeverity, ManifestRedFlagsSummary} from '../Security/ManifestRedFlagsScanner.js';
 import {ObfuscationSeverity, ObfuscationSummary} from '../Security/ObfuscationScanner.js';
 import {TyposquatLevel, TyposquatSummary} from '../Security/TyposquatScanner.js';
 import {PatternSummary, ScriptSummary} from '../Security/SecurityScanner.js';
@@ -136,6 +138,18 @@ const OBFUSCATION_WEIGHT: Record<ObfuscationSeverity, number> = {
     [ObfuscationSeverity.risk]: 25
 };
 
+const MANIFEST_REDFLAGS_WEIGHT: Record<ManifestRedFlagSeverity, number> = {
+    [ManifestRedFlagSeverity.info]: 0,
+    [ManifestRedFlagSeverity.warn]: 3,
+    [ManifestRedFlagSeverity.risk]: 12
+};
+
+const CAPABILITY_WEIGHT: Record<CapabilitySeverity, number> = {
+    [CapabilitySeverity.info]: 0,
+    [CapabilitySeverity.warn]: 4,
+    [CapabilitySeverity.risk]: 15
+};
+
 /**
  * Persisted UI state — keeps filter, sort, and search across reloads
  * via localStorage. Stored as one JSON blob so we can extend later
@@ -190,6 +204,8 @@ export class Matrix {
     private _externalByName: Map<string, ExternalSummary> = new Map();
     private _deprecationByName: Map<string, DeprecationSummary> = new Map();
     private _obfuscationByName: Map<string, ObfuscationSummary> = new Map();
+    private _manifestRedFlagsByName: Map<string, ManifestRedFlagsSummary> = new Map();
+    private _capabilityByName: Map<string, CapabilitySummary> = new Map();
     // Bundlephobia size keyed by package name (we always query against
     // `latest`, so the version is implicit). `null` means asked-and-
     // unbuildable; missing key means not yet asked.
@@ -259,7 +275,9 @@ export class Matrix {
         typosquat: TyposquatSummary|undefined,
         external: ExternalSummary|undefined,
         deprecation: DeprecationSummary|undefined,
-        obfuscation: ObfuscationSummary|undefined
+        obfuscation: ObfuscationSummary|undefined,
+        manifestRedFlags: ManifestRedFlagsSummary|undefined,
+        capability: CapabilitySummary|undefined
     ): number {
         let score = 0;
         if (vulnIds && vulnIds.length > 0) {
@@ -302,6 +320,12 @@ export class Matrix {
         }
         if (obfuscation && obfuscation.maxSeverity !== null) {
             score += OBFUSCATION_WEIGHT[obfuscation.maxSeverity];
+        }
+        if (manifestRedFlags && manifestRedFlags.severity !== null) {
+            score += MANIFEST_REDFLAGS_WEIGHT[manifestRedFlags.severity];
+        }
+        if (capability && capability.severity !== null) {
+            score += CAPABILITY_WEIGHT[capability.severity];
         }
         return score;
     }
@@ -413,6 +437,8 @@ export class Matrix {
         this._externalByName = new Map();
         this._deprecationByName = new Map();
         this._obfuscationByName = new Map();
+        this._manifestRedFlagsByName = new Map();
+        this._capabilityByName = new Map();
         this._bundlesByName = new Map();
         this._integrityByName = new Map();
         this._render();
@@ -550,6 +576,8 @@ export class Matrix {
                 this._externalByName.set(entry.name, entry.external);
                 this._deprecationByName.set(entry.name, entry.deprecation);
                 this._obfuscationByName.set(entry.name, entry.obfuscation);
+                this._manifestRedFlagsByName.set(entry.name, entry.manifestRedFlags);
+                this._capabilityByName.set(entry.name, entry.capability);
                 if (entry.scripts.maxSeverity !== null
                     || entry.patterns.maxSeverity !== null
                     || entry.binaries.maxSeverity !== null
@@ -568,7 +596,11 @@ export class Matrix {
                     || entry.deprecation.level === DeprecationLevel.risk
                     || entry.deprecation.level === DeprecationLevel.warn
                     || entry.obfuscation.maxSeverity === ObfuscationSeverity.risk
-                    || entry.obfuscation.maxSeverity === ObfuscationSeverity.warn) {
+                    || entry.obfuscation.maxSeverity === ObfuscationSeverity.warn
+                    || entry.manifestRedFlags.severity === ManifestRedFlagSeverity.risk
+                    || entry.manifestRedFlags.severity === ManifestRedFlagSeverity.warn
+                    || entry.capability.severity === CapabilitySeverity.risk
+                    || entry.capability.severity === CapabilitySeverity.warn) {
                     anyHit = true;
                 }
             }
@@ -1046,6 +1078,48 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
+        // Manifest red-flags badge — `MAN!` for the native+postinstall
+        // combo or ≥3 stacked flags, `MAN?` for two stacked flags.
+        // Single flags stay info-grade and don't render a badge
+        // (every other manifest in the registry has at least one
+        // small quirk so the threshold has to be meaningful).
+        const manifestRedFlags = this._manifestRedFlagsByName.get(row.name);
+        if (manifestRedFlags && (manifestRedFlags.severity === ManifestRedFlagSeverity.risk
+                                 || manifestRedFlags.severity === ManifestRedFlagSeverity.warn)) {
+            const badge = document.createElement('span');
+            badge.className = `matrix-badge matrix-badge-manifestRedFlags matrix-badge-manifestRedFlags-${manifestRedFlags.severity}`;
+            badge.textContent = manifestRedFlags.severity === ManifestRedFlagSeverity.risk ? 'MAN!' : 'MAN?';
+            badge.title = I18n.t('{n} manifest red-flag(s)', {n: manifestRedFlags.count});
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (row.latest) {
+                    this._onSecurityClick?.(row.name, row.latest);
+                }
+            });
+            nameCell.appendChild(badge);
+        }
+
+        // Capability badge — `CAP!` for the dangerous combinations
+        // (spawn+network, env+network, native+network), `CAP?` for
+        // two heavy-hitter capabilities or dynamic-import alone.
+        // Info-grade single capabilities stay silent (most packages
+        // touch one platform API).
+        const capability = this._capabilityByName.get(row.name);
+        if (capability && (capability.severity === CapabilitySeverity.risk
+                           || capability.severity === CapabilitySeverity.warn)) {
+            const badge = document.createElement('span');
+            badge.className = `matrix-badge matrix-badge-capability matrix-badge-capability-${capability.severity}`;
+            badge.textContent = capability.severity === CapabilitySeverity.risk ? 'CAP!' : 'CAP?';
+            badge.title = I18n.t('{n} capability(ies) detected', {n: capability.count});
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (row.latest) {
+                    this._onSecurityClick?.(row.name, row.latest);
+                }
+            });
+            nameCell.appendChild(badge);
+        }
+
         // Deprecation badge — risk = installed version itself is
         // deprecated; warn = registry latest is deprecated.
         // info-only ("some older versions were deprecated") stays
@@ -1221,7 +1295,9 @@ export class Matrix {
             this._typosquatByName.get(row.name),
             this._externalByName.get(row.name),
             this._deprecationByName.get(row.name),
-            this._obfuscationByName.get(row.name)
+            this._obfuscationByName.get(row.name),
+            this._manifestRedFlagsByName.get(row.name),
+            this._capabilityByName.get(row.name)
         );
     }
 

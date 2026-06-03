@@ -131,6 +131,16 @@ export class SarifBuilder {
             name: 'Obfuscated JS source',
             description: 'JS file(s) inside the tarball look intentionally obfuscated (obfuscator.io identifiers, eval(atob(...)) chains, hex-string arrays, or pathologically long lines outside of dist/min paths).',
             defaultLevel: 'warning'
+        },
+        manifestRedFlags: {
+            name: 'Manifest red-flags',
+            description: 'Soft signals on package.json (missing README/description/files allowlist, many bin entries, native+postinstall combo, dated engines.node range).',
+            defaultLevel: 'warning'
+        },
+        capability: {
+            name: 'Capability inventory',
+            description: 'Aggregated set of platform APIs touched (fs read/write, network, raw sockets, child_process, credential-shaped env reads, native bindings, eval). Severity is the worst-of-combinations.',
+            defaultLevel: 'warning'
         }
     };
 

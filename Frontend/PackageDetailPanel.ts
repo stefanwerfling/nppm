@@ -13,8 +13,10 @@ import {FreshnessFinding, FreshnessLevel} from '../Security/FreshnessScanner.js'
 import {IgnoreScriptsFinding, IgnoreScriptsLevel} from '../Security/IgnoreScriptsScanner.js';
 import {TyposquatFinding, TyposquatLevel} from '../Security/TyposquatScanner.js';
 import {MaintainerFinding, MaintainerSeverity} from '../Security/MaintainerScanner.js';
+import {CapabilityFinding, CapabilitySeverity} from '../Security/CapabilityScanner.js';
 import {DeprecationFinding, DeprecationLevel} from '../Security/DeprecationScanner.js';
 import {ExternalFinding, ExternalSeverity, ExternalSource, ExternalSourceFinding} from '../Security/ExternalSourcesScanner.js';
+import {ManifestRedFlagSeverity, ManifestRedFlagsFinding} from '../Security/ManifestRedFlagsScanner.js';
 import {ObfuscationFinding, ObfuscationSeverity} from '../Security/ObfuscationScanner.js';
 import {ProvenanceFinding, ProvenanceLevel} from '../Security/ProvenanceScanner.js';
 import {OsvVulnerability} from '../Security/OsvClient.js';
@@ -781,6 +783,12 @@ export class PackageDetailPanel {
         const obfuscationInteresting = report.obfuscation.some(
             (f) => f.severity === ObfuscationSeverity.warn || f.severity === ObfuscationSeverity.risk
         );
+        const manifestRedFlagsInteresting = !!report.manifestRedFlags
+            && (report.manifestRedFlags.severity === ManifestRedFlagSeverity.warn
+                || report.manifestRedFlags.severity === ManifestRedFlagSeverity.risk);
+        const capabilityInteresting = !!report.capability
+            && (report.capability.severity === CapabilitySeverity.warn
+                || report.capability.severity === CapabilitySeverity.risk);
         const interestingChurn = report.churn && report.churn.severity !== ChurnSeverity.info;
         const interestingMaintainer = report.maintainer && report.maintainer.severity !== MaintainerSeverity.info;
 
@@ -801,7 +809,8 @@ export class PackageDetailPanel {
         // carry severity classes, so a truly clean package shows the
         // banner + five collapsed rows below.
         if (vulnCount === 0 && scriptCount === 0 && patternCount === 0 && binaryCount === 0
-            && !interestingChurn && !interestingMaintainer && !obfuscationInteresting && report.vulns !== null) {
+            && !interestingChurn && !interestingMaintainer && !obfuscationInteresting
+            && !manifestRedFlagsInteresting && !capabilityInteresting && report.vulns !== null) {
             const ok = document.createElement('div');
             ok.className = 'pdp-placeholder';
             ok.textContent = I18n.t('No known CVEs (OSV.dev), no suspicious install scripts, no notable file churn, no known code patterns and no binary files.');
@@ -840,6 +849,14 @@ export class PackageDetailPanel {
         wrap.appendChild(card(
             this._renderObfuscationSection(report.obfuscation),
             {hasIssue: obfuscationInteresting}
+        ));
+        wrap.appendChild(card(
+            this._renderManifestRedFlagsSection(report.manifestRedFlags),
+            {hasIssue: manifestRedFlagsInteresting}
+        ));
+        wrap.appendChild(card(
+            this._renderCapabilitySection(report.capability),
+            {hasIssue: capabilityInteresting}
         ));
         wrap.appendChild(card(
             this._renderChurnSection(report.churn),
@@ -1668,6 +1685,97 @@ export class PackageDetailPanel {
         }
 
         wrap.appendChild(list);
+        return wrap;
+    }
+
+    /**
+     * Manifest red-flags section. Lists the flagged signals as
+     * chips; null = nothing flagged, render a quiet placeholder.
+     */
+    private _renderManifestRedFlagsSection(finding: ManifestRedFlagsFinding|null): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdp-section';
+
+        const heading = document.createElement('div');
+        heading.className = 'pdp-section-head';
+        heading.textContent = I18n.t('Manifest red-flags');
+        wrap.appendChild(heading);
+
+        if (!finding) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-placeholder';
+            empty.textContent = I18n.t('No manifest red-flags — README, description, files[] and engines all look normal.');
+            wrap.appendChild(empty);
+            return wrap;
+        }
+
+        const card = document.createElement('div');
+        card.className = `pdp-script pdp-sev-${finding.severity}`;
+
+        const head = document.createElement('div');
+        head.className = 'pdp-script-head';
+        const sev = document.createElement('span');
+        sev.className = `pdp-sev pdp-sev-${finding.severity}`;
+        sev.textContent = finding.severity;
+        head.appendChild(sev);
+        const count = document.createElement('span');
+        count.className = 'pdp-script-reason';
+        count.textContent = I18n.t('{n} flag(s)', {n: finding.flags.length});
+        head.appendChild(count);
+        card.appendChild(head);
+
+        const reason = document.createElement('div');
+        reason.className = 'pdp-script-reason';
+        reason.textContent = finding.detail;
+        card.appendChild(reason);
+
+        wrap.appendChild(card);
+        return wrap;
+    }
+
+    /**
+     * Capability inventory section. Shows the aggregated capabilities
+     * the JS files in the tarball touch — one chip per detected
+     * capability, plus the rolled-up severity verdict.
+     */
+    private _renderCapabilitySection(finding: CapabilityFinding|null): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdp-section';
+
+        const heading = document.createElement('div');
+        heading.className = 'pdp-section-head';
+        heading.textContent = I18n.t('Capabilities');
+        wrap.appendChild(heading);
+
+        if (!finding) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-placeholder';
+            empty.textContent = I18n.t('No platform APIs touched — pure logic / utility code.');
+            wrap.appendChild(empty);
+            return wrap;
+        }
+
+        const card = document.createElement('div');
+        card.className = `pdp-script pdp-sev-${finding.severity}`;
+
+        const head = document.createElement('div');
+        head.className = 'pdp-script-head';
+        const sev = document.createElement('span');
+        sev.className = `pdp-sev pdp-sev-${finding.severity}`;
+        sev.textContent = finding.severity;
+        head.appendChild(sev);
+        const count = document.createElement('span');
+        count.className = 'pdp-script-reason';
+        count.textContent = I18n.t('{n} capability(ies)', {n: finding.capabilities.length});
+        head.appendChild(count);
+        card.appendChild(head);
+
+        const list = document.createElement('div');
+        list.className = 'pdp-script-reason';
+        list.textContent = finding.detail;
+        card.appendChild(list);
+
+        wrap.appendChild(card);
         return wrap;
     }
 

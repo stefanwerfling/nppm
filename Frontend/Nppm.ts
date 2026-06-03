@@ -1,7 +1,9 @@
 import {ApiProject} from '../Api/ApiTypes.js';
 import {Api} from './Api.js';
 import {BulkUpgradeModal} from './BulkUpgradeModal.js';
+import {DashboardView} from './DashboardView.js';
 import {DepTreeView} from './DepTreeView.js';
+import {FindingsModal} from './FindingsModal.js';
 import {GlobalScanView} from './GlobalScanView.js';
 import {HistoryView} from './HistoryView.js';
 import {InstalledView} from './InstalledView.js';
@@ -40,6 +42,7 @@ enum View {
     pr = 'pr',
     templates = 'templates',
     template = 'template',
+    dashboard = 'dashboard',
     global = 'global'
 }
 
@@ -61,6 +64,8 @@ export class Nppm {
     private readonly _prReviewView: PrReviewView;
     private readonly _templatesView: TemplatesView;
     private readonly _templateView: TemplateView;
+    private readonly _dashboardView: DashboardView;
+    private readonly _findingsModal: FindingsModal;
     private readonly _globalScanView: GlobalScanView;
     private readonly _detailPanel: PackageDetailPanel;
     private readonly _upgradeModal: UpgradeModal;
@@ -80,6 +85,7 @@ export class Nppm {
     private _prHost: HTMLElement|null = null;
     private _templatesHost: HTMLElement|null = null;
     private _templateHost: HTMLElement|null = null;
+    private _dashboardHost: HTMLElement|null = null;
     private _globalHost: HTMLElement|null = null;
     private _view: View = View.matrix;
     private _projects: ApiProject[] = [];
@@ -117,6 +123,8 @@ export class Nppm {
         this._prReviewView = new PrReviewView(this._prHost!);
         this._templatesView = new TemplatesView(this._templatesHost!);
         this._templateView = new TemplateView(this._templateHost!);
+        this._dashboardView = new DashboardView(this._dashboardHost!);
+        this._findingsModal = new FindingsModal();
 
         // Topbar wiring for the global scan. These elements live in
         // index.html so non-pane components can drive them.
@@ -324,12 +332,52 @@ export class Nppm {
         });
 
         this._treeview.onSelect((project) => {
-            if (project.unid === '__matrix__') {
+            if (project.unid === '__dashboard__') {
+                this._loadDashboard();
+            } else if (project.unid === '__matrix__') {
                 this._switchTo(View.matrix);
             } else if (project.unid === '__templates__') {
                 void this._loadTemplates();
             } else {
                 void this._loadProject(project);
+            }
+        });
+
+        // Dashboard click routing — the cell modal opens for every
+        // scanner; its "Open in <view>" drill-down only fires for
+        // the four scanners with a dedicated view.
+        this._dashboardView.onProjectClick((unid) => {
+            const p = findProject(unid);
+            if (p) {
+                this._treeview.setSelected(unid);
+                void this._loadProject(p);
+            }
+        });
+        this._dashboardView.onCellClick((unid, projectName, scanner, scannerLabel, cell) => {
+            this._findingsModal.open(scanner, scannerLabel, unid, projectName, cell);
+        });
+        this._findingsModal.onDrill((unid, scanner) => {
+            const p = findProject(unid);
+            if (!p) {
+                return;
+            }
+            this._treeview.setSelected(unid);
+            switch (scanner) {
+                case 'cve':
+                case 'integrity':
+                    // Both scanners reason over the lockfile; the
+                    // InstalledView already surfaces per-package
+                    // security findings.
+                    void this._loadProjectInstalled(p);
+                    break;
+                case 'unused':
+                    void this._loadProjectUnused(p);
+                    break;
+                case 'template':
+                    void this._loadProjectTemplate(p);
+                    break;
+                default:
+                    void this._loadProject(p);
             }
         });
 
@@ -526,6 +574,11 @@ export class Nppm {
         await this._templatesView.show();
     }
 
+    private _loadDashboard(): void {
+        this._switchTo(View.dashboard);
+        this._dashboardView.show();
+    }
+
     private async _loadProjectTemplate(project: ApiProject): Promise<void> {
         this._switchTo(View.template);
         this._currentProjectUnid = project.unid;
@@ -585,6 +638,10 @@ export class Nppm {
         this._templateHost.className = 'pane pane-template';
         this._listRoot.appendChild(this._templateHost);
 
+        this._dashboardHost = document.createElement('div');
+        this._dashboardHost.className = 'pane pane-dashboard';
+        this._listRoot.appendChild(this._dashboardHost);
+
         this._globalHost = document.createElement('div');
         this._globalHost.className = 'pane pane-global';
         this._listRoot.appendChild(this._globalHost);
@@ -597,7 +654,7 @@ export class Nppm {
             || !this._historyHost || !this._projectMatrixHost
             || !this._depTreeHost || !this._unusedHost || !this._vulnsHost
             || !this._prHost || !this._templatesHost || !this._templateHost
-            || !this._globalHost) {
+            || !this._dashboardHost || !this._globalHost) {
             return;
         }
 
@@ -612,6 +669,13 @@ export class Nppm {
         this._prHost.style.display = view === View.pr ? '' : 'none';
         this._templatesHost.style.display = view === View.templates ? '' : 'none';
         this._templateHost.style.display = view === View.template ? '' : 'none';
+        this._dashboardHost.style.display = view === View.dashboard ? '' : 'none';
         this._globalHost.style.display = view === View.global ? '' : 'none';
+
+        // Stop the SSE stream when leaving the dashboard so the user
+        // doesn't keep a dangling EventSource open in the background.
+        if (view !== View.dashboard) {
+            this._dashboardView.stop();
+        }
     }
 }

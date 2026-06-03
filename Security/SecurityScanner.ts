@@ -241,6 +241,50 @@ export class SecurityScanner {
     }
 
     /**
+     * Bulk file-churn scan for the Dashboard. Mirrors the bounded-
+     * concurrency shape of `scanHeuristicsBatch` so a project-wide
+     * churn pass doesn't fan out into hundreds of parallel tarball
+     * downloads. Each entry is the unmodified `ChurnFinding|null` the
+     * underlying scanner emits.
+     *
+     * Skipped intentionally by `scanHeuristicsBatch` (the matrix badge
+     * doesn't surface churn). Surfaced here as its own batched
+     * entry-point so the dashboard orchestrator can call it without
+     * reaching into the private `_churn` instance.
+     */
+    public async scanChurnBatch(
+        packages: {name: string; version: string}[],
+        concurrency = 10
+    ): Promise<(ChurnFinding|null)[]> {
+        const result: (ChurnFinding|null)[] = new Array(packages.length);
+        let cursor = 0;
+
+        const runOne = async (): Promise<void> => {
+            while (true) {
+                const i = cursor++;
+                if (i >= packages.length) {
+                    return;
+                }
+                const pkg = packages[i];
+                try {
+                    result[i] = await this._churn.scan(pkg.name, pkg.version);
+                } catch {
+                    result[i] = null;
+                }
+            }
+        };
+
+        const workers: Promise<void>[] = [];
+        const n = Math.min(concurrency, Math.max(1, packages.length));
+        for (let i = 0; i < n; i++) {
+            workers.push(runOne());
+        }
+        await Promise.all(workers);
+
+        return result;
+    }
+
+    /**
      * Bulk fingerprint-derived scan for the matrix badge. Walks every
      * package through the fingerprint builder (permanently cached, so
      * warm = instant) at a bounded concurrency, then extracts both the

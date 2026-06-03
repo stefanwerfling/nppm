@@ -8,7 +8,7 @@ import {
     ApiDepGraphResponse,
     ApiFingerprintDiffResponse,
     ApiFingerprintResponse,
-    ApiHistoryResponse,
+    ApiHistoryResponse, ApiImpactResponse,
     ApiLockfileResponse,
     ApiBundlesRequest,
     ApiBundlesResponse,
@@ -232,6 +232,14 @@ export class Api {
 
     public static async matrix(): Promise<MatrixResponse> {
         return Api._json<MatrixResponse>('/api/matrix');
+    }
+
+    public static async impact(name: string, version?: string): Promise<ApiImpactResponse> {
+        const qs = new URLSearchParams({name});
+        if (version) {
+            qs.set('version', version);
+        }
+        return Api._json<ApiImpactResponse>(`/api/impact?${qs.toString()}`);
     }
 
     public static async fingerprint(name: string, version: string): Promise<ApiFingerprintResponse> {

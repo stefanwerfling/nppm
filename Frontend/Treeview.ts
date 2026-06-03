@@ -107,10 +107,20 @@ export class Treeview {
         addBar.appendChild(addBtn);
         this._root.appendChild(addBar);
 
-        // Always-present "Matrix" entry on top — its UUID is a sentinel
-        // the parent component routes specially.
+        // Always-present sentinel rows on top — Dashboard / Matrix /
+        // Templates. Their UUIDs are sentinels the parent component
+        // routes specially.
         const matrixGroup = document.createElement('div');
         matrixGroup.className = 'tree-group';
+
+        const dashboardItem: ApiProject = {
+            unid: '__dashboard__',
+            name: I18n.t('Dashboard'),
+            type: ConfigProjectType.local,
+            packageCount: 0,
+            workspaceCount: 0
+        };
+        matrixGroup.appendChild(this._renderItem(dashboardItem, true));
 
         const matrixItem: ApiProject = {
             unid: '__matrix__',
@@ -119,13 +129,8 @@ export class Treeview {
             packageCount: 0,
             workspaceCount: 0
         };
+        matrixGroup.appendChild(this._renderItem(matrixItem, true));
 
-        const matrixEl = this._renderItem(matrixItem, true);
-        matrixGroup.appendChild(matrixEl);
-        this._root.appendChild(matrixGroup);
-
-        // Sibling "Templates" sentinel — opens the cross-project
-        // compliance matrix in the right pane.
         const templatesItem: ApiProject = {
             unid: '__templates__',
             name: I18n.t('Templates'),
@@ -133,8 +138,9 @@ export class Treeview {
             packageCount: 0,
             workspaceCount: 0
         };
-        const templatesEl = this._renderItem(templatesItem, true);
-        matrixGroup.appendChild(templatesEl);
+        matrixGroup.appendChild(this._renderItem(templatesItem, true));
+
+        this._root.appendChild(matrixGroup);
 
         if (projects.length === 0) {
             const empty = document.createElement('div');
@@ -312,6 +318,9 @@ export class Treeview {
      * caller can branch on its presence.
      */
     private static _sentinelIcon(unid: string): string|null {
+        if (unid === '__dashboard__') {
+            return '▣';
+        }
         if (unid === '__matrix__') {
             return '▦';
         }

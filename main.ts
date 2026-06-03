@@ -1,6 +1,7 @@
 import 'normalize.css';
 import './main.css';
 import {I18n, LANGUAGES} from './Frontend/I18n.js';
+import {ImpactModal} from './Frontend/ImpactModal.js';
 import {Nppm} from './Frontend/Nppm.js';
 import {SettingsModal} from './Frontend/SettingsModal.js';
 
@@ -62,6 +63,24 @@ function mountSettingsButton(): void {
 }
 
 mountSettingsButton();
+
+/**
+ * Topbar Impact button → ImpactModal. Same pattern as the gear button:
+ * markup lives in `index.html`, click handler + i18n title wired here.
+ */
+function mountImpactButton(): void {
+    const btn = document.getElementById('topbar-impact');
+    if (!btn) {
+        return;
+    }
+    btn.title = I18n.t('Impact analysis');
+    btn.textContent = I18n.t('Impact');
+    btn.addEventListener('click', () => {
+        new ImpactModal().open();
+    });
+}
+
+mountImpactButton();
 
 const app = new Nppm();
 void app.start();

@@ -30,6 +30,104 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'Git package: OSV.dev only indexes registry-installed versions. Script + code-pattern heuristics still ran.': 'Git-Paket: OSV.dev indiziert nur registry-installierte Versionen. Skript- und Code-Pattern-Heuristiken laufen trotzdem.',
     'Global CVE scan': 'Globaler CVE-Scan',
     'History': 'History',
+    'Dashboard': 'Dashboard',
+    'Scanner': 'Scanner',
+    'Scanner info': 'Scanner-Info',
+    'What it scans': 'Was wird gescannt',
+    'How the score is computed': 'Wie die Wertung entsteht',
+    'Unified formula: 100 × (1 − Σ min(weight, 30) / (packages × 30)) with info=1, warn=10, risk=30.':
+        'Einheitliche Formel: 100 × (1 − Σ min(Gewicht, 30) / (Pakete × 30)) mit info=1, warn=10, risk=30.',
+    'Queries OSV.dev for known vulnerabilities affecting each installed name@version.':
+        'Fragt OSV.dev nach bekannten Schwachstellen für jedes installierte name@version ab.',
+    'Every OSV hit counts as risk (no per-vuln severity is fetched in batch).':
+        'Jeder OSV-Treffer zählt als risk (im Batch wird keine Einzel-Severity geladen).',
+    'Classifies the SPDX expression of every package against the configured allow/denylist (permissive / weak-copyleft / strong-copyleft / proprietary / unknown).':
+        'Klassifiziert den SPDX-Ausdruck jedes Pakets gegen die konfigurierte Allow-/Denylist (permissive / weak-copyleft / strong-copyleft / proprietary / unknown).',
+    'Permissive licenses do not count. Unknown / weak-copyleft = info, strong-copyleft = warn, proprietary = risk.':
+        'Permissive Lizenzen zählen nicht. Unknown / weak-copyleft = info, strong-copyleft = warn, proprietary = risk.',
+    'Detects preinstall / install / postinstall / prepare hooks declared in each package.json. Higher severity for scripts that fetch the network or exec child processes.':
+        'Erkennt preinstall / install / postinstall / prepare Hooks in jeder package.json. Höhere Schwere bei Skripten, die Netz nutzen oder Kindprozesse starten.',
+    'Regex-scans tarball JavaScript for risky patterns: eval / Function / child_process / base64-decoded eval, etc.':
+        'Sucht im JavaScript des Tarballs per Regex nach riskanten Mustern: eval / Function / child_process / base64-decodiertes eval usw.',
+    'Classifies binary files inside the tarball by extension and whether they sit on the bin/ path (executables the publisher exposes to npm install).':
+        'Klassifiziert Binärdateien im Tarball nach Endung und ob sie unter bin/ liegen (vom Publisher als ausführbar exponiert).',
+    'Spots publisher handovers on mature packages. A short gap between the previous and current publisher on a long-lived package matches the event-stream / ua-parser-js takeover pattern.':
+        'Erkennt Publisher-Übergaben bei etablierten Paketen. Kurzer Abstand zwischen altem und neuem Publisher auf einem alten Paket = event-stream / ua-parser-js Übernahme-Muster.',
+    'Diffs the current tarball against the previous stable release. Outsized add/remove/modify counts for a patch or minor bump are flagged.':
+        'Vergleicht den aktuellen Tarball mit dem vorigen Stable-Release. Übergroße add/remove/modify-Zahlen bei Patch- oder Minor-Bumps werden markiert.',
+    'Looks at the registry release timeline. Very stale (no recent releases) or unusually bursty cadence both raise the level.':
+        'Schaut auf die Release-Timeline der Registry. Sehr alt (lange keine Releases) oder ungewöhnlich häufige Bursts erhöhen die Schwere.',
+    'Combines package age (first publish) with publisher account age. A brand-new package by a brand-new account is the highest-risk pair.':
+        'Kombiniert Paket-Alter (erster Publish) mit Account-Alter des Publishers. Brandneues Paket von brandneuem Account = höchstes Risiko.',
+    'Derives a recommendation for `npm install --ignore-scripts`. Packages whose hooks do non-trivial work (compile, fetch, write to disk) flip the recommendation away from "ignore".':
+        'Empfiehlt, ob `npm install --ignore-scripts` sicher ist. Pakete, deren Hooks echte Arbeit machen (kompilieren, herunterladen, Disk schreiben), kippen die Empfehlung weg von „ignore".',
+    'Levenshtein distance to popular packages plus Unicode confusables (homoglyph attacks). Distance 1 / Unicode = risk; distance 2 = warn.':
+        'Levenshtein-Distanz zu populären Paketen plus Unicode-Verwechslungen (Homoglyphen). Distanz 1 / Unicode = risk; Distanz 2 = warn.',
+    'Reads the registry dist record for SLSA / sigstore attestation. Provenance + signed land in the no-finding bucket; unsigned counts as info.':
+        'Liest die SLSA-/sigstore-Attestation aus dem Registry-Dist-Eintrag. Provenance + signed gelten als sauber; unsigned zählt als info.',
+    'Cross-checks the lockfile `resolved` URL + `integrity` hash against what the registry currently serves. Mismatches and mirror redirects are surfaced.':
+        'Vergleicht `resolved`-URL + `integrity`-Hash der Lockfile mit dem aktuellen Registry-Stand. Abweichungen und Mirror-Redirects werden gemeldet.',
+    'Walks project source files for unused declared deps, misplaced (dev imports under runtime), and missing (imported but undeclared) packages.':
+        'Geht die Quelldateien des Projekts durch nach ungenutzten Deps, falsch eingeordneten (dev-Imports unter runtime) und fehlenden (importiert, aber nicht deklariert).',
+    'Compares the project against the templates it declares — required deps + forbidden ranges + root metadata + file rules.':
+        'Vergleicht das Projekt mit seinen deklarierten Templates — Pflicht-Deps + verbotene Ranges + Root-Metadaten + File-Regeln.',
+    'The scanner\'s native info / warn / risk severity is used as-is.':
+        'Die native info / warn / risk-Stufe des Scanners wird 1:1 übernommen.',
+    'needs-scripts = info, avoid-scripts = risk. unaffected / safe-to-ignore do not count.':
+        'needs-scripts = info, avoid-scripts = risk. unaffected / safe-to-ignore zählen nicht.',
+    'exact / unrelated do not count. Distance 2 = warn; distance 1 or Unicode confusable = risk.':
+        'exact / unrelated zählen nicht. Distanz 2 = warn; Distanz 1 oder Unicode-Verwechslung = risk.',
+    'provenance / signed are clean. Only unsigned counts (as info).':
+        'provenance / signed gelten als sauber. Nur unsigned zählt (als info).',
+    'Per-finding info / warn / risk applied; total is divided by the package count for the score.':
+        'Pro Befund wird info / warn / risk angewendet; Summe wird durch die Paketzahl geteilt für die Wertung.',
+    'Each unused entry uses its own severity. Misplaced and missing each count as warn.':
+        'Jeder Eintrag in „unused" nutzt seine eigene Severity. Misplaced und missing zählen jeweils als warn.',
+    'Each compliance finding contributes its native severity. Projects without a declared template render N/A.':
+        'Jeder Compliance-Befund nutzt seine native Severity. Projekte ohne deklariertes Template werden als N/A dargestellt.',
+    'Open project': 'Projekt öffnen',
+    'Open in {view}': 'In {view} öffnen',
+    'Installed view': 'Installed-Ansicht',
+    'Unused view': 'Unused-Ansicht',
+    'Template view': 'Template-Ansicht',
+    'nothing flagged': 'nichts auffällig',
+    'Scanner did not run.': 'Scanner wurde nicht ausgeführt.',
+    'Nothing flagged in this project.': 'Nichts auffällig in diesem Projekt.',
+    'Showing top {n} of {total} findings (severity desc).':
+        'Zeige Top-{n} von {total} Befunden (Severity abst.).',
+    'Showing cached snapshot from {time}': 'Zeige Cache-Snapshot von {time}',
+    'Showing cached snapshot': 'Zeige Cache-Snapshot',
+    'just now': 'gerade eben',
+    '{n} min ago': 'vor {n} Min.',
+    '{n} h ago': 'vor {n} Std.',
+    'Please wait — preparing scan …': 'Bitte warten — Scan wird vorbereitet …',
+    'Scanning {n} projects …': 'Scanne {n} Projekte …',
+    'Scan complete — {n} cells': 'Scan fertig — {n} Zellen',
+    'Waiting for the first project …': 'Warte auf das erste Projekt …',
+    '{project} — {scanner}': '{project} — {scanner}',
+    'over {n} packages': 'über {n} Pakete',
+    'N/A': 'N/A',
+    'CVE (OSV)': 'CVE (OSV)',
+    'Install scripts': 'Install-Scripts',
+    'Ignore-scripts safety': '--ignore-scripts-Sicherheit',
+    'Unused deps': 'Ungenutzte Deps',
+    'Template compliance': 'Template-Compliance',
+    'Impact': 'Impact',
+    'Impact analysis': 'Impact-Analyse',
+    'Affected projects ({n})': 'Betroffene Projekte ({n})',
+    'Clean projects ({n})': 'Saubere Projekte ({n})',
+    'Skipped projects ({n})': 'Übersprungene Projekte ({n})',
+    'Enter a package name to scan every configured project for direct + transitive uses. Patterns like "4.17.x" or "4.x" narrow by version.': 'Paketnamen eingeben, um alle konfigurierten Projekte auf direkte und transitive Nutzungen zu prüfen. Muster wie "4.17.x" oder "4.x" grenzen die Version ein.',
+    'No project ships this package — you are not exposed.': 'Kein Projekt liefert dieses Paket aus — du bist nicht betroffen.',
+    'Package name': 'Paketname',
+    'Scan impact': 'Impact scannen',
+    'Scanning all configured projects …': 'Scanne alle konfigurierten Projekte …',
+    'Version (optional)': 'Version (optional)',
+    '{name}{version} — {hits} hits across {affected}/{total} projects': '{name}{version} — {hits} Treffer in {affected}/{total} Projekten',
+    '{n} hits': '{n} Treffer',
+    '{n} CVE': '{n} CVE',
+    'direct': 'direkt',
+    'transitive': 'transitiv',
     'Install hook runs code during `npm install`': 'Install-Hook führt Code beim `npm install` aus',
     'Installed': 'Installiert',
     'Install-scripts': 'Install-Scripts',

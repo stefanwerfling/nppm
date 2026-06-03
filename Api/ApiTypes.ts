@@ -7,6 +7,8 @@ import {Lockfile} from '../Project/Lockfile.js';
 import {PackageDependency} from '../Project/PackageManifest.js';
 import {ReleasesResponse} from '../Releases/Releases.js';
 import {IntegrityFinding, IntegritySeverity, IntegritySummary} from '../Security/IntegrityScanner.js';
+import {DashboardCell, DashboardColumn, DashboardResponse, ScannerId} from '../Dashboard/DashboardBuilder.js';
+import {ImpactReport} from '../Security/ImpactAnalyzer.js';
 import {HeuristicsBatchEntry, SecurityReport} from '../Security/SecurityScanner.js';
 import {PrReviewReport} from '../PrReview/PrReview.js';
 import {UnusedReport} from '../Unused/UnusedReport.js';
@@ -650,6 +652,90 @@ export type ApiVulnerabilityTimelineResponse = VulnerabilityTimelineResponse;
  * stays explicit in `ApiTypes.ts`.
  */
 export type ApiPrReviewResponse = PrReviewReport;
+
+/**
+ * Response shape of `GET /api/impact?name=<name>[&version=<pattern>]`.
+ * Cross-project blast-radius answer for a single package name. Wraps
+ * `ImpactReport` 1:1 — kept as its own type so the API surface stays
+ * explicit in `ApiTypes.ts`.
+ */
+export type ApiImpactResponse = ImpactReport;
+
+/**
+ * Response shape of `GET /api/dashboard/scan` (final `end` event).
+ * Project × scanner matrix with one `DashboardCell` per intersection
+ * — score (0..100 or null = N/A), severity-bucket counts, and the
+ * package denominator that the score formula normalised against.
+ *
+ * The endpoint is SSE because cold caches require fingerprinting +
+ * OSV across every package of every project; the events drive a
+ * progress bar with project + scanner labels.
+ */
+export type ApiDashboardResponse = DashboardResponse;
+
+/**
+ * Response shape of `GET /api/dashboard/snapshot`. Returns the most
+ * recent scan result persisted to `.nppm-cache/dashboard-snapshot.json`
+ * — used by the Dashboard view to render an immediate first-paint
+ * while the user decides whether to trigger a fresh SSE scan.
+ *
+ * Both fields are `null` until the first scan completes.
+ */
+export type ApiDashboardSnapshotResponse = {
+    snapshot: ApiDashboardResponse|null;
+    /** ISO-8601 timestamp of the persisted scan, or `null` when missing. */
+    timestamp: string|null;
+};
+
+/**
+ * SSE event payloads for `GET /api/dashboard/scan`. Sequence:
+ *
+ *   start          { scanners, totalProjects }
+ *   column-start   { projectIndex, projectUnid, projectName }
+ *   progress       { current, total, projectName, scanner }   (×scanner-per-project)
+ *   cell           { projectUnid, scanner, cell }            (×scanner-per-project)
+ *   column-end     { column }
+ *   end            { dashboard }
+ *   | error        { msg }
+ *
+ * Progress emits one event per (project, scanner) pair so the
+ * progress bar can show "kavula — Maintainer (4/45)".
+ */
+export type ApiDashboardScanStartEvent = {
+    scanners: ScannerId[];
+    totalProjects: number;
+};
+
+export type ApiDashboardScanColumnStartEvent = {
+    projectIndex: number;
+    projectUnid: string;
+    projectName: string;
+};
+
+export type ApiDashboardScanProgressEvent = {
+    current: number;
+    total: number;
+    projectName: string;
+    scanner: ScannerId|null;
+};
+
+export type ApiDashboardScanCellEvent = {
+    projectUnid: string;
+    scanner: ScannerId;
+    cell: DashboardCell;
+};
+
+export type ApiDashboardScanColumnEndEvent = {
+    column: DashboardColumn;
+};
+
+export type ApiDashboardScanEndEvent = {
+    dashboard: ApiDashboardResponse;
+};
+
+export type ApiDashboardScanErrorEvent = {
+    msg: string;
+};
 
 /**
  * Response shape of `GET /api/projects/:id/integrity`. Lockfile-

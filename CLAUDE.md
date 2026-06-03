@@ -59,6 +59,7 @@ nppm/
 │   ├── MaintainerScanner.ts  _npmUser handover detection, gap-based severity
 │   ├── LicenseScanner.ts   SPDX classifier (permissive/weak/strong/proprietary/unknown) + mini expr parser
 │   ├── IntegrityScanner.ts lockfile `resolved+integrity` vs registry `dist` cross-check
+│   ├── ImpactAnalyzer.ts   cross-project blast-radius: BFS shortest path from root deps to a queried name(+version)
 │   └── SecurityScanner.ts  aggregator + batched matrix-heuristics
 │
 ├── Unused/                 depcheck-style per-project hygiene scan
@@ -88,6 +89,8 @@ nppm/
 ├── Releases/               npm registry + GitHub Releases merge
 │   ├── Releases.ts
 │   └── ReleasesFetcher.ts
+│
+├── Dashboard/DashboardBuilder.ts  per-(project, scanner) scoring helpers — unified info/warn/risk → 0–100 ring score; reused by /api/dashboard/scan
 │
 ├── DepGraph/DepGraphBuilder.ts  flat-graph walker, npm hoisting algorithm
 ├── History/                per-project change log
@@ -123,6 +126,9 @@ nppm/
 │   ├── UnusedView.ts       per-project depcheck-style report (unused/misplaced/missing)
 │   ├── VulnerabilityTimelineView.ts  retroactive CVE exposure window per name@version
 │   ├── PrReviewView.ts     diffs package.json + lockfile between two git refs
+│   ├── DashboardView.ts    cross-project scanner matrix (rows × cols = scanners × projects, score rings; treeview __dashboard__ sentinel → SSE /api/dashboard/scan; cell click → FindingsModal; header click → project drill-down; snapshot first-paint)
+│   ├── FindingsModal.ts    drill-down modal on Dashboard cell click — scanner label + project + top-50 findings + "Open in <view>" for cve/integrity/unused/template
+│   ├── ImpactModal.ts      cross-project blast-radius modal (topbar "Impact" button → /api/impact)
 │   ├── UpgradeModal.ts     overlay: preview → edit/install → lifecycle-scripts list + Run buttons
 │   ├── BulkUpgradeModal.ts cross-project bulk wizard: grouped preview + per-project SSE install log
 │   ├── SettingsModal.ts    tabbed editor for the non-projects sections of nppm.json
@@ -173,6 +179,9 @@ nppm/
 | GET    | `/api/projects/:id/history/backfill`                  | SSE: git-backfill only (no OSV) — drives History-view button |
 | GET    | `/api/projects/:id/matrix`                            | per-project matrix |
 | GET    | `/api/projects/:id/depgraph`                          | flat resolved dep graph |
+| GET    | `/api/impact?name=&version=`                          | cross-project blast-radius: every reachable instance of `name`, direct + transitive, with shortest dep path |
+| GET    | `/api/dashboard/scan`                                 | SSE: per-(project, scanner) score matrix — emits `start` / `column-start` / `progress` / `cell` / `column-end` / `end`, drives the Dashboard view's progress bar (cold cache ≈ 1 min) |
+| GET    | `/api/dashboard/snapshot`                             | last persisted scan result (`.nppm-cache/dashboard-snapshot.json`), or `{snapshot:null,timestamp:null}` when none — drives the Dashboard view's first-paint |
 | GET    | `/api/projects/:id/unused`                            | depcheck-style hygiene scan (unused / misplaced / missing) |
 | GET    | `/api/projects/:id/sbom?format=cyclonedx\|spdx`       | Software Bill of Materials (default: cyclonedx) |
 | GET    | `/api/projects/:id/vulnerability-timeline`            | retroactive CVE-exposure timeline (cache-only read) |

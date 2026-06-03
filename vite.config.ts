@@ -36,7 +36,10 @@ import {
     ApiTemplatesMatrixRow,
     ApiTemplatesResponse,
     ApiFingerprintResponse,
+    ApiDashboardResponse,
+    ApiDashboardSnapshotResponse,
     ApiHistoryResponse,
+    ApiImpactResponse,
     ApiIntegrityResponse,
     ApiLockfileResponse,
     ApiManifest,
@@ -67,7 +70,9 @@ import {GitResolver} from './Fingerprint/GitResolver.js';
 import {GitHistoryBackfill} from './History/GitHistoryBackfill.js';
 import {HistoryStore} from './History/HistoryStore.js';
 import {RemoteGitHistoryBackfill} from './History/RemoteGitHistoryBackfill.js';
+import {CellFinding, DashboardBuilder, DashboardCell, DashboardColumn, ScannerId, SCANNER_IDS} from './Dashboard/DashboardBuilder.js';
 import {DepGraphBuilder} from './DepGraph/DepGraphBuilder.js';
+import {ImpactAnalyzer, ImpactProjectReport} from './Security/ImpactAnalyzer.js';
 import {MatrixBuilder} from './Matrix/MatrixBuilder.js';
 import {ProjectMatrixBuilder} from './Matrix/ProjectMatrixBuilder.js';
 import {Project} from './Project/Project.js';
@@ -194,6 +199,14 @@ class Server {
             const timelineBuilder = new TimelineBuilder(securityCache);
             const prReviewBuilder = new PrReviewBuilder(osvClient);
             const integrityScanner = new IntegrityScanner(registry);
+
+            // Dashboard snapshot path. Lives in the cache directory
+            // (a re-scan re-creates it; deleting it just forces the
+            // next view-open to start with the empty-state instead of
+            // the previous result). Not gated behind JsonCache because
+            // we never want TTL-eviction here — the user wants to see
+            // *the last* result regardless of age.
+            const dashboardSnapshotPath = path.join(cacheDir, 'dashboard-snapshot.json');
 
             // Templates catalogue. Lives next to nppm.json in
             // `nppm-templates/<id>/template.json` (one folder per
@@ -1057,6 +1070,61 @@ class Server {
             });
 
             // -------------------------------------------------------------
+            // GET /api/impact?name=<name>[&version=<pattern>] — cross-
+            // project blast-radius lookup. Iterates every configured
+            // project, builds its DepGraph (warm-cache fast), runs the
+            // ImpactAnalyzer, and returns the aggregate report. The
+            // version pattern is the permissive shape documented on
+            // `ImpactAnalyzer.versionMatches`; missing/empty = match
+            // every version.
+            //
+            // Hidden projects are scanned too — incident response cares
+            // about all repos, not just the matrix-visible ones.
+            // -------------------------------------------------------------
+            app.get('/api/impact', async (req, res) => {
+                const name = typeof req.query.name === 'string' ? req.query.name.trim() : '';
+                if (name === '') {
+                    res.status(400).json({success: false, msg: 'name query param required'});
+                    return;
+                }
+                const rawVersion = typeof req.query.version === 'string' ? req.query.version.trim() : '';
+                const versionPattern = rawVersion === '' ? null : rawVersion;
+
+                const perProject: ImpactProjectReport[] = [];
+                const skipped: {unid: string; name: string; type: string; reason: string}[] = [];
+
+                for (const [unid, project] of projects.entries()) {
+                    try {
+                        const graph = await DepGraphBuilder.build(unid, project, registry, securityCache);
+                        if (!graph) {
+                            skipped.push({
+                                unid,
+                                name: project.getName(),
+                                type: project.getType(),
+                                reason: 'no lockfile'
+                            });
+                            continue;
+                        }
+                        perProject.push(ImpactAnalyzer.analyzeGraph(graph, name, versionPattern));
+                    } catch (e) {
+                        skipped.push({
+                            unid,
+                            name: project.getName(),
+                            type: project.getType(),
+                            reason: (e as Error).message
+                        });
+                    }
+                }
+
+                const report: ApiImpactResponse = ImpactAnalyzer.buildReport(
+                    {name, versionPattern},
+                    perProject,
+                    skipped
+                );
+                res.status(200).json(report);
+            });
+
+            // -------------------------------------------------------------
             // GET /api/projects/:id/matrix — per-project matrix with one
             // column per workspace (root first) + a Latest column from
             // the registry. Independent of the global matrix, but reuses
@@ -1893,6 +1961,386 @@ class Server {
             // Result events include `projects: string[]` so the UI can
             // show which projects pulled in each vulnerable package.
             // -------------------------------------------------------------
+            // -------------------------------------------------------------
+            // GET /api/dashboard/snapshot — last persisted scan result.
+            // Returned by the SSE `end` handler on every successful
+            // scan; the view uses it to render an immediate first-paint
+            // on open while leaving the user free to trigger a fresh
+            // scan via the Re-scan button.
+            //
+            // Returns `{snapshot: null, timestamp: null}` when no scan
+            // has run yet (first-ever view-open or after Settings → Clear
+            // cache) — distinct from a 500, which is reserved for actual
+            // disk errors.
+            // -------------------------------------------------------------
+            app.get('/api/dashboard/snapshot', (_req, res) => {
+                try {
+                    if (!fs.existsSync(dashboardSnapshotPath)) {
+                        const empty: ApiDashboardSnapshotResponse = {snapshot: null, timestamp: null};
+                        res.status(200).json(empty);
+                        return;
+                    }
+                    const raw = fs.readFileSync(dashboardSnapshotPath, 'utf-8');
+                    const payload = JSON.parse(raw) as ApiDashboardSnapshotResponse;
+                    res.status(200).json(payload);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/dashboard/scan — SSE stream that walks every
+            // project × every scanner and emits one `cell` event per
+            // intersection plus `progress` events with the current
+            // project + scanner label. Each project is its own column;
+            // the final `end` event carries the full DashboardResponse
+            // so a late-joining client (or one that just wants the
+            // result) gets a single deterministic snapshot.
+            //
+            // Per-package scanners (cve / license / scripts / patterns
+            // / binaries / maintainer / churn / cadence / freshness /
+            // ignoreScripts / typosquat / provenance) share three
+            // batched calls (OSV + scanHeuristicsBatch + scanChurnBatch)
+            // that run in parallel. Per-project scanners (integrity /
+            // unused / template) are then run sequentially. Cold-cache
+            // first run takes the bulk of its time inside the three
+            // batches; warm runs hit the permanent fingerprint cache
+            // and complete in seconds.
+            // -------------------------------------------------------------
+            app.get('/api/dashboard/scan', async (req, res) => {
+                res.set({
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'X-Accel-Buffering': 'no'
+                });
+                res.flushHeaders();
+
+                const send = (event: string, data: object): void => {
+                    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+                };
+
+                let aborted = false;
+                req.on('close', () => {
+                    aborted = true;
+                });
+
+                const projectEntries = Array.from(projects.entries());
+                const totalCells = projectEntries.length * SCANNER_IDS.length;
+                const columns: DashboardColumn[] = [];
+                let cellsDone = 0;
+
+                send('start', {scanners: SCANNER_IDS, totalProjects: projectEntries.length});
+
+                try {
+                    for (let projectIdx = 0; projectIdx < projectEntries.length; projectIdx++) {
+                        if (aborted) {
+                            return;
+                        }
+                        const [unid, project] = projectEntries[projectIdx];
+                        const projectName = project.getName();
+
+                        send('column-start', {
+                            projectIndex: projectIdx,
+                            projectUnid: unid,
+                            projectName
+                        });
+
+                        const cells: Partial<Record<ScannerId, DashboardCell>> = {};
+                        let columnError: string|undefined;
+
+                        const emitCell = (scanner: ScannerId, cell: DashboardCell): void => {
+                            cells[scanner] = cell;
+                            send('cell', {projectUnid: unid, scanner, cell});
+                            cellsDone++;
+                            send('progress', {
+                                current: cellsDone,
+                                total: totalCells,
+                                projectName,
+                                scanner
+                            });
+                        };
+
+                        const skipColumnAsNa = (msg: string): void => {
+                            columnError = msg;
+                            for (const id of SCANNER_IDS) {
+                                emitCell(id, DashboardBuilder.naCell(msg));
+                            }
+                        };
+
+                        try {
+                            const lockfile = await project.loadLockfile();
+                            if (!lockfile) {
+                                skipColumnAsNa('no lockfile');
+                            } else {
+                                // Unique package list — same dedup MatrixBuilder
+                                // and the OSV-all stream apply, so the per-package
+                                // batches don't redo work for hoisted duplicates.
+                                const seen = new Set<string>();
+                                const packages: {name: string; version: string}[] = [];
+                                for (const pkg of lockfile.packages) {
+                                    const key = `${pkg.name}@${pkg.version}`;
+                                    if (seen.has(key)) {
+                                        continue;
+                                    }
+                                    seen.add(key);
+                                    packages.push({name: pkg.name, version: pkg.version});
+                                }
+                                const packageCount = packages.length;
+
+                                // Announce the slow phase first so the
+                                // progress bar already shows what's
+                                // happening while the parallel batches run.
+                                send('progress', {
+                                    current: cellsDone,
+                                    total: totalCells,
+                                    projectName,
+                                    scanner: 'cve' as ScannerId
+                                });
+
+                                const [osvMap, heuristics, churns] = await Promise.all([
+                                    osvClient.queryBatch(packages),
+                                    securityScanner.scanHeuristicsBatch(packages),
+                                    securityScanner.scanChurnBatch(packages)
+                                ]);
+
+                                if (aborted) {
+                                    return;
+                                }
+
+                                // Per-package scanner buckets — null entries are
+                                // packages where the scanner found nothing.
+                                // Findings collected in parallel so the cell payload
+                                // surfaces concrete labels in the FindingsModal.
+                                const perScanner: Record<string, (ReturnType<typeof DashboardBuilder.cveSeverity>)[]> = {
+                                    cve: [], license: [], scripts: [], patterns: [],
+                                    binaries: [], maintainer: [], churn: [], cadence: [],
+                                    freshness: [], ignoreScripts: [], typosquat: [], provenance: []
+                                };
+                                const perFindings: Record<string, CellFinding[]> = {
+                                    cve: [], license: [], scripts: [], patterns: [],
+                                    binaries: [], maintainer: [], churn: [], cadence: [],
+                                    freshness: [], ignoreScripts: [], typosquat: [], provenance: []
+                                };
+
+                                const pushFinding = (scanner: ScannerId, label: string,
+                                    sev: ReturnType<typeof DashboardBuilder.cveSeverity>, detail?: string): void => {
+                                    if (sev === null) {
+                                        return;
+                                    }
+                                    perFindings[scanner].push({label, severity: sev, detail});
+                                };
+
+                                for (let i = 0; i < packages.length; i++) {
+                                    const h = heuristics[i];
+                                    const label = `${packages[i].name}@${packages[i].version}`;
+                                    const pkgKey = label;
+                                    const osvIds = osvMap.get(pkgKey) ?? null;
+
+                                    const cve = DashboardBuilder.cveSeverity(osvIds);
+                                    perScanner.cve.push(cve);
+                                    pushFinding('cve', label, cve, osvIds && osvIds.length > 0
+                                        ? osvIds.slice(0, 3).join(', ') : undefined);
+
+                                    const lic = DashboardBuilder.licenseSeverity(h.license);
+                                    perScanner.license.push(lic);
+                                    pushFinding('license', label, lic, h.license.spdx ?? undefined);
+
+                                    const sc = DashboardBuilder.scriptsSeverity(h.scripts);
+                                    perScanner.scripts.push(sc);
+                                    pushFinding('scripts', label, sc, `${h.scripts.count} hook(s)`);
+
+                                    const pat = DashboardBuilder.patternsSeverity(h.patterns);
+                                    perScanner.patterns.push(pat);
+                                    pushFinding('patterns', label, pat, `${h.patterns.count} match(es)`);
+
+                                    const bin = DashboardBuilder.binariesSeverity(h.binaries);
+                                    perScanner.binaries.push(bin);
+                                    pushFinding('binaries', label, bin, `${h.binaries.totalCount} file(s)`);
+
+                                    const main = DashboardBuilder.maintainerSeverity(h.maintainer);
+                                    perScanner.maintainer.push(main);
+                                    pushFinding('maintainer', label, main, h.maintainer.publisher ?? undefined);
+
+                                    const ch = DashboardBuilder.churnSeverity(churns[i]);
+                                    perScanner.churn.push(ch);
+                                    if (ch !== null && churns[i]) {
+                                        const f = churns[i]!;
+                                        pushFinding('churn', label, ch, `${f.bumpType} bump · ${f.added + f.removed + f.modified} files`);
+                                    }
+
+                                    const cad = DashboardBuilder.cadenceSeverity(h.cadence);
+                                    perScanner.cadence.push(cad);
+                                    pushFinding('cadence', label, cad,
+                                        h.cadence.daysSinceLastRelease !== null
+                                            ? `${h.cadence.daysSinceLastRelease}d since last release`
+                                            : undefined);
+
+                                    const fr = DashboardBuilder.freshnessSeverity(h.freshness);
+                                    perScanner.freshness.push(fr);
+                                    pushFinding('freshness', label, fr,
+                                        h.freshness.packageAgeDays !== null
+                                            ? `${h.freshness.packageAgeDays}d package age`
+                                            : undefined);
+
+                                    // ignoreScripts is derived heuristically from the
+                                    // batched scripts.maxSeverity since the batch entry
+                                    // doesn't carry the IgnoreScriptsFinding directly.
+                                    const sMax = h.scripts.maxSeverity;
+                                    const ign: ReturnType<typeof DashboardBuilder.cveSeverity> =
+                                        sMax === 'risk' ? 'risk'
+                                            : sMax === 'warn' ? 'info'
+                                                : null;
+                                    perScanner.ignoreScripts.push(ign);
+                                    pushFinding('ignoreScripts', label, ign,
+                                        ign === 'risk' ? 'avoid --ignore-scripts'
+                                            : ign === 'info' ? 'needs scripts' : undefined);
+
+                                    const ty = DashboardBuilder.typosquatSeverity(h.typosquat);
+                                    perScanner.typosquat.push(ty);
+                                    pushFinding('typosquat', label, ty,
+                                        h.typosquat.closestMatch
+                                            ? `vs. ${h.typosquat.closestMatch}` : undefined);
+
+                                    const pv = DashboardBuilder.provenanceSeverity(h.provenance);
+                                    perScanner.provenance.push(pv);
+                                    pushFinding('provenance', label, pv,
+                                        h.provenance.level ?? undefined);
+                                }
+
+                                // Per-package cells (12 scanners). Each one's
+                                // findings list is sorted + capped inside the
+                                // builder.
+                                const perPackageScanners: ScannerId[] = [
+                                    'cve', 'license', 'scripts', 'patterns', 'binaries',
+                                    'maintainer', 'churn', 'cadence', 'freshness',
+                                    'ignoreScripts', 'typosquat', 'provenance'
+                                ];
+                                for (const id of perPackageScanners) {
+                                    emitCell(id, DashboardBuilder.scorePerPackage(
+                                        perScanner[id], packageCount, perFindings[id]
+                                    ));
+                                    if (aborted) {
+                                        return;
+                                    }
+                                }
+
+                                // Integrity — per-project, scans the lockfile.
+                                send('progress', {
+                                    current: cellsDone,
+                                    total: totalCells,
+                                    projectName,
+                                    scanner: 'integrity' as ScannerId
+                                });
+                                const integrityFindings = await integrityScanner.scan(lockfile.packages);
+                                const integritySevs = integrityFindings.map((f) => DashboardBuilder.integritySeverity(f));
+                                const integrityCellFindings: CellFinding[] = integrityFindings.map((f) => ({
+                                    label: `${f.name}@${f.version}`,
+                                    severity: DashboardBuilder.integritySeverity(f),
+                                    detail: f.kind
+                                }));
+                                emitCell('integrity', DashboardBuilder.scorePerProject(
+                                    integritySevs, packageCount, integrityCellFindings
+                                ));
+
+                                // Unused — only on local projects; remote sources
+                                // surface as N/A via the detector's `supported`
+                                // flag, which `unusedCell` translates for us.
+                                send('progress', {
+                                    current: cellsDone,
+                                    total: totalCells,
+                                    projectName,
+                                    scanner: 'unused' as ScannerId
+                                });
+                                const unusedReport = await unusedDetector.scan(project);
+                                emitCell('unused', DashboardBuilder.unusedCell(unusedReport, packageCount));
+
+                                // Template compliance — runs only when the
+                                // project lists at least one template id; the
+                                // resolver is the same as the per-project
+                                // /api/projects/:id/compliance route.
+                                send('progress', {
+                                    current: cellsDone,
+                                    total: totalCells,
+                                    projectName,
+                                    scanner: 'template' as ScannerId
+                                });
+                                const declared = project.getTemplates();
+                                if (declared.length === 0) {
+                                    emitCell('template', DashboardBuilder.naCell('no templates declared'));
+                                } else {
+                                    templates = templateLoader.loadAll();
+                                    const knownIds = declared.filter((id) => templates.has(id));
+                                    const resolver = new TemplateResolver(
+                                        templates,
+                                        (id) => templateLoader.getFilesDir(id)
+                                    );
+                                    const resolved = resolver.resolve(knownIds);
+                                    const manifests = await project.loadManifests();
+                                    const projectRoot = project instanceof ProjectLocal
+                                        ? project.getRoot()
+                                        : undefined;
+                                    const report = templateChecker.check(manifests, resolved, {projectRoot});
+                                    const sevs = report.findings.map((f) => DashboardBuilder.complianceSeverity(f));
+                                    const tplCellFindings: CellFinding[] = report.findings.map((f) => ({
+                                        label: f.target,
+                                        severity: DashboardBuilder.complianceSeverity(f),
+                                        detail: f.kind
+                                    }));
+                                    emitCell('template', DashboardBuilder.scorePerProject(
+                                        sevs, packageCount, tplCellFindings
+                                    ));
+                                }
+                            }
+                        } catch (e) {
+                            columnError = (e as Error).message;
+                            for (const id of SCANNER_IDS) {
+                                if (!(id in cells)) {
+                                    emitCell(id, DashboardBuilder.naCell(columnError));
+                                }
+                            }
+                        }
+
+                        const column: DashboardColumn = {
+                            project: {unid, name: projectName, type: project.getType()},
+                            cells,
+                            ...(columnError ? {error: columnError} : {})
+                        };
+                        columns.push(column);
+                        send('column-end', {column});
+                    }
+
+                    if (!aborted) {
+                        const dashboard: ApiDashboardResponse = {
+                            scanners: [...SCANNER_IDS],
+                            columns
+                        };
+                        // Persist the result so the next view-open can
+                        // render an immediate first-paint without waiting
+                        // for a fresh SSE scan. Failure to write is
+                        // non-fatal — the user just gets the empty state
+                        // next time.
+                        try {
+                            if (!fs.existsSync(cacheDir)) {
+                                fs.mkdirSync(cacheDir, {recursive: true});
+                            }
+                            const payload: ApiDashboardSnapshotResponse = {
+                                snapshot: dashboard,
+                                timestamp: new Date().toISOString()
+                            };
+                            fs.writeFileSync(dashboardSnapshotPath, JSON.stringify(payload));
+                        } catch (e) {
+                            console.warn(`nppm: dashboard snapshot save failed: ${(e as Error).message}`);
+                        }
+                        send('end', {dashboard});
+                    }
+                } catch (e) {
+                    send('error', {msg: (e as Error).message});
+                } finally {
+                    res.end();
+                }
+            });
+
             app.get('/api/lockfile/analyze-all', async (_req, res) => {
                 res.set({
                     'Content-Type': 'text/event-stream',

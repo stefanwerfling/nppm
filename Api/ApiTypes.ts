@@ -119,6 +119,14 @@ export type ApiConfigSettings = {
         allowInstall?: boolean;
         editor?: string;
     };
+    /**
+     * In-app UX preferences. `startView` picks the first view the
+     * Nppm frontend lands on (`matrix` | `dashboard`). Unknown values
+     * fall back to matrix in `Nppm.start()`.
+     */
+    ui?: {
+        startView?: string;
+    };
     security?: {
         maintainer?: {
             quickHandoverDays?: number;

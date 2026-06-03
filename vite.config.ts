@@ -475,7 +475,7 @@ class Server {
                         // Replace every known section explicitly; absent
                         // keys in `body` drop the section entirely so
                         // the on-disk shape stays clean.
-                        for (const key of ['server', 'browser', 'registry', 'cache', 'actions', 'security']) {
+                        for (const key of ['server', 'browser', 'registry', 'cache', 'actions', 'security', 'ui']) {
                             delete cfg[key];
                         }
                         for (const [key, value] of Object.entries(body)) {

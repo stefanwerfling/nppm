@@ -200,11 +200,22 @@ export class SettingsModal {
         const s = this._current.server ?? {};
         const c = this._current.cache ?? {};
         const b = this._current.browser ?? {};
+        const u = this._current.ui ?? {};
         body.appendChild(this._sectionHead(I18n.t('Server')));
         body.appendChild(this._numberField('sm-port', I18n.t('Port'), s.port, '5190'));
         body.appendChild(this._textField('sm-limit', I18n.t('Body size limit'), s.limit, '10mb'));
         body.appendChild(this._sectionHead(I18n.t('Browser')));
         body.appendChild(this._checkboxField('sm-open', I18n.t('Open browser on dev start'), b.open === true));
+        body.appendChild(this._sectionHead(I18n.t('User interface')));
+        body.appendChild(this._selectField(
+            'sm-startview',
+            I18n.t('Start page'),
+            u.startView === 'dashboard' ? 'dashboard' : 'matrix',
+            [
+                {value: 'matrix', label: I18n.t('Matrix')},
+                {value: 'dashboard', label: I18n.t('Dashboard')}
+            ]
+        ));
         body.appendChild(this._sectionHead(I18n.t('Cache')));
         body.appendChild(this._textField('sm-cdir', I18n.t('Cache directory'), c.dir, '.nppm-cache'));
         body.appendChild(this._numberField('sm-cttl', I18n.t('Cache TTL (minutes)'), c.ttlMinutes, '60'));
@@ -498,6 +509,7 @@ export class SettingsModal {
         const port = this._numVal('.sm-port');
         const limit = this._strVal('.sm-limit');
         const open = this._boolVal('.sm-open');
+        const startView = this._strVal('.sm-startview');
         const cdir = this._strVal('.sm-cdir');
         const cttl = this._numVal('.sm-cttl');
         const server: NonNullable<ApiConfigSettings['server']> = {};
@@ -513,6 +525,12 @@ export class SettingsModal {
         // toggled it on; if false we drop the section so disk shape
         // stays minimal.
         this._current.browser = open ? {open: true} : undefined;
+
+        // UI: only persist `startView` when the user picked the
+        // non-default (dashboard). The matrix fallback is implicit in
+        // `Nppm.start()` so an empty `ui` section keeps the existing
+        // landing behaviour.
+        this._current.ui = startView === 'dashboard' ? {startView} : undefined;
 
         const cache: NonNullable<ApiConfigSettings['cache']> = {};
         if (cdir !== undefined) {
@@ -642,7 +660,8 @@ export class SettingsModal {
             registry: this._current.registry,
             cache: this._current.cache,
             actions: this._current.actions,
-            security: this._current.security
+            security: this._current.security,
+            ui: this._current.ui
         };
         // Drop undefined keys — the backend wipes any unmentioned
         // section anyway, but keeping the wire payload tight makes

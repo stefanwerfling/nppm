@@ -86,6 +86,8 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'Each compliance finding contributes its native severity. Projects without a declared template render N/A.':
         'Jeder Compliance-Befund nutzt seine native Severity. Projekte ohne deklariertes Template werden als N/A dargestellt.',
     'Open project': 'Projekt öffnen',
+    'User interface': 'Oberfläche',
+    'Start page': 'Startseite',
     'Open in {view}': 'In {view} öffnen',
     'Installed view': 'Installed-Ansicht',
     'Unused view': 'Unused-Ansicht',

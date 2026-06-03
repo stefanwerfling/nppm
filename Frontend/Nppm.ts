@@ -476,17 +476,41 @@ export class Nppm {
     }
 
     public async start(): Promise<void> {
-        this._switchTo(View.matrix);
-        this._matrix.renderLoading();
+        // Read the user's start-view preference up-front so the very
+        // first paint already lands on the chosen surface. Failure to
+        // reach /api/config is non-fatal — we just fall back to the
+        // historical matrix landing.
+        const startView = await Nppm._fetchStartView();
+        this._switchTo(startView === 'dashboard' ? View.dashboard : View.matrix);
+        if (startView !== 'dashboard') {
+            this._matrix.renderLoading();
+        }
 
         try {
             const response = await Api.listProjects();
             this._projects = response.projects;
             this._installedView.setEditor(response.editor);
             this._treeview.render(response.projects);
-            await this._loadMatrix();
+            if (startView === 'dashboard') {
+                this._dashboardView.show();
+            } else {
+                await this._loadMatrix();
+            }
         } catch (e) {
             this._matrix.renderError((e as Error).message);
+        }
+    }
+
+    private static async _fetchStartView(): Promise<'matrix'|'dashboard'> {
+        try {
+            const res = await fetch('/api/config');
+            if (!res.ok) {
+                return 'matrix';
+            }
+            const cfg = await res.json() as {ui?: {startView?: string}};
+            return cfg.ui?.startView === 'dashboard' ? 'dashboard' : 'matrix';
+        } catch {
+            return 'matrix';
         }
     }
 

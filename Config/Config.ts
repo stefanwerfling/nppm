@@ -169,6 +169,18 @@ export const SchemaConfigActions = Vts.object({
 });
 
 /**
+ * In-app UX preferences. `startView` picks which right-pane view the
+ * frontend shows on first paint. Defaults to `matrix` so existing
+ * installations keep their landing experience after upgrade; new
+ * installs that prefer the cross-project Dashboard switch via the
+ * Settings dialog. The string is validated loosely here and narrowed
+ * in `Nppm.start()` — unknown values fall back to matrix.
+ */
+export const SchemaConfigUi = Vts.object({
+    startView: Vts.optional(Vts.string())
+});
+
+/**
  * Top-level nppm.json schema.
  */
 export const SchemaConfig = Vts.object({
@@ -179,6 +191,7 @@ export const SchemaConfig = Vts.object({
     cache: Vts.optional(SchemaConfigCache),
     security: Vts.optional(SchemaConfigSecurity),
     actions: Vts.optional(SchemaConfigActions),
+    ui: Vts.optional(SchemaConfigUi),
     /**
      * Remote template-catalogue URLs. Each entry must serve a
      * `template.json`-shaped JSON body. Fetched + validated at server

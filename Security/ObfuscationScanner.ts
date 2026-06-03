@@ -76,6 +76,9 @@ const OBFUSCATOR_DENSITY_WARN = 1;
  */
 const HEX_DENSITY_WARN = 8;
 
+/** Per-file size cap for the regex pipeline (bytes). */
+const MAX_FILE_BYTES = 2 * 1024 * 1024;
+
 /**
  * Path classifier for "is this a build artifact?". Matches the
  * conventional places where minified bundles live so legitimate
@@ -103,6 +106,16 @@ export class ObfuscationScanner {
         const out: ObfuscationFinding[] = [];
         for (const f of files) {
             if (typeof f.content !== 'string' || f.content.length === 0) {
+                continue;
+            }
+            // Cap on per-file regex work. Beyond this size we're
+            // looking at vendored mega-bundles where the build-path
+            // classifier would land us at info anyway; spending
+            // hundreds of ms on regex matching per file would block
+            // the dashboard SSE pipeline (every package's tarball
+            // gets walked here). 2 MB of source is more than enough
+            // to spot a packed payload.
+            if (f.content.length > MAX_FILE_BYTES) {
                 continue;
             }
             const finding = ObfuscationScanner._classifyFile(f.path, f.content);
@@ -187,10 +200,14 @@ export class ObfuscationScanner {
         }
 
         // -- hex-string array (packed payload) --
-        // Matches `["\x..", "\x..", …]` arrays with at least 8 hex
-        // entries — short ones can be lookup tables.
+        // Matches `["\x..", "\xAABBCC", …]` arrays with at least 8
+        // entries — short ones can be lookup tables (e.g. PNG header
+        // bytes). The inner `(?:\\x[0-9a-f]{2})+` is bounded —
+        // each iteration consumes exactly 4 input characters, so the
+        // outer `{7,}` repetition stays linear-time even on huge
+        // minified bundles (no catastrophic backtracking).
         const hexArrayMatch = content.match(
-            /\[\s*(?:"\\x[0-9a-f]{2}(?:[^"]*?)"\s*,\s*){7,}"\\x[0-9a-f]{2}(?:[^"]*?)"\s*\]/gi
+            /\[\s*(?:"(?:\\x[0-9a-f]{2})+"\s*,\s*){7,}"(?:\\x[0-9a-f]{2})+"\s*\]/gi
         );
         if (hexArrayMatch && hexArrayMatch.length > 0) {
             signals.push('hex-string-array');

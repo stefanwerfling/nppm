@@ -25,6 +25,7 @@ if (sub === '-h' || sub === '--help') {
         + '  nppm dev          Start the dev server\n'
         + '  nppm scan [...]   Headless CI scan (see `nppm scan --help`)\n'
         + '  nppm sbom [...]   Emit CycloneDX / SPDX SBOM (see `nppm sbom --help`)\n'
+        + '  nppm action       GitHub-Actions entry: scan + SARIF + sticky PR comment\n'
         + '  nppm --help       Show this help\n'
     );
     process.exit(0);
@@ -37,6 +38,9 @@ if (sub === 'scan') {
 } else if (sub === 'sbom') {
     process.argv.splice(2, 1);
     await import(path.resolve(__dirname, 'sbom.js'));
+} else if (sub === 'action') {
+    process.argv.splice(2, 1);
+    await import(path.resolve(__dirname, 'action.js'));
 } else {
     if (sub === 'dev') {
         process.argv.splice(2, 1);

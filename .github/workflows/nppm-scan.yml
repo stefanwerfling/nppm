@@ -1,0 +1,41 @@
+name: nppm supply-chain scan
+
+# nppm dogfoods its own action — every push and PR runs the full
+# scanner family against this repo's dependencies. Findings show up
+# under Security → Code scanning alerts; PRs get a sticky comment
+# with the CVE delta.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  nppm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: .nppm-cache
+          key: nppm-cache-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            nppm-cache-${{ runner.os }}-
+      - id: nppm
+        uses: ./.github/actions/scan
+        with:
+          fail-on: warn
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: ${{ steps.nppm.outputs.sarif-path }}

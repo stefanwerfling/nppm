@@ -383,6 +383,46 @@ nppm scan --sarif > nppm.sarif       # SARIF 2.1.0 for GitHub Code Scanning
 nppm scan --help                     # full flag list
 ```
 
+### GitHub Action (drop-in)
+
+The repo ships its own composite action at
+[`./.github/actions/scan`](.github/actions/scan/README.md). Two
+output channels in one step:
+
+- **SARIF** → fed to `github/codeql-action/upload-sarif` so findings
+  appear natively under the repo's **Security → Code scanning
+  alerts** tab.
+- **Sticky PR comment** with the CVE delta between base and head
+  (re-uses the same `PrReviewBuilder` the dev UI's "PR" tab uses).
+  Updated in place on every push — one comment per PR.
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  nppm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '20'}
+      - id: nppm
+        uses: stefanwerfling/nppm/.github/actions/scan@main
+        with:
+          fail-on: warn
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: ${{ steps.nppm.outputs.sarif-path }}
+```
+
+Full inputs / outputs / sample comment in the
+[action README](.github/actions/scan/README.md).
+
 ## SBOM export
 
 ```sh

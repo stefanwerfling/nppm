@@ -1,0 +1,89 @@
+name: 'nppm — supply-chain scan + PR review'
+description: >
+  Runs every nppm scanner (CVE, install scripts, code patterns,
+  obfuscation, manifest red-flags, capability, deprecation,
+  external sources, mutable resolution, …) over your repository,
+  writes SARIF for GitHub Code Scanning, and posts a sticky PR
+  comment with the CVE delta between base and head.
+author: 'Stefan Werfling'
+branding:
+  icon: 'shield'
+  color: 'blue'
+inputs:
+  config-path:
+    description: >
+      Path to the project's `nppm.json` (relative to the
+      working-directory). When omitted nppm looks for `nppm.json`
+      in the repository root.
+    required: false
+  fail-on:
+    description: >
+      Severity threshold for the job exit code (`info`, `warn`,
+      `risk`, `none`). The scanner always writes the SARIF — this
+      flag only controls whether the job exits non-zero.
+    required: false
+    default: 'risk'
+  sarif-output:
+    description: >
+      Path the SARIF will be written to. Pass it verbatim to
+      `github/codeql-action/upload-sarif` in the next workflow step.
+    required: false
+    default: 'nppm.sarif'
+  pr-comment:
+    description: >
+      When `true` and the workflow was triggered by a `pull_request`
+      event, the action diffs `package.json` + `package-lock.json`
+      between the base and head refs and upserts a sticky markdown
+      comment on the PR. Set `false` to suppress.
+    required: false
+    default: 'true'
+  pr-base:
+    description: >
+      Override the base ref for the PR diff (defaults to the PR's
+      `base.ref`). Useful when you compare against a non-PR baseline.
+    required: false
+  pr-head:
+    description: >
+      Override the head ref for the PR diff (defaults to the PR's
+      `head.sha`).
+    required: false
+  github-token:
+    description: >
+      Token used to post the PR comment. Defaults to the workflow's
+      built-in `github.token`; supply a PAT if you need
+      cross-repository write permissions.
+    required: false
+    default: ${{ github.token }}
+  working-directory:
+    description: >
+      Working directory for the scan. Defaults to the repo root —
+      change it when the `nppm.json` lives in a sub-folder.
+    required: false
+    default: '.'
+outputs:
+  sarif-path:
+    description: 'Absolute path the SARIF file was written to.'
+    value: ${{ steps.run.outputs.sarif-path }}
+  scan-exit-code:
+    description: 'Exit code of the underlying `nppm scan` invocation.'
+    value: ${{ steps.run.outputs.scan-exit-code }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Install nppm dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}/../../..
+      run: npm ci --omit=dev --no-audit --no-fund
+    - id: run
+      name: Run nppm action
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_CONFIG_PATH: ${{ inputs.config-path }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_SARIF_OUTPUT: ${{ inputs.sarif-output }}
+        INPUT_PR_COMMENT: ${{ inputs.pr-comment }}
+        INPUT_PR_BASE: ${{ inputs.pr-base }}
+        INPUT_PR_HEAD: ${{ inputs.pr-head }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: node ${{ github.action_path }}/../../../cli/nppm.js action

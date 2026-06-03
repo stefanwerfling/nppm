@@ -1,5 +1,6 @@
 import {ApiProject} from '../Api/ApiTypes.js';
 import {Api} from './Api.js';
+import {BadgeFilterModal} from './BadgeFilterModal.js';
 import {BulkUpgradeModal} from './BulkUpgradeModal.js';
 import {DashboardView} from './DashboardView.js';
 import {DepTreeView} from './DepTreeView.js';
@@ -73,6 +74,7 @@ export class Nppm {
     private readonly _whyModal: WhyModal;
     private readonly _workspaceDriftModal: WorkspaceDriftModal;
     private readonly _projectFormModal: ProjectFormModal;
+    private readonly _badgeFilterModal: BadgeFilterModal;
     private readonly _listRoot: HTMLElement;
     private _matrixHost: HTMLElement|null = null;
     private _packageHost: HTMLElement|null = null;
@@ -152,6 +154,12 @@ export class Nppm {
         this._whyModal = new WhyModal();
         this._workspaceDriftModal = new WorkspaceDriftModal();
         this._projectFormModal = new ProjectFormModal();
+        this._badgeFilterModal = new BadgeFilterModal();
+        this._badgeFilterModal.onApply((hidden) => {
+            // Single source of truth — the matrix owns the filter
+            // state and persists it. The modal just hands it back.
+            this._matrix.setHiddenBadges(hidden);
+        });
         this._projectFormModal.onSaved(() => {
             // Re-fetch and re-render the project list so the new /
             // edited entry shows up; if the matrix is currently the
@@ -453,6 +461,10 @@ export class Nppm {
 
         this._matrix.onBulkUpgradeClick((picks) => {
             void this._bulkUpgradeModal.open(picks);
+        });
+
+        this._matrix.onBadgeFilterClick(() => {
+            this._badgeFilterModal.open(this._matrix.getHiddenBadges());
         });
 
         this._matrix.onWorkspaceDriftClick((unid, projectName, pkg) => {

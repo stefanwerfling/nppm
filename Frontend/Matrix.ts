@@ -151,6 +151,109 @@ const CAPABILITY_WEIGHT: Record<CapabilitySeverity, number> = {
 };
 
 /**
+ * Catalogue of every badge the matrix can render alongside a package
+ * name. The Badge-Filter modal uses this to enumerate checkboxes; the
+ * Matrix.render path uses `id` to gate each badge emit through
+ * `_isBadgeVisible`. Order here is the display order in the modal
+ * (group reputation / supply-chain / quality), not the rendering
+ * order in the row (which the badge emits choose independently).
+ */
+export type MatrixBadgeId =
+    | 'cve'
+    | 'license'
+    | 'script'
+    | 'pattern'
+    | 'binary'
+    | 'maintainer'
+    | 'integrity'
+    | 'provenance'
+    | 'freshness'
+    | 'cadence'
+    | 'typosquat'
+    | 'external'
+    | 'obfuscation'
+    | 'manifestRedFlags'
+    | 'capability'
+    | 'deprecation';
+
+export type MatrixBadgeMeta = {
+    id: MatrixBadgeId;
+    /**
+     * Human-readable label rendered in the filter modal. Translated
+     * via `I18n.t()` at render time.
+     */
+    label: string;
+    /**
+     * Sample text rendered inside a styled sample badge — usually the
+     * strongest-variant label (e.g. `DEP!` instead of `DEP?`) so the
+     * user sees the "alert" colour the badge actually uses.
+     */
+    sampleText: string;
+    /**
+     * Concatenated `class` value applied to the sample `<span>` — full
+     * `matrix-badge matrix-badge-<id>[ matrix-badge-<id>-<sev>]`
+     * so the CSS pulls in the correct colour family.
+     */
+    sampleClasses: string;
+    /**
+     * One-line explanation of what the badge means. Translated via
+     * `I18n.t()` at render time.
+     */
+    description: string;
+};
+
+export const MATRIX_BADGES: MatrixBadgeMeta[] = [
+    {id: 'cve', label: 'CVE',
+        sampleText: '5 CVEs', sampleClasses: 'matrix-badge matrix-badge-cve',
+        description: 'Known vulnerabilities from OSV.dev affecting this name@version.'},
+    {id: 'license', label: 'License',
+        sampleText: 'UNLIC', sampleClasses: 'matrix-badge matrix-badge-license matrix-badge-license-proprietary',
+        description: 'License classification (strong-copyleft, proprietary, unknown).'},
+    {id: 'script', label: 'Install scripts',
+        sampleText: 'SCRIPT!', sampleClasses: 'matrix-badge matrix-badge-script matrix-badge-script-risk',
+        description: 'Lifecycle scripts that fetch the network or exec child processes.'},
+    {id: 'pattern', label: 'Code patterns',
+        sampleText: '3 patterns', sampleClasses: 'matrix-badge matrix-badge-pattern',
+        description: 'Regex hits on risky JS patterns (eval, child_process, webhook URLs, env reads…).'},
+    {id: 'binary', label: 'Binaries',
+        sampleText: '2 bins', sampleClasses: 'matrix-badge matrix-badge-binary',
+        description: 'Native binary files shipped inside the tarball.'},
+    {id: 'maintainer', label: 'Maintainer',
+        sampleText: 'MAINT!', sampleClasses: 'matrix-badge matrix-badge-maintainer',
+        description: 'Publisher handover on a mature package — the event-stream / ua-parser-js takeover pattern.'},
+    {id: 'integrity', label: 'Integrity',
+        sampleText: 'INT!', sampleClasses: 'matrix-badge matrix-badge-integrity',
+        description: 'Lockfile integrity hash mismatches the registry — possible mirror hijack.'},
+    {id: 'provenance', label: 'Provenance',
+        sampleText: 'PROV ✓', sampleClasses: 'matrix-badge matrix-badge-provenance',
+        description: 'Latest version was published with `--provenance` (Sigstore-anchored CI attestation).'},
+    {id: 'freshness', label: 'Freshness',
+        sampleText: 'NEW!', sampleClasses: 'matrix-badge matrix-badge-freshness matrix-badge-freshness-risk',
+        description: 'Brand-new package or brand-new publisher — the classic typosquat profile.'},
+    {id: 'cadence', label: 'Release cadence',
+        sampleText: 'STALE!', sampleClasses: 'matrix-badge matrix-badge-cadence matrix-badge-cadence-risk',
+        description: 'Very stale or unusually bursty release cadence — abandoned or volatile project.'},
+    {id: 'typosquat', label: 'Typosquat',
+        sampleText: 'SQUAT!', sampleClasses: 'matrix-badge matrix-badge-typosquat matrix-badge-typosquat-risk',
+        description: 'Name is Levenshtein-1 away from a popular package or contains Unicode confusables.'},
+    {id: 'external', label: 'External sources',
+        sampleText: 'EXT!', sampleClasses: 'matrix-badge matrix-badge-external matrix-badge-external-risk',
+        description: 'Worst-of-three from socket.dev, OpenSSF Scorecard, deps.dev.'},
+    {id: 'obfuscation', label: 'Obfuscation',
+        sampleText: 'OBF!', sampleClasses: 'matrix-badge matrix-badge-obfuscation matrix-badge-obfuscation-risk',
+        description: 'JS file looks intentionally obfuscated (eval(atob(…)), hex-string arrays, etc.).'},
+    {id: 'manifestRedFlags', label: 'Manifest red-flags',
+        sampleText: 'MAN!', sampleClasses: 'matrix-badge matrix-badge-manifestRedFlags matrix-badge-manifestRedFlags-risk',
+        description: 'package.json heuristics: missing README/description/files, many bins, native+postinstall combo.'},
+    {id: 'capability', label: 'Capabilities',
+        sampleText: 'CAP!', sampleClasses: 'matrix-badge matrix-badge-capability matrix-badge-capability-risk',
+        description: 'Dangerous capability combinations (child_process + network, env-read + network, …).'},
+    {id: 'deprecation', label: 'Deprecation',
+        sampleText: 'DEP!', sampleClasses: 'matrix-badge matrix-badge-deprecation matrix-badge-deprecation-risk',
+        description: 'Installed version (risk) or latest (warn) was marked deprecated by the maintainer.'}
+];
+
+/**
  * Persisted UI state — keeps filter, sort, and search across reloads
  * via localStorage. Stored as one JSON blob so we can extend later
  * without touching every reader.
@@ -161,6 +264,12 @@ type StoredMatrixState = {
     filter?: MatrixFilter;
     sort?: MatrixSort;
     search?: string;
+    /**
+     * IDs of badges the user explicitly hid via the Badge-Filter
+     * modal. Empty / absent = all badges visible (the default). Stored
+     * as an array because Set is not JSON-serialisable.
+     */
+    hiddenBadges?: MatrixBadgeId[];
 };
 
 /**
@@ -174,12 +283,20 @@ export class Matrix {
     private _data: MatrixResponse|null = null;
     private _filter: MatrixFilter = MatrixFilter.all;
     private _sort: MatrixSort = MatrixSort.name;
+    /**
+     * Badges the user explicitly hid via the Badge-Filter modal.
+     * Default empty = every badge renders. Mutated through
+     * `setHiddenBadges()` so the persistence + re-render stay
+     * coupled.
+     */
+    private _hiddenBadges: Set<MatrixBadgeId> = new Set();
     private _search: string = '';
     private _onProjectClick: ((unid: string) => void)|null = null;
     private _onCellClick: ((pkg: string, version: string, latest: string|null) => void)|null = null;
     private _onWorkspaceDriftClick: ((projectUnid: string, projectName: string, packageName: string) => void)|null = null;
     private _onScoresChanged: ((scores: Map<string, number>) => void)|null = null;
     private _onSecurityClick: ((pkg: string, version: string) => void)|null = null;
+    private _onBadgeFilterClick: (() => void)|null = null;
     private _onBulkUpgradeClick: ((picks: ApiBulkUpgradePick[]) => void)|null = null;
     // Multi-select state for the cross-project Bulk-Upgrade Wizard.
     // Keyed by `${unid}|${pkg}` — workspace is always root in the global
@@ -231,10 +348,49 @@ export class Matrix {
         if (typeof state.search === 'string') {
             this._search = state.search;
         }
+        if (Array.isArray(state.hiddenBadges)) {
+            // Trust nothing from localStorage — a badge id that no
+            // longer exists in the catalogue is silently dropped so
+            // a deleted scanner doesn't leak hidden state forever.
+            const known = new Set<MatrixBadgeId>(MATRIX_BADGES.map((b) => b.id));
+            for (const id of state.hiddenBadges) {
+                if (known.has(id)) {
+                    this._hiddenBadges.add(id);
+                }
+            }
+        }
+    }
+
+    /**
+     * Get the current set of hidden badge ids. Returned as a fresh
+     * Set so the caller can iterate without worrying about mutation.
+     */
+    public getHiddenBadges(): Set<MatrixBadgeId> {
+        return new Set(this._hiddenBadges);
+    }
+
+    /**
+     * Replace the hidden-badges set in one shot. Persists + re-renders
+     * the table; the toolbar button doesn't need its own re-render
+     * because the filter modal closes itself.
+     */
+    public setHiddenBadges(ids: Set<MatrixBadgeId>): void {
+        this._hiddenBadges = new Set(ids);
+        this._persist();
+        this._rerenderTable();
+    }
+
+    private _isBadgeVisible(id: MatrixBadgeId): boolean {
+        return !this._hiddenBadges.has(id);
     }
 
     private _persist(): void {
-        Matrix._saveState({filter: this._filter, sort: this._sort, search: this._search});
+        Matrix._saveState({
+            filter: this._filter,
+            sort: this._sort,
+            search: this._search,
+            hiddenBadges: [...this._hiddenBadges]
+        });
     }
 
     private static _loadState(): StoredMatrixState {
@@ -403,6 +559,16 @@ export class Matrix {
 
     public onSecurityClick(handler: (pkg: string, version: string) => void): void {
         this._onSecurityClick = handler;
+    }
+
+    /**
+     * Wired by `Nppm` to open the BadgeFilterModal. The matrix
+     * doesn't own the modal — opening it from here would couple two
+     * concerns we want to keep separable (the modal lives a layer up,
+     * just like ImpactModal / UpgradeModal).
+     */
+    public onBadgeFilterClick(handler: () => void): void {
+        this._onBadgeFilterClick = handler;
     }
 
     public onBulkUpgradeClick(handler: (picks: ApiBulkUpgradePick[]) => void): void {
@@ -703,6 +869,22 @@ export class Matrix {
             bar.appendChild(btn);
         }
 
+        // Badges button — opens the BadgeFilterModal. Renders an
+        // active-state hint when at least one badge is hidden so the
+        // user has a quick visual cue that the matrix is filtered.
+        const badgesBtn = document.createElement('button');
+        badgesBtn.className = 'matrix-sort-btn matrix-badges-btn';
+        if (this._hiddenBadges.size > 0) {
+            badgesBtn.classList.add('matrix-sort-btn-active');
+            badgesBtn.textContent = I18n.t('Badges ({n} hidden)', {n: this._hiddenBadges.size});
+        } else {
+            badgesBtn.textContent = I18n.t('Badges');
+        }
+        badgesBtn.addEventListener('click', () => {
+            this._onBadgeFilterClick?.();
+        });
+        bar.appendChild(badgesBtn);
+
         return bar;
     }
 
@@ -832,7 +1014,7 @@ export class Matrix {
         }
 
         const vulnIds = this._vulnsByName.get(row.name);
-        if (vulnIds && vulnIds.length > 0) {
+        if (vulnIds && vulnIds.length > 0 && this._isBadgeVisible('cve')) {
             const badge = document.createElement('span');
             badge.className = 'matrix-badge matrix-badge-cve';
             badge.textContent = `CVE ${vulnIds.length}`;
@@ -850,7 +1032,7 @@ export class Matrix {
         }
 
         const scripts = this._scriptsByName.get(row.name);
-        if (scripts && scripts.maxSeverity !== null) {
+        if (scripts && scripts.maxSeverity !== null && this._isBadgeVisible('script')) {
             const badge = document.createElement('span');
             badge.className = `matrix-badge matrix-badge-script matrix-badge-script-${scripts.maxSeverity}`;
             badge.textContent = Matrix._scriptBadgeLabel(scripts.maxSeverity);
@@ -868,7 +1050,7 @@ export class Matrix {
         // Function call) — `warn` patterns like `child_process` are
         // legitimate in dozens of libraries and would clutter every row.
         const patterns = this._patternsByName.get(row.name);
-        if (patterns && patterns.maxSeverity === PatternSeverity.risk) {
+        if (patterns && patterns.maxSeverity === PatternSeverity.risk && this._isBadgeVisible('pattern')) {
             const badge = document.createElement('span');
             badge.className = 'matrix-badge matrix-badge-pattern';
             badge.textContent = `EVAL ${patterns.count}`;
@@ -886,7 +1068,7 @@ export class Matrix {
         // are routine in many native-binding packages and would
         // clutter every row otherwise.
         const binaries = this._binariesByName.get(row.name);
-        if (binaries && binaries.maxSeverity === BinarySeverity.risk) {
+        if (binaries && binaries.maxSeverity === BinarySeverity.risk && this._isBadgeVisible('binary')) {
             const badge = document.createElement('span');
             badge.className = 'matrix-badge matrix-badge-binary';
             badge.textContent = `BIN ${binaries.riskCount}`;
@@ -904,7 +1086,7 @@ export class Matrix {
         // alone (`warn`) are common when a project moves to CI; we'd
         // train the user to ignore the badge.
         const maintainer = this._maintainersByName.get(row.name);
-        if (maintainer && maintainer.severity === MaintainerSeverity.risk) {
+        if (maintainer && maintainer.severity === MaintainerSeverity.risk && this._isBadgeVisible('maintainer')) {
             const badge = document.createElement('span');
             badge.className = 'matrix-badge matrix-badge-maintainer';
             badge.textContent = 'OWNER!';
@@ -923,7 +1105,7 @@ export class Matrix {
         // MPL in most shops). `unknown` packages get a smaller grey
         // badge so they're noticeable without screaming.
         const license = this._licensesByName.get(row.name);
-        if (license) {
+        if (license && this._isBadgeVisible('license')) {
             const badge = Matrix._licenseBadge(license);
             if (badge) {
                 badge.addEventListener('click', (e) => {
@@ -943,7 +1125,7 @@ export class Matrix {
         // a tarball whose integrity differs from what the registry
         // now serves — real supply-chain signal.
         const integrity = this._integrityByName.get(row.name);
-        if (integrity && integrity.severity === IntegritySeverity.risk) {
+        if (integrity && integrity.severity === IntegritySeverity.risk && this._isBadgeVisible('integrity')) {
             const badge = document.createElement('span');
             badge.className = 'matrix-badge matrix-badge-integrity';
             badge.textContent = 'INTEGRITY!';
@@ -964,7 +1146,7 @@ export class Matrix {
         // green by convention since it answers "this build is
         // verifiable" rather than warning of a risk.
         const provenance = this._provenanceByName.get(row.name);
-        if (provenance && provenance.level === ProvenanceLevel.provenance) {
+        if (provenance && provenance.level === ProvenanceLevel.provenance && this._isBadgeVisible('provenance')) {
             const badge = document.createElement('span');
             badge.className = 'matrix-badge matrix-badge-provenance';
             badge.textContent = 'PROV ✓';
@@ -984,7 +1166,8 @@ export class Matrix {
         // (typically <7d), the classic typosquat profile.
         const freshness = this._freshnessByName.get(row.name);
         if (freshness && (freshness.level === FreshnessLevel.risk
-                          || freshness.level === FreshnessLevel.warn)) {
+                          || freshness.level === FreshnessLevel.warn)
+                && this._isBadgeVisible('freshness')) {
             const badge = document.createElement('span');
             badge.className = `matrix-badge matrix-badge-freshness matrix-badge-freshness-${freshness.level}`;
             badge.textContent = freshness.level === FreshnessLevel.risk ? 'NEW!' : 'NEW';
@@ -1004,7 +1187,8 @@ export class Matrix {
         // 180d warn, 730d risk.
         const cadence = this._cadenceByName.get(row.name);
         if (cadence && (cadence.level === CadenceLevel.risk
-                        || cadence.level === CadenceLevel.warn)) {
+                        || cadence.level === CadenceLevel.warn)
+                && this._isBadgeVisible('cadence')) {
             const badge = document.createElement('span');
             badge.className = `matrix-badge matrix-badge-cadence matrix-badge-cadence-${cadence.level}`;
             badge.textContent = cadence.level === CadenceLevel.risk ? 'STALE!' : 'STALE';
@@ -1024,7 +1208,8 @@ export class Matrix {
         // badge would be useless noise.
         const typosquat = this._typosquatByName.get(row.name);
         if (typosquat && (typosquat.level === TyposquatLevel.risk
-                          || typosquat.level === TyposquatLevel.warn)) {
+                          || typosquat.level === TyposquatLevel.warn)
+                && this._isBadgeVisible('typosquat')) {
             const badge = document.createElement('span');
             badge.className = `matrix-badge matrix-badge-typosquat matrix-badge-typosquat-${typosquat.level}`;
             badge.textContent = typosquat.level === TyposquatLevel.risk ? 'SQUAT!' : 'SQUAT?';
@@ -1044,7 +1229,8 @@ export class Matrix {
         // silent so the badge actually means "look at this".
         const external = this._externalByName.get(row.name);
         if (external && (external.level === ExternalSeverity.risk
-                         || external.level === ExternalSeverity.warn)) {
+                         || external.level === ExternalSeverity.warn)
+                && this._isBadgeVisible('external')) {
             const badge = document.createElement('span');
             badge.className = `matrix-badge matrix-badge-external matrix-badge-external-${external.level}`;
             badge.textContent = external.level === ExternalSeverity.risk ? 'EXT!' : 'EXT?';
@@ -1064,7 +1250,8 @@ export class Matrix {
         // silent.
         const obfuscation = this._obfuscationByName.get(row.name);
         if (obfuscation && (obfuscation.maxSeverity === ObfuscationSeverity.risk
-                            || obfuscation.maxSeverity === ObfuscationSeverity.warn)) {
+                            || obfuscation.maxSeverity === ObfuscationSeverity.warn)
+                && this._isBadgeVisible('obfuscation')) {
             const badge = document.createElement('span');
             badge.className = `matrix-badge matrix-badge-obfuscation matrix-badge-obfuscation-${obfuscation.maxSeverity}`;
             badge.textContent = obfuscation.maxSeverity === ObfuscationSeverity.risk ? 'OBF!' : 'OBF?';
@@ -1085,7 +1272,8 @@ export class Matrix {
         // small quirk so the threshold has to be meaningful).
         const manifestRedFlags = this._manifestRedFlagsByName.get(row.name);
         if (manifestRedFlags && (manifestRedFlags.severity === ManifestRedFlagSeverity.risk
-                                 || manifestRedFlags.severity === ManifestRedFlagSeverity.warn)) {
+                                 || manifestRedFlags.severity === ManifestRedFlagSeverity.warn)
+                && this._isBadgeVisible('manifestRedFlags')) {
             const badge = document.createElement('span');
             badge.className = `matrix-badge matrix-badge-manifestRedFlags matrix-badge-manifestRedFlags-${manifestRedFlags.severity}`;
             badge.textContent = manifestRedFlags.severity === ManifestRedFlagSeverity.risk ? 'MAN!' : 'MAN?';
@@ -1106,7 +1294,8 @@ export class Matrix {
         // touch one platform API).
         const capability = this._capabilityByName.get(row.name);
         if (capability && (capability.severity === CapabilitySeverity.risk
-                           || capability.severity === CapabilitySeverity.warn)) {
+                           || capability.severity === CapabilitySeverity.warn)
+                && this._isBadgeVisible('capability')) {
             const badge = document.createElement('span');
             badge.className = `matrix-badge matrix-badge-capability matrix-badge-capability-${capability.severity}`;
             badge.textContent = capability.severity === CapabilitySeverity.risk ? 'CAP!' : 'CAP?';
@@ -1127,7 +1316,8 @@ export class Matrix {
         // some deprecated history.
         const deprecation = this._deprecationByName.get(row.name);
         if (deprecation && (deprecation.level === DeprecationLevel.risk
-                            || deprecation.level === DeprecationLevel.warn)) {
+                            || deprecation.level === DeprecationLevel.warn)
+                && this._isBadgeVisible('deprecation')) {
             const badge = document.createElement('span');
             badge.className = `matrix-badge matrix-badge-deprecation matrix-badge-deprecation-${deprecation.level}`;
             badge.textContent = deprecation.level === DeprecationLevel.risk ? 'DEP!' : 'DEP?';

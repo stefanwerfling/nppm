@@ -406,6 +406,44 @@ export const TRANSLATIONS_DE: Record<string, string> = {
         'Durchsucht das Lockfile nach Einträgen, die nicht deterministisch reproduzierbar sind: mutable Git-Refs (Branch/Tag statt SHA), fehlende Integrity-Hashes bei Registry-Tarballs, file:/link: lokale Protokolle.',
     'Mutable git ref = risk, missing integrity hash = warn, file:/link: protocol = info. Synthesized lockfiles render N/A.':
         'Mutable Git-Ref = risk, fehlender Integrity-Hash = warn, file:/link:-Protokoll = info. Synthetisierte Lockfiles rendern N/A.',
+    // -- Badge-Filter Modal --------------------------------------------
+    'Badges': 'Badges',
+    'Badges ({n} hidden)': 'Badges ({n} ausgeblendet)',
+    'Show all': 'Alle anzeigen',
+    'Hide all': 'Alle ausblenden',
+    'Apply': 'Übernehmen',
+    // Badge-Beschreibungen (Katalog)
+    'Known vulnerabilities from OSV.dev affecting this name@version.':
+        'Bekannte Schwachstellen aus OSV.dev für dieses name@version.',
+    'License classification (strong-copyleft, proprietary, unknown).':
+        'Lizenz-Einstufung (strong-copyleft, proprietary, unknown).',
+    'Lifecycle scripts that fetch the network or exec child processes.':
+        'Lifecycle-Scripts, die Netzwerk holen oder Child-Prozesse ausführen.',
+    'Regex hits on risky JS patterns (eval, child_process, webhook URLs, env reads…).':
+        'Regex-Treffer auf riskante JS-Muster (eval, child_process, Webhook-URLs, Env-Reads …).',
+    'Native binary files shipped inside the tarball.': 'Native Binärdateien im Tarball.',
+    'Publisher handover on a mature package — the event-stream / ua-parser-js takeover pattern.':
+        'Publisher-Wechsel bei einem etablierten Paket — das event-stream / ua-parser-js Takeover-Muster.',
+    'Lockfile integrity hash mismatches the registry — possible mirror hijack.':
+        'Lockfile-Integrity-Hash weicht von der Registry ab — möglicher Mirror-Hijack.',
+    'Latest version was published with `--provenance` (Sigstore-anchored CI attestation).':
+        'Latest-Version wurde mit `--provenance` veröffentlicht (Sigstore-verankerte CI-Attestation).',
+    'Brand-new package or brand-new publisher — the classic typosquat profile.':
+        'Brandneues Paket oder brandneuer Publisher — das klassische Typosquat-Profil.',
+    'Very stale or unusually bursty release cadence — abandoned or volatile project.':
+        'Sehr alte oder ungewöhnlich häufige Release-Kadenz — abgehängtes oder unruhiges Projekt.',
+    'Name is Levenshtein-1 away from a popular package or contains Unicode confusables.':
+        'Name ist Levenshtein-1 von einem populären Paket entfernt oder enthält Unicode-Verwechsler.',
+    'Worst-of-three from socket.dev, OpenSSF Scorecard, deps.dev.':
+        'Worst-of-three aus socket.dev, OpenSSF Scorecard, deps.dev.',
+    'JS file looks intentionally obfuscated (eval(atob(…)), hex-string arrays, etc.).':
+        'JS-Datei wirkt absichtlich obfuskiert (eval(atob(…)), Hex-String-Arrays usw.).',
+    'package.json heuristics: missing README/description/files, many bins, native+postinstall combo.':
+        'package.json-Heuristiken: fehlende README/description/files, viele bin-Einträge, native+postinstall-Kombi.',
+    'Dangerous capability combinations (child_process + network, env-read + network, …).':
+        'Gefährliche Capability-Kombinationen (child_process + network, env-read + network, …).',
+    'Installed version (risk) or latest (warn) was marked deprecated by the maintainer.':
+        'Installierte Version (risk) oder Latest (warn) wurde vom Maintainer deprecated.',
     'Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.':
         'Bündelt Reputations-Signale Dritter: socket.dev (Supply-Chain-Risiko), OpenSSF Scorecard (Repo-Entwicklungspraktiken), deps.dev (Google Package-Index). Pro Paket worst-of-three.',
     'Per-source severity (socket overall <50 = risk, <80 = warn; OpenSSF <5 = risk, <7 = warn; deps.dev = info only) reduced to worst-of-three per package.':

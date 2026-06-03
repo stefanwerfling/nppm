@@ -4210,3 +4210,66 @@ button.vuln-summary-pill {
 .pr-vuln-pill:hover {
     filter: brightness(1.2);
 }
+
+/* Badge-Filter modal */
+.bfm-panel {
+    width: min(720px, 95vw);
+    max-height: 85vh;
+    overflow: hidden;
+}
+
+.bfm-quick {
+    display: flex;
+    gap: 8px;
+}
+
+.bfm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+    max-height: 60vh;
+    padding-right: 4px;
+}
+
+.bfm-row {
+    display: grid;
+    grid-template-columns: 24px 80px 200px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--c-border);
+    cursor: pointer;
+}
+
+.bfm-row:last-child {
+    border-bottom: 0;
+}
+
+.bfm-row:hover {
+    background: var(--c-bg-soft);
+}
+
+.bfm-check {
+    cursor: pointer;
+}
+
+.bfm-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+.bfm-desc {
+    font-size: 12px;
+    color: var(--c-muted);
+    line-height: 1.4;
+}
+
+.bfm-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    border-top: 1px solid var(--c-border);
+    padding-top: 12px;
+}

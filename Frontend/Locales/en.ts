@@ -415,6 +415,44 @@ export const TRANSLATIONS_EN: Record<string, string> = {
         'Walks the lockfile for entries that can\'t be reproduced deterministically: mutable git refs (branch/tag instead of SHA), missing integrity hashes on registry tarballs, file:/link: local protocols.',
     'Mutable git ref = risk, missing integrity hash = warn, file:/link: protocol = info. Synthesized lockfiles render N/A.':
         'Mutable git ref = risk, missing integrity hash = warn, file:/link: protocol = info. Synthesized lockfiles render N/A.',
+    // -- Badge-Filter modal ---------------------------------------------
+    'Badges': 'Badges',
+    'Badges ({n} hidden)': 'Badges ({n} hidden)',
+    'Show all': 'Show all',
+    'Hide all': 'Hide all',
+    'Apply': 'Apply',
+    // Badge descriptions (catalogue)
+    'Known vulnerabilities from OSV.dev affecting this name@version.':
+        'Known vulnerabilities from OSV.dev affecting this name@version.',
+    'License classification (strong-copyleft, proprietary, unknown).':
+        'License classification (strong-copyleft, proprietary, unknown).',
+    'Lifecycle scripts that fetch the network or exec child processes.':
+        'Lifecycle scripts that fetch the network or exec child processes.',
+    'Regex hits on risky JS patterns (eval, child_process, webhook URLs, env reads…).':
+        'Regex hits on risky JS patterns (eval, child_process, webhook URLs, env reads…).',
+    'Native binary files shipped inside the tarball.': 'Native binary files shipped inside the tarball.',
+    'Publisher handover on a mature package — the event-stream / ua-parser-js takeover pattern.':
+        'Publisher handover on a mature package — the event-stream / ua-parser-js takeover pattern.',
+    'Lockfile integrity hash mismatches the registry — possible mirror hijack.':
+        'Lockfile integrity hash mismatches the registry — possible mirror hijack.',
+    'Latest version was published with `--provenance` (Sigstore-anchored CI attestation).':
+        'Latest version was published with `--provenance` (Sigstore-anchored CI attestation).',
+    'Brand-new package or brand-new publisher — the classic typosquat profile.':
+        'Brand-new package or brand-new publisher — the classic typosquat profile.',
+    'Very stale or unusually bursty release cadence — abandoned or volatile project.':
+        'Very stale or unusually bursty release cadence — abandoned or volatile project.',
+    'Name is Levenshtein-1 away from a popular package or contains Unicode confusables.':
+        'Name is Levenshtein-1 away from a popular package or contains Unicode confusables.',
+    'Worst-of-three from socket.dev, OpenSSF Scorecard, deps.dev.':
+        'Worst-of-three from socket.dev, OpenSSF Scorecard, deps.dev.',
+    'JS file looks intentionally obfuscated (eval(atob(…)), hex-string arrays, etc.).':
+        'JS file looks intentionally obfuscated (eval(atob(…)), hex-string arrays, etc.).',
+    'package.json heuristics: missing README/description/files, many bins, native+postinstall combo.':
+        'package.json heuristics: missing README/description/files, many bins, native+postinstall combo.',
+    'Dangerous capability combinations (child_process + network, env-read + network, …).':
+        'Dangerous capability combinations (child_process + network, env-read + network, …).',
+    'Installed version (risk) or latest (warn) was marked deprecated by the maintainer.':
+        'Installed version (risk) or latest (warn) was marked deprecated by the maintainer.',
     'Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.':
         'Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.',
     'Per-source severity (socket overall <50 = risk, <80 = warn; OpenSSF <5 = risk, <7 = warn; deps.dev = info only) reduced to worst-of-three per package.':

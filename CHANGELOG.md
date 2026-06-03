@@ -14,6 +14,12 @@ from `v1.0.0` onwards.
   `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), issue + PR
   templates, and this changelog itself.
 
+### Changed
+- **Bumped minimum Node version from 20 to 22.** Node 20 went EOL on
+  2026-04-30; current LTS is Node 22. The CI workflow already runs
+  Node 22, and `puppeteer@25` (used by the screenshot generator)
+  requires Node 22.12+.
+
 ## [1.0.0] — initial public release
 
 The baseline shipped surface — everything reachable from the current

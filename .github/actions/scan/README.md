@@ -33,7 +33,7 @@ jobs:
           fetch-depth: 0   # PrReview needs git history
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - id: nppm
         uses: stefanwerfling/nppm/.github/actions/scan@main
         with:

@@ -26,7 +26,7 @@ npm test            # 641+ tests, no network, runs in ~5 s
 npm run dev         # dev server on http://localhost:5190
 ```
 
-Node ≥ 20 is required (see `package.json` `engines`).
+Node ≥ 22 is required (see `package.json` `engines`).
 
 ## What we accept
 

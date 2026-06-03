@@ -1,4 +1,5 @@
 .idea/
+.nppm-backups
 .nppm-cache
 .nppm-history
 node_modules/

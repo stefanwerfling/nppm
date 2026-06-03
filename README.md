@@ -8,7 +8,7 @@
   <a href="https://github.com/stefanwerfling/nppm/actions/workflows/nppm-scan.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/stefanwerfling/nppm/nppm-scan.yml?branch=main&label=CI&logo=github" /></a>
   <a href="https://github.com/stefanwerfling/nppm/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/stefanwerfling/nppm?color=blue" /></a>
   <a href="https://github.com/stefanwerfling/nppm/releases"><img alt="Release" src="https://img.shields.io/github/v/release/stefanwerfling/nppm?include_prereleases&label=release&sort=semver" /></a>
-  <img alt="Node ≥ 20" src="https://img.shields.io/node/v/nppm?label=node&color=43853d" />
+  <img alt="Node ≥ 22" src="https://img.shields.io/node/v/nppm?label=node&color=43853d" />
   <img alt="Tests" src="https://img.shields.io/badge/tests-641%20passing-success" />
   <img alt="Scanners" src="https://img.shields.io/badge/scanners-21-blueviolet" />
   <a href="https://github.com/stefanwerfling/nppm/blob/main/SECURITY.md"><img alt="Security policy" src="https://img.shields.io/badge/security-disclosure-red?logo=github" /></a>
@@ -259,7 +259,7 @@ server, frontend is plain TypeScript + DOM (no framework).
 
 ## Requirements
 
-- Node ≥ 20
+- Node ≥ 22 (current LTS line; Node 20 went EOL on 2026-04-30)
 - A `nppm.json` in the directory you launch `nppm` from
 - Projects either locally checked out or reachable via GitHub/Gitea contents
   API
@@ -419,7 +419,7 @@ jobs:
       - uses: actions/checkout@v4
         with: {fetch-depth: 0}
       - uses: actions/setup-node@v4
-        with: {node-version: '20'}
+        with: {node-version: '22'}
       - id: nppm
         uses: stefanwerfling/nppm/.github/actions/scan@main
         with:

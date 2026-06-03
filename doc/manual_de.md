@@ -54,6 +54,9 @@ Beispielprojekte.
 13. [Einstellungen + Cache neu aufbauen](#13-einstellungen--cache-neu-aufbauen)
 14. [Workspace-Drift-Drill-Down](#14-workspace-drift-drill-down)
 15. [Health-Ring pro Projekt](#15-health-ring-pro-projekt)
+16. [Projektübergreifendes Dashboard](#16-projektübergreifendes-dashboard)
+17. [Impact-Analyse](#17-impact-analyse)
+18. [Badge-Filter](#18-badge-filter)
 
 ---
 
@@ -90,8 +93,41 @@ oder aggregierter Security-Score.
   (klassisches Account-Takeover-Profil — siehe Maintainer-Scanner unten).
 - `GPL` / `UNLIC` / `LIC?` — Lizenz-Klassifikation: Strong-Copyleft /
   proprietär / unbekannt (siehe Lizenz-Tab unten).
+- `PROV ✓` — grünes Positiv-Badge: Latest-Version wurde mit
+  `--provenance` veröffentlicht (Sigstore-verankerte CI-Attestation).
+- `NEW!` / `NEW` — brandneues Paket oder Publisher (< 7 Tage / < 30
+  Tage). Klassisches Typosquat-Profil wenn beide Signale feuern.
+- `STALE!` / `STALE` — Paket wirkt verlassen (≥ 730 Tage / ≥ 180
+  Tage seit dem letzten Release).
+- `SQUAT!` / `SQUAT?` — Name ist Levenshtein-1 von einem populären
+  Paket entfernt ODER enthält Unicode-Verwechsler / Levenshtein-2-
+  Lookalike.
+- `EXT!` / `EXT?` — External-Source-Aggregator (socket.dev /
+  OpenSSF Scorecard / deps.dev) hat das Paket markiert —
+  worst-of-three.
+- `DEP!` / `DEP?` — installierte Version wurde vom Maintainer
+  deprecated (risk) oder Registry-`latest` ist deprecated (warn).
+  Hover zeigt die Begründung des Maintainers.
+- `OBF!` / `OBF?` — JS-Datei im Tarball wirkt absichtlich obfuskiert
+  (`eval(atob(…))` / `_0x`-Dichte / Hex-String-Arrays / lange
+  Zeilen außerhalb von `dist/min/`).
+- `MAN!` / `MAN?` — Manifest-Red-Flags stapeln sich: fehlende
+  README / Description / `files[]`, viele `bin`-Einträge, die
+  Native-Build + Postinstall-Kombi, veraltete `engines.node`.
+- `CAP!` / `CAP?` — gefährliche Capability-Kombinationen
+  (`child_process` + Network / Env + Network / Native + Network).
+  Einzelne Capability bleibt stumm.
+- `INT!` — Lockfile-Integrity-Hash weicht von der Registry ab
+  (möglicher Mirror-Hijack).
 - `WS` — Workspaces *innerhalb* eines Projekts sind uneinig. Ein
   Klick öffnet den [Workspace-Drift-Drill-Down](#14-workspace-drift-drill-down).
+
+Klick auf ein Badge öffnet das
+[Paket-Detail-Panel](#3-paket-detail-panel) auf dem Sicherheits-Tab.
+
+Der **Badges**-Button in der Toolbar öffnet ein Modal, in dem
+einzelne Badge-Familien ausgeblendet werden können — siehe
+[§18 Badge-Filter](#18-badge-filter).
 
 **Git-Dependencies** zeigen die *installierte* Version als Zellenwert
 plus ein kleines `git`-Chip; im Hover erscheint die Original-URL. Die
@@ -307,15 +343,55 @@ loszuwerden.
 
 ### 3.5 Sicherheit
 
-Aggregiert sechs Scanner:
+Aggregiert die volle Scanner-Familie als einklappbare Karten
+(Lizenz hat einen eigenen Tab — siehe 3.6). Standard: jede Karte
+eingeklappt, sofern sie keine warn/risk-Befunde trägt. Ein
+sauberes Paket zeigt also ein Banner + einen Stapel gefalteter
+Karten; ein problematisches öffnet die relevanten von selbst.
 
 - **CVEs** aus OSV.dev (Single-Version-Query, volle Details)
 - **Install-Scripts** — Lifecycle-Hooks klassifiziert info/warn/risk
-- **Code-Pattern** — `eval(`, `new Function(`, `child_process`, base64
+- **Code-Pattern** — `eval(`, `new Function(`, `child_process`,
+  base64, Webhook-URLs, credential-artige Env-Reads,
+  `_0x`-Obfuskator-Fingerprint
 - **Binärdateien** — nativer Code im Tarball
 - **Datei-Churn** — Vergleich gegen die vorherige Stable-Version
 - **Maintainer / Publisher** — vergleicht den `_npmUser` der gewählten
   Version mit dem Trust-Set der letzten Vorgänger.
+- **Provenance / Signatur** — Sigstore-Attestation +
+  npm-Schlüssel-Signaturen. Drei Stufen: `provenance`
+  (Sigstore-attested), `signed` (Registry-Baseline), `unsigned`
+  (sehr alte Releases oder non-npm Mirrors).
+- **Frische** — Paketalter (`time.created`) + Publisher-Account-
+  Alter. Worst-of-two: `risk` (< 7 d) / `warn` (< 30 d) / `info`.
+- **Release-Kadenz** — Tage seit letztem Release + Median-Gap der
+  letzten 10 Versionen. `risk` = verlassen, `warn` = ausbremsend.
+- **Typosquat / Homoglyph** — Levenshtein-Distanz + Unicode-
+  Verwechsler gegen eine kuratierte Popular-Package-Liste.
+- **Deprecation** — liest per-Version `deprecated` aus dem
+  Packument. Zeigt den Maintainer-Hinweis wortwörtlich
+  ("use foo@2 instead" o.ä.).
+- **Obfuskation** — Per-JS-Datei-Befundliste: `path`, Signale
+  (`eval-decoded` / `obfuscator-io-identifier` /
+  `hex-string-array` / `long-line` / `dense-hex-literals`) und
+  ein kurzes Detail (max. Zeilenlänge, `_0x`-Dichte, …).
+  Build-Artefakte (`dist/`, `*.min.js`, …) werden erkannt und auf
+  info gedeckelt — legitime Minification verzerrt das Ergebnis
+  nicht.
+- **Manifest-Red-Flags** — `package.json`-Heuristiken: fehlende
+  README / Description / `files`-Allowlist, viele `bin`-Einträge,
+  Native-Build + Postinstall-Kombi, veraltete `engines.node`.
+  Stufung: 1 Flag = info, 2 = warn, 3 oder die bösartige Kombi =
+  risk.
+- **Capability-Inventar** — welche Plattform-APIs die JS-Dateien
+  berühren. Risk entsteht aus *Kombinationen* (spawn + Network,
+  env-read + Network, native + Network); einzelne Capability
+  bleibt info.
+- **Externe Quellen** — drei Unterabschnitte (socket.dev /
+  OpenSSF Scorecard / deps.dev) jeweils mit Score, Deep-Link und
+  source-spezifischer Begründung. Standardmäßig aus für socket
+  (braucht API-Key); OpenSSF + deps.dev sind frei und
+  standardmäßig an.
 
 Die Severity beim Maintainer-Scanner orientiert sich an der **Geschwindigkeit
 des Owner-Wechsels** auf einem etablierten Paket — empirisch hatten die
@@ -875,3 +951,97 @@ asynchronen Matrix-Scans gelandet sind — sobald jeder Badge-Loader
 (CVE-Batch, Heuristik-Batch, Integrity-Check) zurückkommt, füllt
 sich der Ring mit dem neuen Score nach. Sentinel-Zeilen (Matrix /
 Templates) haben keinen Ring, weil sie keine Projekte sind.
+
+---
+
+## 16. Projektübergreifendes Dashboard
+
+Die **Dashboard**-Sentinel-Zeile in der linken Treeview (▣-Icon,
+über Matrix) landet auf einer `(Projekt × Scanner)`-Ring-Matrix:
+jedes konfigurierte Projekt wird zu einer Spalte, jeder Scanner
+zu einer Zeile, jede Zelle trägt einen 0–100 %-Score, der die
+Befunde des Scanners über das Lockfile des Projekts aggregiert.
+
+![Projektübergreifendes Dashboard](screenshots/19_dashboard_de.png)
+
+- **Score-Formel** ist identisch mit dem per-Projekt Health-Ring:
+  `100 × (1 − Σ min(Gewicht, 30) / (Pakete × 30))` mit `info=1`,
+  `warn=10`, `risk=30`.
+- **Stufen:** ≥ 80 grün, ≥ 60 amber, < 60 rot. `N/A`-Zellen
+  erscheinen, wenn der Scanner für das Projekt nicht zutrifft
+  (kein Lockfile, Remote-Source beim Unused-Scanner, kein
+  Template zugewiesen, keine externe Quelle konfiguriert,
+  synthetisiertes Lockfile bei MutableResolution).
+- **Erster Paint** nutzt den persistierten Snapshot unter
+  `.nppm-cache/dashboard-snapshot.json` — die Ansicht ist sofort
+  da beim Öffnen. Im Header steht, wann er zuletzt aktualisiert
+  wurde; **Re-Scan** streamt einen frischen Lauf via SSE.
+- **Zellklick** öffnet das [Findings-Modal](#3-paket-detail-panel)
+  — Top-50 Beiträger sortiert risk → warn → info, mit
+  Ein-Klick-Sprüngen in die relevante Per-Projekt-Ansicht
+  (Installed für CVE / Integrity, Unused für Unused, Template
+  für Compliance) oder direkt in das Paket-Detail-Panel für die
+  Per-Paket-Scanner.
+- **Header-Klick** öffnet die Per-Paket-Matrix des Projekts.
+- **Scanner-Zeilen-Hover** hebt die Zeile hervor und zeigt einen
+  `i`-Info-Button mit Beschreibung, was der Scanner prüft + wie
+  der Score berechnet wird.
+
+Das Dashboard lässt sich als Default-Landing-View einstellen via
+Einstellungen → Allgemein → "Startseite".
+
+---
+
+## 17. Impact-Analyse
+
+Der **Impact**-Button in der Topbar beantwortet: *"wenn
+`<name>@<version>` sich als bösartig herausstellt, welche meiner
+Projekte sind betroffen — direkt oder transitiv — und über welchen
+kürzesten Pfad?"*.
+
+Das Suchfeld nimmt entweder einen reinen Namen (`lodash`) oder
+eine fixierte Version (`lodash@4.17.20`) entgegen. Eine BFS läuft
+durch den aufgelösten Dep-Graph jedes konfigurierten Projekts,
+findet jede erreichbare Instanz und meldet:
+
+- **Projekt-Liste** mit Anzahl der erreichbaren Instanzen.
+- **Pfad pro Treffer** — kürzester Pfad von der Root-Deklaration
+  zum getroffenen Node (z.B. `root → axios → form-data → lodash`).
+- **Version-Pinned-Filter** — wenn `name@version` übergeben wird,
+  ist das Version-Matching permissiv (Range-Erfüllung), damit
+  "wer fährt diese CVE-Surface gerade?" auch dann beantwortbar
+  bleibt, wenn Projekte unterschiedliche installierte Minors
+  fahren.
+
+Versteckte Projekte werden mitgescannt — Incident-Response kümmert
+sich um jedes Repo, unabhängig von Dashboard-Filterung.
+
+---
+
+## 18. Badge-Filter
+
+Die globale Matrix kann 16 verschiedene Badge-Familien rendern.
+Wenn die Zeile zu voll wird — oder ein Ökosystem (z.B.
+Lizenz-Klassifikation) alles andere übertönt — öffnet der
+**Badges**-Button in der Toolbar ein Filter-Modal:
+
+![Badge-Filter-Modal](screenshots/20_badge_filter_de.png)
+
+Jede Zeile zeigt:
+
+- eine **Checkbox** (Default: an → Badge sichtbar),
+- ein echtes **gestyltes Sample** des Badges — gleiche CSS-Klassen
+  wie die Matrix, damit Farbe und Schriftstärke exakt
+  übereinstimmen,
+- das **Label**,
+- eine **einzeilige Beschreibung**, was das Badge auslöst.
+
+Zwei Shortcuts oben: **Alle anzeigen** schaltet alles ein,
+**Alle ausblenden** alles aus. Die Auswahl wird mit **Übernehmen**
+angewendet; der Toolbar-Button zeigt dann `Badges (N ausgeblendet)`
+mit aktivem Highlight, damit eine gefilterte Matrix sofort
+erkennbar ist.
+
+Die Auswahl persistiert in `localStorage` zusammen mit den anderen
+Matrix-States (Filter / Sortierung / Suche). Reload-sicher, kein
+Server-Roundtrip.

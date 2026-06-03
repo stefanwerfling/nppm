@@ -270,6 +270,9 @@ async function captureLanguage(browser, baseUrl, lang) {
     await captureWorkspaceDrift(page, lang, suffix);
     await captureTemplatesViews(page, lang, suffix);
     await captureSettingsDialog(page, lang, suffix);
+    await captureDashboard(page, lang, suffix);
+    await captureImpactModal(page, lang, suffix);
+    await captureBadgeFilter(page, lang, suffix);
 
     await page.close();
 }
@@ -522,6 +525,133 @@ async function captureTemplatesViews(page, lang, suffix) {
 }
 
 /**
+ * Dashboard sentinel row → cross-project (project × scanner) score
+ * matrix. The snapshot endpoint serves the cached last result so the
+ * first paint is instant; we wait long enough for the SSE re-scan to
+ * fill in fresh cells too, then shoot.
+ */
+async function captureDashboard(page, lang, suffix) {
+    await page.keyboard.press('Escape');
+    await sleep(300);
+
+    const opened = await page.evaluate(() => {
+        const item = document.querySelector('.tree-item[data-unid="__dashboard__"]');
+        if (item) {
+            item.click();
+            return true;
+        }
+        return false;
+    });
+    if (!opened) {
+        console.log('  · Dashboard sentinel row not found — skipping dashboard shot');
+        return;
+    }
+    // Snapshot paint usually lands within a few hundred ms; an SSE
+    // re-scan can take seconds on a cold cache. We wait for the
+    // table to appear, then a beat for the rings to settle.
+    try {
+        await page.waitForSelector('.dash-table, .dash-empty', {timeout: 15_000});
+    } catch {
+        // continue — take whatever's there
+    }
+    await sleep(3000);
+    await shot(page, `19_dashboard${suffix}.png`);
+}
+
+/**
+ * Topbar Impact button → ImpactModal. Pre-fills the query field
+ * with a name that's almost certainly transitively reachable in
+ * the configured projects (`lodash` is the bellwether choice), then
+ * waits for the per-project list to land before shooting.
+ */
+async function captureImpactModal(page, lang, suffix) {
+    await page.keyboard.press('Escape');
+    await sleep(300);
+
+    // The Impact button lives in the topbar — find by class first,
+    // fallback to the label text if the class ever changes.
+    const opened = await page.evaluate(() => {
+        const byClass = document.querySelector('.topbar-impact');
+        if (byClass) {
+            byClass.click();
+            return true;
+        }
+        const btns = Array.from(document.querySelectorAll('button'));
+        const hit = btns.find((b) => /impact/i.test(b.textContent || ''));
+        if (hit) {
+            hit.click();
+            return true;
+        }
+        return false;
+    });
+    if (!opened) {
+        console.log('  · Topbar Impact button not found — skipping impact shot');
+        return;
+    }
+    try {
+        await page.waitForSelector('.umd-panel input', {timeout: 10_000});
+    } catch {
+        console.log('  · Impact modal never rendered input — skipping shot');
+        return;
+    }
+    // Type a query that's likely to hit something in a node project.
+    await page.evaluate(() => {
+        const inp = document.querySelector('.umd-panel input[type="text"], .umd-panel input[type="search"], .umd-panel input');
+        if (inp) {
+            inp.value = 'lodash';
+            inp.dispatchEvent(new Event('input', {bubbles: true}));
+            inp.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+        }
+        const submit = document.querySelector('.umd-panel button.umd-btn-primary, .umd-panel button[type="submit"]');
+        if (submit) {
+            submit.click();
+        }
+    });
+    await sleep(2500);
+    await shot(page, `20_impact${suffix}.png`);
+    await page.keyboard.press('Escape');
+    await sleep(300);
+}
+
+/**
+ * Matrix toolbar → "Badges" button → BadgeFilterModal. Goes back
+ * to the global matrix first so the toolbar exists.
+ */
+async function captureBadgeFilter(page, lang, suffix) {
+    await page.keyboard.press('Escape');
+    await sleep(300);
+    await page.evaluate(() => {
+        const item = document.querySelector('.tree-item[data-unid="__matrix__"]');
+        item?.click();
+    });
+    await sleep(1500);
+    await waitForMatrix(page);
+
+    const opened = await page.evaluate(() => {
+        const btn = document.querySelector('.matrix-badges-btn');
+        if (btn) {
+            btn.click();
+            return true;
+        }
+        return false;
+    });
+    if (!opened) {
+        console.log('  · Badges button not found — skipping badge-filter shot');
+        return;
+    }
+    try {
+        await page.waitForSelector('.bfm-list', {timeout: 10_000});
+    } catch {
+        console.log('  · Badge-filter modal never rendered — skipping shot');
+        return;
+    }
+    await sleep(500);
+    await shot(page, `21_badge_filter${suffix}.png`);
+    await page.keyboard.press('Escape');
+    await sleep(300);
+}
+
+/**
  * Topbar gear → SettingsModal on the General tab.
  */
 async function captureSettingsDialog(page, lang, suffix) {
@@ -562,16 +692,26 @@ async function main() {
     console.log(`Loaded ${ROOT_DEP_NAMES.size} root-dep names for bulk-wizard targeting.`);
 
     const baseUrl = await readBaseUrl();
-    console.log(`Starting nppm at ${baseUrl} …`);
 
-    const server = spawn('node', ['./cli/dev.js'], {
-        cwd: PROJECT_ROOT,
-        env: {...process.env, NPPM_PROJECT_ROOT: PROJECT_ROOT},
-        stdio: ['ignore', 'pipe', 'pipe']
-    });
-
-    server.stdout.on('data', (b) => process.stdout.write(`[server] ${b}`));
-    server.stderr.on('data', (b) => process.stderr.write(`[server] ${b}`));
+    // Reuse a running dev server when one is already responding.
+    // Saves the dance of bouncing the user's session every time
+    // screenshots get regenerated; the spawned child would otherwise
+    // collide on port 5190 and Vite would silently fall back to a
+    // random next-free port that the puppeteer client wouldn't hit.
+    let server = null;
+    const alreadyUp = await fetch(baseUrl).then((r) => r.ok).catch(() => false);
+    if (alreadyUp) {
+        console.log(`Reusing existing nppm at ${baseUrl} …`);
+    } else {
+        console.log(`Starting nppm at ${baseUrl} …`);
+        server = spawn('node', ['./cli/dev.js'], {
+            cwd: PROJECT_ROOT,
+            env: {...process.env, NPPM_PROJECT_ROOT: PROJECT_ROOT},
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+        server.stdout.on('data', (b) => process.stdout.write(`[server] ${b}`));
+        server.stderr.on('data', (b) => process.stderr.write(`[server] ${b}`));
+    }
 
     try {
         await waitForServer(baseUrl);
@@ -586,7 +726,9 @@ async function main() {
             await browser.close();
         }
     } finally {
-        server.kill();
+        if (server !== null) {
+            server.kill();
+        }
     }
 
     console.log('\n✓ Screenshots written to doc/screenshots/');

@@ -7,9 +7,11 @@
 A local-first dashboard that compares npm dependency versions across many
 projects at once and surfaces drift, outdated packages, CVEs, install-time
 risks, lockfile integrity drift, retroactive CVE exposure timelines,
-PR-review-grade dep diffs, and binary file presence in a single view.
-Backend lives inside a Vite dev server, frontend is plain TypeScript + DOM
-(no framework).
+PR-review-grade dep diffs, binary file presence, deprecated versions,
+code obfuscation, third-party reputation (socket.dev / OpenSSF Scorecard /
+deps.dev), manifest red-flags, capability inventories and mutable
+lockfile resolutions in a single view. Backend lives inside a Vite dev
+server, frontend is plain TypeScript + DOM (no framework).
 
 ![Matrix view](doc/screenshots/01_matrix.png)
 
@@ -75,6 +77,64 @@ Backend lives inside a Vite dev server, frontend is plain TypeScript + DOM
     lockfile-injection as `risk`, custom-mirror redirects as `info`.
     Surfaces in the Installed view as a new column + summary pill;
     network-free against the warm registry cache.
+  - Provenance / sigstore — green `PROV ✓` badge on packages whose
+    latest is published with npm `--provenance` (Sigstore-anchored
+    SLSA attestation tying the tarball to a specific CI build).
+  - Freshness — flags packages or maintainer accounts that are
+    brand-new (`NEW!` < 7 days, `NEW` < 30 days). Combined package +
+    publisher age is the classic typosquat profile.
+  - Release cadence — flags very stale (`STALE!` ≥ 730 days) or
+    abandoned-looking packages.
+  - Typosquat + Unicode homoglyph — Levenshtein distance to popular
+    packages plus confusables detection. `SQUAT!` = distance 1 OR
+    Unicode confusable; `SQUAT?` = distance 2.
+  - Ignore-scripts recommendation — per-package verdict on whether
+    `npm install --ignore-scripts` is safe / needed / risky.
+  - Deprecation — reads per-version `deprecated` from the packument
+    (free, no extra HTTP call). `DEP!` when the installed version is
+    deprecated, `DEP?` when only `latest` is. Shows the maintainer's
+    reason verbatim.
+  - Code-obfuscation detection — per-JS-file heuristic over the
+    fingerprint cache: obfuscator.io `_0x` identifier density,
+    `eval(atob(…))` chains, hex-string arrays, pathologically long
+    lines. Path classifier caps `dist/`/`*.min.js` artifacts at info
+    so legitimate minification doesn't get flagged.
+  - Manifest red-flags — pure heuristics over `package.json`:
+    missing README, no `description`, no `files[]` allowlist, many
+    `bin` entries, the native-build+postinstall combo, dated
+    `engines.node` range. Severity stacks: 1 flag = info, 2 = warn,
+    3 or the malicious combo = risk.
+  - Capability inventory — per-package, which platform APIs the JS
+    files touch (`fs.read/write`, `http/fetch`, raw sockets,
+    `child_process`, credential-shaped env vars, native bindings,
+    `eval`). Severity by *combination*: spawn+network or
+    env+network land as risk, single capability as info.
+  - External-sources aggregator — socket.dev (supply-chain risk
+    score, needs API key), OpenSSF Scorecard (repo development
+    practices, free), deps.dev (Google package index, free).
+    Worst-of-three severity per package, configurable per source.
+  - Mutable-resolution scanner — per-project lockfile sweep for
+    entries that can't be reproduced deterministically: mutable git
+    refs (branch/tag instead of SHA), missing integrity hashes on
+    registry tarballs, `file:`/`link:` local protocols.
+- **Cross-project Dashboard** — every scanner's per-project verdict
+  collapsed into a `(project × scanner)` ring matrix with 0–100 %
+  scores. SSE-streamed per cell so a cold scan shows progress
+  immediately; a snapshot under `.nppm-cache/` makes the next open
+  instant. Click any cell for the per-package drill-down with
+  top-50 contributors; click any header to jump to the per-project
+  view. Pickable via Settings → General → "Start page" as the
+  default landing view.
+- **Cross-project Impact Analysis** — topbar **Impact** button
+  answers "which projects pull in `<name>` (or `<name>@<version>`),
+  directly or transitively, and via which shortest path?". BFS over
+  every project's resolved dep graph. Hidden projects are included
+  — incident response cares about every repo.
+- **Badge filter** — the global matrix grows a **Badges** toolbar
+  button that opens a checkbox-per-badge modal. Each row shows the
+  actual styled sample plus a one-line description so you can
+  decide what each badge means before hiding it. Default: all
+  visible. Selection persists in `localStorage`.
 - **Retroactive Vulnerability Timeline** — answers "from when to when
   was this project exposed to which CVE?". Forward-replays the
   per-project history (live snapshots + git-reconstructed entries)
@@ -358,6 +418,9 @@ linked at the top of this README. Quick chapter pointers:
 - [Bulk-Update Wizard](doc/manual_en.md#8-bulk-update-wizard)
 - [Vulnerability Timeline](doc/manual_en.md#9-vulnerability-timeline)
 - [PR Review](doc/manual_en.md#10-pr-review)
+- [Cross-project Dashboard](doc/manual_en.md#16-cross-project-dashboard)
+- [Impact analysis](doc/manual_en.md#17-impact-analysis)
+- [Badge filter](doc/manual_en.md#18-badge-filter)
 
 ## Caches
 

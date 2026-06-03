@@ -143,6 +143,12 @@ export type ApiConfigSettings = {
             allowlist?: string[];
             devPathGlobs?: string[];
         };
+        external?: {
+            enabled?: boolean;
+            socket?: {enabled?: boolean; apiKey?: string};
+            openssf?: {enabled?: boolean};
+            depsDev?: {enabled?: boolean};
+        };
     };
 };
 

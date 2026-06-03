@@ -358,6 +358,7 @@ export class SettingsModal {
         const m = this._current.security?.maintainer ?? {};
         const l = this._current.security?.license ?? {};
         const u = this._current.security?.unused ?? {};
+        const e = this._current.security?.external ?? {};
         body.appendChild(this._sectionHead(I18n.t('Maintainer handover thresholds (days)')));
         body.appendChild(this._numberField('sm-mqh', I18n.t('Quick handover (risk if ≤)'), m.quickHandoverDays, '14'));
         body.appendChild(this._numberField('sm-msg', I18n.t('Suspicious gap (warn if ≤)'), m.suspiciousGapDays, '90'));
@@ -379,6 +380,17 @@ export class SettingsModal {
         body.appendChild(this._sectionHead(I18n.t('Unused-deps detector')));
         body.appendChild(this._textareaField('sm-ual', I18n.t('Allowlist (one package name per line)'), (u.allowlist ?? []).join('\n')));
         body.appendChild(this._textareaField('sm-udp', I18n.t('Dev path globs (one per line, replaces defaults)'), (u.devPathGlobs ?? []).join('\n')));
+
+        body.appendChild(this._sectionHead(I18n.t('External reputation sources')));
+        // The master switch defaults to "on" — leaving it unchecked
+        // here means the user explicitly turned every source off; the
+        // backend then short-circuits the scanner without making any
+        // network calls.
+        body.appendChild(this._checkboxField('sm-ext-en', I18n.t('Enable external sources'), e.enabled !== false));
+        body.appendChild(this._checkboxField('sm-ext-socket-en', I18n.t('socket.dev (needs API key)'), e.socket?.enabled !== false));
+        body.appendChild(this._textField('sm-ext-socket-key', I18n.t('socket.dev API key ($ENV ok)'), e.socket?.apiKey, '$SOCKET_DEV_API_KEY'));
+        body.appendChild(this._checkboxField('sm-ext-openssf-en', I18n.t('OpenSSF Scorecard'), e.openssf?.enabled !== false));
+        body.appendChild(this._checkboxField('sm-ext-depsdev-en', I18n.t('deps.dev (info only)'), e.depsDev?.enabled !== false));
     }
 
     private _sectionHead(label: string): HTMLElement {
@@ -620,6 +632,39 @@ export class SettingsModal {
         }
         if (Object.keys(unused).length > 0) {
             sec.unused = unused;
+        }
+
+        // External-sources: each checkbox tracks an explicit boolean
+        // (default-on) so the persisted value distinguishes "left
+        // default" (omit) from "deliberately disabled" (false). The
+        // API-key field is optional; falsy values stay absent.
+        const ext: NonNullable<NonNullable<ApiConfigSettings['security']>['external']> = {};
+        const extEnableEl = this._panel?.querySelector<HTMLInputElement>('.sm-ext-en');
+        if (extEnableEl && extEnableEl.checked === false) {
+            ext.enabled = false;
+        }
+        const socket: NonNullable<NonNullable<NonNullable<ApiConfigSettings['security']>['external']>['socket']> = {};
+        const socketEnEl = this._panel?.querySelector<HTMLInputElement>('.sm-ext-socket-en');
+        if (socketEnEl && socketEnEl.checked === false) {
+            socket.enabled = false;
+        }
+        const socketKey = this._strVal('.sm-ext-socket-key');
+        if (socketKey !== undefined) {
+            socket.apiKey = socketKey;
+        }
+        if (Object.keys(socket).length > 0) {
+            ext.socket = socket;
+        }
+        const openssfEnEl = this._panel?.querySelector<HTMLInputElement>('.sm-ext-openssf-en');
+        if (openssfEnEl && openssfEnEl.checked === false) {
+            ext.openssf = {enabled: false};
+        }
+        const depsDevEnEl = this._panel?.querySelector<HTMLInputElement>('.sm-ext-depsdev-en');
+        if (depsDevEnEl && depsDevEnEl.checked === false) {
+            ext.depsDev = {enabled: false};
+        }
+        if (Object.keys(ext).length > 0) {
+            sec.external = ext;
         }
 
         this._current.security = Object.keys(sec).length > 0 ? sec : undefined;

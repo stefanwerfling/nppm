@@ -39,6 +39,7 @@ export type CliArgs = {
     runOsv: boolean;
     runHeuristics: boolean;
     runUnused: boolean;
+    runExternal: boolean;
     concurrency: number;
     help: boolean;
 };
@@ -71,6 +72,7 @@ export class CliArgsParser {
         runOsv: true,
         runHeuristics: true,
         runUnused: true,
+        runExternal: true,
         concurrency: 10,
         help: false
     };
@@ -103,6 +105,10 @@ export class CliArgsParser {
             }
             if (raw === '--no-unused') {
                 out.runUnused = false;
+                continue;
+            }
+            if (raw === '--no-external') {
+                out.runExternal = false;
                 continue;
             }
 
@@ -183,6 +189,8 @@ Options:
   --no-heuristics       Skip scripts/patterns/binaries/maintainer/license
                         heuristics — those require fingerprint downloads.
   --no-unused           Skip the unused-deps detector.
+  --no-external         Skip the external-sources scanner (socket.dev,
+                        OpenSSF Scorecard, deps.dev).
   --concurrency=<n>     Parallelism for tarball fingerprint downloads
                         (default: 10).
   -h, --help            Show this help and exit.

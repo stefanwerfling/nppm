@@ -368,6 +368,19 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     'Publisher account has no 2FA — credential-theft would be enough to publish': 'Publisher account has no 2FA — credential-theft would be enough to publish',
     'Registry did not disclose the publisher\'s 2FA state (typical on the public mirror)': 'Registry did not disclose the publisher\'s 2FA state (typical on the public mirror)',
     'Provenance / Signing': 'Provenance / Signing',
+    'External sources': 'External sources',
+    'External reputation sources': 'External reputation sources',
+    'Enable external sources': 'Enable external sources',
+    'socket.dev (needs API key)': 'socket.dev (needs API key)',
+    'socket.dev API key ($ENV ok)': 'socket.dev API key ($ENV ok)',
+    'OpenSSF Scorecard': 'OpenSSF Scorecard',
+    'deps.dev (info only)': 'deps.dev (info only)',
+    'No external source returned a verdict — scanner disabled, no API key, or all three sources had no data for this package.':
+        'No external source returned a verdict — scanner disabled, no API key, or all three sources had no data for this package.',
+    'Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.':
+        'Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.',
+    'Per-source severity (socket overall <50 = risk, <80 = warn; OpenSSF <5 = risk, <7 = warn; deps.dev = info only) reduced to worst-of-three per package.':
+        'Per-source severity (socket overall <50 = risk, <80 = warn; OpenSSF <5 = risk, <7 = warn; deps.dev = info only) reduced to worst-of-three per package.',
     'Latest version published with --provenance (Sigstore-anchored CI build attestation)': 'Latest version published with --provenance (Sigstore-anchored CI build attestation)',
     'No registry record yet — try again once the cache warms.': 'No registry record yet — try again once the cache warms.',
     '{n} registry signature(s)': '{n} registry signature(s)',

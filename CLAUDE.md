@@ -60,6 +60,10 @@ nppm/
 │   ├── LicenseScanner.ts   SPDX classifier (permissive/weak/strong/proprietary/unknown) + mini expr parser
 │   ├── IntegrityScanner.ts lockfile `resolved+integrity` vs registry `dist` cross-check
 │   ├── ImpactAnalyzer.ts   cross-project blast-radius: BFS shortest path from root deps to a queried name(+version)
+│   ├── ExternalSourcesScanner.ts  aggregator over three third-party reputation APIs (socket.dev + OpenSSF Scorecard + deps.dev), worst-of-three severity per package
+│   ├── External/SocketDevFetcher.ts  per-package socket.dev score (needs API key)
+│   ├── External/OpenSsfFetcher.ts   OpenSSF Scorecard fetch + npm `repository` → host/owner/repo parser
+│   ├── External/DepsDevFetcher.ts   deps.dev v3 version metadata (free, no auth)
 │   └── SecurityScanner.ts  aggregator + batched matrix-heuristics
 │
 ├── Unused/                 depcheck-style per-project hygiene scan
@@ -208,7 +212,9 @@ The runner pipeline per project:
    `name@version`.
 2. `OsvClient.queryBatch(...)` for CVE IDs (skipped on `--no-osv`).
 3. `SecurityScanner.scanHeuristicsBatch(...)` for scripts / patterns /
-   binaries / maintainer / license (skipped on `--no-heuristics`).
+   binaries / maintainer / license + the bundled
+   `ExternalSourcesScanner` pass (skipped on `--no-heuristics`; the
+   external pass can be additionally turned off via `--no-external`).
 4. `UnusedDetector.scan(project)` for the depcheck-style buckets
    (skipped on `--no-unused`).
 

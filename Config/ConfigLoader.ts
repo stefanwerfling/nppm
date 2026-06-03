@@ -7,6 +7,10 @@ import {ProjectGitea} from '../Project/ProjectGitea.js';
 import {ProjectGithub} from '../Project/ProjectGithub.js';
 import {ProjectLocal} from '../Project/ProjectLocal.js';
 import {Registry} from '../Registry/Registry.js';
+import {DepsDevFetcher} from '../Security/External/DepsDevFetcher.js';
+import {OpenSsfFetcher} from '../Security/External/OpenSsfFetcher.js';
+import {SocketDevFetcher} from '../Security/External/SocketDevFetcher.js';
+import {ExternalSourcesScanner} from '../Security/ExternalSourcesScanner.js';
 import {LicenseSeverity} from '../Security/LicenseScanner.js';
 import {NpmUserFetcher} from '../Security/NpmUserFetcher.js';
 import {OsvClient} from '../Security/OsvClient.js';
@@ -47,6 +51,13 @@ export type LoadedConfig = {
     securityScanner: SecurityScanner;
     unusedDetector: UnusedDetector;
     bundlephobiaFetcher: BundlephobiaFetcher;
+    /**
+     * External-sources aggregator (socket.dev + OpenSSF + deps.dev).
+     * Already wired into `securityScanner` via constructor; exposed
+     * separately so the Dashboard orchestrator can render N/A cells
+     * when no source is configured.
+     */
+    externalScanner: ExternalSourcesScanner;
     /**
      * `actions.allowInstall` from the config. Defaults to `false`. The
      * dev server's "Edit + install" + per-package "Run script" buttons
@@ -128,6 +139,12 @@ export class ConfigLoader {
                     allowlist?: string[];
                     devPathGlobs?: string[];
                 };
+                external?: {
+                    enabled?: boolean;
+                    socket?: {enabled?: boolean; apiKey?: string};
+                    openssf?: {enabled?: boolean};
+                    depsDev?: {enabled?: boolean};
+                };
             };
             actions?: {
                 allowInstall?: boolean;
@@ -181,6 +198,31 @@ export class ConfigLoader {
             ? treatUnknownAsRaw as LicenseSeverity
             : undefined;
 
+        // External-sources scanner — three TTL cache pockets, one per
+        // upstream API. Disabled-by-default for socket (needs API key);
+        // OpenSSF + deps.dev are free and on-by-default. The aggregator
+        // gates each source independently from the loaded config, and
+        // SecurityScanner reads the wrapper as a single dependency.
+        const socketKey = ConfigLoader.expandEnv(cfg.security?.external?.socket?.apiKey);
+        const socketCache = new JsonCache(path.join(cacheDir, 'external-socket'), cacheTtlMinutes);
+        const openssfCache = new JsonCache(path.join(cacheDir, 'external-openssf'), cacheTtlMinutes);
+        const depsDevCache = new JsonCache(path.join(cacheDir, 'external-depsdev'), cacheTtlMinutes);
+        const socketFetcher = new SocketDevFetcher(socketCache, socketKey);
+        const openssfFetcher = new OpenSsfFetcher(openssfCache);
+        const depsDevFetcher = new DepsDevFetcher(depsDevCache);
+        const externalScanner = new ExternalSourcesScanner(
+            registry,
+            socketFetcher,
+            openssfFetcher,
+            depsDevFetcher,
+            {
+                enabled: cfg.security?.external?.enabled,
+                socket: {enabled: cfg.security?.external?.socket?.enabled},
+                openssf: {enabled: cfg.security?.external?.openssf?.enabled},
+                depsDev: {enabled: cfg.security?.external?.depsDev?.enabled}
+            }
+        );
+
         const securityScanner = new SecurityScanner(
             osvClient,
             fingerprintBuilder,
@@ -192,7 +234,8 @@ export class ConfigLoader {
                     denylist: cfg.security?.license?.denylist,
                     treatUnknownAs
                 },
-                userFetcher
+                userFetcher,
+                external: externalScanner
             }
         );
 
@@ -283,7 +326,8 @@ export class ConfigLoader {
             bundlephobiaFetcher,
             allowInstall,
             editor,
-            projects
+            projects,
+            externalScanner
         };
     }
 }

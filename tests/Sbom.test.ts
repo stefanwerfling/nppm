@@ -11,6 +11,10 @@ import {PackageManifest} from '../Project/PackageManifest.js';
 import {ProjectLocal} from '../Project/ProjectLocal.js';
 import {Project} from '../Project/Project.js';
 import {Registry} from '../Registry/Registry.js';
+import {DepsDevFetcher} from '../Security/External/DepsDevFetcher.js';
+import {OpenSsfFetcher} from '../Security/External/OpenSsfFetcher.js';
+import {SocketDevFetcher} from '../Security/External/SocketDevFetcher.js';
+import {ExternalSourcesScanner} from '../Security/ExternalSourcesScanner.js';
 import {OsvClient} from '../Security/OsvClient.js';
 import {SecurityScanner} from '../Security/SecurityScanner.js';
 import {UnusedDetector} from '../Unused/UnusedDetector.js';
@@ -43,7 +47,14 @@ function makeEnvironment(projects: Project[], cacheDir: string): LoadedConfig {
     const fingerprintBuilder = new FingerprintBuilder(fingerprintCache);
     const securityCache = new JsonCache(path.join(cacheDir, 'security'), 60);
     const osvClient = new OsvClient(securityCache);
-    const securityScanner = new SecurityScanner(osvClient, fingerprintBuilder, registry);
+    const externalScanner = new ExternalSourcesScanner(
+        registry,
+        new SocketDevFetcher(new JsonCache(path.join(cacheDir, 'external-socket'), 60)),
+        new OpenSsfFetcher(new JsonCache(path.join(cacheDir, 'external-openssf'), 60)),
+        new DepsDevFetcher(new JsonCache(path.join(cacheDir, 'external-depsdev'), 60)),
+        {enabled: false}
+    );
+    const securityScanner = new SecurityScanner(osvClient, fingerprintBuilder, registry, {external: externalScanner});
     const unusedDetector = new UnusedDetector({});
     const bundleCache = new JsonCache(path.join(cacheDir, 'bundlephobia'), 60, {permanent: true});
     const bundlephobiaFetcher = new BundlephobiaFetcher(bundleCache);
@@ -63,7 +74,8 @@ function makeEnvironment(projects: Project[], cacheDir: string): LoadedConfig {
         bundlephobiaFetcher,
         allowInstall: false,
         editor: undefined,
-        projects
+        projects,
+        externalScanner
     };
 }
 

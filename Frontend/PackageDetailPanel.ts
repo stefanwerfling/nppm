@@ -13,6 +13,7 @@ import {FreshnessFinding, FreshnessLevel} from '../Security/FreshnessScanner.js'
 import {IgnoreScriptsFinding, IgnoreScriptsLevel} from '../Security/IgnoreScriptsScanner.js';
 import {TyposquatFinding, TyposquatLevel} from '../Security/TyposquatScanner.js';
 import {MaintainerFinding, MaintainerSeverity} from '../Security/MaintainerScanner.js';
+import {ExternalFinding, ExternalSeverity, ExternalSource, ExternalSourceFinding} from '../Security/ExternalSourcesScanner.js';
 import {ProvenanceFinding, ProvenanceLevel} from '../Security/ProvenanceScanner.js';
 import {OsvVulnerability} from '../Security/OsvClient.js';
 import {PatternFinding, PatternSeverity} from '../Security/PatternScanner.js';
@@ -836,7 +837,86 @@ export class PackageDetailPanel {
         wrap.appendChild(card(this._renderFreshnessSection(report.freshness)));
         wrap.appendChild(card(this._renderCadenceSection(report.cadence)));
         wrap.appendChild(card(this._renderTyposquatSection(report.typosquat)));
+        wrap.appendChild(card(
+            this._renderExternalSection(report.external),
+            {hasIssue: report.external.level === ExternalSeverity.warn
+                    || report.external.level === ExternalSeverity.risk}
+        ));
         return wrap;
+    }
+
+    /**
+     * External-sources section. Aggregates socket.dev / OpenSSF /
+     * deps.dev verdicts into one card with up to three subsections.
+     * Empty (no findings) renders a placeholder, same convention as
+     * the other reputation scanners.
+     */
+    private _renderExternalSection(finding: ExternalFinding): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdp-section';
+
+        const heading = document.createElement('div');
+        heading.className = 'pdp-section-head';
+        heading.textContent = I18n.t('External sources');
+        wrap.appendChild(heading);
+
+        if (finding.findings.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-placeholder';
+            empty.textContent = I18n.t('No external source returned a verdict — scanner disabled, no API key, or all three sources had no data for this package.');
+            wrap.appendChild(empty);
+            return wrap;
+        }
+
+        for (const sub of finding.findings) {
+            wrap.appendChild(PackageDetailPanel._renderExternalSubFinding(sub));
+        }
+        return wrap;
+    }
+
+    private static _renderExternalSubFinding(sub: ExternalSourceFinding): HTMLElement {
+        const card = document.createElement('div');
+        card.className = `pdp-script pdp-ext-${sub.source} pdp-sev-${sub.severity}`;
+
+        const head = document.createElement('div');
+        head.className = 'pdp-script-head';
+
+        const pill = document.createElement('span');
+        pill.className = `pdp-tfa pdp-ext-pill-${sub.severity}`;
+        pill.textContent = PackageDetailPanel._externalPillLabel(sub.source);
+        head.appendChild(pill);
+
+        if (sub.score !== null) {
+            const score = document.createElement('span');
+            score.className = 'pdp-script-reason';
+            score.textContent = `${sub.score}/100`;
+            head.appendChild(score);
+        }
+        card.appendChild(head);
+
+        const reason = document.createElement('div');
+        reason.className = 'pdp-script-reason';
+        reason.textContent = sub.detail;
+        card.appendChild(reason);
+
+        if (sub.url) {
+            const link = document.createElement('a');
+            link.className = 'pdp-script-body';
+            link.href = sub.url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = sub.url;
+            card.appendChild(link);
+        }
+        return card;
+    }
+
+    private static _externalPillLabel(source: ExternalSource): string {
+        switch (source) {
+            case 'socket': return 'socket.dev';
+            case 'openssf': return 'OpenSSF';
+            case 'depsDev': return 'deps.dev';
+        }
     }
 
     /**

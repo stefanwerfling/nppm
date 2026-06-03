@@ -100,6 +100,14 @@ export async function runScan(io: RunScanIO): Promise<number> {
         });
     }
 
+    // CLI override for the external-sources master switch. The
+    // scanner's own per-source flags stay in the loaded config; only
+    // the master gate flips so `--no-external` is a one-line opt-out
+    // without rebuilding the scanner tree.
+    if (!args.runExternal) {
+        loaded.externalScanner.setEnabled(false);
+    }
+
     let projects = loaded.projects;
     if (args.projects.length > 0) {
         const want = new Set(args.projects);

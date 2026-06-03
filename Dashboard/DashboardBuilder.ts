@@ -2,6 +2,7 @@ import {ConfigProjectType} from '../Config/Config.js';
 import {BinarySeverity, BinarySummary} from '../Security/BinaryScanner.js';
 import {CadenceLevel, CadenceSummary} from '../Security/CadenceScanner.js';
 import {ChurnFinding, ChurnSeverity} from '../Security/ChurnScanner.js';
+import {ExternalSeverity, ExternalSummary} from '../Security/ExternalSourcesScanner.js';
 import {FreshnessLevel, FreshnessSummary} from '../Security/FreshnessScanner.js';
 import {IgnoreScriptsLevel} from '../Security/IgnoreScriptsScanner.js';
 import {IntegrityFinding, IntegritySeverity} from '../Security/IntegrityScanner.js';
@@ -53,6 +54,7 @@ export const SCANNER_IDS = [
     'ignoreScripts',
     'typosquat',
     'provenance',
+    'external',
     'integrity',
     'unused',
     'template'
@@ -333,6 +335,17 @@ export class DashboardBuilder {
         }
     }
 
+    /**
+     * External-sources scanner — already worst-of-three on its own
+     * ladder (`info | warn | risk`). `level: null` means "no source
+     * contributed" (scanner disabled, every fetcher 401/404, or the
+     * version is a git URL) — same N/A semantics as the other
+     * per-package scanners.
+     */
+    public static externalSeverity(s: ExternalSummary): UnifiedSeverity|null {
+        return DashboardBuilder._passthrough<ExternalSeverity>(s.level);
+    }
+
     public static integritySeverity(f: IntegrityFinding): UnifiedSeverity {
         return DashboardBuilder._passthrough<IntegritySeverity>(f.severity) ?? 'info';
     }
@@ -367,7 +380,8 @@ export class DashboardBuilder {
             cadence: DashboardBuilder.cadenceSeverity(h.cadence),
             freshness: DashboardBuilder.freshnessSeverity(h.freshness),
             typosquat: DashboardBuilder.typosquatSeverity(h.typosquat),
-            provenance: DashboardBuilder.provenanceSeverity(h.provenance)
+            provenance: DashboardBuilder.provenanceSeverity(h.provenance),
+            external: DashboardBuilder.externalSeverity(h.external)
         };
     }
 

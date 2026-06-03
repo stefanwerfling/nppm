@@ -116,6 +116,11 @@ export class SarifBuilder {
             name: 'Missing dependency',
             description: 'Imported from source but not declared in any bucket.',
             defaultLevel: 'error'
+        },
+        external: {
+            name: 'External-sources verdict',
+            description: 'Aggregated reputation signal from socket.dev / OpenSSF Scorecard / deps.dev — worst-of-three per package.',
+            defaultLevel: 'warning'
         }
     };
 

@@ -380,6 +380,7 @@ export class DashboardView {
             case 'ignoreScripts': return I18n.t('Ignore-scripts safety');
             case 'typosquat': return I18n.t('Typosquat');
             case 'provenance': return I18n.t('Provenance');
+            case 'external': return I18n.t('External sources');
             case 'integrity': return I18n.t('Integrity');
             case 'unused': return I18n.t('Unused deps');
             case 'template': return I18n.t('Template compliance');
@@ -557,6 +558,11 @@ export class DashboardView {
             case 'provenance':
                 // Badge / sealed
                 return s('<circle cx="12" cy="12" r="9"/><polyline points="8 12 11 15 16 9"/>');
+            case 'external':
+                // Globe / world — external/internet reputation sources
+                return s('<circle cx="12" cy="12" r="9"/>'
+                    + '<line x1="3" y1="12" x2="21" y2="12"/>'
+                    + '<path d="M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18"/>');
             case 'integrity':
                 // Lock
                 return s('<rect x="4" y="11" width="16" height="10" rx="2"/>'
@@ -606,6 +612,8 @@ export class DashboardView {
                 return I18n.t('Levenshtein distance to popular packages plus Unicode confusables (homoglyph attacks). Distance 1 / Unicode = risk; distance 2 = warn.');
             case 'provenance':
                 return I18n.t('Reads the registry dist record for SLSA / sigstore attestation. Provenance + signed land in the no-finding bucket; unsigned counts as info.');
+            case 'external':
+                return I18n.t('Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.');
             case 'integrity':
                 return I18n.t('Cross-checks the lockfile `resolved` URL + `integrity` hash against what the registry currently serves. Mismatches and mirror redirects are surfaced.');
             case 'unused':
@@ -648,6 +656,9 @@ export class DashboardView {
                 break;
             case 'provenance':
                 specific = I18n.t('provenance / signed are clean. Only unsigned counts (as info).');
+                break;
+            case 'external':
+                specific = I18n.t('Per-source severity (socket overall <50 = risk, <80 = warn; OpenSSF <5 = risk, <7 = warn; deps.dev = info only) reduced to worst-of-three per package.');
                 break;
             case 'integrity':
                 specific = I18n.t('Per-finding info / warn / risk applied; total is divided by the package count for the score.');

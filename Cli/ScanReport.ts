@@ -1,5 +1,6 @@
 import {ConfigProjectType} from '../Config/Config.js';
 import {BinarySeverity} from '../Security/BinaryScanner.js';
+import {ExternalSeverity} from '../Security/ExternalSourcesScanner.js';
 import {LicenseSeverity} from '../Security/LicenseScanner.js';
 import {MaintainerSeverity} from '../Security/MaintainerScanner.js';
 import {PatternSeverity} from '../Security/PatternScanner.js';
@@ -30,7 +31,7 @@ export const UNIFIED_RANK: Record<UnifiedSeverity, number> = {
  * unified ladder so the threshold check is a single integer compare.
  */
 export type ScanFinding = {
-    category: 'vuln'|'script'|'pattern'|'binary'|'maintainer'|'license'|'unused'|'misplaced'|'missing';
+    category: 'vuln'|'script'|'pattern'|'binary'|'maintainer'|'license'|'unused'|'misplaced'|'missing'|'external';
     severity: UnifiedSeverity;
     name: string;
     version?: string;
@@ -188,6 +189,24 @@ export class ScanReportBuilder {
                         message: `${h.license.severity}${h.license.spdx ? ` (${h.license.spdx})` : ''}`
                     });
                 }
+                // External-sources aggregator — emits one row per
+                // (pkg, source) pair when at least one source returned
+                // a non-info verdict. Info-only deps.dev rows are
+                // dropped to keep the report focused on actionable
+                // signals (matches the License "permissive drops out"
+                // convention).
+                if (h.external.level !== null) {
+                    const sev = ScanReportBuilder._externalToUnified(h.external.level);
+                    if (sev !== null) {
+                        findings.push({
+                            category: 'external',
+                            severity: sev,
+                            name: h.name,
+                            version: h.version,
+                            message: `${h.external.count} external source(s)`
+                        });
+                    }
+                }
             }
         }
 
@@ -297,5 +316,19 @@ export class ScanReportBuilder {
     }
     private static _unusedToUnified(s: UnusedSeverity): UnifiedSeverity {
         return s as unknown as UnifiedSeverity;
+    }
+
+    /**
+     * Map the external-sources aggregator's level to the CLI ladder.
+     * Returns `null` for `info` so the gate doesn't fail on
+     * deps.dev's info-only contributions when no real risk is
+     * present (same convention as `licenseToUnified` for permissive).
+     */
+    private static _externalToUnified(s: ExternalSeverity): UnifiedSeverity|null {
+        switch (s) {
+            case ExternalSeverity.info: return null;
+            case ExternalSeverity.warn: return UnifiedSeverity.warn;
+            case ExternalSeverity.risk: return UnifiedSeverity.risk;
+        }
     }
 }

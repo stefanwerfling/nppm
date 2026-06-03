@@ -2115,12 +2115,14 @@ class Server {
                                 const perScanner: Record<string, (ReturnType<typeof DashboardBuilder.cveSeverity>)[]> = {
                                     cve: [], license: [], scripts: [], patterns: [],
                                     binaries: [], maintainer: [], churn: [], cadence: [],
-                                    freshness: [], ignoreScripts: [], typosquat: [], provenance: []
+                                    freshness: [], ignoreScripts: [], typosquat: [], provenance: [],
+                                    external: []
                                 };
                                 const perFindings: Record<string, CellFinding[]> = {
                                     cve: [], license: [], scripts: [], patterns: [],
                                     binaries: [], maintainer: [], churn: [], cadence: [],
-                                    freshness: [], ignoreScripts: [], typosquat: [], provenance: []
+                                    freshness: [], ignoreScripts: [], typosquat: [], provenance: [],
+                                    external: []
                                 };
 
                                 const pushFinding = (scanner: ScannerId, label: string,
@@ -2206,6 +2208,11 @@ class Server {
                                     perScanner.provenance.push(pv);
                                     pushFinding('provenance', label, pv,
                                         h.provenance.level ?? undefined);
+
+                                    const ext = DashboardBuilder.externalSeverity(h.external);
+                                    perScanner.external.push(ext);
+                                    pushFinding('external', label, ext,
+                                        h.external.count > 0 ? `${h.external.count} source(s)` : undefined);
                                 }
 
                                 // Per-package cells (12 scanners). Each one's
@@ -2223,6 +2230,22 @@ class Server {
                                     if (aborted) {
                                         return;
                                     }
+                                }
+
+                                // External-sources column: N/A when no source
+                                // is configured (avoids a misleading 100/100
+                                // when every flag is off). When at least one
+                                // source is enabled, normal per-package
+                                // scoring applies.
+                                if (!securityScanner.hasExternalSources()) {
+                                    emitCell('external', DashboardBuilder.naCell('no external source configured'));
+                                } else {
+                                    emitCell('external', DashboardBuilder.scorePerPackage(
+                                        perScanner.external, packageCount, perFindings.external
+                                    ));
+                                }
+                                if (aborted) {
+                                    return;
                                 }
 
                                 // Integrity — per-project, scans the lockfile.

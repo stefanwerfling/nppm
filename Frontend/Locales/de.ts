@@ -359,6 +359,19 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'Publisher account has no 2FA — credential-theft would be enough to publish': 'Publisher-Konto hat kein 2FA — Credential-Theft genügt zum Publishen',
     'Registry did not disclose the publisher\'s 2FA state (typical on the public mirror)': 'Registry verrät den 2FA-Status des Publishers nicht (Standardverhalten beim öffentlichen Mirror)',
     'Provenance / Signing': 'Provenance / Signatur',
+    'External sources': 'Externe Quellen',
+    'External reputation sources': 'Externe Reputations-Quellen',
+    'Enable external sources': 'Externe Quellen aktivieren',
+    'socket.dev (needs API key)': 'socket.dev (benötigt API-Key)',
+    'socket.dev API key ($ENV ok)': 'socket.dev API-Key ($ENV erlaubt)',
+    'OpenSSF Scorecard': 'OpenSSF Scorecard',
+    'deps.dev (info only)': 'deps.dev (nur Info)',
+    'No external source returned a verdict — scanner disabled, no API key, or all three sources had no data for this package.':
+        'Keine externe Quelle lieferte ein Ergebnis — Scanner deaktiviert, kein API-Key oder alle drei Quellen ohne Daten zu diesem Paket.',
+    'Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.':
+        'Bündelt Reputations-Signale Dritter: socket.dev (Supply-Chain-Risiko), OpenSSF Scorecard (Repo-Entwicklungspraktiken), deps.dev (Google Package-Index). Pro Paket worst-of-three.',
+    'Per-source severity (socket overall <50 = risk, <80 = warn; OpenSSF <5 = risk, <7 = warn; deps.dev = info only) reduced to worst-of-three per package.':
+        'Per-Quelle-Severity (socket overall <50 = risk, <80 = warn; OpenSSF <5 = risk, <7 = warn; deps.dev = nur Info) wird pro Paket zu worst-of-three reduziert.',
     'Latest version published with --provenance (Sigstore-anchored CI build attestation)': 'Latest-Version wurde mit --provenance veröffentlicht (Sigstore-verankerte CI-Build-Attestation)',
     'No registry record yet — try again once the cache warms.': 'Noch kein Registry-Eintrag — bitte später erneut versuchen (Cache muss erst warm werden).',
     '{n} registry signature(s)': '{n} Registry-Signatur(en)',

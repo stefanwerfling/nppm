@@ -26,6 +26,11 @@ import {
     CadenceSummary
 } from './CadenceScanner.js';
 import {
+    ExternalFinding,
+    ExternalSourcesScanner,
+    ExternalSummary
+} from './ExternalSourcesScanner.js';
+import {
     FreshnessFinding,
     FreshnessScanner,
     FreshnessSummary
@@ -93,6 +98,13 @@ export type SecurityReport = {
      * list, no I/O.
      */
     typosquat: TyposquatFinding;
+    /**
+     * Aggregated external-source reputation findings (socket.dev,
+     * OpenSSF Scorecard, deps.dev). Always present; `findings: []`
+     * when the scanner is globally disabled or every per-source
+     * fetcher declined.
+     */
+    external: ExternalFinding;
 };
 
 /**
@@ -132,6 +144,7 @@ export type HeuristicsBatchEntry = {
     freshness: FreshnessSummary;
     cadence: CadenceSummary;
     typosquat: TyposquatSummary;
+    external: ExternalSummary;
 };
 
 /**
@@ -165,6 +178,7 @@ export class SecurityScanner {
     private readonly _churn: ChurnScanner;
     private readonly _maintainer: MaintainerScanner;
     private readonly _license: LicenseScanner;
+    private readonly _external: ExternalSourcesScanner|null;
 
     constructor(
         osv: OsvClient,
@@ -174,6 +188,7 @@ export class SecurityScanner {
             maintainer?: MaintainerScannerOptions;
             license?: LicenseScannerOptions;
             userFetcher?: NpmUserFetcher|null;
+            external?: ExternalSourcesScanner|null;
         } = {}
     ) {
         this._osv = osv;
@@ -182,6 +197,17 @@ export class SecurityScanner {
         this._churn = new ChurnScanner(registry, fingerprint);
         this._maintainer = new MaintainerScanner(registry, opts.maintainer, opts.userFetcher ?? null);
         this._license = new LicenseScanner(opts.license);
+        this._external = opts.external ?? null;
+    }
+
+    /**
+     * Whether the external-sources scanner is wired up and has at
+     * least one enabled source. The Dashboard route handler uses this
+     * to emit an N/A cell (with a clear "no source configured" note)
+     * instead of a misleading perfect score.
+     */
+    public hasExternalSources(): boolean {
+        return this._external !== null && this._external.hasAnySource();
     }
 
     public async scan(name: string, version: string): Promise<SecurityReport> {
@@ -190,12 +216,15 @@ export class SecurityScanner {
         // — fire them in parallel. The registry, maintainer, and churn
         // scans share one packument cache so warm runs are
         // essentially free.
-        const [vulns, fingerprint, churn, maintainer, reg] = await Promise.all([
+        const [vulns, fingerprint, churn, maintainer, reg, external] = await Promise.all([
             this._osv.query(name, version),
             this._fingerprint.build(name, version),
             this._churn.scan(name, version),
             this._maintainer.scan(name, version),
-            this._registry.fetchOne(name)
+            this._registry.fetchOne(name),
+            this._external
+                ? this._external.scan(name, version)
+                : Promise.resolve({name, version, level: null, findings: []} as ExternalFinding)
         ]);
 
         const scriptFindings = ScriptScanner.scan(fingerprint?.manifest ?? null);
@@ -236,7 +265,8 @@ export class SecurityScanner {
             freshness,
             cadence,
             ignoreScripts,
-            typosquat
+            typosquat,
+            external
         };
     }
 
@@ -311,13 +341,18 @@ export class SecurityScanner {
                 }
                 const pkg = packages[i];
                 // Fingerprint download (slow on cold start) and the
-                // registry-based scans (maintainer + license) all run
-                // in parallel. The latter two share the packument
-                // cache so warm runs are instant.
-                const [fingerprint, maintainer, reg] = await Promise.all([
+                // registry-based scans (maintainer + license + external)
+                // all run in parallel. The registry/maintainer/external
+                // calls share the packument cache so warm runs are
+                // instant; external also hits its own three TTL caches.
+                const externalP = this._external
+                    ? this._external.scan(pkg.name, pkg.version)
+                    : Promise.resolve({name: pkg.name, version: pkg.version, level: null, findings: []} as ExternalFinding);
+                const [fingerprint, maintainer, reg, external] = await Promise.all([
                     this._fingerprint.build(pkg.name, pkg.version),
                     this._maintainer.scan(pkg.name, pkg.version),
-                    this._registry.fetchOne(pkg.name)
+                    this._registry.fetchOne(pkg.name),
+                    externalP
                 ]);
 
                 const spdx = fingerprint?.manifest?.license ?? reg?.license ?? null;
@@ -377,7 +412,8 @@ export class SecurityScanner {
                     cadence: SecurityScanner._cadenceSummary(
                         pkg.name, pkg.version, reg?.time
                     ),
-                    typosquat: SecurityScanner._typosquatSummary(pkg.name, pkg.version)
+                    typosquat: SecurityScanner._typosquatSummary(pkg.name, pkg.version),
+                    external: ExternalSourcesScanner.summarise(external)
                 };
             }
         };

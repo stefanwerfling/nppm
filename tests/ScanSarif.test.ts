@@ -19,7 +19,8 @@ function heuristic(name: string, version: string): HeuristicsBatchEntry {
         provenance: {name, version, level: null},
         freshness: {name, version, level: null, packageAgeDays: null, maintainerAgeDays: null},
         cadence: {name, version, level: null, daysSinceLastRelease: null, medianCadenceDays: null},
-        typosquat: {name, version, level: null, closestMatch: null, hasConfusables: false}
+        typosquat: {name, version, level: null, closestMatch: null, hasConfusables: false},
+        external: {name, version, level: null, count: 0}
     };
 }
 

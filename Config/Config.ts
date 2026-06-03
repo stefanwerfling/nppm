@@ -143,10 +143,46 @@ export const SchemaConfigSecurityUnused = Vts.object({
     devPathGlobs: Vts.optional(Vts.array(Vts.string()))
 });
 
+/**
+ * External-sources scanner config. The three sub-fetchers each have
+ * their own enable flag because their cost / availability profiles
+ * differ: socket.dev needs an API key (off by default), OpenSSF and
+ * deps.dev are free and unauthenticated (on by default). The top-level
+ * `enabled` is a master switch; when `false` the scanner short-circuits
+ * to `null` for every package regardless of the per-source flags.
+ *
+ *  - `socket.{enabled, apiKey}` — Bearer-token authed; severity ladder
+ *    from the package's total score (< 50 risk, < 80 warn).
+ *  - `openssf.{enabled}` — repo-keyed; only resolves for
+ *    github/gitlab/bitbucket sources, others return null.
+ *  - `depsDev.{enabled}` — package-keyed; info-only (presence of any
+ *    advisory beyond what OSV already surfaces would be redundant).
+ */
+export const SchemaConfigSecurityExternalSocket = Vts.object({
+    enabled: Vts.optional(Vts.boolean()),
+    apiKey: Vts.optional(Vts.string())
+});
+
+export const SchemaConfigSecurityExternalOpenSsf = Vts.object({
+    enabled: Vts.optional(Vts.boolean())
+});
+
+export const SchemaConfigSecurityExternalDepsDev = Vts.object({
+    enabled: Vts.optional(Vts.boolean())
+});
+
+export const SchemaConfigSecurityExternal = Vts.object({
+    enabled: Vts.optional(Vts.boolean()),
+    socket: Vts.optional(SchemaConfigSecurityExternalSocket),
+    openssf: Vts.optional(SchemaConfigSecurityExternalOpenSsf),
+    depsDev: Vts.optional(SchemaConfigSecurityExternalDepsDev)
+});
+
 export const SchemaConfigSecurity = Vts.object({
     maintainer: Vts.optional(SchemaConfigSecurityMaintainer),
     license: Vts.optional(SchemaConfigSecurityLicense),
-    unused: Vts.optional(SchemaConfigSecurityUnused)
+    unused: Vts.optional(SchemaConfigSecurityUnused),
+    external: Vts.optional(SchemaConfigSecurityExternal)
 });
 
 /**

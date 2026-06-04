@@ -1,4 +1,5 @@
 import {ApiPrReviewResponse} from '../Api/ApiTypes.js';
+import {ConfigProjectType} from '../Config/Config.js';
 import {PrChangeKind, PrDepChange} from '../PrReview/PrReview.js';
 import {Api} from './Api.js';
 import {I18n} from './I18n.js';
@@ -74,6 +75,14 @@ export class PrReviewView {
         if (!unid) {
             return;
         }
+        // PR-review needs a local git checkout to walk `git log` over,
+        // so the backend rejects remote projects with a 400. Short-
+        // circuit here with a friendlier explanation than the raw
+        // "PR review only supported for local projects" error.
+        if (this._projectType !== ConfigProjectType.local) {
+            this._renderNotApplicable();
+            return;
+        }
         this._renderLoading();
         try {
             const report = await Api.prReview(unid, this._base, this._head);
@@ -87,6 +96,17 @@ export class PrReviewView {
                 this._renderError((e as Error).message);
             }
         }
+    }
+
+    private _renderNotApplicable(): void {
+        this._root.innerHTML = '';
+        this._root.appendChild(this._renderHeader());
+        const note = document.createElement('div');
+        note.className = 'installed-meta installed-meta-readonly';
+        note.textContent = I18n.t(
+            'PR review needs a local git checkout to diff refs against — not available for remote projects. Clone the repo locally and add it as a local project to use this view.'
+        );
+        this._root.appendChild(note);
     }
 
     private _renderLoading(): void {

@@ -541,6 +541,8 @@ export const TRANSLATIONS_DE: Record<string, string> = {
         'Nur lesend: Remote-Projekt — Upgrades und Template-Apply sind deaktiviert.',
     'No lockfile available — showing declared top-level deps only (no transitive resolution).':
         'Kein Lockfile vorhanden — nur deklarierte Top-Level-Deps sichtbar (keine transitive Auflösung).',
+    'PR review needs a local git checkout to diff refs against — not available for remote projects. Clone the repo locally and add it as a local project to use this view.':
+        'PR-Review braucht ein lokales Git-Checkout zum Vergleichen der Refs — für Remote-Projekte nicht verfügbar. Klone das Repo lokal und füge es als lokales Projekt hinzu, um diese Ansicht zu nutzen.',
     'Browse …': 'Durchsuchen …',
     'Select a directory': 'Verzeichnis auswählen',
     'Select this directory': 'Dieses Verzeichnis übernehmen',

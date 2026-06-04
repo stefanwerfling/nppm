@@ -549,6 +549,8 @@ export const TRANSLATIONS_EN: Record<string, string> = {
         'Read-only: remote project — upgrades and template apply are disabled.',
     'No lockfile available — showing declared top-level deps only (no transitive resolution).':
         'No lockfile available — showing declared top-level deps only (no transitive resolution).',
+    'PR review needs a local git checkout to diff refs against — not available for remote projects. Clone the repo locally and add it as a local project to use this view.':
+        'PR review needs a local git checkout to diff refs against — not available for remote projects. Clone the repo locally and add it as a local project to use this view.',
     'Browse …': 'Browse …',
     'Select a directory': 'Select a directory',
     'Select this directory': 'Select this directory',

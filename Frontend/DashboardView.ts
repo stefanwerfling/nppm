@@ -1,4 +1,5 @@
 import {
+    ApiDashboardHistoryResponse,
     ApiDashboardResponse,
     ApiDashboardScanCellEvent,
     ApiDashboardScanColumnEndEvent,
@@ -10,8 +11,10 @@ import {
     ApiDashboardSnapshotResponse
 } from '../Api/ApiTypes.js';
 import {DashboardCell, DashboardColumn, ScannerId} from '../Dashboard/DashboardBuilder.js';
+import {DashboardHistoryEntry} from '../Dashboard/DashboardHistoryStore.js';
 import {EcoBoxId, EcosystemBoxModal} from './EcosystemBoxModal.js';
 import {I18n} from './I18n.js';
+import {ImpactModal} from './ImpactModal.js';
 
 /**
  * Cross-project Dashboard view. Rows = scanners, columns = projects,
@@ -51,8 +54,18 @@ export class DashboardView {
     private _onProjectClick: DashboardProjectClickHandler|null = null;
     private _onScoresChanged: ((scores: Map<string, number>) => void)|null = null;
     private _onMatrixClick: (() => void)|null = null;
-    private _activeTab: 'scanner-score'|'overall' = 'scanner-score';
+    private _activeTab: 'scanner-score'|'overall'|'trend' = 'scanner-score';
     private readonly _ecoModal = new EcosystemBoxModal();
+    /**
+     * Overall score of the *previous* persisted scan (one entry back
+     * from the latest history record). Drives the macro-donut's "↑X
+     * vs last scan" delta. `null` when no prior scan exists yet — the
+     * delta line then hides instead of showing `+78`.
+     */
+    private _previousOverall: number|null = null;
+    private _historyEntries: DashboardHistoryEntry[] = [];
+    private _trendRangeDays: 30|90|365 = 90;
+    private _widgetStripHost: HTMLElement|null = null;
 
     constructor(root: HTMLElement) {
         this._root = root;
@@ -143,6 +156,10 @@ export class DashboardView {
     }
 
     private async _loadSnapshot(): Promise<void> {
+        // Fetch history in parallel — drives the macro-donut delta and
+        // pre-warms the trend tab. A history failure is non-fatal; the
+        // donut just hides its delta line.
+        void this._loadHistory();
         try {
             const res = await fetch('/api/dashboard/snapshot');
             if (!res.ok) {
@@ -157,6 +174,30 @@ export class DashboardView {
             }
         } catch {
             this._startScan();
+        }
+    }
+
+    /**
+     * Fetch history once when the view opens. The donut-delta only
+     * needs `previous.overall`; the trend tab uses the full entry
+     * list. Default range 90d covers the typical "is the project
+     * trending up or down lately?" question without flooding the SVG.
+     */
+    private async _loadHistory(): Promise<void> {
+        try {
+            const res = await fetch(`/api/dashboard/history?days=${this._trendRangeDays}`);
+            if (!res.ok) {
+                return;
+            }
+            const payload = (await res.json()) as ApiDashboardHistoryResponse;
+            this._historyEntries = payload.entries;
+            this._previousOverall = payload.previous?.overall ?? null;
+            // Re-render in case the user is already looking at the
+            // scanner-score tab — the macro-donut needs to re-paint
+            // its delta line now that the previous-overall is known.
+            this._renderTable();
+        } catch {
+            // ignore; donut just hides its delta line
         }
     }
 
@@ -235,6 +276,14 @@ export class DashboardView {
         this._renderTabBar();
         this._root.appendChild(tabBarHost);
 
+        // Widget strip sits between the tab bar and the table body.
+        // Painted only on the scanner-score tab — Overall has its own
+        // hero card, Trend has its own chart.
+        const widgetStripHost = document.createElement('div');
+        widgetStripHost.className = 'dash-widget-strip-host';
+        this._widgetStripHost = widgetStripHost;
+        this._root.appendChild(widgetStripHost);
+
         const tableHost = document.createElement('div');
         tableHost.className = 'dash-table-host';
         this._tableHost = tableHost;
@@ -246,9 +295,10 @@ export class DashboardView {
             return;
         }
         this._tabBarHost.innerHTML = '';
-        const tabs: {value: 'scanner-score'|'overall'; label: string}[] = [
+        const tabs: {value: 'scanner-score'|'overall'|'trend'; label: string}[] = [
             {value: 'scanner-score', label: I18n.t('Scanner Score')},
-            {value: 'overall', label: I18n.t('Overall Evaluation')}
+            {value: 'overall', label: I18n.t('Overall Evaluation')},
+            {value: 'trend', label: I18n.t('Trend')}
         ];
         for (const t of tabs) {
             const btn = document.createElement('button');
@@ -401,6 +451,7 @@ export class DashboardView {
             return;
         }
         this._tableHost.innerHTML = '';
+        this._renderWidgetStrip();
 
         if (this._scanners.length === 0 || this._columnOrder.length === 0) {
             const hint = document.createElement('div');
@@ -412,6 +463,10 @@ export class DashboardView {
 
         if (this._activeTab === 'overall') {
             this._renderOverallTab();
+            return;
+        }
+        if (this._activeTab === 'trend') {
+            this._renderTrendTab();
             return;
         }
 
@@ -932,6 +987,567 @@ export class DashboardView {
             section.appendChild(row);
         }
         return section;
+    }
+
+    /**
+     * Header strip rendered above the scanner table on the
+     * scanner-score tab. Painted only when columns exist so an
+     * empty-state view doesn't ship a strip of placeholder "0/100"s.
+     * On the Overall / Trend tabs the strip is intentionally hidden —
+     * the strip's roll-ups would duplicate the hero card / trend
+     * chart already on screen.
+     */
+    private _renderWidgetStrip(): void {
+        if (!this._widgetStripHost) {
+            return;
+        }
+        this._widgetStripHost.innerHTML = '';
+        if (this._activeTab !== 'scanner-score' || this._columns.size === 0) {
+            return;
+        }
+
+        const strip = document.createElement('div');
+        strip.className = 'dash-widget-strip';
+        strip.appendChild(this._renderMacroDonut());
+        strip.appendChild(this._renderTopWorstPackages());
+        this._widgetStripHost.appendChild(strip);
+    }
+
+    /**
+     * 3-segment donut summarising the ecosystem at a glance:
+     *   green  → projects whose avg score is ≥ 80 (treeview ring green)
+     *   amber  → projects whose avg score is 60-79
+     *   red    → projects whose avg score is < 60 (treeview ring red)
+     *
+     * Big number in the centre is the average over all per-project
+     * averages. Sub-line carries the ↑/↓ delta against the previous
+     * persisted scan when one exists.
+     */
+    private _renderMacroDonut(): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'dash-donut';
+
+        let healthy = 0;
+        let warning = 0;
+        let risky = 0;
+        let scoreSum = 0;
+        let scored = 0;
+        for (const col of this._columns.values()) {
+            let psum = 0;
+            let pn = 0;
+            for (const cell of Object.values(col.cells)) {
+                if (cell.score !== null) {
+                    psum += cell.score;
+                    pn++;
+                }
+            }
+            if (pn === 0) {
+                continue;
+            }
+            const avg = psum / pn;
+            scoreSum += avg;
+            scored++;
+            if (avg >= 80) {
+                healthy++;
+            } else if (avg >= 60) {
+                warning++;
+            } else {
+                risky++;
+            }
+        }
+        const overall = scored > 0 ? Math.round(scoreSum / scored) : null;
+        const total = healthy + warning + risky;
+
+        const svgNs = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNs, 'svg');
+        svg.setAttribute('class', 'dash-donut-svg');
+        svg.setAttribute('viewBox', '0 0 100 100');
+        svg.setAttribute('width', '160');
+        svg.setAttribute('height', '160');
+
+        // Donut background ring (light grey) — sits behind so an
+        // unscored ecosystem still shows the shape.
+        const bg = document.createElementNS(svgNs, 'circle');
+        bg.setAttribute('cx', '50');
+        bg.setAttribute('cy', '50');
+        bg.setAttribute('r', '40');
+        bg.setAttribute('fill', 'none');
+        bg.setAttribute('class', 'dash-donut-bg');
+        svg.appendChild(bg);
+
+        // Segments — stroke-dasharray / -dashoffset rotated counter-
+        // clockwise so the slice order starts at 12 o'clock and walks
+        // clockwise. Circumference of r=40 is 2π·40 ≈ 251.33.
+        const circ = 2 * Math.PI * 40;
+        const seg = (n: number, cls: string, offset: number): void => {
+            if (n === 0) {
+                return;
+            }
+            const length = (n / total) * circ;
+            const c = document.createElementNS(svgNs, 'circle');
+            c.setAttribute('cx', '50');
+            c.setAttribute('cy', '50');
+            c.setAttribute('r', '40');
+            c.setAttribute('fill', 'none');
+            c.setAttribute('class', `dash-donut-seg dash-donut-seg-${cls}`);
+            c.setAttribute('stroke-dasharray', `${length} ${circ - length}`);
+            c.setAttribute('stroke-dashoffset', String(-offset));
+            c.setAttribute('transform', 'rotate(-90 50 50)');
+            svg.appendChild(c);
+        };
+        if (total > 0) {
+            seg(healthy, 'good', 0);
+            seg(warning, 'warn', (healthy / total) * circ);
+            seg(risky, 'risk', ((healthy + warning) / total) * circ);
+        }
+
+        // Big-number in the centre.
+        const num = document.createElementNS(svgNs, 'text');
+        num.setAttribute('class', 'dash-donut-num');
+        num.setAttribute('x', '50');
+        num.setAttribute('y', '50');
+        num.setAttribute('text-anchor', 'middle');
+        num.setAttribute('dominant-baseline', 'central');
+        num.textContent = overall !== null ? `${overall}` : '—';
+        svg.appendChild(num);
+
+        // "/100" suffix underneath.
+        const sub = document.createElementNS(svgNs, 'text');
+        sub.setAttribute('class', 'dash-donut-sub');
+        sub.setAttribute('x', '50');
+        sub.setAttribute('y', '66');
+        sub.setAttribute('text-anchor', 'middle');
+        sub.textContent = I18n.t('avg / 100');
+        svg.appendChild(sub);
+
+        wrap.appendChild(svg);
+
+        const legend = document.createElement('div');
+        legend.className = 'dash-donut-legend';
+
+        const legendRow = (cls: string, count: number, label: string): HTMLElement => {
+            const row = document.createElement('div');
+            row.className = 'dash-donut-legend-row';
+            const dot = document.createElement('span');
+            dot.className = `dash-donut-legend-dot dash-donut-legend-dot-${cls}`;
+            row.appendChild(dot);
+            const text = document.createElement('span');
+            text.className = 'dash-donut-legend-text';
+            text.textContent = `${count} ${label}`;
+            row.appendChild(text);
+            return row;
+        };
+        legend.appendChild(legendRow('good', healthy, I18n.t('healthy')));
+        legend.appendChild(legendRow('warn', warning, I18n.t('warning')));
+        legend.appendChild(legendRow('risk', risky, I18n.t('risky')));
+
+        if (overall !== null && this._previousOverall !== null
+            && overall !== this._previousOverall) {
+            const delta = overall - this._previousOverall;
+            const sign = delta > 0 ? '↑' : '↓';
+            const line = document.createElement('div');
+            line.className = `dash-donut-delta dash-donut-delta-${delta > 0 ? 'up' : 'down'}`;
+            line.textContent = I18n.t('{sign}{n} pts vs last scan', {
+                sign,
+                n: Math.abs(delta)
+            });
+            legend.appendChild(line);
+        }
+
+        wrap.appendChild(legend);
+        return wrap;
+    }
+
+    /**
+     * Cross-project top-N table: aggregate every CellFinding by its
+     * `label`, sum unified severity weights (info=1 / warn=10 /
+     * risk=30) per package, and surface the heaviest contributors.
+     * Mirrors the score formula's weighting so a row's "−X pts"
+     * matches the user's intuition for which package is dragging the
+     * fleet down.
+     */
+    private _renderTopWorstPackages(): HTMLElement {
+        const weights: Record<'info'|'warn'|'risk', number> = {info: 1, warn: 10, risk: 30};
+        type Agg = {
+            label: string;
+            projects: Set<string>;
+            weight: number;
+            scanners: Map<string, number>;
+            risk: number;
+            warn: number;
+            info: number;
+        };
+        const byLabel = new Map<string, Agg>();
+        for (const col of this._columns.values()) {
+            for (const [scanner, cell] of Object.entries(col.cells)) {
+                for (const f of cell.findings) {
+                    let agg = byLabel.get(f.label);
+                    if (!agg) {
+                        agg = {
+                            label: f.label,
+                            projects: new Set(),
+                            weight: 0,
+                            scanners: new Map(),
+                            risk: 0,
+                            warn: 0,
+                            info: 0
+                        };
+                        byLabel.set(f.label, agg);
+                    }
+                    agg.projects.add(col.project.unid);
+                    agg.weight += weights[f.severity];
+                    agg.scanners.set(scanner, (agg.scanners.get(scanner) ?? 0) + 1);
+                    agg[f.severity]++;
+                }
+            }
+        }
+
+        const wrap = document.createElement('div');
+        wrap.className = 'dash-topworst';
+
+        const head = document.createElement('div');
+        head.className = 'dash-topworst-head';
+        const title = document.createElement('h3');
+        title.className = 'dash-topworst-title';
+        title.textContent = I18n.t('Top problem packages');
+        head.appendChild(title);
+        const hint = document.createElement('div');
+        hint.className = 'dash-topworst-hint';
+        hint.textContent = I18n.t('Click a row to open Impact analysis.');
+        head.appendChild(hint);
+        wrap.appendChild(head);
+
+        if (byLabel.size === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'dash-topworst-empty';
+            empty.textContent = I18n.t('No findings — every project is clean.');
+            wrap.appendChild(empty);
+            return wrap;
+        }
+
+        const ranked = Array.from(byLabel.values())
+            .sort((a, b) => b.weight - a.weight)
+            .slice(0, 10);
+
+        const list = document.createElement('div');
+        list.className = 'dash-topworst-list';
+        for (const a of ranked) {
+            const row = document.createElement('div');
+            row.className = 'dash-topworst-row';
+            row.title = I18n.t('Open Impact analysis for this package');
+            row.addEventListener('click', () => {
+                const parsed = DashboardView._parseFindingLabel(a.label);
+                new ImpactModal().open(parsed);
+            });
+
+            const name = document.createElement('div');
+            name.className = 'dash-topworst-name';
+            name.textContent = a.label;
+            row.appendChild(name);
+
+            const projects = document.createElement('div');
+            projects.className = 'dash-topworst-projects';
+            projects.textContent = a.projects.size === 1
+                ? I18n.t('in 1 project')
+                : I18n.t('in {n} projects', {n: a.projects.size});
+            row.appendChild(projects);
+
+            const topScanner = Array.from(a.scanners.entries())
+                .sort((x, y) => y[1] - x[1])[0];
+            const scannerEl = document.createElement('div');
+            scannerEl.className = 'dash-topworst-scanner';
+            scannerEl.textContent = topScanner
+                ? DashboardView._scannerLabel(topScanner[0] as ScannerId)
+                : '';
+            row.appendChild(scannerEl);
+
+            const pts = document.createElement('div');
+            pts.className = 'dash-topworst-pts';
+            pts.textContent = `−${a.weight} ${I18n.t('pts')}`;
+            row.appendChild(pts);
+
+            list.appendChild(row);
+        }
+        wrap.appendChild(list);
+        return wrap;
+    }
+
+    /**
+     * Trend tab body. Multi-line SVG chart, one polyline per project
+     * over the chosen range. Hand-rolled (matches the project's "D3
+     * only when it earns its keep" stance — line + axis ticks are
+     * pure SVG, no d3-scale).
+     */
+    private _renderTrendTab(): void {
+        if (!this._tableHost) {
+            return;
+        }
+        const wrap = document.createElement('div');
+        wrap.className = 'dash-trend';
+
+        // Range selector — clicking a chip re-fetches with the new
+        // window and re-renders. Cheap, the endpoint is sub-100ms.
+        const controls = document.createElement('div');
+        controls.className = 'dash-trend-controls';
+        const label = document.createElement('span');
+        label.className = 'dash-trend-controls-label';
+        label.textContent = I18n.t('Range:');
+        controls.appendChild(label);
+        for (const days of [30, 90, 365] as const) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'dash-trend-range';
+            if (days === this._trendRangeDays) {
+                btn.classList.add('dash-trend-range-active');
+            }
+            btn.textContent = I18n.t('{n}d', {n: days});
+            btn.addEventListener('click', () => {
+                if (this._trendRangeDays === days) {
+                    return;
+                }
+                this._trendRangeDays = days;
+                void this._loadHistory();
+            });
+            controls.appendChild(btn);
+        }
+        wrap.appendChild(controls);
+
+        if (this._historyEntries.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'dash-trend-empty';
+            empty.textContent = I18n.t('No history yet — trigger a scan and come back tomorrow.');
+            wrap.appendChild(empty);
+            this._tableHost.appendChild(wrap);
+            return;
+        }
+
+        wrap.appendChild(this._renderTrendChart(this._historyEntries));
+        this._tableHost.appendChild(wrap);
+    }
+
+    /**
+     * Pure-SVG line chart. Layout: 800×320 viewport; 40px padding
+     * left/bottom for axis labels, 12px padding top/right. One
+     * `<polyline>` per project, plus the ecosystem-overall line on
+     * top in a heavier stroke. Hover-tooltip via title attributes on
+     * the data dots — cheap and accessible.
+     */
+    private _renderTrendChart(entries: DashboardHistoryEntry[]): SVGElement {
+        const svgNs = 'http://www.w3.org/2000/svg';
+        const W = 880;
+        const H = 360;
+        const PAD_L = 44;
+        const PAD_R = 200; // legend column
+        const PAD_T = 16;
+        const PAD_B = 36;
+        const PLOT_W = W - PAD_L - PAD_R;
+        const PLOT_H = H - PAD_T - PAD_B;
+
+        const svg = document.createElementNS(svgNs, 'svg');
+        svg.setAttribute('class', 'dash-trend-svg');
+        svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+        // X scale: timestamp → pixel. Single-entry guard so we don't
+        // divide by zero on the first scan.
+        const tStart = new Date(entries[0].timestamp).getTime();
+        const tEnd = new Date(entries[entries.length - 1].timestamp).getTime();
+        const tSpan = Math.max(1, tEnd - tStart);
+        const xPx = (iso: string): number => {
+            const t = new Date(iso).getTime();
+            return PAD_L + ((t - tStart) / tSpan) * PLOT_W;
+        };
+        const yPx = (score: number): number =>
+            PAD_T + (1 - score / 100) * PLOT_H;
+
+        // Y gridlines + labels at 0/25/50/75/100.
+        for (const score of [0, 25, 50, 75, 100]) {
+            const y = yPx(score);
+            const line = document.createElementNS(svgNs, 'line');
+            line.setAttribute('class', 'dash-trend-grid');
+            line.setAttribute('x1', String(PAD_L));
+            line.setAttribute('y1', String(y));
+            line.setAttribute('x2', String(PAD_L + PLOT_W));
+            line.setAttribute('y2', String(y));
+            svg.appendChild(line);
+            const lbl = document.createElementNS(svgNs, 'text');
+            lbl.setAttribute('class', 'dash-trend-axis');
+            lbl.setAttribute('x', String(PAD_L - 6));
+            lbl.setAttribute('y', String(y + 4));
+            lbl.setAttribute('text-anchor', 'end');
+            lbl.textContent = String(score);
+            svg.appendChild(lbl);
+        }
+
+        // X-axis date ticks: first, middle, last entry timestamps.
+        const tickIdx = entries.length === 1
+            ? [0]
+            : entries.length === 2
+                ? [0, entries.length - 1]
+                : [0, Math.floor(entries.length / 2), entries.length - 1];
+        for (const i of tickIdx) {
+            const x = xPx(entries[i].timestamp);
+            const lbl = document.createElementNS(svgNs, 'text');
+            lbl.setAttribute('class', 'dash-trend-axis');
+            lbl.setAttribute('x', String(x));
+            lbl.setAttribute('y', String(PAD_T + PLOT_H + 18));
+            lbl.setAttribute('text-anchor', 'middle');
+            lbl.textContent = DashboardView._formatShortDate(entries[i].timestamp);
+            svg.appendChild(lbl);
+        }
+
+        // Collect each project's timeline. A project absent from an
+        // entry (added later or removed) just has no point at that x —
+        // polyline skips the gap by splitting into segments.
+        type ProjectSeries = {unid: string; name: string; points: {x: number; y: number; iso: string; score: number}[]};
+        const seriesByUnid = new Map<string, ProjectSeries>();
+        for (const entry of entries) {
+            for (const p of entry.perProject) {
+                if (p.avg === null) {
+                    continue;
+                }
+                let s = seriesByUnid.get(p.unid);
+                if (!s) {
+                    s = {unid: p.unid, name: p.name, points: []};
+                    seriesByUnid.set(p.unid, s);
+                }
+                s.points.push({
+                    x: xPx(entry.timestamp),
+                    y: yPx(p.avg),
+                    iso: entry.timestamp,
+                    score: p.avg
+                });
+            }
+        }
+
+        // Sort projects by latest score asc so the worst project ends
+        // up on top of the legend (and at the bottom of the chart's
+        // z-order, which is fine — we paint overall last).
+        const seriesList = Array.from(seriesByUnid.values())
+            .sort((a, b) => {
+                const la = a.points[a.points.length - 1]?.score ?? 100;
+                const lb = b.points[b.points.length - 1]?.score ?? 100;
+                return la - lb;
+            });
+
+        // Colour palette — cycles for projects beyond the 12th. Picked
+        // so adjacent hues stay distinguishable on a dark background.
+        const palette = [
+            '#ff6b6b', '#feca57', '#48dbfb', '#1dd1a1', '#5f27cd', '#ff9ff3',
+            '#54a0ff', '#00d2d3', '#c8d6e5', '#ee5253', '#10ac84', '#ff9f43'
+        ];
+
+        for (let i = 0; i < seriesList.length; i++) {
+            const s = seriesList[i];
+            const colour = palette[i % palette.length];
+            const poly = document.createElementNS(svgNs, 'polyline');
+            poly.setAttribute('class', 'dash-trend-line');
+            poly.setAttribute('points', s.points.map((p) => `${p.x},${p.y}`).join(' '));
+            poly.setAttribute('stroke', colour);
+            svg.appendChild(poly);
+            for (const p of s.points) {
+                const dot = document.createElementNS(svgNs, 'circle');
+                dot.setAttribute('class', 'dash-trend-dot');
+                dot.setAttribute('cx', String(p.x));
+                dot.setAttribute('cy', String(p.y));
+                dot.setAttribute('r', '2.5');
+                dot.setAttribute('fill', colour);
+                const title = document.createElementNS(svgNs, 'title');
+                title.textContent = `${s.name}: ${p.score} · ${DashboardView._formatShortDate(p.iso)}`;
+                dot.appendChild(title);
+                svg.appendChild(dot);
+            }
+        }
+
+        // Ecosystem-overall line — heavier stroke, painted last so it
+        // sits on top.
+        const overallPoints = entries
+            .filter((e) => e.overall !== null)
+            .map((e) => ({x: xPx(e.timestamp), y: yPx(e.overall!), iso: e.timestamp, score: e.overall!}));
+        if (overallPoints.length > 1) {
+            const poly = document.createElementNS(svgNs, 'polyline');
+            poly.setAttribute('class', 'dash-trend-line dash-trend-line-overall');
+            poly.setAttribute('points', overallPoints.map((p) => `${p.x},${p.y}`).join(' '));
+            svg.appendChild(poly);
+        }
+        for (const p of overallPoints) {
+            const dot = document.createElementNS(svgNs, 'circle');
+            dot.setAttribute('class', 'dash-trend-dot dash-trend-dot-overall');
+            dot.setAttribute('cx', String(p.x));
+            dot.setAttribute('cy', String(p.y));
+            dot.setAttribute('r', '3.5');
+            const title = document.createElementNS(svgNs, 'title');
+            title.textContent = `${I18n.t('Ecosystem overall')}: ${p.score} · ${DashboardView._formatShortDate(p.iso)}`;
+            dot.appendChild(title);
+            svg.appendChild(dot);
+        }
+
+        // Legend column on the right. Overall sits on top, then
+        // per-project worst-first.
+        const legendX = PAD_L + PLOT_W + 16;
+        let legendY = PAD_T + 4;
+        const legendEntry = (colour: string, text: string, isOverall: boolean): void => {
+            const swatch = document.createElementNS(svgNs, 'line');
+            swatch.setAttribute('x1', String(legendX));
+            swatch.setAttribute('y1', String(legendY));
+            swatch.setAttribute('x2', String(legendX + 18));
+            swatch.setAttribute('y2', String(legendY));
+            swatch.setAttribute('stroke', colour);
+            swatch.setAttribute('stroke-width', isOverall ? '3' : '2');
+            swatch.setAttribute('stroke-linecap', 'round');
+            svg.appendChild(swatch);
+            const lbl = document.createElementNS(svgNs, 'text');
+            lbl.setAttribute('class', isOverall
+                ? 'dash-trend-legend dash-trend-legend-overall'
+                : 'dash-trend-legend');
+            lbl.setAttribute('x', String(legendX + 24));
+            lbl.setAttribute('y', String(legendY + 4));
+            lbl.textContent = text;
+            svg.appendChild(lbl);
+            legendY += 18;
+        };
+        legendEntry('currentColor', I18n.t('Ecosystem overall'), true);
+        for (let i = 0; i < seriesList.length && i < 12; i++) {
+            legendEntry(palette[i % palette.length], seriesList[i].name, false);
+        }
+        if (seriesList.length > 12) {
+            const lbl = document.createElementNS(svgNs, 'text');
+            lbl.setAttribute('class', 'dash-trend-legend');
+            lbl.setAttribute('x', String(legendX + 24));
+            lbl.setAttribute('y', String(legendY + 4));
+            lbl.textContent = I18n.t('+ {n} more', {n: seriesList.length - 12});
+            svg.appendChild(lbl);
+        }
+
+        return svg;
+    }
+
+    /**
+     * Parse a CellFinding label into name + version. Per-package
+     * scanners emit `name@version`; per-project scanners (template,
+     * unused, mutableResolution) emit either `name` or
+     * `name@version` depending on the finding. ImpactModal handles
+     * both — name-only seeds skip the version filter.
+     */
+    private static _parseFindingLabel(label: string): {name?: string; version?: string} {
+        // Scoped packages start with `@scope/name@version`; only the
+        // *last* `@` separates name from version.
+        const at = label.lastIndexOf('@');
+        if (at <= 0) {
+            return {name: label};
+        }
+        return {name: label.slice(0, at), version: label.slice(at + 1)};
+    }
+
+    /** YYYY-MM-DD without leading century — tighter on the X axis. */
+    private static _formatShortDate(iso: string): string {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) {
+            return iso;
+        }
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${d.getFullYear() % 100}-${m}-${day}`;
     }
 
     private static _renderPills(risk: number, warn: number, info: number): HTMLElement {

@@ -1,0 +1,194 @@
+import fs from 'fs';
+import path from 'path';
+import {DashboardResponse, ScannerId} from './DashboardBuilder.js';
+
+/**
+ * One compact daily record of the dashboard scan, derived from the
+ * full `DashboardResponse`. We persist only the averages the trend
+ * surfaces use — not the per-cell findings — so a year of history
+ * stays well under a megabyte even on a 20-project ecosystem.
+ *
+ * `overall` is the average over the per-project averages (each
+ * project's `avg` is the mean of its non-N/A cell scores). `null`
+ * means no project produced any scored cell.
+ */
+export type DashboardHistoryEntry = {
+    timestamp: string;
+    overall: number|null;
+    perProject: {unid: string; name: string; avg: number|null}[];
+    perScanner: {scanner: ScannerId; avg: number|null}[];
+};
+
+/**
+ * Per-day persistence of dashboard scan averages, mirroring the
+ * `HistoryStore` shape (atomic write-then-rename, one file per
+ * logical key). One file per UTC date in
+ * `<projectRoot>/.nppm-history/dashboard/YYYY-MM-DD.json` — the last
+ * scan of a given day wins so re-running the scan multiple times in
+ * a day doesn't bloat the trend line.
+ *
+ * Lives under `.nppm-history/` (not `.nppm-cache/`) so the user can
+ * commit it if they want a long-term ecosystem-health record under
+ * source control. Same rationale as `HistoryStore`.
+ */
+export class DashboardHistoryStore {
+
+    private readonly _dir: string;
+
+    constructor(dir: string) {
+        this._dir = dir;
+        fs.mkdirSync(dir, {recursive: true});
+    }
+
+    /**
+     * Compute the compact entry from a full `DashboardResponse` and
+     * persist it under the timestamp's UTC date. Failure to write is
+     * non-fatal — the caller decides whether to surface it.
+     */
+    public recordScan(dashboard: DashboardResponse, timestampIso: string): DashboardHistoryEntry {
+        const entry = DashboardHistoryStore.summarize(dashboard, timestampIso);
+        const file = path.join(this._dir, `${DashboardHistoryStore._dateKey(timestampIso)}.json`);
+        const tmp = `${file}.tmp`;
+        fs.writeFileSync(tmp, JSON.stringify(entry));
+        fs.renameSync(tmp, file);
+        return entry;
+    }
+
+    /**
+     * Return every persisted entry within the last `days` days,
+     * sorted chronologically (oldest first). `days <= 0` returns the
+     * empty list — callers route to an empty-state UI.
+     */
+    public readRange(days: number): DashboardHistoryEntry[] {
+        if (days <= 0 || !fs.existsSync(this._dir)) {
+            return [];
+        }
+        const cutoffMs = Date.now() - days * 86400_000;
+        const out: DashboardHistoryEntry[] = [];
+        for (const name of fs.readdirSync(this._dir)) {
+            if (!name.endsWith('.json')) {
+                continue;
+            }
+            const file = path.join(this._dir, name);
+            try {
+                const raw = fs.readFileSync(file, 'utf-8');
+                const parsed = JSON.parse(raw) as DashboardHistoryEntry;
+                const t = new Date(parsed.timestamp).getTime();
+                if (Number.isNaN(t) || t < cutoffMs) {
+                    continue;
+                }
+                out.push(parsed);
+            } catch {
+                // Corrupt file — skip it; next scan overwrites it.
+            }
+        }
+        out.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+        return out;
+    }
+
+    /**
+     * Last (most recent) entry across every persisted day, or `null`
+     * when none exist. Used by the macro-donut to compute a delta
+     * against the immediately-previous scan without forcing the
+     * caller to know the file layout.
+     */
+    public readPrevious(beforeTimestampIso: string): DashboardHistoryEntry|null {
+        if (!fs.existsSync(this._dir)) {
+            return null;
+        }
+        const beforeMs = new Date(beforeTimestampIso).getTime();
+        if (Number.isNaN(beforeMs)) {
+            return null;
+        }
+        let best: DashboardHistoryEntry|null = null;
+        let bestMs = -Infinity;
+        for (const name of fs.readdirSync(this._dir)) {
+            if (!name.endsWith('.json')) {
+                continue;
+            }
+            try {
+                const raw = fs.readFileSync(path.join(this._dir, name), 'utf-8');
+                const parsed = JSON.parse(raw) as DashboardHistoryEntry;
+                const t = new Date(parsed.timestamp).getTime();
+                if (Number.isNaN(t) || t >= beforeMs) {
+                    continue;
+                }
+                if (t > bestMs) {
+                    best = parsed;
+                    bestMs = t;
+                }
+            } catch {
+                // ignore
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Reduce a full dashboard response to the compact entry shape.
+     * Public so tests can stay self-contained without writing to
+     * disk — and so the route handler can build the in-memory entry
+     * for the SSE end event without a round-trip through disk.
+     */
+    public static summarize(dashboard: DashboardResponse, timestampIso: string): DashboardHistoryEntry {
+        const perProject: {unid: string; name: string; avg: number|null}[] = [];
+        const scannerSum = new Map<ScannerId, {sum: number; n: number}>();
+        let overallSum = 0;
+        let overallN = 0;
+
+        for (const col of dashboard.columns) {
+            let projSum = 0;
+            let projN = 0;
+            for (const [scanner, cell] of Object.entries(col.cells) as [ScannerId, {score: number|null}][]) {
+                if (cell.score === null) {
+                    continue;
+                }
+                projSum += cell.score;
+                projN++;
+                let bucket = scannerSum.get(scanner);
+                if (!bucket) {
+                    bucket = {sum: 0, n: 0};
+                    scannerSum.set(scanner, bucket);
+                }
+                bucket.sum += cell.score;
+                bucket.n++;
+            }
+            const avg = projN > 0 ? Math.round(projSum / projN) : null;
+            if (avg !== null) {
+                overallSum += avg;
+                overallN++;
+            }
+            perProject.push({unid: col.project.unid, name: col.project.name, avg});
+        }
+
+        const perScanner: {scanner: ScannerId; avg: number|null}[] = [];
+        for (const [scanner, bucket] of scannerSum) {
+            perScanner.push({scanner, avg: Math.round(bucket.sum / bucket.n)});
+        }
+        perScanner.sort((a, b) => a.scanner.localeCompare(b.scanner));
+
+        return {
+            timestamp: timestampIso,
+            overall: overallN > 0 ? Math.round(overallSum / overallN) : null,
+            perProject,
+            perScanner
+        };
+    }
+
+    /**
+     * UTC `YYYY-MM-DD` key — last scan of a UTC day wins. Local-time
+     * keying would put two scans run at 01:00 and 23:00 of the same
+     * local day into two different files when the timezone has DST
+     * shifts; UTC is stable.
+     */
+    private static _dateKey(iso: string): string {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) {
+            return 'invalid-date';
+        }
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(d.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+}

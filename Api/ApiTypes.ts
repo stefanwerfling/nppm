@@ -8,6 +8,7 @@ import {PackageDependency} from '../Project/PackageManifest.js';
 import {ReleasesResponse} from '../Releases/Releases.js';
 import {IntegrityFinding, IntegritySeverity, IntegritySummary} from '../Security/IntegrityScanner.js';
 import {DashboardCell, DashboardColumn, DashboardResponse, ScannerId} from '../Dashboard/DashboardBuilder.js';
+import {DashboardHistoryEntry} from '../Dashboard/DashboardHistoryStore.js';
 import {ImpactReport} from '../Security/ImpactAnalyzer.js';
 import {HeuristicsBatchEntry, SecurityReport} from '../Security/SecurityScanner.js';
 import {PrReviewReport} from '../PrReview/PrReview.js';
@@ -756,6 +757,21 @@ export type ApiDashboardScanEndEvent = {
 
 export type ApiDashboardScanErrorEvent = {
     msg: string;
+};
+
+/**
+ * Response shape of `GET /api/dashboard/history?days=`. Returned
+ * sorted chronologically (oldest first) so the trend chart can
+ * iterate left-to-right without an extra sort step.
+ *
+ * `previous` carries the entry immediately before the most-recent
+ * snapshot, *if* one exists — drives the "↑2 vs last scan" delta
+ * inside the macro-donut widget. Independent of `days` so the donut
+ * delta is meaningful even on the 30-day view.
+ */
+export type ApiDashboardHistoryResponse = {
+    entries: DashboardHistoryEntry[];
+    previous: DashboardHistoryEntry|null;
 };
 
 /**

@@ -36,6 +36,7 @@ import {
     ApiTemplatesMatrixRow,
     ApiTemplatesResponse,
     ApiFingerprintResponse,
+    ApiDashboardHistoryResponse,
     ApiDashboardResponse,
     ApiDashboardSnapshotResponse,
     ApiHistoryResponse,
@@ -72,6 +73,7 @@ import {GitHistoryBackfill} from './History/GitHistoryBackfill.js';
 import {HistoryStore} from './History/HistoryStore.js';
 import {RemoteGitHistoryBackfill} from './History/RemoteGitHistoryBackfill.js';
 import {CellFinding, DashboardBuilder, DashboardCell, DashboardColumn, ScannerId, SCANNER_IDS} from './Dashboard/DashboardBuilder.js';
+import {DashboardHistoryStore} from './Dashboard/DashboardHistoryStore.js';
 import {DepGraphBuilder} from './DepGraph/DepGraphBuilder.js';
 import {ImpactAnalyzer, ImpactProjectReport} from './Security/ImpactAnalyzer.js';
 import {MatrixBuilder} from './Matrix/MatrixBuilder.js';
@@ -257,6 +259,14 @@ class Server {
             // we never want TTL-eviction here — the user wants to see
             // *the last* result regardless of age.
             const dashboardSnapshotPath = path.join(cacheDir, 'dashboard-snapshot.json');
+
+            // Per-day rolling history of dashboard averages — lives under
+            // `.nppm-history/` (not the cache) so the user can commit
+            // it for a long-term ecosystem-health record. Drives the
+            // Dashboard "Trend" tab and the macro-donut delta widget.
+            const dashboardHistoryStore = new DashboardHistoryStore(
+                path.join(historyDir, 'dashboard')
+            );
 
             // Templates catalogue. Lives next to nppm.json in
             // `nppm-templates/<id>/template.json` (one folder per
@@ -2042,6 +2052,32 @@ class Server {
             });
 
             // -------------------------------------------------------------
+            // GET /api/dashboard/history?days=N — compact rolling history
+            // of per-project + ecosystem averages, one record per UTC day.
+            // Drives the Dashboard "Trend" tab and the macro-donut delta.
+            // `days` clamps to [1, 3650]; defaults to 90.
+            // `previous` carries the entry preceding the most-recent one
+            // *regardless of `days`* so the macro-donut delta works on
+            // any range.
+            // -------------------------------------------------------------
+            app.get('/api/dashboard/history', (req, res) => {
+                try {
+                    const raw = typeof req.query.days === 'string'
+                        ? Number.parseInt(req.query.days, 10) : 90;
+                    const days = Math.min(3650, Math.max(1, Number.isFinite(raw) ? raw : 90));
+                    const entries = dashboardHistoryStore.readRange(days);
+                    let previous: ReturnType<typeof dashboardHistoryStore.readPrevious> = null;
+                    if (entries.length > 0) {
+                        previous = dashboardHistoryStore.readPrevious(entries[entries.length - 1].timestamp);
+                    }
+                    const payload: ApiDashboardHistoryResponse = {entries, previous};
+                    res.status(200).json(payload);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
             // GET /api/dashboard/scan — SSE stream that walks every
             // project × every scanner and emits one `cell` event per
             // intersection plus `progress` events with the current
@@ -2549,6 +2585,14 @@ class Server {
                                 timestamp: new Date().toISOString()
                             };
                             fs.writeFileSync(dashboardSnapshotPath, JSON.stringify(payload));
+                            // Append (or overwrite, for same-UTC-day) the
+                            // compact daily record powering the Trend tab
+                            // + macro-donut delta.
+                            try {
+                                dashboardHistoryStore.recordScan(dashboard, payload.timestamp!);
+                            } catch (e) {
+                                console.warn(`nppm: dashboard history save failed: ${(e as Error).message}`);
+                            }
                         } catch (e) {
                             console.warn(`nppm: dashboard snapshot save failed: ${(e as Error).message}`);
                         }

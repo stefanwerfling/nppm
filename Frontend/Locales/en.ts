@@ -642,6 +642,21 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     'No release timestamps in the registry.': 'No release timestamps in the registry.',
     'Daily downloads (last year)': 'Daily downloads (last year)',
     'No downloads data — either the npm public downloads API is unreachable or this package is not indexed.': 'No downloads data — either the npm public downloads API is unreachable or this package is not indexed.',
+    'Maintainer count over versions': 'Maintainer count over versions',
+    'Chart info': 'Chart info',
+    'Each point is one published version: X = release date, Y = the registry-reported `dist.unpackedSize`. Watch for a sudden jump — that\'s usually when a stable utility absorbed a heavyweight dependency or started bundling a runtime. A slow upward drift is normal as features accumulate.':
+        'Each point is one published version: X = release date, Y = the registry-reported `dist.unpackedSize`. Watch for a sudden jump — that\'s usually when a stable utility absorbed a heavyweight dependency or started bundling a runtime. A slow upward drift is normal as features accumulate.',
+    'Y = number of names in the version\'s `maintainers[]` array. A growing line means the project picked up co-maintainers; a sudden drop from N to 1 right before a takeover incident is the event-stream / ua-parser-js pattern. Solo-author packages stay flat at 1 — that\'s a risk *signal*, not a verdict.':
+        'Y = number of names in the version\'s `maintainers[]` array. A growing line means the project picked up co-maintainers; a sudden drop from N to 1 right before a takeover incident is the event-stream / ua-parser-js pattern. Solo-author packages stay flat at 1 — that\'s a risk *signal*, not a verdict.',
+    'Y = `Object.keys(dependencies).length` per published version — runtime deps only, devDeps and peers are intentionally excluded. A flat line is the goal for a leaf utility; a spike is the classic "stable utility quietly grew a framework" smell, worth checking the diff between that version and its predecessor.':
+        'Y = `Object.keys(dependencies).length` per published version — runtime deps only, devDeps and peers are intentionally excluded. A flat line is the goal for a leaf utility; a spike is the classic "stable utility quietly grew a framework" smell, worth checking the diff between that version and its predecessor.',
+    'One bar per calendar month over the last 24. Months without a release stay at 0 so gaps in the cadence are visible. Steady bars = healthy maintenance rhythm; long flat-zero stretches followed by a sudden cluster of releases is the typical "post-incident hotfix" or "abandoned-then-revived" pattern.':
+        'One bar per calendar month over the last 24. Months without a release stay at 0 so gaps in the cadence are visible. Steady bars = healthy maintenance rhythm; long flat-zero stretches followed by a sudden cluster of releases is the typical "post-incident hotfix" or "abandoned-then-revived" pattern.',
+    'Y = daily download count from the npm public registry over the last 365 days. The seven-day rhythm of weekday/weekend dips is normal. A sustained drop usually signals the package was deprecated, replaced, or absorbed into a meta-package; a sudden spike often follows a viral mention or a security advisory recommending it as a replacement.':
+        'Y = daily download count from the npm public registry over the last 365 days. The seven-day rhythm of weekday/weekend dips is normal. A sustained drop usually signals the package was deprecated, replaced, or absorbed into a meta-package; a sudden spike often follows a viral mention or a security advisory recommending it as a replacement.',
+    'No maintainer data — registry cache may be stale; refresh or clear cache to repopulate.': 'No maintainer data — registry cache may be stale; refresh or clear cache to repopulate.',
+    'Direct dependencies over versions': 'Direct dependencies over versions',
+    'No dependency data — registry cache may be stale; refresh or clear cache to repopulate.': 'No dependency data — registry cache may be stale; refresh or clear cache to repopulate.',
     '{scanned} of {total} scanners contributed': '{scanned} of {total} scanners contributed',
     'in 1 project': 'in 1 project',
     'in {n} projects': 'in {n} projects',

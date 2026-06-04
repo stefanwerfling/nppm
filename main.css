@@ -2286,11 +2286,55 @@ html, body {
     gap: 8px;
 }
 
+.pdp-trends-headwrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .pdp-trends-head {
     margin: 0;
     font-size: 13px;
     font-weight: 600;
     color: var(--c-text);
+}
+
+.pdp-trends-info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--c-muted);
+    cursor: help;
+    position: relative;
+    line-height: 0;
+}
+
+.pdp-trends-info:hover,
+.pdp-trends-info:focus {
+    color: var(--c-text);
+    outline: none;
+}
+
+.pdp-trends-tip {
+    display: none;
+    position: absolute;
+    z-index: 50;
+    max-width: 320px;
+    padding: 8px 10px;
+    background: var(--c-bg);
+    color: var(--c-text);
+    border: 1px solid var(--c-border);
+    border-radius: 6px;
+    font-size: 11px;
+    line-height: 1.4;
+    font-weight: 400;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
+
+.pdp-trends-info:hover .pdp-trends-tip,
+.pdp-trends-info:focus .pdp-trends-tip {
+    display: block;
 }
 
 .pdp-trends-empty {

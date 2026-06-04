@@ -14,6 +14,18 @@ export type PackageVersionMeta = {
     unpackedSize: number|null;
     fileCount: number|null;
     publisher: string|null;
+    /**
+     * Number of names in the version's `maintainers[]` array. `null`
+     * on very old packages whose registry record predates the field.
+     */
+    maintainerCount: number|null;
+    /**
+     * Number of runtime deps (`Object.keys(dependencies).length`).
+     * `null` when the field is missing on cache entries written
+     * before the extractor existed; explicit `0` when the version
+     * truly has no runtime deps.
+     */
+    depCount: number|null;
 };
 
 /**
@@ -67,12 +79,20 @@ export class PackageTrendsBuilder {
             const releasedAt = typeof time[version] === 'string' ? time[version] : null;
             const dist = pkg.dist?.[version];
             const publisher = pkg.publishers?.[version]?.name ?? null;
+            const maintainerCount = typeof pkg.maintainerCounts?.[version] === 'number'
+                ? pkg.maintainerCounts[version]
+                : null;
+            const depCount = typeof pkg.dependencyCounts?.[version] === 'number'
+                ? pkg.dependencyCounts[version]
+                : null;
             meta.push({
                 version,
                 releasedAt,
                 unpackedSize: typeof dist?.unpackedSize === 'number' ? dist.unpackedSize : null,
                 fileCount: typeof dist?.fileCount === 'number' ? dist.fileCount : null,
-                publisher
+                publisher,
+                maintainerCount,
+                depCount
             });
         }
 

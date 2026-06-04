@@ -22,20 +22,33 @@ describe('PackageTrendsBuilder.build', () => {
         expect(out.versions.map((v) => v.version)).toEqual(['1.0.0', '1.5.0', '2.0.0']);
     });
 
-    it('attaches per-version unpackedSize / fileCount / publisher', () => {
+    it('attaches per-version unpackedSize / fileCount / publisher / counts', () => {
         const out = PackageTrendsBuilder.build(mkPkg({
             versions: ['1.0.0'],
             time: {'1.0.0': '2024-01-01T00:00:00.000Z'},
             dist: {'1.0.0': {tarball: 't', unpackedSize: 12345, fileCount: 7}},
-            publishers: {'1.0.0': {name: 'alice'}}
+            publishers: {'1.0.0': {name: 'alice'}},
+            maintainerCounts: {'1.0.0': 3},
+            dependencyCounts: {'1.0.0': 5}
         }));
         expect(out.versions[0]).toEqual({
             version: '1.0.0',
             releasedAt: '2024-01-01T00:00:00.000Z',
             unpackedSize: 12345,
             fileCount: 7,
-            publisher: 'alice'
+            publisher: 'alice',
+            maintainerCount: 3,
+            depCount: 5
         });
+    });
+
+    it('treats missing maintainer/dep counts as null', () => {
+        const out = PackageTrendsBuilder.build(mkPkg({
+            versions: ['1.0.0'],
+            time: {'1.0.0': '2024-01-01T00:00:00.000Z'}
+        }));
+        expect(out.versions[0].maintainerCount).toBeNull();
+        expect(out.versions[0].depCount).toBeNull();
     });
 
     it('sorts undated versions to the tail', () => {

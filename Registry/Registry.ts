@@ -112,6 +112,22 @@ export type RegistryPackage = {
      * was added.
      */
     deprecations?: Record<string, string>;
+    /**
+     * Per-version maintainer count — `length` of the version object's
+     * `maintainers[]` array. Surfaces in the PackageDetailPanel Trends
+     * tab as "team size over time"; helps spot the typical handover
+     * pattern (1 → 5 maintainers after a project gets popular, or
+     * 5 → 1 right before an abandoned-takeover incident).
+     */
+    maintainerCounts?: Record<string, number>;
+    /**
+     * Per-version direct-dependency count — `Object.keys(...).length`
+     * of the version object's `dependencies` map. Surfaces as
+     * "complexity over versions" in the Trends tab; a sudden spike
+     * is the typical "a stable utility added a heavyweight framework
+     * mid-life" smell.
+     */
+    dependencyCounts?: Record<string, number>;
 };
 
 /**
@@ -176,7 +192,9 @@ export class Registry {
                 license: Registry._extractLicense(raw.license, raw.licenses),
                 publishers: Registry._extractPublishers(raw.versions),
                 dist: Registry._extractDist(raw.versions),
-                deprecations: Registry._extractDeprecations(raw.versions)
+                deprecations: Registry._extractDeprecations(raw.versions),
+                maintainerCounts: Registry._extractMaintainerCounts(raw.versions),
+                dependencyCounts: Registry._extractDependencyCounts(raw.versions)
             };
 
             this._cache.set(name, pkg);
@@ -369,6 +387,62 @@ export class Registry {
             const dep = (entry as {deprecated?: unknown}).deprecated;
             if (typeof dep === 'string' && dep.length > 0) {
                 out[version] = dep;
+                any = true;
+            }
+        }
+        return any ? out : undefined;
+    }
+
+    /**
+     * Pull `maintainers[].length` out of each version object. Very old
+     * packages predate the field; those versions are skipped.
+     */
+    private static _extractMaintainerCounts(versions: unknown): Record<string, number>|undefined {
+        if (!versions || typeof versions !== 'object') {
+            return undefined;
+        }
+        const out: Record<string, number> = {};
+        let any = false;
+        for (const [version, entry] of Object.entries(versions as Record<string, unknown>)) {
+            if (!entry || typeof entry !== 'object') {
+                continue;
+            }
+            const maintainers = (entry as {maintainers?: unknown}).maintainers;
+            if (Array.isArray(maintainers)) {
+                out[version] = maintainers.length;
+                any = true;
+            }
+        }
+        return any ? out : undefined;
+    }
+
+    /**
+     * Pull `Object.keys(dependencies).length` out of each version
+     * object. Devtype / peer / optional buckets are intentionally
+     * excluded — the user thinks of "direct deps" as the runtime
+     * `dependencies` map. Versions without a `dependencies` map are
+     * recorded as 0 (= "no runtime deps", not "data missing"), which
+     * matches npm's semantic.
+     */
+    private static _extractDependencyCounts(versions: unknown): Record<string, number>|undefined {
+        if (!versions || typeof versions !== 'object') {
+            return undefined;
+        }
+        const out: Record<string, number> = {};
+        let any = false;
+        for (const [version, entry] of Object.entries(versions as Record<string, unknown>)) {
+            if (!entry || typeof entry !== 'object') {
+                continue;
+            }
+            const deps = (entry as {dependencies?: unknown}).dependencies;
+            if (deps && typeof deps === 'object') {
+                out[version] = Object.keys(deps as Record<string, unknown>).length;
+                any = true;
+            } else {
+                // Version object exists but no dependencies map — that
+                // *is* "0 runtime deps", record it explicitly so the
+                // Trends chart sees a real datapoint instead of a gap.
+                out[version] = 0;
                 any = true;
             }
         }

@@ -410,10 +410,94 @@ export class PackageDetailPanel {
         wrap.className = 'pdp-trends';
 
         wrap.appendChild(PackageDetailPanel._renderSizeOverVersions(t));
+        wrap.appendChild(PackageDetailPanel._renderMaintainersOverVersions(t));
+        wrap.appendChild(PackageDetailPanel._renderDepsOverVersions(t));
         wrap.appendChild(PackageDetailPanel._renderReleasesByMonth(t));
         wrap.appendChild(PackageDetailPanel._renderDownloadsRange(t));
 
         return wrap;
+    }
+
+    /**
+     * Maintainer-count over release dates. Shows the typical
+     * trajectory: solo author → community handover → contributor
+     * peak → consolidation. A sudden drop right before a takeover
+     * incident is what the user is hunting for here.
+     */
+    private static _renderMaintainersOverVersions(t: import('../Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
+        const section = document.createElement('div');
+        section.className = 'pdp-trends-section';
+        section.appendChild(PackageDetailPanel._sectionHead(
+            I18n.t('Maintainer count over versions'),
+            I18n.t('Y = number of names in the version\'s `maintainers[]` array. A growing line means the project picked up co-maintainers; a sudden drop from N to 1 right before a takeover incident is the event-stream / ua-parser-js pattern. Solo-author packages stay flat at 1 — that\'s a risk *signal*, not a verdict.')
+        ));
+
+        type Pt = {iso: string; count: number; version: string};
+        const points: Pt[] = [];
+        for (const v of t.versions) {
+            if (v.releasedAt && typeof v.maintainerCount === 'number') {
+                points.push({iso: v.releasedAt, count: v.maintainerCount, version: v.version});
+            }
+        }
+        if (points.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-trends-empty';
+            empty.textContent = I18n.t('No maintainer data — registry cache may be stale; refresh or clear cache to repopulate.');
+            section.appendChild(empty);
+            return section;
+        }
+
+        const svg = PackageDetailPanel._lineChart(
+            points.map((p) => ({
+                timestamp: p.iso,
+                value: p.count,
+                tooltip: `${p.version}: ${p.count} ${p.count === 1 ? 'maintainer' : 'maintainers'}`
+            })),
+            (v) => String(Math.round(v))
+        );
+        section.appendChild(svg);
+        return section;
+    }
+
+    /**
+     * Direct-dependency count over release dates. A sudden spike is
+     * the classic "stable utility quietly grew a framework" smell —
+     * worth a look at the diff between that version and its
+     * predecessor.
+     */
+    private static _renderDepsOverVersions(t: import('../Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
+        const section = document.createElement('div');
+        section.className = 'pdp-trends-section';
+        section.appendChild(PackageDetailPanel._sectionHead(
+            I18n.t('Direct dependencies over versions'),
+            I18n.t('Y = `Object.keys(dependencies).length` per published version — runtime deps only, devDeps and peers are intentionally excluded. A flat line is the goal for a leaf utility; a spike is the classic "stable utility quietly grew a framework" smell, worth checking the diff between that version and its predecessor.')
+        ));
+
+        type Pt = {iso: string; count: number; version: string};
+        const points: Pt[] = [];
+        for (const v of t.versions) {
+            if (v.releasedAt && typeof v.depCount === 'number') {
+                points.push({iso: v.releasedAt, count: v.depCount, version: v.version});
+            }
+        }
+        if (points.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-trends-empty';
+            empty.textContent = I18n.t('No dependency data — registry cache may be stale; refresh or clear cache to repopulate.');
+            section.appendChild(empty);
+            return section;
+        }
+
+        const svg = PackageDetailPanel._lineChart(
+            points.map((p) => ({
+                timestamp: p.iso,
+                value: p.count,
+                tooltip: `${p.version}: ${p.count} ${p.count === 1 ? 'direct dep' : 'direct deps'}`
+            })),
+            (v) => String(Math.round(v))
+        );
+        section.appendChild(svg);
+        return section;
     }
 
     /**
@@ -426,10 +510,10 @@ export class PackageDetailPanel {
     private static _renderSizeOverVersions(t: import('../Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
         const section = document.createElement('div');
         section.className = 'pdp-trends-section';
-        const head = document.createElement('h3');
-        head.className = 'pdp-trends-head';
-        head.textContent = I18n.t('Unpacked size over versions');
-        section.appendChild(head);
+        section.appendChild(PackageDetailPanel._sectionHead(
+            I18n.t('Unpacked size over versions'),
+            I18n.t('Each point is one published version: X = release date, Y = the registry-reported `dist.unpackedSize`. Watch for a sudden jump — that\'s usually when a stable utility absorbed a heavyweight dependency or started bundling a runtime. A slow upward drift is normal as features accumulate.')
+        ));
 
         type Pt = {iso: string; size: number; version: string};
         const points: Pt[] = [];
@@ -462,10 +546,10 @@ export class PackageDetailPanel {
     private static _renderReleasesByMonth(t: import('../Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
         const section = document.createElement('div');
         section.className = 'pdp-trends-section';
-        const head = document.createElement('h3');
-        head.className = 'pdp-trends-head';
-        head.textContent = I18n.t('Releases per month');
-        section.appendChild(head);
+        section.appendChild(PackageDetailPanel._sectionHead(
+            I18n.t('Releases per month'),
+            I18n.t('One bar per calendar month over the last 24. Months without a release stay at 0 so gaps in the cadence are visible. Steady bars = healthy maintenance rhythm; long flat-zero stretches followed by a sudden cluster of releases is the typical "post-incident hotfix" or "abandoned-then-revived" pattern.')
+        ));
 
         if (t.releasesByMonth.length === 0) {
             const empty = document.createElement('div');
@@ -503,10 +587,10 @@ export class PackageDetailPanel {
     private static _renderDownloadsRange(t: import('../Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
         const section = document.createElement('div');
         section.className = 'pdp-trends-section';
-        const head = document.createElement('h3');
-        head.className = 'pdp-trends-head';
-        head.textContent = I18n.t('Daily downloads (last year)');
-        section.appendChild(head);
+        section.appendChild(PackageDetailPanel._sectionHead(
+            I18n.t('Daily downloads (last year)'),
+            I18n.t('Y = daily download count from the npm public registry over the last 365 days. The seven-day rhythm of weekday/weekend dips is normal. A sustained drop usually signals the package was deprecated, replaced, or absorbed into a meta-package; a sudden spike often follows a viral mention or a security advisory recommending it as a replacement.')
+        ));
 
         if (!t.downloads || t.downloads.length === 0) {
             const empty = document.createElement('div');
@@ -527,6 +611,92 @@ export class PackageDetailPanel {
         section.appendChild(svg);
         return section;
     }
+
+    /**
+     * Section heading with an inline info button. Hover/focus reveals
+     * a tooltip explaining what the chart shows and what to interpret.
+     * Same `position: fixed` + JS-computed-anchor pattern the Dashboard
+     * uses — keeps the tooltip from clipping when it sits at the
+     * bottom of a scrolled modal pane.
+     */
+    private static _sectionHead(title: string, tipText: string): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdp-trends-headwrap';
+
+        const head = document.createElement('h3');
+        head.className = 'pdp-trends-head';
+        head.textContent = title;
+        wrap.appendChild(head);
+
+        const info = document.createElement('span');
+        info.className = 'pdp-trends-info';
+        info.tabIndex = 0;
+        info.setAttribute('role', 'button');
+        info.setAttribute('aria-label', I18n.t('Chart info'));
+        info.innerHTML = PackageDetailPanel._INFO_SVG;
+
+        const tip = document.createElement('div');
+        tip.className = 'pdp-trends-tip';
+        tip.textContent = tipText;
+
+        info.appendChild(tip);
+        PackageDetailPanel._wireTooltip(info, tip);
+
+        wrap.appendChild(info);
+        return wrap;
+    }
+
+    /**
+     * Position the tooltip on hover/focus so it never overflows the
+     * viewport. `position: fixed` escapes the modal scroll container
+     * and the panel padding, so the tooltip can render outside the
+     * panel's clip rect even for the bottom-most chart.
+     */
+    private static _wireTooltip(info: HTMLElement, tip: HTMLElement): void {
+        const position = (): void => {
+            const infoRect = info.getBoundingClientRect();
+            const margin = 12;
+            const gap = 8;
+
+            tip.style.position = 'fixed';
+            tip.style.left = '0px';
+            tip.style.top = '0px';
+
+            const tipWidth = tip.offsetWidth;
+            const tipHeight = tip.offsetHeight;
+
+            let left = infoRect.right + gap;
+            let top = infoRect.top - 6;
+
+            if (left + tipWidth > window.innerWidth - margin) {
+                left = infoRect.left - tipWidth - gap;
+            }
+            if (left < margin) {
+                left = margin;
+            }
+
+            if (top + tipHeight > window.innerHeight - margin) {
+                top = window.innerHeight - margin - tipHeight;
+            }
+            if (top < margin) {
+                top = margin;
+            }
+
+            tip.style.left = `${left}px`;
+            tip.style.top = `${top}px`;
+        };
+
+        info.addEventListener('mouseenter', position);
+        info.addEventListener('focus', position);
+    }
+
+    /** 14×14 outline info "i" inside a circle — feather-style. */
+    private static readonly _INFO_SVG =
+        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" '
+        + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        + '<circle cx="12" cy="12" r="10"/>'
+        + '<line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12" y2="8"/>'
+        + '</svg>';
 
     /**
      * Generic SVG line chart. 560×180 viewport, 40px padding L/B for

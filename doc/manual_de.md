@@ -505,6 +505,37 @@ Selbstauskunft im `package.json`.
 "proprietary"` zwingt jedes Paket ohne erkannte Lizenz in den manuellen
 Review.
 
+### 3.7 Trends
+
+Pro-Paket-Verlauf — fünf gestapelte SVG-Sub-Charts, alle aus
+Daten gerendert, die schon im Packument-Cache liegen (kein
+zusätzlicher HTTP für die ersten vier; nur die Downloads-Linie
+holt einmalig `/downloads/range/last-year/<pkg>`, 24h gecached):
+
+![Detail: Trends](screenshots/24_panel_trends_de.png)
+
+- **Größe pro Version** — Linie, X = Release-Datum, Y =
+  `dist.unpackedSize`. Macht sichtbar, wann ein Paket aufgebläht
+  wurde.
+- **Maintainer-Anzahl pro Version** — Linie über `maintainers[].length`.
+  Typische Trajektorie ist Solo-Autor → Community-Handover →
+  Contributor-Peak; ein plötzlicher Sprung von 5 auf 1 direkt vor
+  einem Takeover-Incident ist genau das Muster, das hier auffällt.
+- **Direkte Abhängigkeiten pro Version** — Linie über
+  `Object.keys(dependencies).length`. Ein Sprung nach oben ist der
+  klassische "stabiles Utility hat heimlich ein Framework
+  geschluckt"-Geruch.
+- **Releases pro Monat** — Bar-Chart, letzte 24 Monate, mit Null-
+  Backfill für lückenlose Cadence-Lesbarkeit.
+- **Tägliche Downloads (letztes Jahr)** — Linie aus der npm-
+  Public-Downloads-API. Punkte werden ab >60 Datenpunkten
+  weggelassen (sonst unlesbar), die Linie alleine trägt die
+  Story.
+
+Sehr alte Releases (vor ~2016) tragen oft kein `unpackedSize` und
+keine `maintainers[]`-Liste — die entsprechenden Punkte fallen
+sauber raus statt mit `0` zu lügen.
+
 ---
 
 ## 4. Globaler CVE-Scan
@@ -1122,6 +1153,55 @@ Durchschnitt des Dashboards füttert auch den Health-Ring im
 Treeview (mit dem Matrix-Score als Fallback für Projekte, die
 das Dashboard noch nicht gescort hat), damit die Zahl im
 Sidebar immer das wiedergibt, was das Dashboard sagt.
+
+### 16.3 Trend-Tab
+
+Pro-Scan persistiert ein kompakter Tages-Eintrag in
+`.nppm-history/dashboard/YYYY-MM-DD.json` (letzter Scan des Tages
+gewinnt). Der **Trend**-Tab plottet diese Historie als
+Multi-Linie-Chart, eine Linie pro Projekt plus eine dickere
+Ökosystem-Linie obendrauf.
+
+![Dashboard — Trend-Tab](screenshots/23_dashboard_trend_de.png)
+
+Über dem Chart sitzen zwei Chip-Reihen:
+
+- **Metric** — `Score` / `Pakete` / `Größe` / `Downloads`. Score
+  ist Default und liest aus dem Tages-Eintrag direkt; die anderen
+  drei lazy-laden ihren Datentopf beim ersten Klick und cachen
+  ihn für die Session.
+- **Range** — `30T` / `90T` / `365T`. Wechsel triggert Re-Fetch
+  mit serverseitigem Clipping (für Score) bzw. Range-Replay (für
+  Pakete).
+
+**Metric-Definitionen:**
+
+- **Score** liest `overall` aus jedem Tages-Eintrag — derselbe
+  Mittelwert, der oben rechts im Macro-Donut steht.
+- **Pakete** rekonstruiert die Installations-Anzahl pro Projekt
+  über die Zeit aus `HistoryStore`, indem es vom heutigen Stand
+  rückwärts durch jeden Add/Remove-Event walked. Geht typischerweise
+  Jahre zurück, weil `GitHistoryBackfill` auf jedem `git log
+  -- package-lock.json` läuft. Ökosystem-Summe ist Carry-Forward
+  über nicht-aligned Projekt-Timestamps.
+- **Größe** summiert pro Projekt `dist.unpackedSize` über alle
+  installierten Paket-Versionen. Best-Effort-Untergrenze: sehr alte
+  Releases ohne `unpackedSize` fallen aus der Summe. Ökosystem-Summe
+  hier *nicht* dedupliziert — jedes Projekt hat seine eigene
+  Kopie der Pakete auf der Platte.
+- **Downloads** holt für jedes distinct installierte Paket aus
+  `api.npmjs.org/downloads/point/last-week/<pkg>` die Wochen-
+  Downloads (24h cached). Per-Projekt-Summe dedupliziert
+  innerhalb des Projekts (Paket über mehrere Pfade gezogen
+  zählt einmal). Ökosystem-Summe dedupliziert *über alle
+  Projekte* — `react` in drei Projekten ist trotzdem nur ein
+  Download-Bucket. Die Lücke zwischen `Σ Per-Projekt` und
+  `Ecosystem total (dedupliziert)` ist selbst ein Signal für
+  Dep-Tree-Overlap.
+
+Macro-Donut, Top-N Worst Packages und die Score-Delta-Zeile
+("↑2 vs letzter Scan") sitzen unverändert im Scanner-Score-Tab —
+nur Trend zeigt den vollen Zeitverlauf.
 
 ---
 

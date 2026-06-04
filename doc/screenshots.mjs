@@ -266,6 +266,18 @@ async function captureLanguage(browser, baseUrl, lang) {
     await sleep(2500);
     await shot(page, `10_panel_security${suffix}.png`);
 
+    // Trends tab — five sub-charts from packument data + npm downloads
+    // API. The downloads fetch and the first paint together take a
+    // beat; 4s headroom keeps the screenshot from catching the
+    // empty-state placeholder.
+    await page.evaluate((label) => {
+        const tabs = Array.from(document.querySelectorAll('.pdp-tab'));
+        const hit = tabs.find((t) => t.textContent?.trim() === label);
+        hit?.click();
+    }, lang === 'de' ? 'Trends' : 'Trends');
+    await sleep(4000);
+    await shot(page, `24_panel_trends${suffix}.png`);
+
     await captureBulkWizard(page, lang, suffix, ROOT_DEP_NAMES);
     await captureWorkspaceDrift(page, lang, suffix);
     await captureTemplatesViews(page, lang, suffix);
@@ -585,6 +597,33 @@ async function captureDashboard(page, lang, suffix) {
     // boxes. Give the browser a beat to settle the rendering.
     await sleep(1500);
     await shot(page, `22_dashboard_overall${suffix}.png`);
+
+    // Trend tab — plots each daily history entry as a multi-line
+    // chart. Defaults to the Score metric since that's the only one
+    // populated without a fresh scan; Packages/Size/Downloads land
+    // after the next dashboard run. Stays empty-state when no history
+    // exists yet — the capture still proceeds so the placeholder is
+    // documented as the cold-start experience.
+    const trendOpened = await page.evaluate(() => {
+        const tabs = Array.from(document.querySelectorAll('.dash-tab'));
+        const trend = tabs.find((t) => /^trend$/i.test((t.textContent || '').trim()));
+        if (trend) {
+            trend.click();
+            return true;
+        }
+        return false;
+    });
+    if (!trendOpened) {
+        console.log('  · Trend tab not found — skipping trend shot');
+        return;
+    }
+    try {
+        await page.waitForSelector('.dash-trend-svg, .dash-trend-empty', {timeout: 5_000});
+    } catch {
+        // continue
+    }
+    await sleep(1200);
+    await shot(page, `23_dashboard_trend${suffix}.png`);
 }
 
 /**

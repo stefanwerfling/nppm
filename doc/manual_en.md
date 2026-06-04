@@ -479,6 +479,35 @@ in the tarball** — a cross-check against the manifest's self-report.
 "proprietary"` forces any package without a recognised license into
 manual review.
 
+### 3.7 Trends
+
+Per-package timeline — five stacked SVG sub-charts, all rendered
+from data already in the packument cache (no extra HTTP for the
+first four; only the downloads line fetches
+`/downloads/range/last-year/<pkg>` once, 24h cached):
+
+![Detail: Trends](screenshots/24_panel_trends.png)
+
+- **Unpacked size over versions** — line, X = release date, Y =
+  `dist.unpackedSize`. Makes it obvious when a package bloated.
+- **Maintainer count over versions** — line over
+  `maintainers[].length`. Typical trajectory is solo author →
+  community handover → contributor peak; a sudden drop from 5 to 1
+  right before a takeover incident is exactly the pattern this
+  chart surfaces.
+- **Direct dependencies over versions** — line over
+  `Object.keys(dependencies).length`. A spike is the classic
+  "stable utility quietly grew a framework" smell.
+- **Releases per month** — bar chart, last 24 months, with zero
+  back-fill so the cadence (and gaps in it) stays readable.
+- **Daily downloads (last year)** — line from the npm public
+  downloads API. Dots are dropped above 60 datapoints so the line
+  stays visible; the polyline alone tells the story.
+
+Very old releases (pre-~2016) often lack `unpackedSize` and
+`maintainers[]` — those points drop out cleanly instead of lying
+with a `0`.
+
 ---
 
 ## 4. Global CVE scan
@@ -1075,6 +1104,52 @@ average also drives the treeview's health ring (with the
 Matrix's score as a fallback for projects the Dashboard hasn't
 scored yet), so the number in the sidebar always matches what
 the Dashboard says.
+
+### 16.3 Trend tab
+
+Each scan persists a compact daily entry into
+`.nppm-history/dashboard/YYYY-MM-DD.json` (last scan of the day
+wins). The **Trend** tab plots that history as a multi-line chart,
+one line per project plus a heavier ecosystem-overall line on top.
+
+![Dashboard — Trend tab](screenshots/23_dashboard_trend.png)
+
+Two chip rows sit above the chart:
+
+- **Metric** — `Score` / `Packages` / `Size` / `Downloads`. Score
+  is the default and reads from the daily entry directly; the other
+  three lazy-load their data on first click and cache it for the
+  session.
+- **Range** — `30d` / `90d` / `365d`. Switching triggers a re-fetch
+  with server-side clipping (Score) or range replay (Packages).
+
+**Metric semantics:**
+
+- **Score** reads `overall` from each daily entry — the same
+  average that powers the macro-donut.
+- **Packages** reconstructs the installed-package count per project
+  over time from `HistoryStore` by walking the add/remove events
+  backwards from today. Typically goes back years because
+  `GitHistoryBackfill` walks `git log -- package-lock.json` on
+  first run. Ecosystem total is a carry-forward across the
+  non-aligned per-project timestamps.
+- **Size** sums `dist.unpackedSize` over every installed
+  (name, version) per project. Best-effort floor: very old
+  releases without `unpackedSize` drop out of the sum. Ecosystem
+  total here is *not* deduplicated — each project carries its own
+  copy on disk so the sum reflects the true install footprint.
+- **Downloads** fetches weekly downloads per distinct installed
+  package from `api.npmjs.org/downloads/point/last-week/<pkg>`
+  (24h cached). Per-project sums dedupe within each project
+  (a package pulled through multiple paths counts once); the
+  ecosystem total dedupes *across* projects (`react` in three
+  projects is still one download bucket). The gap between
+  `Σ per-project` and `Ecosystem total (deduplicated)` is itself
+  a dep-tree-overlap signal.
+
+The macro-donut, Top-N Worst Packages, and the score-delta line
+("↑2 vs last scan") still live in the Scanner-Score tab — only
+Trend shows the full timeline.
 
 ---
 

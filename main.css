@@ -3028,6 +3028,15 @@ html, body {
     color: var(--c-error);
 }
 
+.dash-th-note {
+    color: #e8a64a;
+}
+
+.dash-th-note-marker {
+    cursor: help;
+    font-weight: normal;
+}
+
 .dash-th-clickable {
     cursor: pointer;
     user-select: none;

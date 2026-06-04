@@ -135,6 +135,14 @@ export type DashboardColumn = {
     project: {unid: string; name: string; type: ConfigProjectType};
     cells: Partial<Record<ScannerId, DashboardCell>>;
     error?: string;
+    /**
+     * Soft, informational annotation — like `error` but doesn't paint
+     * the column header red. Used when the column was scanned in a
+     * degraded mode (e.g. no lockfile, ran against registry latest)
+     * so the user knows the score is best-effort instead of
+     * lockfile-pinned.
+     */
+    note?: string;
 };
 
 export type DashboardResponse = {

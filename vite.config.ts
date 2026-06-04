@@ -2121,6 +2121,7 @@ class Server {
                             }
                         };
 
+                        let columnNote: string|undefined;
                         try {
                             send('progress', {
                                 current: cellsDone,
@@ -2130,22 +2131,25 @@ class Server {
                                 detail: `Loading lockfile for ${projectName}`
                             });
                             const lockfile = await project.loadLockfile();
-                            if (!lockfile) {
-                                skipColumnAsNa('no lockfile');
-                            } else {
-                                // Unique package list — same dedup MatrixBuilder
-                                // and the OSV-all stream apply, so the per-package
-                                // batches don't redo work for hoisted duplicates.
-                                //
-                                // Git-sourced deps need the resolved URL as the
-                                // version coordinate, otherwise the scanners see
-                                // the inner semver (`figtree@1.0.21`) and happily
-                                // fetch the unrelated public npm package of the
-                                // same name. The semver is kept around as
+                            // Build the package list — either from the
+                            // lockfile (exact installed versions) or as a
+                            // best-effort fallback from the manifest's
+                            // declared deps resolved to the registry's
+                            // `latest`. The fallback is what lets remote
+                            // projects without a committed package-lock.json
+                            // still get scanned instead of every cell
+                            // turning N/A.
+                            const seen = new Set<string>();
+                            const packages: {name: string; version: string; displayVersion: string}[] = [];
+                            if (lockfile) {
+                                // Git-sourced deps need the resolved URL as
+                                // the version coordinate, otherwise the
+                                // scanners see the inner semver
+                                // (`figtree@1.0.21`) and happily fetch the
+                                // unrelated public npm package of the same
+                                // name. The semver is kept around as
                                 // `displayVersion` purely for the user-facing
                                 // label.
-                                const seen = new Set<string>();
-                                const packages: {name: string; version: string; displayVersion: string}[] = [];
                                 for (const pkg of lockfile.packages) {
                                     const useGitUrl = pkg.resolved
                                         && GitResolver.isGitVersion(pkg.resolved);
@@ -2161,6 +2165,54 @@ class Server {
                                         displayVersion: pkg.version
                                     });
                                 }
+                            } else {
+                                // Manifest fallback. Resolve each declared
+                                // dep to the registry's `latest` — that's
+                                // what `npm install` would pull today. Deps
+                                // with no registry entry (private packages,
+                                // git URLs) are skipped from the scan but
+                                // still counted in the displayed package
+                                // count via the `columnNote`.
+                                send('progress', {
+                                    current: cellsDone,
+                                    total: totalCells,
+                                    projectName,
+                                    scanner: null,
+                                    detail: `No lockfile — resolving declared deps for ${projectName}`
+                                });
+                                const manifests = await project.loadManifests();
+                                const rootManifest = manifests.find((m) => m.workspace === undefined);
+                                const declared = rootManifest?.dependencies ?? [];
+                                const resolved = await Promise.all(declared.map(async (d) => {
+                                    if (GitResolver.isGitVersion(d.version)) {
+                                        return {name: d.name, version: d.version, displayVersion: d.version};
+                                    }
+                                    const reg = await registry.fetchOne(d.name);
+                                    const latest = reg?.latest ?? null;
+                                    if (!latest) {
+                                        return null;
+                                    }
+                                    return {name: d.name, version: latest, displayVersion: d.version};
+                                }));
+                                for (const entry of resolved) {
+                                    if (!entry) {
+                                        continue;
+                                    }
+                                    const key = `${entry.name}@${entry.version}`;
+                                    if (seen.has(key)) {
+                                        continue;
+                                    }
+                                    seen.add(key);
+                                    packages.push(entry);
+                                }
+                                if (packages.length === 0) {
+                                    skipColumnAsNa('no lockfile and no resolvable declared deps');
+                                } else {
+                                    columnNote = 'no lockfile — scanned against registry latest';
+                                }
+                            }
+
+                            if (packages.length > 0) {
                                 const packageCount = packages.length;
 
                                 // Announce the slow phase first so the
@@ -2371,36 +2423,44 @@ class Server {
                                     return;
                                 }
 
-                                // Integrity — per-project, scans the lockfile.
+                                // Integrity + Mutable-resolution both walk
+                                // the lockfile, so they have nothing to
+                                // compare against when we're scanning from
+                                // the manifest fallback. Emit a clear N/A
+                                // instead of silently scoring 100/100.
                                 send('progress', {
                                     current: cellsDone,
                                     total: totalCells,
                                     projectName,
                                     scanner: 'integrity' as ScannerId
                                 });
-                                const integrityFindings = await integrityScanner.scan(lockfile.packages);
-                                const integritySevs = integrityFindings.map((f) => DashboardBuilder.integritySeverity(f));
-                                const integrityCellFindings: CellFinding[] = integrityFindings.map((f) => ({
-                                    label: `${f.name}@${f.version}`,
-                                    severity: DashboardBuilder.integritySeverity(f),
-                                    detail: f.kind
-                                }));
-                                emitCell('integrity', DashboardBuilder.scorePerProject(
-                                    integritySevs, packageCount, integrityCellFindings
-                                ));
+                                if (lockfile) {
+                                    const integrityFindings = await integrityScanner.scan(lockfile.packages);
+                                    const integritySevs = integrityFindings.map((f) => DashboardBuilder.integritySeverity(f));
+                                    const integrityCellFindings: CellFinding[] = integrityFindings.map((f) => ({
+                                        label: `${f.name}@${f.version}`,
+                                        severity: DashboardBuilder.integritySeverity(f),
+                                        detail: f.kind
+                                    }));
+                                    emitCell('integrity', DashboardBuilder.scorePerProject(
+                                        integritySevs, packageCount, integrityCellFindings
+                                    ));
+                                } else {
+                                    emitCell('integrity', DashboardBuilder.naCell('no lockfile'));
+                                }
 
-                                // Mutable resolution — flags lockfile entries with
-                                // mutable git refs, missing integrity hashes, or
-                                // file:/link: protocols. Synthesized lockfiles
-                                // (walked from node_modules) surface as N/A.
                                 send('progress', {
                                     current: cellsDone,
                                     total: totalCells,
                                     projectName,
                                     scanner: 'mutableResolution' as ScannerId
                                 });
-                                const mutableResolutionReport = MutableResolutionScanner.scan(lockfile);
-                                emitCell('mutableResolution', DashboardBuilder.mutableResolutionCell(mutableResolutionReport));
+                                if (lockfile) {
+                                    const mutableResolutionReport = MutableResolutionScanner.scan(lockfile);
+                                    emitCell('mutableResolution', DashboardBuilder.mutableResolutionCell(mutableResolutionReport));
+                                } else {
+                                    emitCell('mutableResolution', DashboardBuilder.naCell('no lockfile'));
+                                }
 
                                 // Unused — only on local projects; remote sources
                                 // surface as N/A via the detector's `supported`
@@ -2463,7 +2523,8 @@ class Server {
                         const column: DashboardColumn = {
                             project: {unid, name: projectName, type: project.getType()},
                             cells,
-                            ...(columnError ? {error: columnError} : {})
+                            ...(columnError ? {error: columnError} : {}),
+                            ...(columnNote ? {note: columnNote} : {})
                         };
                         columns.push(column);
                         send('column-end', {column});

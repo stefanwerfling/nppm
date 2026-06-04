@@ -331,6 +331,18 @@ export class DashboardView {
                 const errTitle = th.title;
                 th.title = `${errTitle} · ${col.error}`;
                 th.classList.add('dash-th-error');
+            } else if (col?.note) {
+                // Soft annotation (e.g. "no lockfile — scanned against
+                // registry latest"). Adds a small info marker after the
+                // project name without flipping the column to the red
+                // error style.
+                const errTitle = th.title;
+                th.title = `${errTitle} · ${col.note}`;
+                th.classList.add('dash-th-note');
+                const marker = document.createElement('span');
+                marker.className = 'dash-th-note-marker';
+                marker.textContent = ' ⓘ';
+                th.appendChild(marker);
             }
             headRow.appendChild(th);
         }

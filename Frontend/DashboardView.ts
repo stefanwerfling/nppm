@@ -496,6 +496,7 @@ export class DashboardView {
         const wrap = document.createElement('div');
         wrap.className = 'dash-overall';
 
+        wrap.appendChild(this._renderEcosystemCard());
         wrap.appendChild(this._renderOverallProjects());
         const pkgsSection = this._renderOverallPackages();
         if (pkgsSection) {
@@ -503,6 +504,210 @@ export class DashboardView {
         }
 
         this._tableHost.appendChild(wrap);
+    }
+
+    /**
+     * Hero card with the forest/dark-forest background and eight
+     * absolutely-positioned metric boxes laid out left-green /
+     * right-red around the central tree. Thin SVG connectors run
+     * from each box's edge to a small anchor circle on the
+     * visual feature it speaks to — purely decorative but matches
+     * the design reference.
+     *
+     * All numbers come from the same `_columns` map the
+     * scanner-score tab already consumes, so the card stays in sync
+     * with whatever the SSE stream has delivered so far.
+     */
+    private _renderEcosystemCard(): HTMLElement {
+        const card = document.createElement('div');
+        card.className = 'dash-eco-card';
+
+        // SVG overlay must sit above the background image but below
+        // the boxes — the boxes' z-index bumps them over it.
+        const svgNs = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNs, 'svg');
+        svg.setAttribute('class', 'dash-eco-svg');
+        svg.setAttribute('viewBox', '0 0 100 100');
+        svg.setAttribute('preserveAspectRatio', 'none');
+        card.appendChild(svg);
+
+        // Compute ecosystem aggregates over every column we've seen.
+        let totalRisk = 0;
+        let totalWarn = 0;
+        let totalInfo = 0;
+        let cveCount = 0;
+        let deprecationCount = 0;
+        let typosquatCount = 0;
+        let maintainerWarnRisk = 0;
+        let healthyProjects = 0;
+        let riskyProjects = 0;
+        let scoredProjects = 0;
+        let scoreSum = 0;
+        for (const col of this._columns.values()) {
+            let projScoreSum = 0;
+            let projScored = 0;
+            for (const [scanner, cell] of Object.entries(col.cells)) {
+                if (cell.score !== null) {
+                    projScoreSum += cell.score;
+                    projScored++;
+                }
+                totalRisk += cell.counts.risk;
+                totalWarn += cell.counts.warn;
+                totalInfo += cell.counts.info;
+                if (scanner === 'cve') {
+                    cveCount += cell.counts.risk + cell.counts.warn;
+                }
+                if (scanner === 'deprecation') {
+                    deprecationCount += cell.counts.risk + cell.counts.warn;
+                }
+                if (scanner === 'typosquat') {
+                    typosquatCount += cell.counts.risk;
+                }
+                if (scanner === 'maintainer') {
+                    maintainerWarnRisk += cell.counts.risk + cell.counts.warn;
+                }
+            }
+            if (projScored > 0) {
+                const avg = projScoreSum / projScored;
+                scoreSum += avg;
+                scoredProjects++;
+                if (avg >= 80) {
+                    healthyProjects++;
+                }
+                if (avg < 60) {
+                    riskyProjects++;
+                }
+            }
+        }
+        const ecosystemHealth = scoredProjects > 0 ? Math.round(scoreSum / scoredProjects) : null;
+        const projectCount = this._columns.size;
+
+        // Box layout — coordinates in % of the card, anchor points
+        // (where the connector tip lands) likewise in %. Box origin
+        // is its top-left corner.
+        type BoxSpec = {
+            side: 'green'|'red';
+            top: number; left: number; w: number;
+            anchorX: number; anchorY: number;
+            label: string; value: string;
+        };
+        const boxes: BoxSpec[] = [
+            {
+                side: 'green',
+                top: 5, left: 3, w: 19,
+                anchorX: 27, anchorY: 17,
+                label: I18n.t('Projects'),
+                value: String(projectCount)
+            },
+            {
+                side: 'green',
+                top: 22, left: 3, w: 19,
+                anchorX: 24, anchorY: 30,
+                label: I18n.t('Ecosystem health'),
+                value: ecosystemHealth !== null ? `${ecosystemHealth}/100` : '—'
+            },
+            {
+                side: 'green',
+                top: 55, left: 3, w: 19,
+                anchorX: 26, anchorY: 60,
+                label: I18n.t('Healthy projects'),
+                value: String(healthyProjects)
+            },
+            {
+                side: 'green',
+                top: 75, left: 14, w: 22,
+                anchorX: 30, anchorY: 78,
+                label: I18n.t('Info-level findings'),
+                value: String(totalInfo)
+            },
+            {
+                side: 'red',
+                top: 5, left: 78, w: 19,
+                anchorX: 73, anchorY: 17,
+                label: I18n.t('Risk findings'),
+                value: String(totalRisk)
+            },
+            {
+                side: 'red',
+                top: 22, left: 78, w: 19,
+                anchorX: 70, anchorY: 30,
+                label: I18n.t('CVE flags'),
+                value: String(cveCount)
+            },
+            {
+                side: 'red',
+                top: 55, left: 78, w: 19,
+                anchorX: 73, anchorY: 60,
+                label: I18n.t('Deprecated'),
+                value: String(deprecationCount)
+            },
+            {
+                side: 'red',
+                top: 75, left: 64, w: 22,
+                anchorX: 70, anchorY: 78,
+                label: I18n.t('At-risk projects'),
+                value: String(riskyProjects)
+            },
+            {
+                side: 'red',
+                top: 38, left: 78, w: 19,
+                anchorX: 71, anchorY: 43,
+                label: I18n.t('Maintainer alerts'),
+                value: String(maintainerWarnRisk)
+            },
+            {
+                side: 'red',
+                top: 38, left: 39, w: 22,
+                anchorX: 50, anchorY: 53,
+                label: I18n.t('Typosquat hits'),
+                value: String(typosquatCount)
+            }
+        ];
+
+        // Draw connectors first so the boxes (added next) paint on
+        // top. Lines run from the centre of the box edge facing the
+        // anchor to the anchor itself; a small circle marks the tip.
+        for (const b of boxes) {
+            const boxCenterX = b.left + b.w / 2;
+            const boxBottom = b.top + 12; // approx box height in %
+            const startX = b.anchorX < boxCenterX ? b.left + 2 : b.left + b.w - 2;
+            const startY = boxBottom;
+            const line = document.createElementNS(svgNs, 'line');
+            line.setAttribute('x1', String(startX));
+            line.setAttribute('y1', String(startY));
+            line.setAttribute('x2', String(b.anchorX));
+            line.setAttribute('y2', String(b.anchorY));
+            line.setAttribute('class', `dash-eco-line dash-eco-line-${b.side}`);
+            svg.appendChild(line);
+            const dot = document.createElementNS(svgNs, 'circle');
+            dot.setAttribute('cx', String(b.anchorX));
+            dot.setAttribute('cy', String(b.anchorY));
+            dot.setAttribute('r', '0.6');
+            dot.setAttribute('class', `dash-eco-dot dash-eco-dot-${b.side}`);
+            svg.appendChild(dot);
+        }
+
+        for (const b of boxes) {
+            const box = document.createElement('div');
+            box.className = `dash-eco-box dash-eco-box-${b.side}`;
+            box.style.top = `${b.top}%`;
+            box.style.left = `${b.left}%`;
+            box.style.width = `${b.w}%`;
+
+            const value = document.createElement('div');
+            value.className = 'dash-eco-value';
+            value.textContent = b.value;
+            box.appendChild(value);
+
+            const label = document.createElement('div');
+            label.className = 'dash-eco-label';
+            label.textContent = b.label;
+            box.appendChild(label);
+
+            card.appendChild(box);
+        }
+
+        return card;
     }
 
     private _renderOverallProjects(): HTMLElement {

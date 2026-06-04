@@ -25,6 +25,7 @@ import {
     ApiProjectsResponse,
     ApiLifecycleScriptsResponse,
     ApiReleasesResponse,
+    ApiPackageTrendsResponse,
     ApiSecurityResponse,
     ApiUnusedResponse,
     ApiUpgradePreviewResponse,
@@ -254,6 +255,10 @@ export class Api {
     ): Promise<ApiFingerprintDiffResponse> {
         const qs = new URLSearchParams({name, before, after});
         return Api._json<ApiFingerprintDiffResponse>(`/api/fingerprint/diff?${qs.toString()}`);
+    }
+
+    public static async packageTrends(name: string): Promise<ApiPackageTrendsResponse> {
+        return Api._json<ApiPackageTrendsResponse>(`/api/packages/${encodeURIComponent(name)}/trends`);
     }
 
     public static async security(name: string, version: string): Promise<ApiSecurityResponse> {

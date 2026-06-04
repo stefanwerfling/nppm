@@ -38,6 +38,7 @@ import {
     ApiFingerprintResponse,
     ApiDashboardGrowthResponse,
     ApiDashboardHistoryResponse,
+    ApiPackageTrendsResponse,
     ApiDashboardResponse,
     ApiDashboardSnapshotResponse,
     ApiHistoryResponse,
@@ -79,6 +80,7 @@ import {DashboardGrowthBuilder, GrowthProjectInput} from './Dashboard/DashboardG
 import {InstalledSize} from './Dashboard/InstalledSize.js';
 import {DownloadsAggregator} from './Dashboard/DownloadsAggregator.js';
 import {NpmDownloadsFetcher} from './Downloads/NpmDownloadsFetcher.js';
+import {PackageTrendsBuilder} from './Package/PackageTrendsBuilder.js';
 import {DepGraphBuilder} from './DepGraph/DepGraphBuilder.js';
 import {ImpactAnalyzer, ImpactProjectReport} from './Security/ImpactAnalyzer.js';
 import {MatrixBuilder} from './Matrix/MatrixBuilder.js';
@@ -2098,6 +2100,31 @@ class Server {
             // the latest snapshot. Drives the Dashboard Trend tab's
             // "Packages" metric.
             // -------------------------------------------------------------
+            // -------------------------------------------------------------
+            // GET /api/packages/:name/trends — per-package timeline.
+            // Versions + releases-per-month come from the packument
+            // cache (no extra HTTP on warm cache); downloads-per-day
+            // is the last-year range from the npm public downloads
+            // API. The downloads field is `null` if the npm API is
+            // unreachable so the rest of the response still renders.
+            // -------------------------------------------------------------
+            app.get('/api/packages/:name/trends', async (req, res) => {
+                try {
+                    const name = decodeURIComponent(req.params.name);
+                    const pkg = await registry.fetchOne(name);
+                    if (!pkg) {
+                        res.status(404).json({success: false, msg: 'package not found'});
+                        return;
+                    }
+                    const base = PackageTrendsBuilder.build(pkg);
+                    const downloads = await downloadsFetcher.fetchRange(name, 'last-year');
+                    const payload: ApiPackageTrendsResponse = {...base, downloads};
+                    res.status(200).json(payload);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
             app.get('/api/dashboard/growth', (req, res) => {
                 try {
                     const raw = typeof req.query.days === 'string'

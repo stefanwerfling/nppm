@@ -2273,6 +2273,75 @@ html, body {
     overflow: auto;
 }
 
+.pdp-trends {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 8px 12px 16px 12px;
+}
+
+.pdp-trends-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pdp-trends-head {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--c-text);
+}
+
+.pdp-trends-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--c-muted);
+    font-size: 12px;
+    border: 1px dashed var(--c-border);
+    border-radius: 6px;
+}
+
+.pdp-trends-svg {
+    width: 100%;
+    height: auto;
+    max-height: 220px;
+    background: var(--c-panel);
+    border: 1px solid var(--c-border);
+    border-radius: 6px;
+    padding: 6px;
+    box-sizing: border-box;
+}
+
+.pdp-trends-grid {
+    stroke: var(--c-border);
+    stroke-width: 0.5;
+    stroke-dasharray: 2 2;
+}
+
+.pdp-trends-axis {
+    fill: var(--c-muted);
+    font-size: 10px;
+}
+
+.pdp-trends-line {
+    fill: none;
+    stroke: #48dbfb;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.pdp-trends-dot {
+    fill: #48dbfb;
+    opacity: 0.9;
+}
+
+.pdp-trends-bar {
+    fill: #1dd1a1;
+    opacity: 0.85;
+}
+
 .pdp-placeholder,
 .pdp-error {
     padding: 24px;

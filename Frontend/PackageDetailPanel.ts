@@ -33,7 +33,8 @@ enum Tab {
     diff = 'diff',
     releases = 'releases',
     security = 'security',
-    license = 'license'
+    license = 'license',
+    trends = 'trends'
 }
 
 /**
@@ -72,6 +73,9 @@ export class PackageDetailPanel {
      * collapsed again.
      */
     private _releasesShowAll: boolean = false;
+    private _trends: import('../Api/ApiTypes.js').ApiPackageTrendsResponse|null = null;
+    private _trendsError: string|null = null;
+    private _trendsInflight: boolean = false;
 
     public async open(name: string, rawVersion: string, latest: string|null): Promise<void> {
         return this._open(name, rawVersion, latest, Tab.files);
@@ -99,6 +103,9 @@ export class PackageDetailPanel {
         this._releasesError = null;
         this._releasesInflight = false;
         this._releasesShowAll = false;
+        this._trends = null;
+        this._trendsError = null;
+        this._trendsInflight = false;
 
         this._mount(`${name}@${version}`);
         this._renderLoading();
@@ -227,7 +234,8 @@ export class PackageDetailPanel {
                 : I18n.t('Diff')},
             {value: Tab.releases, label: I18n.t('Releases')},
             {value: Tab.security, label: this._securityTabLabel()},
-            {value: Tab.license, label: this._licenseTabLabel()}
+            {value: Tab.license, label: this._licenseTabLabel()},
+            {value: Tab.trends, label: I18n.t('Trends')}
         ];
 
         const bar = document.createElement('div');
@@ -290,6 +298,9 @@ export class PackageDetailPanel {
             case Tab.license:
                 this._renderLicenseTab();
                 return;
+            case Tab.trends:
+                this._renderTrendsTab();
+                return;
         }
     }
 
@@ -350,6 +361,394 @@ export class PackageDetailPanel {
         }
 
         this._tabPane.appendChild(this._renderLicenseBody(this._securityReport));
+    }
+
+    private _renderTrendsTab(): void {
+        if (!this._tabPane || !this._fingerprint) {
+            return;
+        }
+
+        if (this._trendsError) {
+            const err = document.createElement('div');
+            err.className = 'pdp-error';
+            err.textContent = this._trendsError;
+            this._tabPane.appendChild(err);
+            return;
+        }
+
+        if (!this._trends) {
+            const loading = document.createElement('div');
+            loading.className = 'pdp-placeholder';
+            loading.textContent = I18n.t('Loading trends …');
+            this._tabPane.appendChild(loading);
+
+            if (!this._trendsInflight) {
+                this._trendsInflight = true;
+                const name = this._fingerprint.name;
+                void Api.packageTrends(name).then((data) => {
+                    this._trendsInflight = false;
+                    this._trends = data;
+                    if (this._activeTab === Tab.trends) {
+                        this._renderActiveTab();
+                    }
+                }).catch((e: Error) => {
+                    this._trendsInflight = false;
+                    this._trendsError = e.message;
+                    if (this._activeTab === Tab.trends) {
+                        this._renderActiveTab();
+                    }
+                });
+            }
+            return;
+        }
+
+        this._tabPane.appendChild(this._renderTrendsBody(this._trends));
+    }
+
+    private _renderTrendsBody(t: import('../Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'pdp-trends';
+
+        wrap.appendChild(PackageDetailPanel._renderSizeOverVersions(t));
+        wrap.appendChild(PackageDetailPanel._renderReleasesByMonth(t));
+        wrap.appendChild(PackageDetailPanel._renderDownloadsRange(t));
+
+        return wrap;
+    }
+
+    /**
+     * Pure-SVG line chart of unpacked-size against release date. One
+     * point per version that carries both fields — earlier-published
+     * releases without size info simply don't render. X axis spans
+     * the full version timeline so the user can see when growth
+     * accelerated relative to release dates.
+     */
+    private static _renderSizeOverVersions(t: import('../Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
+        const section = document.createElement('div');
+        section.className = 'pdp-trends-section';
+        const head = document.createElement('h3');
+        head.className = 'pdp-trends-head';
+        head.textContent = I18n.t('Unpacked size over versions');
+        section.appendChild(head);
+
+        type Pt = {iso: string; size: number; version: string};
+        const points: Pt[] = [];
+        for (const v of t.versions) {
+            if (v.releasedAt && typeof v.unpackedSize === 'number') {
+                points.push({iso: v.releasedAt, size: v.unpackedSize, version: v.version});
+            }
+        }
+        if (points.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-trends-empty';
+            empty.textContent = I18n.t('No size data — older registry releases lack the unpackedSize field.');
+            section.appendChild(empty);
+            return section;
+        }
+
+        const svg = PackageDetailPanel._lineChart(
+            points.map((p) => ({timestamp: p.iso, value: p.size, tooltip: `${p.version}: ${PackageDetailPanel._formatBytes(p.size)}`})),
+            (v) => PackageDetailPanel._formatBytes(v)
+        );
+        section.appendChild(svg);
+        return section;
+    }
+
+    /**
+     * Bar chart of releases per calendar month over the last 24
+     * months. Each bar = one month; backfilled with zeros for months
+     * without a release so the cadence (and gaps in it) is visible.
+     */
+    private static _renderReleasesByMonth(t: import('../Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
+        const section = document.createElement('div');
+        section.className = 'pdp-trends-section';
+        const head = document.createElement('h3');
+        head.className = 'pdp-trends-head';
+        head.textContent = I18n.t('Releases per month');
+        section.appendChild(head);
+
+        if (t.releasesByMonth.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-trends-empty';
+            empty.textContent = I18n.t('No release timestamps in the registry.');
+            section.appendChild(empty);
+            return section;
+        }
+
+        // Restrict to the last 24 months so the bars stay readable
+        // on packages with a decade of monthly releases. Back-fill
+        // zeros so the X axis is continuous.
+        const lookup = new Map<string, number>();
+        for (const b of t.releasesByMonth) {
+            lookup.set(b.month, b.count);
+        }
+        const now = new Date();
+        const months: {month: string; count: number}[] = [];
+        for (let i = 23; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            months.push({month: key, count: lookup.get(key) ?? 0});
+        }
+
+        const svg = PackageDetailPanel._barChart(months);
+        section.appendChild(svg);
+        return section;
+    }
+
+    /**
+     * Pure-SVG daily downloads line over the last year. Empty-state
+     * when the downloads API was unreachable or the package isn't
+     * indexed (private package, mirror).
+     */
+    private static _renderDownloadsRange(t: import('../Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
+        const section = document.createElement('div');
+        section.className = 'pdp-trends-section';
+        const head = document.createElement('h3');
+        head.className = 'pdp-trends-head';
+        head.textContent = I18n.t('Daily downloads (last year)');
+        section.appendChild(head);
+
+        if (!t.downloads || t.downloads.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'pdp-trends-empty';
+            empty.textContent = I18n.t('No downloads data — either the npm public downloads API is unreachable or this package is not indexed.');
+            section.appendChild(empty);
+            return section;
+        }
+
+        const svg = PackageDetailPanel._lineChart(
+            t.downloads.map((p) => ({
+                timestamp: p.day,
+                value: p.downloads,
+                tooltip: `${p.day}: ${PackageDetailPanel._formatCount(p.downloads)}`
+            })),
+            (v) => PackageDetailPanel._formatCount(v)
+        );
+        section.appendChild(svg);
+        return section;
+    }
+
+    /**
+     * Generic SVG line chart. 560×180 viewport, 40px padding L/B for
+     * axes, 12px T/R. Auto-scales Y to a "nice" ceiling. Used by
+     * size-over-versions and downloads-over-time.
+     */
+    private static _lineChart(
+        points: {timestamp: string; value: number; tooltip: string}[],
+        yFormatter: (v: number) => string
+    ): SVGElement {
+        const svgNs = 'http://www.w3.org/2000/svg';
+        const W = 560;
+        const H = 180;
+        const PAD_L = 56;
+        const PAD_R = 12;
+        const PAD_T = 12;
+        const PAD_B = 28;
+        const PLOT_W = W - PAD_L - PAD_R;
+        const PLOT_H = H - PAD_T - PAD_B;
+
+        const svg = document.createElementNS(svgNs, 'svg');
+        svg.setAttribute('class', 'pdp-trends-svg');
+        svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+        const times = points.map((p) => new Date(p.timestamp).getTime());
+        const tStart = Math.min(...times);
+        const tEnd = Math.max(...times);
+        const tSpan = Math.max(1, tEnd - tStart);
+        let max = 0;
+        for (const p of points) {
+            if (p.value > max) {
+                max = p.value;
+            }
+        }
+        const yMax = PackageDetailPanel._niceCeil(Math.max(max, 1));
+        const xPx = (iso: string): number =>
+            PAD_L + ((new Date(iso).getTime() - tStart) / tSpan) * PLOT_W;
+        const yPx = (v: number): number => PAD_T + (1 - v / yMax) * PLOT_H;
+
+        for (const tick of [0, yMax / 2, yMax]) {
+            const y = yPx(tick);
+            const line = document.createElementNS(svgNs, 'line');
+            line.setAttribute('class', 'pdp-trends-grid');
+            line.setAttribute('x1', String(PAD_L));
+            line.setAttribute('y1', String(y));
+            line.setAttribute('x2', String(PAD_L + PLOT_W));
+            line.setAttribute('y2', String(y));
+            svg.appendChild(line);
+            const lbl = document.createElementNS(svgNs, 'text');
+            lbl.setAttribute('class', 'pdp-trends-axis');
+            lbl.setAttribute('x', String(PAD_L - 4));
+            lbl.setAttribute('y', String(y + 3));
+            lbl.setAttribute('text-anchor', 'end');
+            lbl.textContent = yFormatter(tick);
+            svg.appendChild(lbl);
+        }
+
+        for (const idx of [0, Math.floor(points.length / 2), points.length - 1]) {
+            const p = points[idx];
+            const lbl = document.createElementNS(svgNs, 'text');
+            lbl.setAttribute('class', 'pdp-trends-axis');
+            lbl.setAttribute('x', String(xPx(p.timestamp)));
+            lbl.setAttribute('y', String(PAD_T + PLOT_H + 14));
+            lbl.setAttribute('text-anchor', 'middle');
+            lbl.textContent = p.timestamp.slice(0, 10);
+            svg.appendChild(lbl);
+        }
+
+        const poly = document.createElementNS(svgNs, 'polyline');
+        poly.setAttribute('class', 'pdp-trends-line');
+        poly.setAttribute('points', points.map((p) => `${xPx(p.timestamp)},${yPx(p.value)}`).join(' '));
+        svg.appendChild(poly);
+
+        // Dots only for sparse series (< 60 points). Daily-downloads
+        // series have 365 points — drawing each dot makes the chart
+        // unreadable, the polyline alone tells the story.
+        if (points.length < 60) {
+            for (const p of points) {
+                const dot = document.createElementNS(svgNs, 'circle');
+                dot.setAttribute('class', 'pdp-trends-dot');
+                dot.setAttribute('cx', String(xPx(p.timestamp)));
+                dot.setAttribute('cy', String(yPx(p.value)));
+                dot.setAttribute('r', '2.5');
+                const title = document.createElementNS(svgNs, 'title');
+                title.textContent = p.tooltip;
+                dot.appendChild(title);
+                svg.appendChild(dot);
+            }
+        }
+
+        return svg;
+    }
+
+    /**
+     * Bar chart for releases-per-month. Continuous X axis with one
+     * bar per month over the last 24, labelled at first / mid / last
+     * so the visual cadence is clear without crowding.
+     */
+    private static _barChart(months: {month: string; count: number}[]): SVGElement {
+        const svgNs = 'http://www.w3.org/2000/svg';
+        const W = 560;
+        const H = 180;
+        const PAD_L = 56;
+        const PAD_R = 12;
+        const PAD_T = 12;
+        const PAD_B = 28;
+        const PLOT_W = W - PAD_L - PAD_R;
+        const PLOT_H = H - PAD_T - PAD_B;
+
+        const svg = document.createElementNS(svgNs, 'svg');
+        svg.setAttribute('class', 'pdp-trends-svg');
+        svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+        let max = 0;
+        for (const m of months) {
+            if (m.count > max) {
+                max = m.count;
+            }
+        }
+        const yMax = Math.max(1, PackageDetailPanel._niceCeil(max));
+        const barW = (PLOT_W / months.length) * 0.8;
+        const gap = (PLOT_W / months.length) * 0.2;
+
+        for (const tick of [0, yMax / 2, yMax]) {
+            const y = PAD_T + (1 - tick / yMax) * PLOT_H;
+            const line = document.createElementNS(svgNs, 'line');
+            line.setAttribute('class', 'pdp-trends-grid');
+            line.setAttribute('x1', String(PAD_L));
+            line.setAttribute('y1', String(y));
+            line.setAttribute('x2', String(PAD_L + PLOT_W));
+            line.setAttribute('y2', String(y));
+            svg.appendChild(line);
+            const lbl = document.createElementNS(svgNs, 'text');
+            lbl.setAttribute('class', 'pdp-trends-axis');
+            lbl.setAttribute('x', String(PAD_L - 4));
+            lbl.setAttribute('y', String(y + 3));
+            lbl.setAttribute('text-anchor', 'end');
+            lbl.textContent = String(Math.round(tick));
+            svg.appendChild(lbl);
+        }
+
+        months.forEach((m, i) => {
+            const x = PAD_L + i * (barW + gap) + gap / 2;
+            const h = (m.count / yMax) * PLOT_H;
+            const y = PAD_T + PLOT_H - h;
+            const rect = document.createElementNS(svgNs, 'rect');
+            rect.setAttribute('class', 'pdp-trends-bar');
+            rect.setAttribute('x', String(x));
+            rect.setAttribute('y', String(y));
+            rect.setAttribute('width', String(barW));
+            rect.setAttribute('height', String(h));
+            const title = document.createElementNS(svgNs, 'title');
+            title.textContent = `${m.month}: ${m.count} ${m.count === 1 ? 'release' : 'releases'}`;
+            rect.appendChild(title);
+            svg.appendChild(rect);
+        });
+
+        for (const idx of [0, Math.floor(months.length / 2), months.length - 1]) {
+            const x = PAD_L + idx * (barW + gap) + barW / 2;
+            const lbl = document.createElementNS(svgNs, 'text');
+            lbl.setAttribute('class', 'pdp-trends-axis');
+            lbl.setAttribute('x', String(x));
+            lbl.setAttribute('y', String(PAD_T + PLOT_H + 14));
+            lbl.setAttribute('text-anchor', 'middle');
+            lbl.textContent = months[idx].month;
+            svg.appendChild(lbl);
+        }
+
+        return svg;
+    }
+
+    private static _niceCeil(n: number): number {
+        if (n <= 1) {
+            return 1;
+        }
+        const mag = Math.pow(10, Math.floor(Math.log10(n)));
+        const lead = n / mag;
+        let snap: number;
+        if (lead <= 1) {
+            snap = 1;
+        } else if (lead <= 2) {
+            snap = 2;
+        } else if (lead <= 2.5) {
+            snap = 2.5;
+        } else if (lead <= 5) {
+            snap = 5;
+        } else {
+            snap = 10;
+        }
+        return snap * mag;
+    }
+
+    private static _formatBytes(n: number): string {
+        if (n < 1024) {
+            return `${n} B`;
+        }
+        const units = ['kB', 'MB', 'GB'];
+        let v = n / 1024;
+        let i = 0;
+        while (v >= 1024 && i < units.length - 1) {
+            v /= 1024;
+            i++;
+        }
+        return v >= 100 ? `${Math.round(v)} ${units[i]}` : `${v.toFixed(1)} ${units[i]}`;
+    }
+
+    private static _formatCount(n: number): string {
+        if (n < 1000) {
+            return String(Math.round(n));
+        }
+        if (n < 1_000_000) {
+            const v = n / 1000;
+            return v >= 100 ? `${Math.round(v)}k` : `${v.toFixed(1)}k`;
+        }
+        if (n < 1_000_000_000) {
+            const v = n / 1_000_000;
+            return v >= 100 ? `${Math.round(v)}M` : `${v.toFixed(1)}M`;
+        }
+        const v = n / 1_000_000_000;
+        return v >= 100 ? `${Math.round(v)}G` : `${v.toFixed(1)}G`;
     }
 
     private _renderLicenseBody(report: SecurityReport): HTMLElement {

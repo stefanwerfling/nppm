@@ -172,6 +172,53 @@ export class NpmDownloadsFetcher {
     }
 
     /**
+     * Daily downloads over a fixed window — drives the per-package
+     * Trends tab's downloads line. `period` is npm's own preset
+     * (`last-week` / `last-month` / `last-year`); we don't accept
+     * arbitrary ranges because the upstream API caps a single call
+     * at ~365 days and the preset short-circuits the math.
+     *
+     * Cached under its own key so it doesn't collide with the
+     * `last-week` point fetched by `fetchMany`. Cache TTL applies
+     * (the JsonCache the constructor was given decides).
+     */
+    public async fetchRange(
+        name: string,
+        period: 'last-week'|'last-month'|'last-year' = 'last-year'
+    ): Promise<{day: string; downloads: number}[]|null> {
+        const key = `range_${period}_${name}`;
+        const cached = this._cache.get<{data: {day: string; downloads: number}[]|null}>(key);
+        if (cached) {
+            return cached.data;
+        }
+        let result: {day: string; downloads: number}[]|null = null;
+        try {
+            const url = `${this._baseUrl}/downloads/range/${period}/${name}`;
+            const res = await fetch(url, {headers: {Accept: 'application/json'}});
+            if (res.ok) {
+                const raw = await res.json() as {downloads?: unknown};
+                if (Array.isArray(raw.downloads)) {
+                    result = [];
+                    for (const row of raw.downloads) {
+                        if (row && typeof row === 'object'
+                            && typeof (row as {day?: unknown}).day === 'string'
+                            && typeof (row as {downloads?: unknown}).downloads === 'number') {
+                            result.push({
+                                day: (row as {day: string}).day,
+                                downloads: (row as {downloads: number}).downloads
+                            });
+                        }
+                    }
+                }
+            }
+        } catch {
+            result = null;
+        }
+        this._cache.set(key, {data: result});
+        return result;
+    }
+
+    /**
      * Cache key sanitiser — scoped names contain `/` which JsonCache
      * already maps onto its filename scheme via Cache.set, but adding
      * the `dl_` prefix keeps the downloads pocket distinct from any

@@ -47,6 +47,12 @@ export type RegistryDist = {
      * fall out of the sum (best-effort floor, not authoritative).
      */
     unpackedSize?: number;
+    /**
+     * Number of files in the published tarball — the registry tracks
+     * it alongside `unpackedSize`. Useful as a per-package complexity
+     * signal in the PackageDetailPanel Trends tab.
+     */
+    fileCount?: number;
 };
 
 /**
@@ -330,6 +336,10 @@ export class Registry {
             const sz = (d as {unpackedSize?: unknown}).unpackedSize;
             if (typeof sz === 'number' && Number.isFinite(sz) && sz >= 0) {
                 distEntry.unpackedSize = sz;
+            }
+            const fc = (d as {fileCount?: unknown}).fileCount;
+            if (typeof fc === 'number' && Number.isFinite(fc) && fc >= 0) {
+                distEntry.fileCount = fc;
             }
             out[version] = distEntry;
             any = true;

@@ -10,6 +10,7 @@ import {IntegrityFinding, IntegritySeverity, IntegritySummary} from '../Security
 import {DashboardCell, DashboardColumn, DashboardResponse, ScannerId} from '../Dashboard/DashboardBuilder.js';
 import {DashboardHistoryEntry} from '../Dashboard/DashboardHistoryStore.js';
 import {DashboardGrowth} from '../Dashboard/DashboardGrowthBuilder.js';
+import {PackageTrendsResponse} from '../Package/PackageTrendsBuilder.js';
 import {ImpactReport} from '../Security/ImpactAnalyzer.js';
 import {HeuristicsBatchEntry, SecurityReport} from '../Security/SecurityScanner.js';
 import {PrReviewReport} from '../PrReview/PrReview.js';
@@ -783,6 +784,15 @@ export type ApiDashboardHistoryResponse = {
  * metric.
  */
 export type ApiDashboardGrowthResponse = DashboardGrowth;
+
+/**
+ * Response shape of `GET /api/packages/:name/trends`. Per-version
+ * timeline + releases-by-month histogram (both from the registry
+ * packument cache) + optional daily downloads line (fetched from
+ * the npm public downloads API, cached 24h). Drives the
+ * `PackageDetailPanel` Trends tab.
+ */
+export type ApiPackageTrendsResponse = PackageTrendsResponse;
 
 /**
  * Response shape of `GET /api/projects/:id/integrity`. Lockfile-

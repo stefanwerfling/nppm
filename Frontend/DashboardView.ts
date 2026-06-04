@@ -518,11 +518,11 @@ export class DashboardView {
         wrap.className = 'dash-overall';
 
         wrap.appendChild(this._renderEcosystemCard());
-        wrap.appendChild(this._renderOverallProjects());
-        const pkgsSection = this._renderOverallPackages();
-        if (pkgsSection) {
-            wrap.appendChild(pkgsSection);
-        }
+        // Project-health list and top-problem-packages roll-ups are
+        // intentionally suppressed for now — the hero card carries
+        // the same information in summary form and the modals offer
+        // the drill-down. The `_renderOverall*` helpers stay around
+        // so it's one-line to bring either back.
 
         this._tableHost.appendChild(wrap);
     }

@@ -3478,6 +3478,9 @@ class Server {
                 if (!body.repo || typeof body.repo !== 'string') {
                     return 'repo is required for github projects';
                 }
+                if (Server._normaliseGithubRepo(body.repo) === null) {
+                    return `repo "${body.repo}" must look like "owner/name" or "https://github.com/owner/name"`;
+                }
                 return null;
             case ConfigProjectType.gitea:
                 if (!body.url || typeof body.url !== 'string') {
@@ -3487,6 +3490,25 @@ class Server {
             default:
                 return `unknown project type "${body.type as string}"`;
         }
+    }
+
+    /**
+     * Accept both the short-form `owner/name` the GitHub contents API
+     * actually wants and the long-form `https://github.com/owner/name(.git)?`
+     * users tend to paste from the address bar. Returns the normalised
+     * short form, or `null` when neither shape matches — the
+     * validator surfaces that as a 400.
+     */
+    private static _normaliseGithubRepo(input: string): string|null {
+        const v = input.trim().replace(/\.git$/, '').replace(/\/$/, '');
+        const m = /^(?:https?:\/\/(?:[^@]+@)?github\.com\/|git@github\.com:|git\+https?:\/\/github\.com\/|github:)([^/\s]+)\/([^/\s]+)$/i.exec(v);
+        if (m) {
+            return `${m[1]}/${m[2]}`;
+        }
+        if (/^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9._-]+$/.test(v)) {
+            return v;
+        }
+        return null;
     }
 
     /**
@@ -3502,7 +3524,12 @@ class Server {
         if (body.type === ConfigProjectType.local) {
             out.path = body.path;
         } else if (body.type === ConfigProjectType.github) {
-            out.repo = body.repo;
+            // Normalise full GitHub URLs ("https://github.com/o/r") to
+            // the short form the contents API actually expects; the
+            // validator already accepted the long form, so we just
+            // make sure nppm.json never stores the broken shape.
+            const repoIn = body.repo ?? '';
+            out.repo = Server._normaliseGithubRepo(repoIn) ?? repoIn;
             if (body.ref) {
                 out.ref = body.ref;
             }

@@ -55,10 +55,29 @@ export class ProjectGithub extends ProjectRemote {
         opts: {hidden?: boolean; configIndex?: number; templates?: string[]} = {}
     ) {
         super(displayName, opts);
-        this._repo = repo;
+        // Accept either `owner/repo` or a full github.com URL the user
+        // pasted from the address bar — the contents API only handles
+        // the short form. Normalising here keeps the rest of this
+        // class oblivious to which shape sat in nppm.json.
+        this._repo = ProjectGithub._normaliseRepo(repo);
         this._ref = ref;
         this._token = token;
         this._cache = cache ?? null;
+    }
+
+    /**
+     * Pure parser — mirrors {@link Server._normaliseGithubRepo} but
+     * leaves the input untouched when it doesn't match any known
+     * shape, so a malformed entry produces a clear "package.json
+     * missing" error instead of silently mutating state.
+     */
+    private static _normaliseRepo(input: string): string {
+        const v = input.trim().replace(/\.git$/, '').replace(/\/$/, '');
+        const m = /^(?:https?:\/\/(?:[^@]+@)?github\.com\/|git@github\.com:|git\+https?:\/\/github\.com\/|github:)([^/\s]+)\/([^/\s]+)$/i.exec(v);
+        if (m) {
+            return `${m[1]}/${m[2]}`;
+        }
+        return input;
     }
 
     public getType(): ConfigProjectType {

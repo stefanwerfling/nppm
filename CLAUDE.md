@@ -102,7 +102,16 @@ nppm/
 │   ├── GitHeadFetcher.ts   TTL-cached HEAD-tarball fetcher: resolves the upstream HEAD via GitResolver, lifts `package.json.version` + commit SHA out of the codeload prefix. Returns `GitHeadInfo` carrying an `error` field on failure (`GitHub unreachable: …` not cached, `Repository not found` cached). Per-instance Gitea token routing.
 │   └── GitCommitsFetcher.ts  GitHub REST `/commits` + Gitea v1 `/repos/.../commits` (per-instance token); maps each row into the existing `Release` shape with `sha`, `subject`, `author`. TTL-cached against the releases pocket. Drives /api/releases for git-versions.
 │
-├── Dashboard/DashboardBuilder.ts  per-(project, scanner) scoring helpers — unified info/warn/risk → 0–100 ring score; reused by /api/dashboard/scan
+├── Dashboard/
+│   ├── DashboardBuilder.ts        per-(project, scanner) scoring helpers — unified info/warn/risk → 0–100 ring score; reused by /api/dashboard/scan
+│   ├── DashboardHistoryStore.ts   per-UTC-day JSON in `.nppm-history/dashboard/YYYY-MM-DD.json` (last scan of day wins); summarize() + recordScan() + readRange() + readPrevious(). Drives the Trend tab + macro-donut "↑X pts vs last scan" delta.
+│   ├── DashboardGrowthBuilder.ts  per-project package-count timeline replayed from HistoryStore (baseline = lastSnapshot.length − Σ(added − removed); walk forward emitting points). Carry-forward sum across non-aligned per-project timestamps for ecosystem total. Drives Trend tab "Packages" metric.
+│   ├── InstalledSize.ts           sums `dist.unpackedSize` across a lockfile-derived package set via the packument cache; returns {totalBytes, coveredCount, totalCount} so the UI labels the number as a best-effort floor.
+│   └── DownloadsAggregator.ts     two-layer dedupe: per-project sums distinct names once; ecosystem total dedupes across all projects. Gap = dep-tree-overlap signal.
+│
+├── Downloads/NpmDownloadsFetcher.ts  `api.npmjs.org/downloads/point/last-week/<pkg>` with comma-bulk for unscoped (128-batch) + per-name fetch for scoped; 24h TTL cache; null-envelope for misses. `fetchRange()` for the per-package last-year daily downloads line, cached under a separate key.
+│
+├── Package/PackageTrendsBuilder.ts  folds RegistryPackage → {versions: [{version, releasedAt, unpackedSize, fileCount, publisher, maintainerCount, depCount}], releasesByMonth: [{month, count}]}. Strips aux `created`/`modified` keys from `time` map. Versions without a date sort to the tail.
 │
 ├── DepGraph/DepGraphBuilder.ts  flat-graph walker, npm hoisting algorithm
 ├── History/                per-project change log
@@ -138,7 +147,7 @@ nppm/
 │   ├── UnusedView.ts       per-project depcheck-style report (unused/misplaced/missing)
 │   ├── VulnerabilityTimelineView.ts  retroactive CVE exposure window per name@version
 │   ├── PrReviewView.ts     diffs package.json + lockfile between two git refs
-│   ├── DashboardView.ts    cross-project scanner matrix split into two tabs: **Scanner Score** (rows × cols = scanners × projects, score rings; treeview __dashboard__ sentinel → SSE /api/dashboard/scan; cell click → FindingsModal; header click → project drill-down; snapshot first-paint; per-package progress detail; survives view switches) and **Overall Evaluation** (ecosystem hero card built from `_columns` only — no extra fetch). Emits per-project averages on snapshot load + column-end + scan-end to drive the treeview ring (Dashboard-wins precedence; Matrix is fallback). Manifest-fallback projects render an orange ⓘ next to the column header carrying the `column.note` tooltip.
+│   ├── DashboardView.ts    cross-project scanner matrix split into three tabs: **Scanner Score** (rows × cols = scanners × projects, score rings; treeview __dashboard__ sentinel → SSE /api/dashboard/scan; cell click → FindingsModal; header click → project drill-down; snapshot first-paint; per-package progress detail; survives view switches; header strip above the table renders a 3-segment Macro-Donut with ecosystem avg + "↑X pts vs last scan" delta from `/api/dashboard/history` previous, plus Top-10 Worst Packages aggregated by CellFinding label/severity-weight with row-click → ImpactModal), **Overall Evaluation** (ecosystem hero card built from `_columns` only — no extra fetch), and **Trend** (hand-rolled SVG multi-line chart with 4 metric chips: Score reads dashboard-history `overall`; Packages reads `/api/dashboard/growth`; Size reads history-entry `totalSizeBytes` + `perProject[].sizeBytes`; Downloads reads `totalDownloadsLastWeek` + `perProject[].downloadsLastWeek`. Range chips 30d/90d/365d. Per-project lines + heavier overall line. Dynamic Y-axis with `_niceCeil`. Old entries without a metric drop out via `typeof === 'number'` filter — no migration needed). Emits per-project averages on snapshot load + column-end + scan-end to drive the treeview ring (Dashboard-wins precedence; Matrix is fallback). Manifest-fallback projects render an orange ⓘ next to the column header carrying the `column.note` tooltip.
 │   ├── EcosystemBoxModal.ts  detail modal for the Overall-Evaluation hero card boxes. Dispatches on box id and renders the matching breakdown: project lists (Projects / Healthy / At-risk, with "Open in Matrix" CTA), per-scanner averages (Ecosystem health), per-scanner severity counts (Info / Risk roll-ups), per-package lists with project attribution (CVE / Deprecated / Maintainer / Typosquat). Package rows aren't clickable — cross-project matrix is the drill surface.
 │   ├── FindingsModal.ts    drill-down modal on Dashboard cell click — scanner label + project + top-50 findings + "Open in <view>" for cve/integrity/unused/template
 │   ├── ImpactModal.ts      cross-project blast-radius modal (topbar "Impact" button → /api/impact)
@@ -153,7 +162,7 @@ nppm/
 │   ├── WorkspaceDriftModal.ts  per-project breakdown for the matrix `WS` badge + "Open project matrix" jump
 │   ├── EditorUrl.ts        URL-handler templates for vscode/vscodium/cursor/phpstorm/webstorm/idea/subl
 │   ├── GlobalScanView.ts   SSE-driven global scan results
-│   ├── PackageDetailPanel.ts  modal w/ 5 tabs (Files/Deps/Diff/Releases/Security)
+│   ├── PackageDetailPanel.ts  modal w/ 7 tabs (Files/Deps/Diff/Releases/Security/License/Trends). Trends tab renders 5 hand-rolled SVG sub-charts from `/api/packages/:name/trends`: unpacked-size/version, maintainer-count/version, direct-deps/version, releases/month (back-filled 24m bars), daily downloads (last-year polyline, dots dropped above 60 points). Each sub-chart has an info `i` icon next to the heading with a viewport-safe tooltip (mirrors DashboardView `_wireTooltip` pattern).
 │   ├── Treeview.ts         left-pane project list
 │   ├── Resizer.ts          splitter logic
 │   ├── Api.ts              `fetch()` wrapper
@@ -193,8 +202,11 @@ nppm/
 | GET    | `/api/projects/:id/matrix`                            | per-project matrix |
 | GET    | `/api/projects/:id/depgraph`                          | flat resolved dep graph |
 | GET    | `/api/impact?name=&version=`                          | cross-project blast-radius: every reachable instance of `name`, direct + transitive, with shortest dep path |
-| GET    | `/api/dashboard/scan`                                 | SSE: per-(project, scanner) score matrix — emits `start` / `column-start` / `progress` / `cell` / `column-end` / `end`, drives the Dashboard view's progress bar (cold cache ≈ 1 min) |
+| GET    | `/api/dashboard/scan`                                 | SSE: per-(project, scanner) score matrix — emits `start` / `column-start` / `progress` / `cell` / `column-end` / `end`, drives the Dashboard view's progress bar (cold cache ≈ 1 min). Post-loop fetches per-package downloads and attaches per-project `downloadsLastWeek` + ecosystem-deduped total to the response. |
 | GET    | `/api/dashboard/snapshot`                             | last persisted scan result (`.nppm-cache/dashboard-snapshot.json`), or `{snapshot:null,timestamp:null}` when none — drives the Dashboard view's first-paint |
+| GET    | `/api/dashboard/history?days=`                        | rolling daily history `{entries, previous}` from `.nppm-history/dashboard/YYYY-MM-DD.json`; entries clipped to `days` (default 90, clamp 1..3650); `previous` is the entry immediately before the most-recent regardless of range. Drives the Trend tab (Score metric) + macro-donut delta. |
+| GET    | `/api/dashboard/growth?days=`                        | per-project package-count timelines `{series, total}` reconstructed from per-project HistoryStore replays; carry-forward ecosystem total. Drives the Trend tab (Packages metric). |
+| GET    | `/api/packages/:name/trends`                          | per-version timeline (size/files/publisher/maintainer/dep counts) from the packument cache + releases-by-month + last-year daily downloads. Drives the PackageDetailPanel Trends tab. |
 | GET    | `/api/projects/:id/unused`                            | depcheck-style hygiene scan (unused / misplaced / missing) |
 | GET    | `/api/projects/:id/sbom?format=cyclonedx\|spdx`       | Software Bill of Materials (default: cyclonedx) |
 | GET    | `/api/projects/:id/vulnerability-timeline`            | retroactive CVE-exposure timeline (cache-only read) |

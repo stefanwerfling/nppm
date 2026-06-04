@@ -114,11 +114,12 @@ export type SecurityReport = {
      */
     ignoreScripts: IgnoreScriptsFinding;
     /**
-     * Typosquat / homoglyph classification. Always present — pure
-     * derivation from the package name against a curated popular
-     * list, no I/O.
+     * Typosquat / homoglyph classification. `null` for git-installed
+     * deps — those share their name with whatever's on npm, but the
+     * user owns the code, so flagging a Levenshtein-1 collision would
+     * be a false positive.
      */
-    typosquat: TyposquatFinding;
+    typosquat: TyposquatFinding|null;
     /**
      * Aggregated external-source reputation findings (socket.dev,
      * OpenSSF Scorecard, deps.dev). Always present; `findings: []`
@@ -286,25 +287,29 @@ export class SecurityScanner {
         const manifestRedFlags = ManifestRedFlagsScanner.classify(fingerprint?.manifest ?? null);
         const capability = fingerprint ? CapabilityScanner.scan(fingerprint.files) : null;
 
-        // Prefer the manifest license (per-version, can differ between
-        // releases) over the packument license (top-level, version-
-        // agnostic). Both fall back to `null` if neither is present.
-        const spdx = fingerprint?.manifest?.license ?? reg?.license ?? null;
-        const provenance = ProvenanceScanner.classify(reg?.dist?.[version]);
         // Git-installed packages don't correspond to the registry
         // entry of the same name — the npm-published `figtree` could
         // be a 10-year-old unrelated package while the user installs
-        // from `github:owner/figtree`. Skip the name-keyed scanners
-        // (cadence + freshness) so the matrix doesn't flag a
-        // brand-new git dep as abandoned.
+        // from `github:owner/figtree`. Skip every name-keyed
+        // registry-derived scanner so the matrix doesn't flag a
+        // brand-new git dep based on someone else's package.
         const isGit = GitResolver.isGitVersion(version);
+
+        // Prefer the manifest license (per-version, can differ between
+        // releases) over the packument license (top-level, version-
+        // agnostic). For git deps the packument belongs to an
+        // unrelated package, so the fallback is suppressed.
+        const spdx = fingerprint?.manifest?.license
+            ?? (isGit ? null : reg?.license)
+            ?? null;
+        const provenance = isGit ? null : ProvenanceScanner.classify(reg?.dist?.[version]);
         const freshness = isGit ? null : FreshnessScanner.classify({
             firstPublishedAt: reg?.time?.created ?? null,
             maintainerCreatedAt: maintainer?.currentPublisherCreatedAt ?? null
         });
         const cadence = isGit ? null : CadenceScanner.classify(reg?.time);
         const ignoreScripts = IgnoreScriptsScanner.classify(scriptFindings);
-        const typosquat = TyposquatScanner.classify(name);
+        const typosquat = isGit ? null : TyposquatScanner.classify(name);
         const deprecation = isGit ? null : DeprecationScanner.classify(version, reg);
 
         return {
@@ -415,7 +420,15 @@ export class SecurityScanner {
                     externalP
                 ]);
 
-                const spdx = fingerprint?.manifest?.license ?? reg?.license ?? null;
+                // Git deps share a name with whatever was pushed to
+                // npm under the same identifier; the registry packument
+                // belongs to that unrelated package. Suppress every
+                // packument-derived fallback so the matrix doesn't
+                // report a foreign package's license or provenance.
+                const isGit = GitResolver.isGitVersion(pkg.version);
+                const spdx = fingerprint?.manifest?.license
+                    ?? (isGit ? null : reg?.license)
+                    ?? null;
                 const licenseFinding = this._license.classify(spdx);
 
                 const scriptFindings = ScriptScanner.scan(fingerprint?.manifest ?? null);
@@ -465,7 +478,7 @@ export class SecurityScanner {
                     provenance: {
                         name: pkg.name,
                         version: pkg.version,
-                        level: ProvenanceScanner.classify(reg?.dist?.[pkg.version])?.level ?? null
+                        level: isGit ? null : (ProvenanceScanner.classify(reg?.dist?.[pkg.version])?.level ?? null)
                     },
                     freshness: SecurityScanner._freshnessSummary(
                         pkg.name, pkg.version,
@@ -519,13 +532,15 @@ export class SecurityScanner {
         name: string,
         version: string
     ): TyposquatSummary {
-        const finding = TyposquatScanner.classify(name);
+        const finding = GitResolver.isGitVersion(version)
+            ? null
+            : TyposquatScanner.classify(name);
         return {
             name,
             version,
-            level: finding.level,
-            closestMatch: finding.closestMatch,
-            hasConfusables: finding.hasConfusables
+            level: finding?.level ?? null,
+            closestMatch: finding?.closestMatch ?? null,
+            hasConfusables: finding?.hasConfusables ?? false
         };
     }
 

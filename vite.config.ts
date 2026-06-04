@@ -2077,15 +2077,30 @@ class Server {
                                 // Unique package list — same dedup MatrixBuilder
                                 // and the OSV-all stream apply, so the per-package
                                 // batches don't redo work for hoisted duplicates.
+                                //
+                                // Git-sourced deps need the resolved URL as the
+                                // version coordinate, otherwise the scanners see
+                                // the inner semver (`figtree@1.0.21`) and happily
+                                // fetch the unrelated public npm package of the
+                                // same name. The semver is kept around as
+                                // `displayVersion` purely for the user-facing
+                                // label.
                                 const seen = new Set<string>();
-                                const packages: {name: string; version: string}[] = [];
+                                const packages: {name: string; version: string; displayVersion: string}[] = [];
                                 for (const pkg of lockfile.packages) {
-                                    const key = `${pkg.name}@${pkg.version}`;
+                                    const useGitUrl = pkg.resolved
+                                        && GitResolver.isGitVersion(pkg.resolved);
+                                    const scanVersion = useGitUrl ? pkg.resolved! : pkg.version;
+                                    const key = `${pkg.name}@${scanVersion}`;
                                     if (seen.has(key)) {
                                         continue;
                                     }
                                     seen.add(key);
-                                    packages.push({name: pkg.name, version: pkg.version});
+                                    packages.push({
+                                        name: pkg.name,
+                                        version: scanVersion,
+                                        displayVersion: pkg.version
+                                    });
                                 }
                                 const packageCount = packages.length;
 
@@ -2138,8 +2153,12 @@ class Server {
 
                                 for (let i = 0; i < packages.length; i++) {
                                     const h = heuristics[i];
-                                    const label = `${packages[i].name}@${packages[i].version}`;
-                                    const pkgKey = label;
+                                    // Label uses the human-readable semver (e.g.
+                                    // `figtree@1.0.21`); the OSV map is keyed by the
+                                    // exact coordinate that was queried, which for
+                                    // git deps is the resolved git URL.
+                                    const label = `${packages[i].name}@${packages[i].displayVersion}`;
+                                    const pkgKey = `${packages[i].name}@${packages[i].version}`;
                                     const osvIds = osvMap.get(pkgKey) ?? null;
 
                                     const cve = DashboardBuilder.cveSeverity(osvIds);
@@ -2440,12 +2459,20 @@ class Server {
                             const lockfile = await project.loadLockfile();
                             if (lockfile) {
                                 for (const pkg of lockfile.packages) {
-                                    const key = `${pkg.name}@${pkg.version}`;
+                                    // Git-sourced deps use the resolved URL
+                                    // as their canonical coordinate so OSV
+                                    // skips them cleanly instead of asking
+                                    // about an unrelated public package of
+                                    // the same name.
+                                    const useGitUrl = pkg.resolved
+                                        && GitResolver.isGitVersion(pkg.resolved);
+                                    const version = useGitUrl ? pkg.resolved! : pkg.version;
+                                    const key = `${pkg.name}@${version}`;
                                     let entry = byKey.get(key);
                                     if (!entry) {
                                         entry = {
                                             name: pkg.name,
-                                            version: pkg.version,
+                                            version,
                                             projects: new Set()
                                         };
                                         byKey.set(key, entry);
@@ -2566,16 +2593,21 @@ class Server {
                     // Dedupe — the same package can appear multiple times
                     // in nested installs (`node_modules/a/node_modules/b`)
                     // but we only need to ask OSV once per `name@version`.
+                    // Git-sourced deps query under their resolved URL so
+                    // OSV skips them without asking npm about a foreign
+                    // same-named package.
                     const seen = new Set<string>();
                     const queue: {name: string; version: string}[] = [];
 
                     for (const p of lockfile.packages) {
-                        const key = `${p.name}@${p.version}`;
+                        const useGitUrl = p.resolved && GitResolver.isGitVersion(p.resolved);
+                        const version = useGitUrl ? p.resolved! : p.version;
+                        const key = `${p.name}@${version}`;
                         if (seen.has(key)) {
                             continue;
                         }
                         seen.add(key);
-                        queue.push({name: p.name, version: p.version});
+                        queue.push({name: p.name, version});
                     }
 
                     send('start', {total: queue.length});

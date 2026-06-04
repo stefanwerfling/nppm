@@ -126,6 +126,47 @@ describe('SecurityScanner.scanHeuristicsBatch', () => {
         expect(entries[0].freshness.packageAgeDays).toBeNull();
     });
 
+    it('does not borrow license, provenance or typosquat from an unrelated npm package for git deps', async () => {
+        // The user's `figtree` lives only on GitHub; the npm registry
+        // has an unrelated 11-year-old `figtree` from a different
+        // author with `license: UNLICENSED`, a `dist` entry, and a
+        // name that's Levenshtein-1 to a popular package. None of
+        // those signals belong to the user's package — the report
+        // must show neither the foreign license, nor a provenance
+        // verdict, nor a typosquat finding.
+        const builder = new FingerprintBuilder(null, async () => null);
+        const osv = new OsvClient(null, async () => ({vulns: []}));
+        const cache = new JsonCache('/tmp/nppm-noop-' + Math.random().toString(36).slice(2), 60);
+        await cache.set('reg_figtree', {
+            data: {
+                name: 'figtree',
+                license: 'UNLICENSED',
+                'dist-tags': {latest: '0.0.0'},
+                versions: {},
+                dist: {
+                    '0.0.0': {
+                        tarball: 'https://registry.npmjs.org/figtree/-/figtree-0.0.0.tgz',
+                        signatures: [{keyid: 'k', sig: 's'}]
+                    }
+                },
+                time: {created: '2015-01-03T13:21:21.270Z', '0.0.0': '2015-01-03T13:21:21.270Z'}
+            }
+        });
+        const registry = new Registry('http://unused', cache);
+        const scanner = new SecurityScanner(osv, builder, registry);
+
+        const entries = await scanner.scanHeuristicsBatch([
+            {name: 'figtree', version: 'github:user/figtree'}
+        ]);
+
+        expect(entries[0].license.spdx).toBeNull();
+        expect(entries[0].license.severity).toBe('unknown');
+        expect(entries[0].provenance.level).toBeNull();
+        expect(entries[0].typosquat.level).toBeNull();
+        expect(entries[0].typosquat.closestMatch).toBeNull();
+        expect(entries[0].typosquat.hasConfusables).toBe(false);
+    });
+
     it('respects the concurrency bound (does not fire all in parallel)', async () => {
         let inflight = 0;
         let peak = 0;

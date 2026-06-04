@@ -192,8 +192,17 @@ export class IntegrityScanner {
         for (const p of packages) {
             // Skip non-registry installs — git/file URLs aren't
             // anchored in the registry; comparing integrity makes no
-            // sense.
-            if (!p.name || !p.version || GitResolver.isGitVersion(p.version)) {
+            // sense. The check has to cover both `p.version`
+            // (`"figtree": "git+…"` in the manifest) and `p.resolved`
+            // (lockfile entry resolved to a git tarball but reporting
+            // the inner semver `1.0.21` as version).
+            if (!p.name || !p.version) {
+                continue;
+            }
+            if (GitResolver.isGitVersion(p.version)) {
+                continue;
+            }
+            if (p.resolved && GitResolver.isGitVersion(p.resolved)) {
                 continue;
             }
             const key = `${p.name}@${p.version}`;

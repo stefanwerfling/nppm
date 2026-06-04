@@ -1100,8 +1100,9 @@ export class PackageDetailPanel {
      * warn + risk we surface the closest popular match and the
      * confusable flag explicitly.
      */
-    private _renderTyposquatSection(finding: TyposquatFinding): HTMLElement {
-        if (finding.level === TyposquatLevel.exact
+    private _renderTyposquatSection(finding: TyposquatFinding|null): HTMLElement {
+        if (finding === null
+            || finding.level === TyposquatLevel.exact
             || finding.level === TyposquatLevel.unrelated) {
             // Returning an empty <div> keeps the appendChild chain
             // simple while contributing no visible content.

@@ -656,14 +656,12 @@ export class PackageDetailPanel {
             wrap.appendChild(hint);
         }
 
-        // Commits mode (git deps): we render only the first
-        // INITIAL_COUNT cards and let the user expand on demand. The
-        // marker is `sha` — set by /api/releases when the backend
-        // routed through GitCommitsFetcher; absent for npm releases.
-        const isCommitsMode = data.releases.some((r) => r.sha);
+        // Render only the first INITIAL_COUNT cards by default and
+        // let the user expand on demand. Applies to both commits
+        // (git deps) and npm registry releases — long histories
+        // benefit equally from the collapse.
         const INITIAL_COUNT = 5;
-        const collapse = isCommitsMode
-            && !this._releasesShowAll
+        const collapse = !this._releasesShowAll
             && data.releases.length > INITIAL_COUNT;
         const visible = collapse ? data.releases.slice(0, INITIAL_COUNT) : data.releases;
 

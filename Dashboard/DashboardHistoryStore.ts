@@ -21,6 +21,14 @@ export type DashboardHistoryEntry = {
      * deps, …). Drives the Dashboard Trend tab's "Size" metric.
      */
     totalSizeBytes: number|null;
+    /**
+     * Ecosystem-deduped sum of last-week npm download counts across
+     * every distinct package name installed by *any* project. A name
+     * shared by three projects is counted once here — the metric
+     * tracks the reach of the deduplicated dep tree, not its
+     * cumulative ownership.
+     */
+    totalDownloadsLastWeek: number|null;
     perProject: {
         unid: string;
         name: string;
@@ -33,6 +41,13 @@ export type DashboardHistoryEntry = {
          * silently skipped from the sum.
          */
         sizeBytes: number|null;
+        /**
+         * Within-project deduped sum of last-week downloads. A package
+         * pulled through multiple paths counts once. `null` when not
+         * computed at scan time (e.g. the column errored before the
+         * downloads fetch ran).
+         */
+        downloadsLastWeek: number|null;
     }[];
     perScanner: {scanner: ScannerId; avg: number|null}[];
 };
@@ -63,8 +78,14 @@ export class DashboardHistoryStore {
      * persist it under the timestamp's UTC date. Failure to write is
      * non-fatal — the caller decides whether to surface it.
      */
-    public recordScan(dashboard: DashboardResponse, timestampIso: string): DashboardHistoryEntry {
-        const entry = DashboardHistoryStore.summarize(dashboard, timestampIso);
+    public recordScan(
+        dashboard: DashboardResponse,
+        timestampIso: string,
+        ecosystemDownloadsDeduped: number|null = null
+    ): DashboardHistoryEntry {
+        const entry = DashboardHistoryStore.summarize(
+            dashboard, timestampIso, ecosystemDownloadsDeduped
+        );
         const file = path.join(this._dir, `${DashboardHistoryStore._dateKey(timestampIso)}.json`);
         const tmp = `${file}.tmp`;
         fs.writeFileSync(tmp, JSON.stringify(entry));
@@ -148,13 +169,18 @@ export class DashboardHistoryStore {
      * disk — and so the route handler can build the in-memory entry
      * for the SSE end event without a round-trip through disk.
      */
-    public static summarize(dashboard: DashboardResponse, timestampIso: string): DashboardHistoryEntry {
-        const perProject: {unid: string; name: string; avg: number|null; sizeBytes: number|null}[] = [];
+    public static summarize(
+        dashboard: DashboardResponse,
+        timestampIso: string,
+        ecosystemDownloadsDeduped: number|null = null
+    ): DashboardHistoryEntry {
+        const perProject: {unid: string; name: string; avg: number|null; sizeBytes: number|null; downloadsLastWeek: number|null}[] = [];
         const scannerSum = new Map<ScannerId, {sum: number; n: number}>();
         let overallSum = 0;
         let overallN = 0;
         let totalSize = 0;
         let anySize = false;
+        let anyDownloads = false;
 
         for (const col of dashboard.columns) {
             let projSum = 0;
@@ -183,7 +209,19 @@ export class DashboardHistoryStore {
                 totalSize += sizeBytes;
                 anySize = true;
             }
-            perProject.push({unid: col.project.unid, name: col.project.name, avg, sizeBytes});
+            const downloadsLastWeek = typeof col.downloadsLastWeek === 'number'
+                ? col.downloadsLastWeek
+                : null;
+            if (downloadsLastWeek !== null) {
+                anyDownloads = true;
+            }
+            perProject.push({
+                unid: col.project.unid,
+                name: col.project.name,
+                avg,
+                sizeBytes,
+                downloadsLastWeek
+            });
         }
 
         const perScanner: {scanner: ScannerId; avg: number|null}[] = [];
@@ -192,10 +230,25 @@ export class DashboardHistoryStore {
         }
         perScanner.sort((a, b) => a.scanner.localeCompare(b.scanner));
 
+        // Total downloads prefers the caller's deduped value (only
+        // it knows the per-name dedupe across the whole fleet).
+        // Falls back to the per-project sum only when the caller has
+        // no downloads info at all — gives the metric *some* shape
+        // for tests / future paths that don't compute downloads.
+        let totalDl: number|null = null;
+        if (ecosystemDownloadsDeduped !== null) {
+            totalDl = ecosystemDownloadsDeduped;
+        } else if (anyDownloads) {
+            totalDl = perProject.reduce(
+                (s, p) => s + (p.downloadsLastWeek ?? 0), 0
+            );
+        }
+
         return {
             timestamp: timestampIso,
             overall: overallN > 0 ? Math.round(overallSum / overallN) : null,
             totalSizeBytes: anySize ? totalSize : null,
+            totalDownloadsLastWeek: totalDl,
             perProject,
             perScanner
         };

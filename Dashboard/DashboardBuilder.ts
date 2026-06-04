@@ -157,6 +157,13 @@ export type DashboardColumn = {
      * knows the number is conservative.
      */
     sizeCoverage?: {covered: number; total: number};
+    /**
+     * Sum of last-week npm download counts for every *distinct*
+     * package name in this project (within-project dedupe — a name
+     * pulled through multiple paths counts once). Best-effort:
+     * names absent from the npm public downloads API contribute zero.
+     */
+    downloadsLastWeek?: number;
 };
 
 export type DashboardResponse = {

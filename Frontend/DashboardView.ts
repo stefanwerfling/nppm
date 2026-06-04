@@ -67,7 +67,7 @@ export class DashboardView {
     private _historyEntries: DashboardHistoryEntry[] = [];
     private _growth: ApiDashboardGrowthResponse|null = null;
     private _trendRangeDays: 30|90|365 = 90;
-    private _trendMetric: 'score'|'packages'|'size' = 'score';
+    private _trendMetric: 'score'|'packages'|'size'|'downloads' = 'score';
     private _widgetStripHost: HTMLElement|null = null;
 
     constructor(root: HTMLElement) {
@@ -1320,10 +1320,11 @@ export class DashboardView {
         metricLabel.className = 'dash-trend-controls-label';
         metricLabel.textContent = I18n.t('Metric:');
         metrics.appendChild(metricLabel);
-        const metricOpts: {value: 'score'|'packages'|'size'; label: string}[] = [
+        const metricOpts: {value: 'score'|'packages'|'size'|'downloads'; label: string}[] = [
             {value: 'score', label: I18n.t('Score')},
             {value: 'packages', label: I18n.t('Packages')},
-            {value: 'size', label: I18n.t('Size')}
+            {value: 'size', label: I18n.t('Size')},
+            {value: 'downloads', label: I18n.t('Downloads')}
         ];
         for (const m of metricOpts) {
             const btn = document.createElement('button');
@@ -1404,7 +1405,7 @@ export class DashboardView {
                 return;
             }
             wrap.appendChild(this._renderGrowthChart(this._growth));
-        } else {
+        } else if (this._trendMetric === 'size') {
             // size — derived from the same DashboardHistoryEntry payload
             // the score chart reads. `typeof === 'number'` so older
             // entries persisted before the size field was added (where
@@ -1418,6 +1419,19 @@ export class DashboardView {
                 return;
             }
             wrap.appendChild(this._renderSizeChart(sized));
+        } else {
+            // downloads
+            const dl = this._historyEntries.filter(
+                (e) => typeof e.totalDownloadsLastWeek === 'number'
+            );
+            if (dl.length === 0) {
+                wrap.appendChild(DashboardView._renderTrendEmpty(
+                    I18n.t('No downloads data yet — older scans pre-date the downloads metric. Re-scan to populate it.')
+                ));
+                this._tableHost.appendChild(wrap);
+                return;
+            }
+            wrap.appendChild(this._renderDownloadsChart(dl));
         }
 
         this._tableHost.appendChild(wrap);
@@ -1556,6 +1570,77 @@ export class DashboardView {
             overallLabel: I18n.t('Ecosystem total'),
             valueFormatter: (v) => DashboardView._formatBytes(v)
         });
+    }
+
+    /**
+     * Downloads-per-week chart. Reads `perProject[].downloadsLastWeek`
+     * + `totalDownloadsLastWeek` from the history payload. Y axis
+     * auto-scaled; value formatter shows abbreviated counts (k / M).
+     */
+    private _renderDownloadsChart(entries: DashboardHistoryEntry[]): SVGElement {
+        type Pt = {timestamp: string; value: number};
+        const seriesByUnid = new Map<string, {unid: string; name: string; points: Pt[]}>();
+        for (const e of entries) {
+            for (const p of e.perProject) {
+                if (typeof p.downloadsLastWeek !== 'number') {
+                    continue;
+                }
+                let s = seriesByUnid.get(p.unid);
+                if (!s) {
+                    s = {unid: p.unid, name: p.name, points: []};
+                    seriesByUnid.set(p.unid, s);
+                }
+                s.points.push({timestamp: e.timestamp, value: p.downloadsLastWeek});
+            }
+        }
+        const overall: Pt[] = entries
+            .filter((e) => typeof e.totalDownloadsLastWeek === 'number')
+            .map((e) => ({timestamp: e.timestamp, value: e.totalDownloadsLastWeek as number}));
+        let max = 0;
+        for (const s of seriesByUnid.values()) {
+            for (const p of s.points) {
+                if (p.value > max) {
+                    max = p.value;
+                }
+            }
+        }
+        for (const p of overall) {
+            if (p.value > max) {
+                max = p.value;
+            }
+        }
+        const yMax = DashboardView._niceCeil(Math.max(max, 1));
+        const yTicks = [0, Math.round(yMax * 0.25), Math.round(yMax * 0.5), Math.round(yMax * 0.75), yMax];
+        return this._renderChartSvg({
+            series: Array.from(seriesByUnid.values()),
+            overall,
+            yMin: 0,
+            yMax,
+            yTicks,
+            overallLabel: I18n.t('Ecosystem total (deduplicated)'),
+            valueFormatter: (v) => DashboardView._formatCount(v)
+        });
+    }
+
+    /**
+     * Abbreviated count formatter — 12_345 → "12.3k", 9_876_543 →
+     * "9.9M". Below 1000 we render the raw integer so the gridlines
+     * don't pretend precision the data doesn't have.
+     */
+    private static _formatCount(n: number): string {
+        if (n < 1000) {
+            return String(Math.round(n));
+        }
+        if (n < 1_000_000) {
+            const v = n / 1000;
+            return v >= 100 ? `${Math.round(v)}k` : `${v.toFixed(1)}k`;
+        }
+        if (n < 1_000_000_000) {
+            const v = n / 1_000_000;
+            return v >= 100 ? `${Math.round(v)}M` : `${v.toFixed(1)}M`;
+        }
+        const v = n / 1_000_000_000;
+        return v >= 100 ? `${Math.round(v)}G` : `${v.toFixed(1)}G`;
     }
 
     /**

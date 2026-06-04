@@ -77,6 +77,8 @@ import {CellFinding, DashboardBuilder, DashboardCell, DashboardColumn, ScannerId
 import {DashboardHistoryStore} from './Dashboard/DashboardHistoryStore.js';
 import {DashboardGrowthBuilder, GrowthProjectInput} from './Dashboard/DashboardGrowthBuilder.js';
 import {InstalledSize} from './Dashboard/InstalledSize.js';
+import {DownloadsAggregator} from './Dashboard/DownloadsAggregator.js';
+import {NpmDownloadsFetcher} from './Downloads/NpmDownloadsFetcher.js';
 import {DepGraphBuilder} from './DepGraph/DepGraphBuilder.js';
 import {ImpactAnalyzer, ImpactProjectReport} from './Security/ImpactAnalyzer.js';
 import {MatrixBuilder} from './Matrix/MatrixBuilder.js';
@@ -270,6 +272,14 @@ class Server {
             const dashboardHistoryStore = new DashboardHistoryStore(
                 path.join(historyDir, 'dashboard')
             );
+
+            // npm public downloads API — drives the Dashboard Trend
+            // tab's "Downloads" metric. Cached in its own pocket
+            // (`downloads/`) with a 24h TTL since the API exposes
+            // last-week counts that shift daily; permanent caching
+            // would lock in stale numbers.
+            const downloadsCache = new JsonCache(path.join(cacheDir, 'downloads'), 60 * 24);
+            const downloadsFetcher = new NpmDownloadsFetcher(downloadsCache);
 
             // Templates catalogue. Lives next to nppm.json in
             // `nppm-templates/<id>/template.json` (one folder per
@@ -2150,6 +2160,10 @@ class Server {
                 const totalCells = projectEntries.length * SCANNER_IDS.length;
                 const columns: DashboardColumn[] = [];
                 let cellsDone = 0;
+                // Per-project name set, collected as each column is
+                // built, so the downloads pass after the loop can do
+                // one big batched fetch.
+                const projectNames = new Map<string, string[]>();
 
                 send('start', {scanners: SCANNER_IDS, totalProjects: projectEntries.length});
 
@@ -2283,6 +2297,13 @@ class Server {
 
                             if (packages.length > 0) {
                                 const packageCount = packages.length;
+
+                                // Stash the distinct package names for
+                                // the post-loop downloads fetch — git
+                                // coordinates' `displayVersion` may be
+                                // a URL but the *name* is the registry
+                                // identifier the downloads API uses.
+                                projectNames.set(unid, packages.map((p) => p.name));
 
                                 // Installed-size aggregate over the
                                 // *display* (registry-semver) versions so
@@ -2623,6 +2644,54 @@ class Server {
                     }
 
                     if (!aborted) {
+                        // Downloads pass — collect every distinct name
+                        // installed by any project, batch-fetch from the
+                        // npm public downloads API, then fold into per-
+                        // project sums (within-project deduped) +
+                        // ecosystem-deduped total. Best-effort: a network
+                        // failure here just leaves the downloads fields
+                        // unset on the columns.
+                        let ecosystemDownloads: number|null = null;
+                        try {
+                            const everyName = new Set<string>();
+                            for (const ns of projectNames.values()) {
+                                for (const n of ns) {
+                                    everyName.add(n);
+                                }
+                            }
+                            if (everyName.size > 0) {
+                                send('progress', {
+                                    current: cellsDone,
+                                    total: totalCells,
+                                    projectName: '',
+                                    scanner: null,
+                                    detail: `Fetching weekly downloads for ${everyName.size} distinct package(s)`
+                                });
+                                const downloadsByName = await downloadsFetcher.fetchMany(
+                                    Array.from(everyName),
+                                    (fetched, total) => {
+                                        send('progress', {
+                                            current: cellsDone,
+                                            total: totalCells,
+                                            projectName: '',
+                                            scanner: null,
+                                            detail: `Fetching weekly downloads (${fetched}/${total})`
+                                        });
+                                    }
+                                );
+                                const folded = DownloadsAggregator.fold(projectNames, downloadsByName);
+                                for (const col of columns) {
+                                    const v = folded.perProject.get(col.project.unid);
+                                    if (typeof v === 'number') {
+                                        col.downloadsLastWeek = v;
+                                    }
+                                }
+                                ecosystemDownloads = folded.ecosystemDeduped;
+                            }
+                        } catch (e) {
+                            console.warn(`nppm: dashboard downloads fetch failed: ${(e as Error).message}`);
+                        }
+
                         const dashboard: ApiDashboardResponse = {
                             scanners: [...SCANNER_IDS],
                             columns
@@ -2645,7 +2714,9 @@ class Server {
                             // compact daily record powering the Trend tab
                             // + macro-donut delta.
                             try {
-                                dashboardHistoryStore.recordScan(dashboard, payload.timestamp!);
+                                dashboardHistoryStore.recordScan(
+                                    dashboard, payload.timestamp!, ecosystemDownloads
+                                );
                             } catch (e) {
                                 console.warn(`nppm: dashboard history save failed: ${(e as Error).message}`);
                             }

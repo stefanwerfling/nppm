@@ -43,13 +43,24 @@ describe('DashboardHistoryStore', () => {
         ]);
         const entry = DashboardHistoryStore.summarize(dashboard, '2026-06-04T10:00:00Z');
         expect(entry.perProject).toEqual([
-            {unid: 'a', name: 'projA', avg: 90, sizeBytes: null},
-            {unid: 'b', name: 'projB', avg: 50, sizeBytes: null}
+            {unid: 'a', name: 'projA', avg: 90, sizeBytes: null, downloadsLastWeek: null},
+            {unid: 'b', name: 'projB', avg: 50, sizeBytes: null, downloadsLastWeek: null}
         ]);
         expect(entry.perScanner.find((s) => s.scanner === 'cve')?.avg).toBe(65);
         expect(entry.perScanner.find((s) => s.scanner === 'license')?.avg).toBe(75);
         expect(entry.overall).toBe(70);
         expect(entry.totalSizeBytes).toBeNull();
+        expect(entry.totalDownloadsLastWeek).toBeNull();
+    });
+
+    it('records ecosystem-deduped downloads when the caller provides one', () => {
+        const dashboard = mkDashboard([
+            {unid: 'a', name: 'projA', cells: {cve: 90}}
+        ]);
+        const entry = DashboardHistoryStore.summarize(
+            dashboard, '2026-06-04T10:00:00Z', 1_234_567
+        );
+        expect(entry.totalDownloadsLastWeek).toBe(1_234_567);
     });
 
     it('aggregates totalSizeBytes when column-level sizeBytes are present', () => {

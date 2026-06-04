@@ -1110,7 +1110,10 @@ class Server {
                 try {
                     const graph = await DepGraphBuilder.build(req.params.id, project, registry, securityCache);
                     if (!graph) {
-                        res.status(404).json({success: false, msg: 'Kein Lockfile vorhanden'});
+                        res.status(404).json({
+                            success: false,
+                            msg: 'No lockfile available for this project — commit package-lock.json or use a local project'
+                        });
                         return;
                     }
                     res.status(200).json(graph);
@@ -2659,7 +2662,7 @@ class Server {
                     const lockfile = await project.loadLockfile();
 
                     if (!lockfile) {
-                        send('error', {msg: 'Kein package-lock.json in diesem Projekt.'});
+                        send('error', {msg: 'No package-lock.json in this project.'});
                         res.end();
                         return;
                     }

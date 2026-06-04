@@ -318,7 +318,21 @@ export class Api {
         const res = await fetch(url);
 
         if (!res.ok) {
-            throw new Error(`${url} → ${res.status} ${res.statusText}`);
+            // Most write/error responses ship `{success:false, msg:'…'}`
+            // — prefer that human-readable text over the generic
+            // "404 Not Found" the status line gives us. Falling back
+            // to the status pair keeps non-JSON bodies sensible.
+            let detail = `${res.status} ${res.statusText}`;
+            try {
+                const body = await res.clone().json() as {msg?: string; error?: string};
+                const msg = body.msg ?? body.error;
+                if (typeof msg === 'string' && msg.length > 0) {
+                    detail = msg;
+                }
+            } catch {
+                // non-JSON body — keep the status line
+            }
+            throw new Error(`${url} → ${detail}`);
         }
 
         return (await res.json()) as T;

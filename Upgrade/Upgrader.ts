@@ -2,6 +2,7 @@ import {ChildProcess, spawn} from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import {ApiUpgradeRequest} from '../Api/ApiTypes.js';
+import {SafePath} from '../Project/SafePath.js';
 import {BackupStamp, BackupStore} from './BackupStore.js';
 import {EditResult, PackageJsonEditor} from './PackageJsonEditor.js';
 
@@ -60,7 +61,9 @@ export class Upgrader {
         const rel = wsDir.length > 0
             ? path.join(wsDir, 'package.json')
             : 'package.json';
-        return {abs: path.join(this._projectRoot, rel), rel};
+        // SafePath rejects workspaces like `../../etc` that would let an
+        // upgrade-apply call write a package.json outside the project.
+        return {abs: SafePath.join(this._projectRoot, rel), rel};
     }
 
     /**

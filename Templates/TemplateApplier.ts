@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import {PackageManifest} from '../Project/PackageManifest.js';
+import {SafePath} from '../Project/SafePath.js';
 import {BackupStore} from '../Upgrade/BackupStore.js';
 import {ResolvedTemplate, ResolvedTemplateFile, ResolvedTemplateWorkspace, TemplateRoot} from './Template.js';
 
@@ -433,17 +434,21 @@ export class TemplateApplier {
     }
 
     private static _packageJsonFor(workspace: string|undefined, projectRoot: string): string {
+        // Both `workspace` and `relPath` can ultimately originate from a
+        // remote template the user added, so contain them via SafePath
+        // — `../../etc/...` segments throw instead of silently writing
+        // outside the project root.
         if (workspace === undefined || workspace.length === 0) {
-            return path.join(projectRoot, 'package.json');
+            return SafePath.join(projectRoot, 'package.json');
         }
-        return path.join(projectRoot, workspace, 'package.json');
+        return SafePath.join(projectRoot, workspace, 'package.json');
     }
 
     private static _fileAbs(projectRoot: string, workspace: string|undefined, relPath: string): string {
         if (workspace === undefined || workspace.length === 0) {
-            return path.join(projectRoot, relPath);
+            return SafePath.join(projectRoot, relPath);
         }
-        return path.join(projectRoot, workspace, relPath);
+        return SafePath.join(projectRoot, workspace, relPath);
     }
 
     private static _detectIndent(source: string): string|number {

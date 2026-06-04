@@ -1074,7 +1074,7 @@ zentralen Baum — grün umrandet auf der gesunden Seite, rot
 umrandet auf der riskanten Seite, jede mit einer dünnen
 glühenden SVG-Linie zum visuellen Anker verbunden.
 
-![Dashboard — Overall Evaluation](screenshots/21_dashboard_overall_de.png)
+![Dashboard — Overall Evaluation](screenshots/22_dashboard_overall_de.png)
 
 Alle Metriken stammen aus derselben `_columns`-Map wie der
 Scanner-Score-Tab, deshalb füllt sich die Card live mit, während
@@ -1158,7 +1158,7 @@ Wenn die Zeile zu voll wird — oder ein Ökosystem (z.B.
 Lizenz-Klassifikation) alles andere übertönt — öffnet der
 **Badges**-Button in der Toolbar ein Filter-Modal:
 
-![Badge-Filter-Modal](screenshots/20_badge_filter_de.png)
+![Badge-Filter-Modal](screenshots/21_badge_filter_de.png)
 
 Jede Zeile zeigt:
 

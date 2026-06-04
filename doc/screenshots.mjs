@@ -556,6 +556,35 @@ async function captureDashboard(page, lang, suffix) {
     }
     await sleep(3000);
     await shot(page, `19_dashboard${suffix}.png`);
+
+    // Second Dashboard shot — the Overall Evaluation tab with the
+    // ecosystem hero card. Click the tab button by its text content
+    // so the capture works in both EN ("Overall Evaluation") and DE
+    // ("Gesamt-Auswertung").
+    const switched = await page.evaluate(() => {
+        const tabs = Array.from(document.querySelectorAll('.dash-tab'));
+        const overall = tabs.find((t) =>
+            /overall|gesamt/i.test(t.textContent || '')
+        );
+        if (overall) {
+            overall.click();
+            return true;
+        }
+        return false;
+    });
+    if (!switched) {
+        console.log('  · Overall Evaluation tab not found — skipping overall shot');
+        return;
+    }
+    try {
+        await page.waitForSelector('.dash-eco-card', {timeout: 5_000});
+    } catch {
+        // continue — take whatever's there
+    }
+    // The hero card has SVG connectors + a backdrop-blur on the
+    // boxes. Give the browser a beat to settle the rendering.
+    await sleep(1500);
+    await shot(page, `22_dashboard_overall${suffix}.png`);
 }
 
 /**

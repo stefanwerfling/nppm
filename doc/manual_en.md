@@ -1028,7 +1028,7 @@ tree — green-bordered on the healthy side, red-bordered on the
 risky side, each connected to its visual anchor by a thin
 glowing SVG line.
 
-![Dashboard — Overall Evaluation](screenshots/21_dashboard_overall.png)
+![Dashboard — Overall Evaluation](screenshots/22_dashboard_overall.png)
 
 All metrics derive from the same `_columns` map the Scanner
 Score tab uses, so the card fills in live as the scan
@@ -1110,7 +1110,7 @@ row gets too busy — or when one ecosystem (e.g. license
 classification) dominates and drowns out everything else — the
 **Badges** button in the toolbar opens a filter modal:
 
-![Badge filter modal](screenshots/20_badge_filter.png)
+![Badge filter modal](screenshots/21_badge_filter.png)
 
 Each row shows:
 

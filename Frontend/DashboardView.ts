@@ -42,11 +42,13 @@ export class DashboardView {
     private _progressEl: HTMLElement|null = null;
     private _progressBar: HTMLElement|null = null;
     private _progressText: HTMLElement|null = null;
+    private _tabBarHost: HTMLElement|null = null;
     private _tableHost: HTMLElement|null = null;
     private _rescanBtn: HTMLButtonElement|null = null;
     private _snapshotTimestamp: string|null = null;
     private _onCellClick: DashboardCellClickHandler|null = null;
     private _onProjectClick: DashboardProjectClickHandler|null = null;
+    private _activeTab: 'scanner-score'|'overall' = 'scanner-score';
 
     constructor(root: HTMLElement) {
         this._root = root;
@@ -166,10 +168,45 @@ export class DashboardView {
         this._progressText = progressLabel;
         this._root.appendChild(progressEl);
 
+        const tabBarHost = document.createElement('div');
+        tabBarHost.className = 'dash-tabs';
+        this._tabBarHost = tabBarHost;
+        this._renderTabBar();
+        this._root.appendChild(tabBarHost);
+
         const tableHost = document.createElement('div');
         tableHost.className = 'dash-table-host';
         this._tableHost = tableHost;
         this._root.appendChild(tableHost);
+    }
+
+    private _renderTabBar(): void {
+        if (!this._tabBarHost) {
+            return;
+        }
+        this._tabBarHost.innerHTML = '';
+        const tabs: {value: 'scanner-score'|'overall'; label: string}[] = [
+            {value: 'scanner-score', label: I18n.t('Scanner Score')},
+            {value: 'overall', label: I18n.t('Overall Evaluation')}
+        ];
+        for (const t of tabs) {
+            const btn = document.createElement('button');
+            btn.className = 'dash-tab';
+            btn.type = 'button';
+            if (t.value === this._activeTab) {
+                btn.classList.add('dash-tab-active');
+            }
+            btn.textContent = t.label;
+            btn.addEventListener('click', () => {
+                if (this._activeTab === t.value) {
+                    return;
+                }
+                this._activeTab = t.value;
+                this._renderTabBar();
+                this._renderTable();
+            });
+            this._tabBarHost.appendChild(btn);
+        }
     }
 
     private _startScan(): void {
@@ -307,6 +344,11 @@ export class DashboardView {
             return;
         }
 
+        if (this._activeTab === 'overall') {
+            this._renderOverallTab();
+            return;
+        }
+
         const table = document.createElement('table');
         table.className = 'dash-table';
 
@@ -385,6 +427,228 @@ export class DashboardView {
         table.appendChild(tbody);
 
         this._tableHost.appendChild(table);
+    }
+
+    /**
+     * Overall-Evaluation tab body. Renders two roll-ups derived
+     * entirely from the cells the scanner-score tab already shows:
+     *
+     *  - Project health list: one row per project with the average
+     *    score over all non-N/A cells, sorted worst-first so the
+     *    user's eye lands on the project that needs attention. The
+     *    severity totals live next to the score as compact pills.
+     *  - Top problem packages: a flat aggregation of every
+     *    `CellFinding` across every (project, scanner), grouped by
+     *    package label. Sorted by risk/warn/info weight, capped at
+     *    20 entries — enough to fit on a screen, not so many the
+     *    table becomes a finding-counter wall.
+     */
+    private _renderOverallTab(): void {
+        if (!this._tableHost) {
+            return;
+        }
+
+        const wrap = document.createElement('div');
+        wrap.className = 'dash-overall';
+
+        wrap.appendChild(this._renderOverallProjects());
+        const pkgsSection = this._renderOverallPackages();
+        if (pkgsSection) {
+            wrap.appendChild(pkgsSection);
+        }
+
+        this._tableHost.appendChild(wrap);
+    }
+
+    private _renderOverallProjects(): HTMLElement {
+        type Agg = {
+            unid: string;
+            name: string;
+            avg: number|null;
+            risk: number;
+            warn: number;
+            info: number;
+            scannedCells: number;
+            totalCells: number;
+        };
+        const aggs: Agg[] = [];
+        for (const unid of this._columnOrder) {
+            const col = this._columns.get(unid);
+            if (!col) {
+                continue;
+            }
+            let sum = 0;
+            let scanned = 0;
+            let risk = 0;
+            let warn = 0;
+            let info = 0;
+            for (const cell of Object.values(col.cells)) {
+                if (cell.score !== null) {
+                    sum += cell.score;
+                    scanned++;
+                }
+                risk += cell.counts.risk;
+                warn += cell.counts.warn;
+                info += cell.counts.info;
+            }
+            aggs.push({
+                unid,
+                name: col.project.name,
+                avg: scanned > 0 ? Math.round(sum / scanned) : null,
+                risk, warn, info,
+                scannedCells: scanned,
+                totalCells: Object.keys(col.cells).length
+            });
+        }
+        // Worst-first; rows with no scanned cells slot to the bottom.
+        aggs.sort((a, b) => {
+            if (a.avg === null && b.avg === null) {
+                return 0;
+            }
+            if (a.avg === null) {
+                return 1;
+            }
+            if (b.avg === null) {
+                return -1;
+            }
+            return a.avg - b.avg;
+        });
+
+        const section = document.createElement('div');
+        section.className = 'dash-overall-section';
+        const head = document.createElement('h3');
+        head.className = 'dash-overall-head';
+        head.textContent = I18n.t('Project health (worst first)');
+        section.appendChild(head);
+
+        for (const a of aggs) {
+            const row = document.createElement('div');
+            row.className = 'dash-overall-row dash-overall-row-clickable';
+            row.title = I18n.t('Open project');
+            row.addEventListener('click', () => this._onProjectClick?.(a.unid));
+
+            const nameEl = document.createElement('div');
+            nameEl.className = 'dash-overall-name';
+            nameEl.textContent = a.name;
+            row.appendChild(nameEl);
+
+            const scoreEl = document.createElement('div');
+            scoreEl.className = 'dash-overall-score';
+            if (a.avg === null) {
+                scoreEl.textContent = '—';
+                scoreEl.classList.add('dash-overall-score-na');
+            } else {
+                scoreEl.textContent = String(a.avg);
+                scoreEl.classList.add(a.avg >= 80 ? 'dash-overall-score-good'
+                    : a.avg >= 60 ? 'dash-overall-score-warn'
+                        : 'dash-overall-score-risk');
+            }
+            scoreEl.title = I18n.t('{scanned} of {total} scanners contributed', {
+                scanned: a.scannedCells, total: a.totalCells
+            });
+            row.appendChild(scoreEl);
+
+            row.appendChild(DashboardView._renderPills(a.risk, a.warn, a.info));
+            section.appendChild(row);
+        }
+        return section;
+    }
+
+    private _renderOverallPackages(): HTMLElement|null {
+        type Agg = {label: string; risk: number; warn: number; info: number; projects: Set<string>};
+        const byLabel = new Map<string, Agg>();
+        for (const unid of this._columnOrder) {
+            const col = this._columns.get(unid);
+            if (!col) {
+                continue;
+            }
+            for (const cell of Object.values(col.cells)) {
+                for (const f of cell.findings) {
+                    let agg = byLabel.get(f.label);
+                    if (!agg) {
+                        agg = {label: f.label, risk: 0, warn: 0, info: 0, projects: new Set()};
+                        byLabel.set(f.label, agg);
+                    }
+                    agg.projects.add(unid);
+                    if (f.severity === 'risk') {
+                        agg.risk++;
+                    } else if (f.severity === 'warn') {
+                        agg.warn++;
+                    } else if (f.severity === 'info') {
+                        agg.info++;
+                    }
+                }
+            }
+        }
+        if (byLabel.size === 0) {
+            return null;
+        }
+        const topN = Array.from(byLabel.values())
+            .sort((a, b) => {
+                if (a.risk !== b.risk) {
+                    return b.risk - a.risk;
+                }
+                if (a.warn !== b.warn) {
+                    return b.warn - a.warn;
+                }
+                return b.info - a.info;
+            })
+            .slice(0, 20);
+
+        const section = document.createElement('div');
+        section.className = 'dash-overall-section';
+        const head = document.createElement('h3');
+        head.className = 'dash-overall-head';
+        head.textContent = I18n.t('Top problem packages');
+        section.appendChild(head);
+
+        for (const a of topN) {
+            const row = document.createElement('div');
+            row.className = 'dash-overall-row';
+
+            const nameEl = document.createElement('div');
+            nameEl.className = 'dash-overall-name';
+            nameEl.textContent = a.label;
+            row.appendChild(nameEl);
+
+            const projEl = document.createElement('div');
+            projEl.className = 'dash-overall-projcount';
+            projEl.textContent = a.projects.size === 1
+                ? I18n.t('in 1 project')
+                : I18n.t('in {n} projects', {n: a.projects.size});
+            row.appendChild(projEl);
+
+            row.appendChild(DashboardView._renderPills(a.risk, a.warn, a.info));
+            section.appendChild(row);
+        }
+        return section;
+    }
+
+    private static _renderPills(risk: number, warn: number, info: number): HTMLElement {
+        const pills = document.createElement('div');
+        pills.className = 'dash-overall-pills';
+        if (risk > 0) {
+            const pill = document.createElement('span');
+            pill.className = 'dash-overall-pill dash-overall-pill-risk';
+            pill.textContent = String(risk);
+            pill.title = I18n.t('{n} risk-level finding(s)', {n: risk});
+            pills.appendChild(pill);
+        }
+        if (warn > 0) {
+            const pill = document.createElement('span');
+            pill.className = 'dash-overall-pill dash-overall-pill-warn';
+            pill.textContent = String(warn);
+            pill.title = I18n.t('{n} warn-level finding(s)', {n: warn});
+            pills.appendChild(pill);
+        }
+        if (info > 0) {
+            const pill = document.createElement('span');
+            pill.className = 'dash-overall-pill dash-overall-pill-info';
+            pill.textContent = String(info);
+            pill.title = I18n.t('{n} info-level finding(s)', {n: info});
+            pills.appendChild(pill);
+        }
+        return pills;
     }
 
     /**

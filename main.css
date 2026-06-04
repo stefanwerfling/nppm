@@ -2998,6 +2998,118 @@ html, body {
     overflow: auto;
 }
 
+.dash-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--c-border);
+    margin: 0 0 12px 0;
+}
+
+.dash-tab {
+    background: transparent;
+    color: var(--c-muted);
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.dash-tab:hover {
+    color: var(--c-text);
+}
+
+.dash-tab-active {
+    color: var(--c-text);
+    border-bottom-color: var(--c-accent);
+}
+
+.dash-overall {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 0 4px;
+}
+
+.dash-overall-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dash-overall-head {
+    font-size: 13px;
+    color: var(--c-muted);
+    margin: 0 0 6px 0;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.dash-overall-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    background: var(--c-bg);
+}
+
+.dash-overall-row-clickable {
+    cursor: pointer;
+}
+
+.dash-overall-row-clickable:hover {
+    background: var(--c-row-hover);
+}
+
+.dash-overall-name {
+    font-weight: 500;
+    color: var(--c-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dash-overall-projcount {
+    color: var(--c-muted);
+    font-size: 12px;
+}
+
+.dash-overall-score {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-weight: 700;
+    font-size: 16px;
+    min-width: 40px;
+    text-align: right;
+}
+
+.dash-overall-score-good { color: #4caf50; }
+.dash-overall-score-warn { color: #f0b400; }
+.dash-overall-score-risk { color: #e85a5a; }
+.dash-overall-score-na   { color: var(--c-muted); }
+
+.dash-overall-pills {
+    display: flex;
+    gap: 4px;
+}
+
+.dash-overall-pill {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    min-width: 18px;
+    text-align: center;
+}
+
+.dash-overall-pill-risk { background: rgba(232, 90, 90, 0.18); color: #e85a5a; }
+.dash-overall-pill-warn { background: rgba(240, 180, 0, 0.18); color: #f0b400; }
+.dash-overall-pill-info { background: rgba(74, 159, 255, 0.18); color: #4a9fff; }
+
 .dash-table {
     border-collapse: separate;
     border-spacing: 0;

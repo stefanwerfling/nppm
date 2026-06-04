@@ -10,6 +10,7 @@ import {
     ApiDashboardSnapshotResponse
 } from '../Api/ApiTypes.js';
 import {DashboardCell, DashboardColumn, ScannerId} from '../Dashboard/DashboardBuilder.js';
+import {EcoBoxId, EcosystemBoxModal} from './EcosystemBoxModal.js';
 import {I18n} from './I18n.js';
 
 /**
@@ -49,10 +50,20 @@ export class DashboardView {
     private _onCellClick: DashboardCellClickHandler|null = null;
     private _onProjectClick: DashboardProjectClickHandler|null = null;
     private _onScoresChanged: ((scores: Map<string, number>) => void)|null = null;
+    private _onMatrixClick: (() => void)|null = null;
     private _activeTab: 'scanner-score'|'overall' = 'scanner-score';
+    private readonly _ecoModal = new EcosystemBoxModal();
 
     constructor(root: HTMLElement) {
         this._root = root;
+        this._ecoModal.onProjectClick((unid) => {
+            this._onProjectClick?.(unid);
+        });
+        this._ecoModal.onNavigate((target) => {
+            if (target === 'matrix') {
+                this._onMatrixClick?.();
+            }
+        });
     }
 
     public onCellClick(handler: DashboardCellClickHandler): void {
@@ -61,6 +72,16 @@ export class DashboardView {
 
     public onProjectClick(handler: DashboardProjectClickHandler): void {
         this._onProjectClick = handler;
+    }
+
+    /**
+     * Listener for the "Open in Matrix" CTA inside the ecosystem
+     * box modal. Wired by `Nppm` to the same code path the
+     * treeview's matrix sentinel takes — keeps navigation
+     * symmetric across surfaces.
+     */
+    public onMatrixClick(handler: () => void): void {
+        this._onMatrixClick = handler;
     }
 
     /**
@@ -586,81 +607,114 @@ export class DashboardView {
         // (where the connector tip lands) likewise in %. Box origin
         // is its top-left corner.
         type BoxSpec = {
+            id: EcoBoxId;
             side: 'green'|'red';
             top: number; left: number; w: number;
             anchorX: number; anchorY: number;
             label: string; value: string;
+            tip: string;
         };
         const boxes: BoxSpec[] = [
             {
+                id: 'projects',
                 side: 'green',
                 top: 5, left: 3, w: 19,
                 anchorX: 27, anchorY: 17,
                 label: I18n.t('Projects'),
-                value: String(projectCount)
+                value: String(projectCount),
+                tip: I18n.t('How many projects nppm is currently scanning. Click for the list.')
             },
             {
+                id: 'ecosystem-health',
                 side: 'green',
                 top: 22, left: 3, w: 19,
-                anchorX: 24, anchorY: 30,
+                // Aim across the canopy toward the upper-centre tree
+                // foliage — longer, clearly visible diagonal instead
+                // of a stub that sits next to the box.
+                anchorX: 40, anchorY: 26,
                 label: I18n.t('Ecosystem health'),
-                value: ecosystemHealth !== null ? `${ecosystemHealth}/100` : '—'
+                value: ecosystemHealth !== null ? `${ecosystemHealth}/100` : '—',
+                tip: I18n.t('Average scanner score across every project. Click for the per-scanner breakdown.')
             },
             {
+                id: 'healthy-projects',
                 side: 'green',
                 top: 55, left: 3, w: 19,
                 anchorX: 26, anchorY: 60,
                 label: I18n.t('Healthy projects'),
-                value: String(healthyProjects)
+                value: String(healthyProjects),
+                tip: I18n.t('Projects whose average scanner score is 80 or above. Click for the list.')
             },
             {
+                id: 'info-findings',
                 side: 'green',
                 top: 75, left: 14, w: 22,
-                anchorX: 30, anchorY: 78,
+                // Box bottom-left, anchor previously sat *inside* the
+                // box's X range so the line was a stub. Send it up
+                // and right toward the mushroom cluster at the
+                // tree's base — clear diagonal away from the box.
+                anchorX: 42, anchorY: 58,
                 label: I18n.t('Info-level findings'),
-                value: String(totalInfo)
+                value: String(totalInfo),
+                tip: I18n.t('Lowest-severity findings across all scanners — useful as an early warning. Click for the per-scanner breakdown.')
             },
             {
+                id: 'risk-findings',
                 side: 'red',
                 top: 5, left: 78, w: 19,
                 anchorX: 73, anchorY: 17,
                 label: I18n.t('Risk findings'),
-                value: String(totalRisk)
+                value: String(totalRisk),
+                tip: I18n.t('Highest-severity findings across all scanners. Click for the per-scanner breakdown.')
             },
             {
+                id: 'cve-flags',
                 side: 'red',
                 top: 22, left: 78, w: 19,
                 anchorX: 70, anchorY: 30,
                 label: I18n.t('CVE flags'),
-                value: String(cveCount)
+                value: String(cveCount),
+                tip: I18n.t('Packages whose installed version has known CVE entries on OSV.dev. Click for the package list.')
             },
             {
+                id: 'deprecated',
                 side: 'red',
                 top: 55, left: 78, w: 19,
                 anchorX: 73, anchorY: 60,
                 label: I18n.t('Deprecated'),
-                value: String(deprecationCount)
+                value: String(deprecationCount),
+                tip: I18n.t('Packages whose installed or latest version is deprecated on the registry. Click for the list.')
             },
             {
+                id: 'at-risk-projects',
                 side: 'red',
                 top: 75, left: 64, w: 22,
-                anchorX: 70, anchorY: 78,
+                // Mirror of the info-findings box: the previous
+                // anchor sat inside the box's X range. Aim up and
+                // left toward the shield + dark-roots cluster so the
+                // diagonal is visible.
+                anchorX: 58, anchorY: 58,
                 label: I18n.t('At-risk projects'),
-                value: String(riskyProjects)
+                value: String(riskyProjects),
+                tip: I18n.t('Projects whose average scanner score is below 60. Click for the list.')
             },
             {
+                id: 'maintainer-alerts',
                 side: 'red',
                 top: 38, left: 78, w: 19,
                 anchorX: 71, anchorY: 43,
                 label: I18n.t('Maintainer alerts'),
-                value: String(maintainerWarnRisk)
+                value: String(maintainerWarnRisk),
+                tip: I18n.t('Packages with risky maintainer-handover or 2FA-status patterns. Click for the list.')
             },
             {
+                id: 'typosquat-hits',
                 side: 'red',
                 top: 38, left: 39, w: 22,
                 anchorX: 50, anchorY: 53,
                 label: I18n.t('Typosquat hits'),
-                value: String(typosquatCount)
+                value: String(typosquatCount),
+                tip: I18n.t('Names a Levenshtein distance of 1-2 from a popular package, or carrying confusable characters. Click for the list.')
             }
         ];
 
@@ -691,10 +745,14 @@ export class DashboardView {
 
         for (const b of boxes) {
             const box = document.createElement('div');
-            box.className = `dash-eco-box dash-eco-box-${b.side}`;
+            box.className = `dash-eco-box dash-eco-box-${b.side} dash-eco-box-clickable`;
             box.style.top = `${b.top}%`;
             box.style.left = `${b.left}%`;
             box.style.width = `${b.w}%`;
+            box.title = b.tip;
+            box.addEventListener('click', () => {
+                this._ecoModal.open(b.id, b.label, this._columns);
+            });
 
             const value = document.createElement('div');
             value.className = 'dash-eco-value';

@@ -3083,7 +3083,7 @@ html, body {
 }
 
 .dash-eco-line {
-    stroke-width: 0.18;
+    stroke-width: 0.32;
     fill: none;
     opacity: 0.85;
 }
@@ -3118,6 +3118,127 @@ html, body {
 .dash-eco-box-red {
     border: 1px solid rgba(232, 90, 90, 0.75);
     box-shadow: 0 0 8px rgba(232, 90, 90, 0.25), inset 0 0 6px rgba(232, 90, 90, 0.08);
+}
+
+.dash-eco-box-clickable {
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.dash-eco-box-clickable:hover {
+    transform: translateY(-1px);
+}
+
+.dash-eco-box-clickable.dash-eco-box-green:hover {
+    box-shadow: 0 0 14px rgba(110, 227, 110, 0.55), inset 0 0 8px rgba(110, 227, 110, 0.18);
+}
+
+.dash-eco-box-clickable.dash-eco-box-red:hover {
+    box-shadow: 0 0 14px rgba(232, 90, 90, 0.55), inset 0 0 8px rgba(232, 90, 90, 0.18);
+}
+
+/* Ecosystem-box modal — reuses the .umd-* shell. */
+.ebm-panel {
+    min-width: 480px;
+    max-width: 720px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.ebm-desc {
+    color: var(--c-muted);
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--c-border);
+}
+
+.ebm-body {
+    padding: 12px 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.ebm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ebm-empty {
+    color: var(--c-muted);
+    font-style: italic;
+    padding: 16px;
+    text-align: center;
+}
+
+.ebm-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 10px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    background: var(--c-bg);
+}
+
+.ebm-row-clickable {
+    cursor: pointer;
+}
+
+.ebm-row-clickable:hover {
+    background: var(--c-row-hover);
+}
+
+.ebm-row-name {
+    color: var(--c-text);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ebm-row-projects {
+    color: var(--c-muted);
+    font-size: 11px;
+    grid-column: 2;
+}
+
+.ebm-row-score {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-weight: 700;
+    font-size: 13px;
+}
+
+.ebm-row-score-good { color: #4caf50; }
+.ebm-row-score-warn { color: #f0b400; }
+.ebm-row-score-risk { color: #e85a5a; }
+
+.ebm-row-pills {
+    display: flex;
+    gap: 4px;
+}
+
+.ebm-row-pill {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    min-width: 18px;
+    text-align: center;
+}
+
+.ebm-row-pill-risk { background: rgba(232, 90, 90, 0.18); color: #e85a5a; }
+.ebm-row-pill-warn { background: rgba(240, 180, 0, 0.18); color: #f0b400; }
+.ebm-row-pill-info { background: rgba(74, 159, 255, 0.18); color: #4a9fff; }
+
+.ebm-footer {
+    border-top: 1px solid var(--c-border);
+    padding: 10px 16px;
+    display: flex;
+    justify-content: flex-end;
 }
 
 .dash-eco-value {

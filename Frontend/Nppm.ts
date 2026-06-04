@@ -493,6 +493,12 @@ export class Nppm {
             this._dashboardScores = scores;
             this._pushScoresToTreeview();
         });
+        this._dashboardView.onMatrixClick(() => {
+            this._switchTo(View.matrix);
+            this._matrix.renderLoading();
+            void this._loadMatrix();
+            this._treeview.setSelected('__matrix__');
+        });
 
         this._workspaceDriftModal.onOpenProjectMatrix((unid) => {
             const proj = this._projects.find((p) => p.unid === unid);

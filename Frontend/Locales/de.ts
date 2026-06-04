@@ -554,6 +554,52 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'At-risk projects': 'Risiko-Projekte',
     'Maintainer alerts': 'Maintainer-Warnungen',
     'Typosquat hits': 'Typosquat-Treffer',
+    'How many projects nppm is currently scanning. Click for the list.':
+        'Wie viele Projekte nppm gerade scannt. Klick für die Liste.',
+    'Average scanner score across every project. Click for the per-scanner breakdown.':
+        'Durchschnitt der Scanner-Scores über alle Projekte. Klick für die Aufschlüsselung pro Scanner.',
+    'Projects whose average scanner score is 80 or above. Click for the list.':
+        'Projekte mit durchschnittlichem Score ab 80. Klick für die Liste.',
+    'Lowest-severity findings across all scanners — useful as an early warning. Click for the per-scanner breakdown.':
+        'Niedrig-priorisierte Findings über alle Scanner — nützlich als Frühwarnung. Klick für die Aufschlüsselung pro Scanner.',
+    'Highest-severity findings across all scanners. Click for the per-scanner breakdown.':
+        'Höchst-priorisierte Findings über alle Scanner. Klick für die Aufschlüsselung pro Scanner.',
+    'Packages whose installed version has known CVE entries on OSV.dev. Click for the package list.':
+        'Pakete mit bekannten CVEs auf OSV.dev für die installierte Version. Klick für die Paketliste.',
+    'Packages whose installed or latest version is deprecated on the registry. Click for the list.':
+        'Pakete deren installierte oder latest-Version auf der Registry als deprecated markiert ist. Klick für die Liste.',
+    'Projects whose average scanner score is below 60. Click for the list.':
+        'Projekte mit durchschnittlichem Score unter 60. Klick für die Liste.',
+    'Packages with risky maintainer-handover or 2FA-status patterns. Click for the list.':
+        'Pakete mit auffälligen Maintainer-Wechseln oder 2FA-Status. Klick für die Liste.',
+    'Names a Levenshtein distance of 1-2 from a popular package, or carrying confusable characters. Click for the list.':
+        'Namen mit Levenshtein-Distanz 1-2 zu populären Paketen, oder mit Confusable-Zeichen. Klick für die Liste.',
+    'Open in Matrix': 'In Matrix öffnen',
+    'No matching projects.': 'Keine passenden Projekte.',
+    'No matching packages.': 'Keine passenden Pakete.',
+    'No scanner data yet.': 'Noch keine Scanner-Daten.',
+    'No findings yet.': 'Noch keine Findings.',
+    'in {name}': 'in {name}',
+    'Every project nppm currently scans. The list shows each project\'s average score across all non-N/A scanner cells, worst first.':
+        'Jedes Projekt das nppm aktuell scannt. Die Liste zeigt den Durchschnittsscore über alle Nicht-N/A Scanner-Zellen, schlechteste zuerst.',
+    'Average score across every project and every scanner. The list breaks that average down per scanner so you can spot which dimension is dragging the ecosystem down.':
+        'Durchschnitt über alle Projekte und alle Scanner. Die Liste schlüsselt den Durchschnitt pro Scanner auf, damit du siehst welche Dimension das Ökosystem runterzieht.',
+    'Projects whose average scanner score is 80 or above — solid green ring in the treeview. Click to open one.':
+        'Projekte mit Durchschnittsscore ab 80 — grüner Ring im Treeview. Klick um eins zu öffnen.',
+    'Lowest-severity findings (info) across all projects and scanners. These rarely block anything but they\'re the early-warning layer — drift here often precedes warn / risk later.':
+        'Niedrigste Findings (info) über alle Projekte und Scanner. Blocken selten was, sind aber die Frühwarnschicht — Drift hier geht oft warn/risk später voraus.',
+    'Highest-severity findings across all projects and scanners. The breakdown shows which scanner produced how many — the top entries are usually the ones to fix first.':
+        'Höchste Findings über alle Projekte und Scanner. Die Aufschlüsselung zeigt welcher Scanner wie viele produziert hat — die obersten Einträge sind meist zuerst zu fixen.',
+    'Packages whose installed version has known CVE entries on OSV.dev. Each row lists the packages with the project(s) it appears in.':
+        'Pakete deren installierte Version bekannte CVE-Einträge auf OSV.dev hat. Jede Zeile listet das Paket und die Projekte in denen es vorkommt.',
+    'Packages whose installed or latest published version carries a deprecation marker on the npm registry. Risk-level entries are the urgent ones (the version you ship today is deprecated).':
+        'Pakete deren installierte oder latest-Version einen Deprecation-Marker auf der npm-Registry trägt. Risk-Einträge sind die dringenden (die ausgelieferte Version ist deprecated).',
+    'Projects whose average scanner score is below 60 — red ring in the treeview. Click to open one.':
+        'Projekte mit Durchschnittsscore unter 60 — roter Ring im Treeview. Klick um eins zu öffnen.',
+    'Packages with maintainer-handover or 2FA-status patterns matching the event-stream / ua-parser-js incident profiles. Each row shows the project(s) affected.':
+        'Pakete mit Maintainer-Übergaben oder 2FA-Mustern wie bei event-stream / ua-parser-js. Jede Zeile zeigt die betroffenen Projekte.',
+    'Package names a Levenshtein distance of 1-2 from a popular package, or carrying confusable (non-ASCII) characters. Most matches are intentional namesakes; the rows surface the suspicious ones.':
+        'Paketnamen mit Levenshtein-Distanz 1-2 zu populären Paketen, oder mit Confusable (Nicht-ASCII) Zeichen. Die meisten Treffer sind harmlos, die Zeilen zeigen die verdächtigen.',
     'Project health (worst first)': 'Projekt-Health (schlechteste zuerst)',
     'Top problem packages': 'Auffälligste Pakete',
     '{scanned} of {total} scanners contributed': '{scanned} von {total} Scannern beitragend',

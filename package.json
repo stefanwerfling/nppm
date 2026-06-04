@@ -44,7 +44,8 @@
     "sbom": "node ./cli/sbom.js",
     "docs:screenshots": "node ./doc/screenshots.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+     "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
   },
   "type": "module",
   "version": "1.0.0"

@@ -3,7 +3,7 @@ import express from 'express';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import {defineConfig, Plugin} from 'vite';
+import {defineConfig, Plugin, ViteDevServer} from 'vite';
 import {SchemaErrors} from 'vts';
 import {
     ApiBulkUpgradeApplyRequest,
@@ -115,7 +115,7 @@ class Server {
     public static plugin(): Plugin {
         return {
             name: 'vite-express-middleware',
-            configureServer(server) {
+            configureServer(server: ViteDevServer) {
             const app = express();
             app.use(express.json());
 

@@ -9,6 +9,69 @@ from `v1.0.0` onwards.
 ## [Unreleased]
 
 ### Added
+- **Dashboard: Trend tab with four metric chips.** Each scan now
+  persists a compact daily record into
+  `.nppm-history/dashboard/YYYY-MM-DD.json` (last scan of the day
+  wins), and the new third Dashboard tab plots that history as a
+  hand-rolled SVG multi-line chart (one line per project plus a
+  heavier ecosystem-overall line on top). Range chips 30 d / 90 d /
+  365 d, metric chips Score / Packages / Size / Downloads. Score
+  reads the daily entry directly; Packages reconstructs per-project
+  install-count timelines from `HistoryStore` via add/remove replay
+  back to the baseline; Size sums `dist.unpackedSize` across each
+  project's installed-version set; Downloads fetches weekly counts
+  from `api.npmjs.org/downloads/point/last-week/<pkg>` and folds
+  them into per-project sums + an ecosystem-deduped total (the gap
+  between Σ-per-project and ecosystem total is itself a
+  dep-tree-overlap signal). Y axis auto-scales to a "nice" ceiling
+  per metric; old history entries without a given field drop out
+  cleanly via `typeof === 'number'` filtering — no migration.
+- **Dashboard: Macro-Donut + Top-10 Worst Packages header strip.**
+  The Scanner-Score tab now leads with a 3-segment SVG donut
+  (healthy ≥ 80 / warning 60-79 / risky < 60) carrying the
+  ecosystem average and a `↑X pts vs last scan` delta from the
+  previous persisted entry, alongside a top-10 list aggregated
+  from every `CellFinding` by package label (severity-weighted
+  info=1 / warn=10 / risk=30). Row click routes into ImpactModal.
+- **PackageDetailPanel: Trends tab (7th tab).** Five hand-rolled
+  SVG sub-charts surfacing per-package history from the packument
+  cache + npm public downloads API:
+  unpacked-size / version (X = release date, Y = bytes),
+  maintainer-count / version (`maintainers[].length` over time),
+  direct-deps / version (`Object.keys(dependencies).length`),
+  releases / month (24-month back-filled bar chart),
+  daily downloads / last year (line, dots dropped above 60
+  datapoints so 365-point series stay readable). Each chart has
+  an info `i` icon with a viewport-safe tooltip explaining what
+  the chart shows and what to interpret (mirrors the DashboardView
+  scanner tooltip pattern). Lazy-loaded on tab activation; one
+  endpoint fetch (`/api/packages/:name/trends`) populates all five
+  charts.
+- **`Registry` now extracts four more per-version packument fields:**
+  `dist.unpackedSize`, `dist.fileCount`, `maintainers[].length`,
+  `Object.keys(dependencies).length`. All cached in the existing
+  registry pocket, so warm-cache reads add no HTTP.
+- **Dashboard scan hooks `HistoryStore.recordSnapshot()` per
+  project.** Previously the per-project history file was only
+  populated when the user opened the per-project Lockfile view or
+  triggered a Vuln-Timeline scan. A Dashboard-only user would
+  therefore get an empty Packages line on the Trend tab even after
+  a full Dashboard scan. The SSE handler now records a snapshot
+  inside the per-project loop, same shape and try/catch the
+  `/api/projects/:id/lockfile` handler uses.
+- **`GET /api/dashboard/history?days=`** returns the rolling daily
+  history entries plus a `previous` field carrying the entry
+  immediately before the most recent (regardless of the `days`
+  window) so the macro-donut delta is meaningful on any range.
+- **`GET /api/dashboard/growth?days=`** replays each project's
+  `HistoryStore` file into a `{series, total}` package-count
+  timeline. Range clipping anchors the carry-forward at the cutoff
+  so a 30 d view starts at the right Y instead of dropping from
+  zero.
+- **`GET /api/packages/:name/trends`** returns the per-version
+  timeline + releases-by-month + last-year daily downloads in one
+  response — the PackageDetailPanel Trends tab fires a single
+  fetch.
 - **Dashboard: Scanner Score + Overall Evaluation tabs.** The
   cross-project scanner matrix is now under the Scanner Score tab;
   the new Overall Evaluation tab renders an ecosystem hero card —

@@ -9,7 +9,7 @@
   <a href="https://github.com/stefanwerfling/nppm/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/stefanwerfling/nppm?color=blue" /></a>
   <a href="https://github.com/stefanwerfling/nppm/releases"><img alt="Release" src="https://img.shields.io/github/v/release/stefanwerfling/nppm?include_prereleases&label=release&sort=semver" /></a>
   <img alt="Node ≥ 22" src="https://img.shields.io/node/v/nppm?label=node&color=43853d" />
-  <img alt="Tests" src="https://img.shields.io/badge/tests-641%20passing-success" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-710%20passing-success" />
   <img alt="Scanners" src="https://img.shields.io/badge/scanners-21-blueviolet" />
   <a href="https://github.com/stefanwerfling/nppm/blob/main/SECURITY.md"><img alt="Security policy" src="https://img.shields.io/badge/security-disclosure-red?logo=github" /></a>
 </p>
@@ -141,13 +141,30 @@ server, frontend is plain TypeScript + DOM (no framework).
   column carrying the "no lockfile — scanned against registry
   latest" note. Click any cell for the per-package drill-down with
   top-50 contributors; click any header to jump to the per-project
-  view. The **Overall Evaluation** tab renders an ecosystem hero
-  card: a forest-themed 3:2 scene with ten clickable metric boxes
-  (projects, ecosystem health, healthy / at-risk counts, total
-  risk findings, CVE / deprecation / maintainer / typosquat flags),
-  each with a hover tooltip and a detail modal. Switching tabs
-  leaves the SSE alone. Pickable via Settings → General →
-  "Start page" as the default landing view.
+  view. The Scanner-Score tab leads with a **header strip** carrying
+  a 3-segment macro-donut (healthy ≥ 80 / warning 60-79 / risky <
+  60) with the ecosystem average + a `↑X pts vs last scan` delta,
+  alongside a **Top-10 Worst Packages** list aggregated by
+  severity-weighted finding contribution. The **Overall Evaluation**
+  tab renders an ecosystem hero card: a forest-themed 3:2 scene
+  with ten clickable metric boxes, each with a hover tooltip and a
+  detail modal. The **Trend** tab plots a rolling daily history of
+  the ecosystem with four metric chips (Score / Packages / Size /
+  Downloads) and three range chips (30 d / 90 d / 365 d) — one line
+  per project plus a heavier ecosystem-overall line on top.
+  Switching tabs leaves the SSE alone. Pickable via Settings →
+  General → "Start page" as the default landing view.
+- **Per-package Trends** — the Package detail panel grows a seventh
+  `Trends` tab with five hand-rolled SVG sub-charts surfacing the
+  full per-version history from the registry packument plus the
+  npm public downloads API: unpacked size over versions, maintainer
+  count over versions, direct dependencies over versions, releases
+  per month (back-filled 24-month bar chart), and daily downloads
+  over the last year. Each chart has an info `i` icon with a
+  viewport-safe tooltip explaining what to interpret — the classic
+  "maintainer drop from 5 to 1 right before a takeover" and
+  "stable utility quietly grew a framework" patterns are now
+  visible at a glance.
 - **Cross-project Impact Analysis** — topbar **Impact** button
   answers "which projects pull in `<name>` (or `<name>@<version>`),
   directly or transitively, and via which shortest path?". BFS over

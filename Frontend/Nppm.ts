@@ -516,6 +516,13 @@ export class Nppm {
             this._projects = response.projects;
             this._installedView.setEditor(response.editor);
             this._treeview.render(response.projects);
+
+            // Highlight the corresponding sentinel row so the first
+            // paint already reflects where the user is. Without this
+            // the treeview shows no selection until the user clicks
+            // something, which makes the initial landing look like a
+            // half-loaded state.
+            this._treeview.setSelected(startView === 'dashboard' ? '__dashboard__' : '__matrix__');
             if (startView === 'dashboard') {
                 this._dashboardView.show();
             } else {

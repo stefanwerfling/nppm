@@ -544,6 +544,7 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     'Git-only dependency — refs: {refs}': 'Git-only dependency — refs: {refs}',
     'Git HEAD — refs in projects: {refs}': 'Git HEAD — refs in projects: {refs}',
     'Diff against HEAD': 'Diff against HEAD',
+    'Load all ({n})': 'Load all ({n})',
     'Browse …': 'Browse …',
     'Select a directory': 'Select a directory',
     'Select this directory': 'Select this directory',

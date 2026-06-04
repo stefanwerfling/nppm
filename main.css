@@ -2455,6 +2455,22 @@ html, body {
     gap: 10px;
 }
 
+.pdp-releases-loadall {
+    margin-top: 12px;
+    padding: 8px 14px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    background: var(--c-bg);
+    color: var(--c-text);
+    cursor: pointer;
+    font-size: 12px;
+    align-self: flex-start;
+}
+
+.pdp-releases-loadall:hover {
+    background: var(--c-row-hover);
+}
+
 .pdp-release {
     border: 1px solid var(--c-border);
     border-radius: var(--radius-sm);

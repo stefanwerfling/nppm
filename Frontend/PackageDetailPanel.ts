@@ -64,6 +64,14 @@ export class PackageDetailPanel {
     private _releases: ReleasesResponse|null = null;
     private _releasesError: string|null = null;
     private _releasesInflight: boolean = false;
+    /**
+     * For commits-mode releases (git deps) the panel renders only
+     * the first {@link _COMMITS_INITIAL} cards and surfaces an
+     * "Alle laden" button. This flag flips when the user clicks it
+     * and resets on each `open()` so a different package starts
+     * collapsed again.
+     */
+    private _releasesShowAll: boolean = false;
 
     public async open(name: string, rawVersion: string, latest: string|null): Promise<void> {
         return this._open(name, rawVersion, latest, Tab.files);
@@ -90,6 +98,7 @@ export class PackageDetailPanel {
         this._releases = null;
         this._releasesError = null;
         this._releasesInflight = false;
+        this._releasesShowAll = false;
 
         this._mount(`${name}@${version}`);
         this._renderLoading();
@@ -647,14 +656,37 @@ export class PackageDetailPanel {
             wrap.appendChild(hint);
         }
 
+        // Commits mode (git deps): we render only the first
+        // INITIAL_COUNT cards and let the user expand on demand. The
+        // marker is `sha` — set by /api/releases when the backend
+        // routed through GitCommitsFetcher; absent for npm releases.
+        const isCommitsMode = data.releases.some((r) => r.sha);
+        const INITIAL_COUNT = 5;
+        const collapse = isCommitsMode
+            && !this._releasesShowAll
+            && data.releases.length > INITIAL_COUNT;
+        const visible = collapse ? data.releases.slice(0, INITIAL_COUNT) : data.releases;
+
         const list = document.createElement('div');
         list.className = 'pdp-releases';
 
-        for (const r of data.releases) {
+        for (const r of visible) {
             list.appendChild(this._renderReleaseCard(r));
         }
 
         wrap.appendChild(list);
+
+        if (collapse) {
+            const btn = document.createElement('button');
+            btn.className = 'pdp-releases-loadall';
+            btn.textContent = I18n.t('Load all ({n})', {n: String(data.releases.length)});
+            btn.addEventListener('click', () => {
+                this._releasesShowAll = true;
+                this._renderActiveTab();
+            });
+            wrap.appendChild(btn);
+        }
+
         return wrap;
     }
 

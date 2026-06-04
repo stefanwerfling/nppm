@@ -665,14 +665,15 @@ export class DashboardView {
         ];
 
         // Draw connectors first so the boxes (added next) paint on
-        // top. Start each line at the *centre* of its box and rely
-        // on the box's solid background + higher z-index to mask
-        // the portion that overlaps — the line then appears to
-        // emerge cleanly from the box edge facing the anchor,
-        // regardless of how tall the box wound up rendering at.
+        // top. Start each line a few percent inside the box so the
+        // origin is guaranteed to sit behind the solid box fill —
+        // the visible portion of the line then emerges cleanly at
+        // the box edge that faces the anchor. Boxes render at ~9-12%
+        // tall on the 960×640 card; `+4` keeps the start well above
+        // the bottom edge even on the shortest box.
         for (const b of boxes) {
             const boxCenterX = b.left + b.w / 2;
-            const boxCenterY = b.top + 7; // boxes render at ~14% tall; centre ≈ top + 7
+            const boxCenterY = b.top + 4;
             const line = document.createElementNS(svgNs, 'line');
             line.setAttribute('x1', String(boxCenterX));
             line.setAttribute('y1', String(boxCenterY));

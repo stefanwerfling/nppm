@@ -3034,8 +3034,20 @@ html, body {
 
 .dash-eco-card {
     position: relative;
-    width: 100%;
+     /* Fixed display size — anchors + boxes are positioned in % of
+     * the card, so the relative geometry stays constant regardless
+     * of where the splitter sits. On a 1366×768 panel the right
+     * pane is roughly 1080 wide; capping at 960×640 keeps the card
+     * comfortable there while still looking generous on a 1920px
+     * monitor. `max-width: 100%` lets it shrink (not grow) on a
+     * narrow pane so a horizontal scrollbar never appears. */
+    width: 960px;
+    max-width: 100%;
     aspect-ratio: 3 / 2;
+    /* `.dash-overall` is a flex column — `margin: auto` doesn't
+     * centre on the cross-axis in a flex container, so we use
+     * `align-self: center` explicitly. */
+    align-self: center;
     background-image: url('/Frontend/background.jpg');
     background-size: cover;
     background-position: center;

@@ -9,6 +9,7 @@ import {ReleasesResponse} from '../Releases/Releases.js';
 import {IntegrityFinding, IntegritySeverity, IntegritySummary} from '../Security/IntegrityScanner.js';
 import {DashboardCell, DashboardColumn, DashboardResponse, ScannerId} from '../Dashboard/DashboardBuilder.js';
 import {DashboardHistoryEntry} from '../Dashboard/DashboardHistoryStore.js';
+import {DashboardGrowth} from '../Dashboard/DashboardGrowthBuilder.js';
 import {ImpactReport} from '../Security/ImpactAnalyzer.js';
 import {HeuristicsBatchEntry, SecurityReport} from '../Security/SecurityScanner.js';
 import {PrReviewReport} from '../PrReview/PrReview.js';
@@ -773,6 +774,15 @@ export type ApiDashboardHistoryResponse = {
     entries: DashboardHistoryEntry[];
     previous: DashboardHistoryEntry|null;
 };
+
+/**
+ * Response shape of `GET /api/dashboard/growth?days=`. Per-project
+ * installed-package-count timelines reconstructed from each project's
+ * `.nppm-history/<project>.json` (HistoryStore), plus a carry-forward
+ * ecosystem-total series. Drives the Dashboard Trend tab's "Packages"
+ * metric.
+ */
+export type ApiDashboardGrowthResponse = DashboardGrowth;
 
 /**
  * Response shape of `GET /api/projects/:id/integrity`. Lockfile-

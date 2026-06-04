@@ -36,6 +36,7 @@ import {
     ApiTemplatesMatrixRow,
     ApiTemplatesResponse,
     ApiFingerprintResponse,
+    ApiDashboardGrowthResponse,
     ApiDashboardHistoryResponse,
     ApiDashboardResponse,
     ApiDashboardSnapshotResponse,
@@ -74,6 +75,7 @@ import {HistoryStore} from './History/HistoryStore.js';
 import {RemoteGitHistoryBackfill} from './History/RemoteGitHistoryBackfill.js';
 import {CellFinding, DashboardBuilder, DashboardCell, DashboardColumn, ScannerId, SCANNER_IDS} from './Dashboard/DashboardBuilder.js';
 import {DashboardHistoryStore} from './Dashboard/DashboardHistoryStore.js';
+import {DashboardGrowthBuilder, GrowthProjectInput} from './Dashboard/DashboardGrowthBuilder.js';
 import {DepGraphBuilder} from './DepGraph/DepGraphBuilder.js';
 import {ImpactAnalyzer, ImpactProjectReport} from './Security/ImpactAnalyzer.js';
 import {MatrixBuilder} from './Matrix/MatrixBuilder.js';
@@ -2071,6 +2073,35 @@ class Server {
                         previous = dashboardHistoryStore.readPrevious(entries[entries.length - 1].timestamp);
                     }
                     const payload: ApiDashboardHistoryResponse = {entries, previous};
+                    res.status(200).json(payload);
+                } catch (e) {
+                    res.status(500).json({success: false, msg: (e as Error).message});
+                }
+            });
+
+            // -------------------------------------------------------------
+            // GET /api/dashboard/growth?days=N — per-project installed-
+            // package count over time + carry-forward ecosystem total.
+            // Reconstructed from each project's `.nppm-history/...json`
+            // (HistoryStore) by replaying add/remove deltas backward from
+            // the latest snapshot. Drives the Dashboard Trend tab's
+            // "Packages" metric.
+            // -------------------------------------------------------------
+            app.get('/api/dashboard/growth', (req, res) => {
+                try {
+                    const raw = typeof req.query.days === 'string'
+                        ? Number.parseInt(req.query.days, 10) : 90;
+                    const days = Math.min(3650, Math.max(1, Number.isFinite(raw) ? raw : 90));
+                    const sinceMs = Date.now() - days * 86400_000;
+
+                    const inputs: GrowthProjectInput[] = [];
+                    for (const [unid, project] of projects) {
+                        const name = project.getName();
+                        const history = historyStore.read(unid, name);
+                        inputs.push({unid, name, history});
+                    }
+                    const payload: ApiDashboardGrowthResponse =
+                        DashboardGrowthBuilder.build(inputs, sinceMs);
                     res.status(200).json(payload);
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});

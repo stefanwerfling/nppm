@@ -1,4 +1,5 @@
 import {
+    ApiDashboardGrowthResponse,
     ApiDashboardHistoryResponse,
     ApiDashboardResponse,
     ApiDashboardScanCellEvent,
@@ -64,7 +65,9 @@ export class DashboardView {
      */
     private _previousOverall: number|null = null;
     private _historyEntries: DashboardHistoryEntry[] = [];
+    private _growth: ApiDashboardGrowthResponse|null = null;
     private _trendRangeDays: 30|90|365 = 90;
+    private _trendMetric: 'score'|'packages' = 'score';
     private _widgetStripHost: HTMLElement|null = null;
 
     constructor(root: HTMLElement) {
@@ -198,6 +201,27 @@ export class DashboardView {
             this._renderTable();
         } catch {
             // ignore; donut just hides its delta line
+        }
+    }
+
+    /**
+     * Lazy-load the growth series only when the user actually picks
+     * the "Packages" metric — score is the default and most users
+     * will never touch the other chip on most sessions. Cached for
+     * the lifetime of `show()` so flipping back and forth between
+     * metrics is instant after the first fetch.
+     */
+    private async _loadGrowth(): Promise<void> {
+        try {
+            const res = await fetch(`/api/dashboard/growth?days=${this._trendRangeDays}`);
+            if (!res.ok) {
+                return;
+            }
+            const payload = (await res.json()) as ApiDashboardGrowthResponse;
+            this._growth = payload;
+            this._renderTable();
+        } catch {
+            // ignore; trend tab shows empty state
         }
     }
 
@@ -1285,6 +1309,44 @@ export class DashboardView {
         const wrap = document.createElement('div');
         wrap.className = 'dash-trend';
 
+        // Metric selector — flipping between "Score" (uses the
+        // dashboard-history payload) and "Packages" (uses the
+        // growth payload reconstructed from per-project HistoryStore
+        // files). The two metrics live on different Y axes so we
+        // re-render the chart wholesale on switch.
+        const metrics = document.createElement('div');
+        metrics.className = 'dash-trend-controls';
+        const metricLabel = document.createElement('span');
+        metricLabel.className = 'dash-trend-controls-label';
+        metricLabel.textContent = I18n.t('Metric:');
+        metrics.appendChild(metricLabel);
+        const metricOpts: {value: 'score'|'packages'; label: string}[] = [
+            {value: 'score', label: I18n.t('Score')},
+            {value: 'packages', label: I18n.t('Packages')}
+        ];
+        for (const m of metricOpts) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'dash-trend-range';
+            if (m.value === this._trendMetric) {
+                btn.classList.add('dash-trend-range-active');
+            }
+            btn.textContent = m.label;
+            btn.addEventListener('click', () => {
+                if (this._trendMetric === m.value) {
+                    return;
+                }
+                this._trendMetric = m.value;
+                if (m.value === 'packages' && this._growth === null) {
+                    void this._loadGrowth();
+                } else {
+                    this._renderTable();
+                }
+            });
+            metrics.appendChild(btn);
+        }
+        wrap.appendChild(metrics);
+
         // Range selector — clicking a chip re-fetches with the new
         // window and re-renders. Cheap, the endpoint is sub-100ms.
         const controls = document.createElement('div');
@@ -1306,33 +1368,173 @@ export class DashboardView {
                     return;
                 }
                 this._trendRangeDays = days;
+                // Range change invalidates the cached growth payload
+                // (the endpoint clips server-side), so refetch both.
+                this._growth = null;
                 void this._loadHistory();
+                if (this._trendMetric === 'packages') {
+                    void this._loadGrowth();
+                }
             });
             controls.appendChild(btn);
         }
         wrap.appendChild(controls);
 
-        if (this._historyEntries.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'dash-trend-empty';
-            empty.textContent = I18n.t('No history yet — trigger a scan and come back tomorrow.');
-            wrap.appendChild(empty);
-            this._tableHost.appendChild(wrap);
-            return;
+        if (this._trendMetric === 'score') {
+            if (this._historyEntries.length === 0) {
+                wrap.appendChild(DashboardView._renderTrendEmpty(
+                    I18n.t('No history yet — trigger a scan and come back tomorrow.')
+                ));
+                this._tableHost.appendChild(wrap);
+                return;
+            }
+            wrap.appendChild(this._renderScoreChart(this._historyEntries));
+        } else {
+            if (this._growth === null) {
+                wrap.appendChild(DashboardView._renderTrendEmpty(I18n.t('Loading …')));
+                this._tableHost.appendChild(wrap);
+                return;
+            }
+            if (this._growth.series.length === 0) {
+                wrap.appendChild(DashboardView._renderTrendEmpty(
+                    I18n.t('No package-history yet — run a project lockfile call or git-backfill from the History view.')
+                ));
+                this._tableHost.appendChild(wrap);
+                return;
+            }
+            wrap.appendChild(this._renderGrowthChart(this._growth));
         }
 
-        wrap.appendChild(this._renderTrendChart(this._historyEntries));
         this._tableHost.appendChild(wrap);
     }
 
+    private static _renderTrendEmpty(msg: string): HTMLElement {
+        const empty = document.createElement('div');
+        empty.className = 'dash-trend-empty';
+        empty.textContent = msg;
+        return empty;
+    }
+
     /**
-     * Pure-SVG line chart. Layout: 800×320 viewport; 40px padding
-     * left/bottom for axis labels, 12px padding top/right. One
-     * `<polyline>` per project, plus the ecosystem-overall line on
-     * top in a heavier stroke. Hover-tooltip via title attributes on
-     * the data dots — cheap and accessible.
+     * Score-over-time chart. Y axis fixed at 0..100 since the
+     * dashboard score formula caps there. Reuses the generic
+     * `_renderChartSvg` helper after projecting the history entries
+     * into the {series, overall} shape it expects.
      */
-    private _renderTrendChart(entries: DashboardHistoryEntry[]): SVGElement {
+    private _renderScoreChart(entries: DashboardHistoryEntry[]): SVGElement {
+        type Pt = {timestamp: string; value: number};
+        const seriesByUnid = new Map<string, {unid: string; name: string; points: Pt[]}>();
+        for (const e of entries) {
+            for (const p of e.perProject) {
+                if (p.avg === null) {
+                    continue;
+                }
+                let s = seriesByUnid.get(p.unid);
+                if (!s) {
+                    s = {unid: p.unid, name: p.name, points: []};
+                    seriesByUnid.set(p.unid, s);
+                }
+                s.points.push({timestamp: e.timestamp, value: p.avg});
+            }
+        }
+        const overall: Pt[] = entries
+            .filter((e) => e.overall !== null)
+            .map((e) => ({timestamp: e.timestamp, value: e.overall!}));
+        return this._renderChartSvg({
+            series: Array.from(seriesByUnid.values()),
+            overall,
+            yMin: 0,
+            yMax: 100,
+            yTicks: [0, 25, 50, 75, 100],
+            overallLabel: I18n.t('Ecosystem overall'),
+            valueFormatter: (v) => String(v)
+        });
+    }
+
+    /**
+     * Package-count-over-time chart. Y axis derived from the data
+     * (0..ceil(maxCount * 1.05)) so a slow-growing 50-package project
+     * doesn't get visually flattened by a 5000-package monorepo on
+     * the same axis. Total line carries the carry-forward ecosystem
+     * sum from the growth builder.
+     */
+    private _renderGrowthChart(g: ApiDashboardGrowthResponse): SVGElement {
+        type Pt = {timestamp: string; value: number};
+        const series = g.series.map((s) => ({
+            unid: s.unid,
+            name: s.name,
+            points: s.points.map((p) => ({timestamp: p.timestamp, value: p.count}))
+        }));
+        const overall: Pt[] = g.total.map((p) => ({timestamp: p.timestamp, value: p.count}));
+        let max = 0;
+        for (const s of series) {
+            for (const p of s.points) {
+                if (p.value > max) {
+                    max = p.value;
+                }
+            }
+        }
+        for (const p of overall) {
+            if (p.value > max) {
+                max = p.value;
+            }
+        }
+        const yMax = DashboardView._niceCeil(Math.max(max, 1));
+        const yTicks = [0, Math.round(yMax * 0.25), Math.round(yMax * 0.5), Math.round(yMax * 0.75), yMax];
+        return this._renderChartSvg({
+            series,
+            overall,
+            yMin: 0,
+            yMax,
+            yTicks,
+            overallLabel: I18n.t('Ecosystem total'),
+            valueFormatter: (v) => String(v)
+        });
+    }
+
+    /**
+     * Round up to a "nice" Y-axis ceiling so the gridlines hit round
+     * numbers. Pick the leading digit and snap up to the next
+     * 1 / 2 / 2.5 / 5 / 10 multiple of the magnitude.
+     */
+    private static _niceCeil(n: number): number {
+        if (n <= 1) {
+            return 1;
+        }
+        const mag = Math.pow(10, Math.floor(Math.log10(n)));
+        const lead = n / mag;
+        let snap: number;
+        if (lead <= 1) {
+            snap = 1;
+        } else if (lead <= 2) {
+            snap = 2;
+        } else if (lead <= 2.5) {
+            snap = 2.5;
+        } else if (lead <= 5) {
+            snap = 5;
+        } else {
+            snap = 10;
+        }
+        return snap * mag;
+    }
+
+    /**
+     * Pure-SVG line chart. Layout: 880×360 viewport; 44px padding
+     * left for Y labels, 200px right for the legend column, 16px
+     * top, 36px bottom for X tick labels. One `<polyline>` per
+     * project, plus the ecosystem-overall line on top in a heavier
+     * stroke. Hover-tooltip via title attributes on the data dots —
+     * cheap and accessible.
+     */
+    private _renderChartSvg(input: {
+        series: {unid: string; name: string; points: {timestamp: string; value: number}[]}[];
+        overall: {timestamp: string; value: number}[];
+        yMin: number;
+        yMax: number;
+        yTicks: number[];
+        overallLabel: string;
+        valueFormatter: (v: number) => string;
+    }): SVGElement {
         const svgNs = 'http://www.w3.org/2000/svg';
         const W = 880;
         const H = 360;
@@ -1348,21 +1550,39 @@ export class DashboardView {
         svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
         svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
-        // X scale: timestamp → pixel. Single-entry guard so we don't
-        // divide by zero on the first scan.
-        const tStart = new Date(entries[0].timestamp).getTime();
-        const tEnd = new Date(entries[entries.length - 1].timestamp).getTime();
+        // Collect every timestamp across series + overall so the X
+        // scale spans the full union — a project that only logged
+        // points before another project started shouldn't get
+        // squished into the right edge.
+        const allTimes: number[] = [];
+        for (const s of input.series) {
+            for (const p of s.points) {
+                allTimes.push(new Date(p.timestamp).getTime());
+            }
+        }
+        for (const p of input.overall) {
+            allTimes.push(new Date(p.timestamp).getTime());
+        }
+        if (allTimes.length === 0) {
+            // Defensive — callers should have returned early when no
+            // data is available, but render a friendly empty SVG
+            // rather than crash on the maths below.
+            return svg;
+        }
+        const tStart = Math.min(...allTimes);
+        const tEnd = Math.max(...allTimes);
         const tSpan = Math.max(1, tEnd - tStart);
         const xPx = (iso: string): number => {
             const t = new Date(iso).getTime();
             return PAD_L + ((t - tStart) / tSpan) * PLOT_W;
         };
-        const yPx = (score: number): number =>
-            PAD_T + (1 - score / 100) * PLOT_H;
+        const yRange = Math.max(1, input.yMax - input.yMin);
+        const yPx = (v: number): number =>
+            PAD_T + (1 - (v - input.yMin) / yRange) * PLOT_H;
 
-        // Y gridlines + labels at 0/25/50/75/100.
-        for (const score of [0, 25, 50, 75, 100]) {
-            const y = yPx(score);
+        // Y gridlines + labels from the caller-supplied tick set.
+        for (const tick of input.yTicks) {
+            const y = yPx(tick);
             const line = document.createElementNS(svgNs, 'line');
             line.setAttribute('class', 'dash-trend-grid');
             line.setAttribute('x1', String(PAD_L));
@@ -1375,58 +1595,33 @@ export class DashboardView {
             lbl.setAttribute('x', String(PAD_L - 6));
             lbl.setAttribute('y', String(y + 4));
             lbl.setAttribute('text-anchor', 'end');
-            lbl.textContent = String(score);
+            lbl.textContent = input.valueFormatter(tick);
             svg.appendChild(lbl);
         }
 
-        // X-axis date ticks: first, middle, last entry timestamps.
-        const tickIdx = entries.length === 1
-            ? [0]
-            : entries.length === 2
-                ? [0, entries.length - 1]
-                : [0, Math.floor(entries.length / 2), entries.length - 1];
-        for (const i of tickIdx) {
-            const x = xPx(entries[i].timestamp);
+        // X-axis date ticks: start / middle / end of the union span.
+        const tickTimes = tStart === tEnd
+            ? [tStart]
+            : [tStart, (tStart + tEnd) / 2, tEnd];
+        for (const t of tickTimes) {
+            const iso = new Date(t).toISOString();
             const lbl = document.createElementNS(svgNs, 'text');
             lbl.setAttribute('class', 'dash-trend-axis');
-            lbl.setAttribute('x', String(x));
+            lbl.setAttribute('x', String(xPx(iso)));
             lbl.setAttribute('y', String(PAD_T + PLOT_H + 18));
             lbl.setAttribute('text-anchor', 'middle');
-            lbl.textContent = DashboardView._formatShortDate(entries[i].timestamp);
+            lbl.textContent = DashboardView._formatShortDate(iso);
             svg.appendChild(lbl);
         }
 
-        // Collect each project's timeline. A project absent from an
-        // entry (added later or removed) just has no point at that x —
-        // polyline skips the gap by splitting into segments.
-        type ProjectSeries = {unid: string; name: string; points: {x: number; y: number; iso: string; score: number}[]};
-        const seriesByUnid = new Map<string, ProjectSeries>();
-        for (const entry of entries) {
-            for (const p of entry.perProject) {
-                if (p.avg === null) {
-                    continue;
-                }
-                let s = seriesByUnid.get(p.unid);
-                if (!s) {
-                    s = {unid: p.unid, name: p.name, points: []};
-                    seriesByUnid.set(p.unid, s);
-                }
-                s.points.push({
-                    x: xPx(entry.timestamp),
-                    y: yPx(p.avg),
-                    iso: entry.timestamp,
-                    score: p.avg
-                });
-            }
-        }
-
-        // Sort projects by latest score asc so the worst project ends
-        // up on top of the legend (and at the bottom of the chart's
-        // z-order, which is fine — we paint overall last).
-        const seriesList = Array.from(seriesByUnid.values())
+        // Sort projects by latest value asc so the lowest series is
+        // first in the legend (matches "worst-first" semantics for
+        // the score metric; for packages it shows the smallest
+        // project first, which is also a reasonable default).
+        const seriesList = input.series.slice()
             .sort((a, b) => {
-                const la = a.points[a.points.length - 1]?.score ?? 100;
-                const lb = b.points[b.points.length - 1]?.score ?? 100;
+                const la = a.points[a.points.length - 1]?.value ?? Infinity;
+                const lb = b.points[b.points.length - 1]?.value ?? Infinity;
                 return la - lb;
             });
 
@@ -1442,18 +1637,19 @@ export class DashboardView {
             const colour = palette[i % palette.length];
             const poly = document.createElementNS(svgNs, 'polyline');
             poly.setAttribute('class', 'dash-trend-line');
-            poly.setAttribute('points', s.points.map((p) => `${p.x},${p.y}`).join(' '));
+            poly.setAttribute('points',
+                s.points.map((p) => `${xPx(p.timestamp)},${yPx(p.value)}`).join(' '));
             poly.setAttribute('stroke', colour);
             svg.appendChild(poly);
             for (const p of s.points) {
                 const dot = document.createElementNS(svgNs, 'circle');
                 dot.setAttribute('class', 'dash-trend-dot');
-                dot.setAttribute('cx', String(p.x));
-                dot.setAttribute('cy', String(p.y));
+                dot.setAttribute('cx', String(xPx(p.timestamp)));
+                dot.setAttribute('cy', String(yPx(p.value)));
                 dot.setAttribute('r', '2.5');
                 dot.setAttribute('fill', colour);
                 const title = document.createElementNS(svgNs, 'title');
-                title.textContent = `${s.name}: ${p.score} · ${DashboardView._formatShortDate(p.iso)}`;
+                title.textContent = `${s.name}: ${input.valueFormatter(p.value)} · ${DashboardView._formatShortDate(p.timestamp)}`;
                 dot.appendChild(title);
                 svg.appendChild(dot);
             }
@@ -1461,29 +1657,27 @@ export class DashboardView {
 
         // Ecosystem-overall line — heavier stroke, painted last so it
         // sits on top.
-        const overallPoints = entries
-            .filter((e) => e.overall !== null)
-            .map((e) => ({x: xPx(e.timestamp), y: yPx(e.overall!), iso: e.timestamp, score: e.overall!}));
-        if (overallPoints.length > 1) {
+        if (input.overall.length > 1) {
             const poly = document.createElementNS(svgNs, 'polyline');
             poly.setAttribute('class', 'dash-trend-line dash-trend-line-overall');
-            poly.setAttribute('points', overallPoints.map((p) => `${p.x},${p.y}`).join(' '));
+            poly.setAttribute('points',
+                input.overall.map((p) => `${xPx(p.timestamp)},${yPx(p.value)}`).join(' '));
             svg.appendChild(poly);
         }
-        for (const p of overallPoints) {
+        for (const p of input.overall) {
             const dot = document.createElementNS(svgNs, 'circle');
             dot.setAttribute('class', 'dash-trend-dot dash-trend-dot-overall');
-            dot.setAttribute('cx', String(p.x));
-            dot.setAttribute('cy', String(p.y));
+            dot.setAttribute('cx', String(xPx(p.timestamp)));
+            dot.setAttribute('cy', String(yPx(p.value)));
             dot.setAttribute('r', '3.5');
             const title = document.createElementNS(svgNs, 'title');
-            title.textContent = `${I18n.t('Ecosystem overall')}: ${p.score} · ${DashboardView._formatShortDate(p.iso)}`;
+            title.textContent = `${input.overallLabel}: ${input.valueFormatter(p.value)} · ${DashboardView._formatShortDate(p.timestamp)}`;
             dot.appendChild(title);
             svg.appendChild(dot);
         }
 
         // Legend column on the right. Overall sits on top, then
-        // per-project worst-first.
+        // per-project sorted.
         const legendX = PAD_L + PLOT_W + 16;
         let legendY = PAD_T + 4;
         const legendEntry = (colour: string, text: string, isOverall: boolean): void => {
@@ -1506,7 +1700,7 @@ export class DashboardView {
             svg.appendChild(lbl);
             legendY += 18;
         };
-        legendEntry('currentColor', I18n.t('Ecosystem overall'), true);
+        legendEntry('currentColor', input.overallLabel, true);
         for (let i = 0; i < seriesList.length && i < 12; i++) {
             legendEntry(palette[i % palette.length], seriesList[i].name, false);
         }

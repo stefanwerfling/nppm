@@ -530,6 +530,29 @@ export class Matrix {
         if (!this._data) {
             return out;
         }
+        // Until at least one batched signal (CVE / heuristics / …)
+        // has landed, every row's contribution to `_scoreFor` is zero,
+        // which would round-trip to a misleading 100% health for every
+        // project. Emit an empty map instead so the treeview keeps the
+        // "…" loading state until the first real data arrives.
+        const hasSignal = this._vulnsByName.size > 0
+            || this._scriptsByName.size > 0
+            || this._patternsByName.size > 0
+            || this._binariesByName.size > 0
+            || this._maintainersByName.size > 0
+            || this._licensesByName.size > 0
+            || this._freshnessByName.size > 0
+            || this._cadenceByName.size > 0
+            || this._typosquatByName.size > 0
+            || this._externalByName.size > 0
+            || this._deprecationByName.size > 0
+            || this._obfuscationByName.size > 0
+            || this._manifestRedFlagsByName.size > 0
+            || this._capabilityByName.size > 0
+            || this._integrityByName.size > 0;
+        if (!hasSignal) {
+            return out;
+        }
         const totals = new Map<string, {score: number; count: number}>();
         for (const project of this._data.projects) {
             totals.set(project.unid, {score: 0, count: 0});

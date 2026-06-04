@@ -254,7 +254,28 @@ export class ProjectMatrixView {
 
         const latestTd = document.createElement('td');
         latestTd.className = 'matrix-cell-latest';
-        latestTd.textContent = row.latest ?? '?';
+        if (row.latest) {
+            latestTd.textContent = row.latest;
+        } else if (row.gitLatest) {
+            // Symmetric with the cross-project matrix's git-pill: show
+            // upstream version + short SHA when the HEAD fetcher
+            // resolved them, fall back to a plain "git" pill when not.
+            latestTd.classList.add('matrix-cell-latest-git');
+            if (row.gitLatest.version || row.gitLatest.shortSha) {
+                const parts: string[] = [];
+                if (row.gitLatest.version) {
+                    parts.push(row.gitLatest.version);
+                }
+                if (row.gitLatest.shortSha) {
+                    parts.push(row.gitLatest.shortSha);
+                }
+                latestTd.textContent = parts.join(' · ');
+            } else {
+                latestTd.textContent = 'git';
+            }
+        } else {
+            latestTd.textContent = '?';
+        }
         tr.appendChild(latestTd);
 
         return tr;

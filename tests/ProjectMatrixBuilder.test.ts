@@ -120,4 +120,50 @@ describe('ProjectMatrixBuilder.build', () => {
         expect(matrix.workspaces).toEqual([{label: 'root'}]);
         expect(matrix.rows).toHaveLength(1);
     });
+
+    it('forces latest=null on git-only rows so a foreign npm package of the same name cannot leak in', async () => {
+        // The user's `figtree` is a git dep; npm has an unrelated
+        // `figtree@0.0.0` from another author. The per-project matrix
+        // must not surface fundon's 0.0.0 as latest just because the
+        // registry returns it for that name.
+        const project = new FakeProject('p', [
+            manifest('root', {figtree: 'git+https://github.com/me/figtree.git#v1.0.20'}),
+            manifest('api', {figtree: 'git+https://github.com/me/figtree.git#main'}, 'packages/api')
+        ]);
+        const matrix = await ProjectMatrixBuilder.build('UNID', project, new FakeRegistry({
+            figtree: {name: 'figtree', latest: '0.0.0', versions: ['0.0.0']}
+        }));
+        const row = matrix.rows.find((r) => r.name === 'figtree');
+        expect(row).toBeDefined();
+        expect(row!.latest).toBeNull();
+        expect(row!.gitLatest).toBeDefined();
+        expect(row!.gitLatest!.sourceUrl).toBe('git+https://github.com/me/figtree.git');
+    });
+
+    it('resolves git HEAD info once per distinct origin and stamps version + shortSha on the row', async () => {
+        const project = new FakeProject('p', [
+            manifest('root', {figtree: 'git+https://github.com/me/figtree.git#v1.0.20'}),
+            manifest('api', {figtree: 'git+https://github.com/me/figtree.git#main'}, 'packages/api')
+        ]);
+
+        let calls = 0;
+        const headFetcher = {
+            fetch: async (url: string) => {
+                calls++;
+                expect(url).toBe('git+https://github.com/me/figtree.git');
+                return {version: '1.0.28', sha: 'a'.repeat(40), shortSha: 'aaaaaaa'};
+            }
+        };
+        const matrix = await ProjectMatrixBuilder.build(
+            'UNID',
+            project,
+            new FakeRegistry({}),
+            headFetcher as any
+        );
+
+        expect(calls).toBe(1);
+        const row = matrix.rows.find((r) => r.name === 'figtree')!;
+        expect(row.gitLatest?.version).toBe('1.0.28');
+        expect(row.gitLatest?.shortSha).toBe('aaaaaaa');
+    });
 });

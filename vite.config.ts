@@ -1189,7 +1189,7 @@ class Server {
                 }
 
                 try {
-                    const matrix = await ProjectMatrixBuilder.build(req.params.id, project, registry);
+                    const matrix = await ProjectMatrixBuilder.build(req.params.id, project, registry, gitHeadFetcher);
                     res.status(200).json(matrix);
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});

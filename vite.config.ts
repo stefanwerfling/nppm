@@ -76,6 +76,7 @@ import {RemoteGitHistoryBackfill} from './History/RemoteGitHistoryBackfill.js';
 import {CellFinding, DashboardBuilder, DashboardCell, DashboardColumn, ScannerId, SCANNER_IDS} from './Dashboard/DashboardBuilder.js';
 import {DashboardHistoryStore} from './Dashboard/DashboardHistoryStore.js';
 import {DashboardGrowthBuilder, GrowthProjectInput} from './Dashboard/DashboardGrowthBuilder.js';
+import {InstalledSize} from './Dashboard/InstalledSize.js';
 import {DepGraphBuilder} from './DepGraph/DepGraphBuilder.js';
 import {ImpactAnalyzer, ImpactProjectReport} from './Security/ImpactAnalyzer.js';
 import {MatrixBuilder} from './Matrix/MatrixBuilder.js';
@@ -2189,6 +2190,7 @@ class Server {
                         };
 
                         let columnNote: string|undefined;
+                        let columnSize: {totalBytes: number; coveredCount: number; totalCount: number}|undefined;
                         try {
                             send('progress', {
                                 current: cellsDone,
@@ -2281,6 +2283,22 @@ class Server {
 
                             if (packages.length > 0) {
                                 const packageCount = packages.length;
+
+                                // Installed-size aggregate over the
+                                // *display* (registry-semver) versions so
+                                // the packument lookup hits — using
+                                // `pkg.resolved` for git deps here would
+                                // miss the cache entirely. Git deps fall
+                                // out of the sum and show up in
+                                // `coverage.covered / coverage.total`.
+                                try {
+                                    columnSize = await InstalledSize.compute(
+                                        packages.map((p) => ({name: p.name, version: p.displayVersion})),
+                                        registry
+                                    );
+                                } catch {
+                                    // best-effort; leave undefined
+                                }
 
                                 // Announce the slow phase first so the
                                 // progress bar already shows what's
@@ -2591,7 +2609,14 @@ class Server {
                             project: {unid, name: projectName, type: project.getType()},
                             cells,
                             ...(columnError ? {error: columnError} : {}),
-                            ...(columnNote ? {note: columnNote} : {})
+                            ...(columnNote ? {note: columnNote} : {}),
+                            ...(columnSize !== undefined ? {sizeBytes: columnSize.totalBytes} : {}),
+                            ...(columnSize ? {
+                                sizeCoverage: {
+                                    covered: columnSize.coveredCount,
+                                    total: columnSize.totalCount
+                                }
+                            } : {})
                         };
                         columns.push(column);
                         send('column-end', {column});

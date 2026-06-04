@@ -6,7 +6,12 @@ import {DashboardHistoryStore} from '../Dashboard/DashboardHistoryStore.js';
 import {DashboardResponse, SCANNER_IDS} from '../Dashboard/DashboardBuilder.js';
 import {ConfigProjectType} from '../Config/Config.js';
 
-const mkDashboard = (rows: {unid: string; name: string; cells: Record<string, number|null>}[]): DashboardResponse => ({
+const mkDashboard = (rows: {
+    unid: string;
+    name: string;
+    cells: Record<string, number|null>;
+    sizeBytes?: number;
+}[]): DashboardResponse => ({
     scanners: [...SCANNER_IDS],
     columns: rows.map((r) => ({
         project: {unid: r.unid, name: r.name, type: ConfigProjectType.local},
@@ -15,7 +20,8 @@ const mkDashboard = (rows: {unid: string; name: string; cells: Record<string, nu
                 scanner,
                 {score, counts: {info: 0, warn: 0, risk: 0}, total: 0, findings: []}
             ])
-        )
+        ),
+        ...(r.sizeBytes !== undefined ? {sizeBytes: r.sizeBytes} : {})
     }))
 });
 
@@ -37,12 +43,26 @@ describe('DashboardHistoryStore', () => {
         ]);
         const entry = DashboardHistoryStore.summarize(dashboard, '2026-06-04T10:00:00Z');
         expect(entry.perProject).toEqual([
-            {unid: 'a', name: 'projA', avg: 90},
-            {unid: 'b', name: 'projB', avg: 50}
+            {unid: 'a', name: 'projA', avg: 90, sizeBytes: null},
+            {unid: 'b', name: 'projB', avg: 50, sizeBytes: null}
         ]);
         expect(entry.perScanner.find((s) => s.scanner === 'cve')?.avg).toBe(65);
         expect(entry.perScanner.find((s) => s.scanner === 'license')?.avg).toBe(75);
         expect(entry.overall).toBe(70);
+        expect(entry.totalSizeBytes).toBeNull();
+    });
+
+    it('aggregates totalSizeBytes when column-level sizeBytes are present', () => {
+        const dashboard = mkDashboard([
+            {unid: 'a', name: 'projA', cells: {cve: 80}, sizeBytes: 12_000_000},
+            {unid: 'b', name: 'projB', cells: {cve: 50}, sizeBytes: 8_000_000},
+            {unid: 'c', name: 'projC', cells: {cve: 70}} // no size
+        ]);
+        const entry = DashboardHistoryStore.summarize(dashboard, '2026-06-04T10:00:00Z');
+        expect(entry.totalSizeBytes).toBe(20_000_000);
+        expect(entry.perProject[0].sizeBytes).toBe(12_000_000);
+        expect(entry.perProject[1].sizeBytes).toBe(8_000_000);
+        expect(entry.perProject[2].sizeBytes).toBeNull();
     });
 
     it('returns overall=null when every cell is N/A', () => {

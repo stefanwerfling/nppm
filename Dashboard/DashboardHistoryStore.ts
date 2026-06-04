@@ -15,7 +15,25 @@ import {DashboardResponse, ScannerId} from './DashboardBuilder.js';
 export type DashboardHistoryEntry = {
     timestamp: string;
     overall: number|null;
-    perProject: {unid: string; name: string; avg: number|null}[];
+    /**
+     * Sum of every project's `sizeBytes` at scan time. `null` when no
+     * project produced a size aggregate (registry offline, all git
+     * deps, …). Drives the Dashboard Trend tab's "Size" metric.
+     */
+    totalSizeBytes: number|null;
+    perProject: {
+        unid: string;
+        name: string;
+        avg: number|null;
+        /**
+         * Installed-bytes footprint for this project at scan time.
+         * `null` when not computed (e.g. column.error). The number
+         * is a best-effort floor — packages whose registry entry
+         * lacks `unpackedSize` (very old releases, git deps) are
+         * silently skipped from the sum.
+         */
+        sizeBytes: number|null;
+    }[];
     perScanner: {scanner: ScannerId; avg: number|null}[];
 };
 
@@ -131,10 +149,12 @@ export class DashboardHistoryStore {
      * for the SSE end event without a round-trip through disk.
      */
     public static summarize(dashboard: DashboardResponse, timestampIso: string): DashboardHistoryEntry {
-        const perProject: {unid: string; name: string; avg: number|null}[] = [];
+        const perProject: {unid: string; name: string; avg: number|null; sizeBytes: number|null}[] = [];
         const scannerSum = new Map<ScannerId, {sum: number; n: number}>();
         let overallSum = 0;
         let overallN = 0;
+        let totalSize = 0;
+        let anySize = false;
 
         for (const col of dashboard.columns) {
             let projSum = 0;
@@ -158,7 +178,12 @@ export class DashboardHistoryStore {
                 overallSum += avg;
                 overallN++;
             }
-            perProject.push({unid: col.project.unid, name: col.project.name, avg});
+            const sizeBytes = typeof col.sizeBytes === 'number' ? col.sizeBytes : null;
+            if (sizeBytes !== null) {
+                totalSize += sizeBytes;
+                anySize = true;
+            }
+            perProject.push({unid: col.project.unid, name: col.project.name, avg, sizeBytes});
         }
 
         const perScanner: {scanner: ScannerId; avg: number|null}[] = [];
@@ -170,6 +195,7 @@ export class DashboardHistoryStore {
         return {
             timestamp: timestampIso,
             overall: overallN > 0 ? Math.round(overallSum / overallN) : null,
+            totalSizeBytes: anySize ? totalSize : null,
             perProject,
             perScanner
         };

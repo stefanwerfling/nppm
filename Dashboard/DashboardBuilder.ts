@@ -143,6 +143,20 @@ export type DashboardColumn = {
      * lockfile-pinned.
      */
     note?: string;
+    /**
+     * Installed-size aggregate. Sum of `dist.unpackedSize` across
+     * every package in the lockfile for which the registry exposes
+     * a size. Absent on columns that errored before lockfile-load or
+     * had no resolvable packages.
+     */
+    sizeBytes?: number;
+    /**
+     * How many of the lockfile's packages contributed to `sizeBytes`
+     * (the registry exposes `unpackedSize` for most but not all). The
+     * UI surfaces this as a "best-effort floor" tooltip so the user
+     * knows the number is conservative.
+     */
+    sizeCoverage?: {covered: number; total: number};
 };
 
 export type DashboardResponse = {

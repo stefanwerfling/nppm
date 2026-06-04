@@ -38,6 +38,15 @@ export type RegistryDist = {
             predicateType?: string;
         };
     };
+    /**
+     * Unpacked size in bytes as the registry reports it (the size on
+     * disk after `npm install` extracts the tarball). Used by the
+     * Dashboard Trend tab's "Size" metric to compute per-project +
+     * ecosystem installed footprints. Absent on very old releases
+     * where the registry never recorded the field — those packages
+     * fall out of the sum (best-effort floor, not authoritative).
+     */
+    unpackedSize?: number;
 };
 
 /**
@@ -317,6 +326,10 @@ export class Registry {
             );
             if (att) {
                 distEntry.attestations = att;
+            }
+            const sz = (d as {unpackedSize?: unknown}).unpackedSize;
+            if (typeof sz === 'number' && Number.isFinite(sz) && sz >= 0) {
+                distEntry.unpackedSize = sz;
             }
             out[version] = distEntry;
             any = true;

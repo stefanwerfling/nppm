@@ -67,7 +67,7 @@ export class DashboardView {
     private _historyEntries: DashboardHistoryEntry[] = [];
     private _growth: ApiDashboardGrowthResponse|null = null;
     private _trendRangeDays: 30|90|365 = 90;
-    private _trendMetric: 'score'|'packages' = 'score';
+    private _trendMetric: 'score'|'packages'|'size' = 'score';
     private _widgetStripHost: HTMLElement|null = null;
 
     constructor(root: HTMLElement) {
@@ -1320,9 +1320,10 @@ export class DashboardView {
         metricLabel.className = 'dash-trend-controls-label';
         metricLabel.textContent = I18n.t('Metric:');
         metrics.appendChild(metricLabel);
-        const metricOpts: {value: 'score'|'packages'; label: string}[] = [
+        const metricOpts: {value: 'score'|'packages'|'size'; label: string}[] = [
             {value: 'score', label: I18n.t('Score')},
-            {value: 'packages', label: I18n.t('Packages')}
+            {value: 'packages', label: I18n.t('Packages')},
+            {value: 'size', label: I18n.t('Size')}
         ];
         for (const m of metricOpts) {
             const btn = document.createElement('button');
@@ -1389,7 +1390,7 @@ export class DashboardView {
                 return;
             }
             wrap.appendChild(this._renderScoreChart(this._historyEntries));
-        } else {
+        } else if (this._trendMetric === 'packages') {
             if (this._growth === null) {
                 wrap.appendChild(DashboardView._renderTrendEmpty(I18n.t('Loading …')));
                 this._tableHost.appendChild(wrap);
@@ -1403,6 +1404,20 @@ export class DashboardView {
                 return;
             }
             wrap.appendChild(this._renderGrowthChart(this._growth));
+        } else {
+            // size — derived from the same DashboardHistoryEntry payload
+            // the score chart reads. `typeof === 'number'` so older
+            // entries persisted before the size field was added (where
+            // the JSON lacks the key entirely) drop out cleanly.
+            const sized = this._historyEntries.filter((e) => typeof e.totalSizeBytes === 'number');
+            if (sized.length === 0) {
+                wrap.appendChild(DashboardView._renderTrendEmpty(
+                    I18n.t('No size data yet — older scans pre-date the size metric. Re-scan to populate it.')
+                ));
+                this._tableHost.appendChild(wrap);
+                return;
+            }
+            wrap.appendChild(this._renderSizeChart(sized));
         }
 
         this._tableHost.appendChild(wrap);
@@ -1490,6 +1505,77 @@ export class DashboardView {
             overallLabel: I18n.t('Ecosystem total'),
             valueFormatter: (v) => String(v)
         });
+    }
+
+    /**
+     * Installed-bytes chart. Reads per-project + ecosystem totals
+     * from the DashboardHistoryEntry payload (recorded at each scan).
+     * Y axis auto-scales with `_niceCeil` and labels use the
+     * byte-formatter so the gridlines read "120 MB" not "125829120".
+     */
+    private _renderSizeChart(entries: DashboardHistoryEntry[]): SVGElement {
+        type Pt = {timestamp: string; value: number};
+        const seriesByUnid = new Map<string, {unid: string; name: string; points: Pt[]}>();
+        for (const e of entries) {
+            for (const p of e.perProject) {
+                if (typeof p.sizeBytes !== 'number') {
+                    continue;
+                }
+                let s = seriesByUnid.get(p.unid);
+                if (!s) {
+                    s = {unid: p.unid, name: p.name, points: []};
+                    seriesByUnid.set(p.unid, s);
+                }
+                s.points.push({timestamp: e.timestamp, value: p.sizeBytes});
+            }
+        }
+        const overall: Pt[] = entries
+            .filter((e) => typeof e.totalSizeBytes === 'number')
+            .map((e) => ({timestamp: e.timestamp, value: e.totalSizeBytes as number}));
+        let max = 0;
+        for (const s of seriesByUnid.values()) {
+            for (const p of s.points) {
+                if (p.value > max) {
+                    max = p.value;
+                }
+            }
+        }
+        for (const p of overall) {
+            if (p.value > max) {
+                max = p.value;
+            }
+        }
+        const yMax = DashboardView._niceCeil(Math.max(max, 1));
+        const yTicks = [0, Math.round(yMax * 0.25), Math.round(yMax * 0.5), Math.round(yMax * 0.75), yMax];
+        return this._renderChartSvg({
+            series: Array.from(seriesByUnid.values()),
+            overall,
+            yMin: 0,
+            yMax,
+            yTicks,
+            overallLabel: I18n.t('Ecosystem total'),
+            valueFormatter: (v) => DashboardView._formatBytes(v)
+        });
+    }
+
+    /**
+     * Human-readable byte count. Snaps to the largest unit that keeps
+     * the number ≥ 1 — 1024-based since that's what npm reports
+     * (`du`-style). One decimal for the < 100 range, none above so
+     * the labels don't visually drift.
+     */
+    private static _formatBytes(n: number): string {
+        if (n < 1024) {
+            return `${n} B`;
+        }
+        const units = ['kB', 'MB', 'GB', 'TB'];
+        let v = n / 1024;
+        let i = 0;
+        while (v >= 1024 && i < units.length - 1) {
+            v /= 1024;
+            i++;
+        }
+        return v >= 100 ? `${Math.round(v)} ${units[i]}` : `${v.toFixed(1)} ${units[i]}`;
     }
 
     /**

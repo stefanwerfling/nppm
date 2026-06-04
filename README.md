@@ -53,8 +53,10 @@ server, frontend is plain TypeScript + DOM (no framework).
   one column per project (with a `WS` badge when the project's own
   workspaces disagree — clicking the badge opens a per-workspace
   breakdown with a jump to the per-project matrix). Git-only rows are
-  recognised: no fake `latest` from a same-named registry collision,
-  the Latest column shows `git` with the actual refs in the tooltip.
+  recognised: no fake `latest` from a same-named registry collision —
+  the Latest column shows the upstream HEAD as `1.0.28 · 7d3f12a`
+  (version + short SHA) for GitHub and Gitea hosts, falling back to a
+  plain `git` pill with an orange ⓘ when the host is unreachable.
 - **Per-project matrix** — workspaces split into individual columns so you
   see drift inside one project at a glance.
 - **Project sub-views** for each configured project: `Declared`
@@ -129,12 +131,23 @@ server, frontend is plain TypeScript + DOM (no framework).
     registry tarballs, `file:`/`link:` local protocols.
 - **Cross-project Dashboard** — every scanner's per-project verdict
   collapsed into a `(project × scanner)` ring matrix with 0–100 %
-  scores. SSE-streamed per cell so a cold scan shows progress
-  immediately; a snapshot under `.nppm-cache/` makes the next open
-  instant. Click any cell for the per-package drill-down with
+  scores under the **Scanner Score** tab. SSE-streamed per cell so a
+  cold scan shows progress immediately (per-package sub-phase shown
+  in the status line: "Fingerprinting lodash@4.17.21 (32/84) —
+  kavula"); a snapshot under `.nppm-cache/` makes the next open
+  instant. Lockfile-less projects (browser extensions, many
+  libraries) are scanned against the registry's `latest` for every
+  declared dep — same cells light up, with a small ⓘ on the project
+  column carrying the "no lockfile — scanned against registry
+  latest" note. Click any cell for the per-package drill-down with
   top-50 contributors; click any header to jump to the per-project
-  view. Pickable via Settings → General → "Start page" as the
-  default landing view.
+  view. The **Overall Evaluation** tab renders an ecosystem hero
+  card: a forest-themed 3:2 scene with ten clickable metric boxes
+  (projects, ecosystem health, healthy / at-risk counts, total
+  risk findings, CVE / deprecation / maintainer / typosquat flags),
+  each with a hover tooltip and a detail modal. Switching tabs
+  leaves the SSE alone. Pickable via Settings → General →
+  "Start page" as the default landing view.
 - **Cross-project Impact Analysis** — topbar **Impact** button
   answers "which projects pull in `<name>` (or `<name>@<version>`),
   directly or transitively, and via which shortest path?". BFS over
@@ -178,6 +191,11 @@ server, frontend is plain TypeScript + DOM (no framework).
   lifecycle hook in `node_modules` with a per-package "Run" button
   (`npm rebuild <pkg>`) so the user can re-fire only the scripts
   they've reviewed. Backups land in `.nppm-backups/<timestamp>/`.
+  Every project-rooted write is routed through `SafePath.join`,
+  which refuses anything that isn't a strict descendant of the
+  project root — `../../etc/cron.d/evil` workspace paths and
+  malicious template file entries are both contained at the
+  endpoint boundary.
 - **Open in IDE** — small `IDE` button next to every installed
   package's path in the Installed view. Opens `node_modules/<pkg>` in
   the editor configured under `actions.editor` (`vscode` /

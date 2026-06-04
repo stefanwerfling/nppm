@@ -32,10 +32,11 @@ nppm/
 │   ├── Project.ts          common interface (loadManifests, loadLockfile, getKey, …)
 │   ├── ProjectLocal.ts     local-dir reader, includes workspace expansion
 │   ├── ProjectRemote.ts    abstract base for GitHub/Gitea
-│   ├── ProjectGithub.ts    contents API
-│   ├── ProjectGitea.ts     contents API (different URL shape, token format)
+│   ├── ProjectGithub.ts    contents API; constructor normalises full URLs (https://, git@, github:, .git suffix) to owner/name
+│   ├── ProjectGitea.ts     contents API (different URL shape, token format); exposes getHost()/getToken() for the Gitea-host allow-list in GitResolver/GitHeadFetcher
 │   ├── PackageManifest.ts  flat DependencyType + PackageDependency types
-│   └── Lockfile.ts         parsePackageLock v2/v3, scanNodeModules fallback
+│   ├── Lockfile.ts         parsePackageLock v2/v3, scanNodeModules fallback
+│   └── SafePath.ts         join() containment helper — resolves a candidate against a root, refuses anything that isn't the root itself or a strict descendant of `${root}${sep}`. Used by Upgrader.resolvePackageJson + TemplateApplier._packageJsonFor/_fileAbs.
 │
 ├── Registry/Registry.ts    npm-registry client with batched concurrency
 │
@@ -44,11 +45,11 @@ nppm/
 │   └── ProjectMatrixBuilder.ts  per-project (rows = pkgs, cols = workspaces)
 │
 ├── Fingerprint/            tarball-level scanning
-│   ├── TarballParser.ts    zlib + manual 512-byte tar walk (no `tar` dep)
+│   ├── TarballParser.ts    zlib + manual 512-byte tar walk (no `tar` dep); exposes the stripped top-level folder so GitHeadFetcher can lift the SHA out of GitHub codeload's `<repo>-<sha>` prefix
 │   ├── Fingerprint.ts      File / Package / Diff types
-│   ├── FingerprintBuilder.ts  fetch+gunzip+hash, content cache for JS files
+│   ├── FingerprintBuilder.ts  fetch+gunzip+hash, content cache for JS files; cache-less variant for non-SHA-pinned git coordinates so HEAD content is never served stale
 │   ├── FingerprintDiff.ts  added/removed/modified
-│   └── GitResolver.ts      git URLs → codeload/gitlab/bitbucket tarball URLs
+│   └── GitResolver.ts      git URLs → codeload/gitlab/bitbucket/gitea tarball URLs. Host-agnostic `parse()` extracts host/owner/repo/ref; tarball resolver accepts a `giteaHosts` allow-list so any configured Gitea project routes through `/archive/<ref>.tar.gz`.
 │
 ├── Security/               heuristic + CVE scanners
 │   ├── OsvClient.ts        OSV.dev (single + batch), envelope-cached
@@ -97,7 +98,9 @@ nppm/
 │
 ├── Releases/               npm registry + GitHub Releases merge
 │   ├── Releases.ts
-│   └── ReleasesFetcher.ts
+│   ├── ReleasesFetcher.ts
+│   ├── GitHeadFetcher.ts   TTL-cached HEAD-tarball fetcher: resolves the upstream HEAD via GitResolver, lifts `package.json.version` + commit SHA out of the codeload prefix. Returns `GitHeadInfo` carrying an `error` field on failure (`GitHub unreachable: …` not cached, `Repository not found` cached). Per-instance Gitea token routing.
+│   └── GitCommitsFetcher.ts  GitHub REST `/commits` + Gitea v1 `/repos/.../commits` (per-instance token); maps each row into the existing `Release` shape with `sha`, `subject`, `author`. TTL-cached against the releases pocket. Drives /api/releases for git-versions.
 │
 ├── Dashboard/DashboardBuilder.ts  per-(project, scanner) scoring helpers — unified info/warn/risk → 0–100 ring score; reused by /api/dashboard/scan
 │
@@ -135,7 +138,8 @@ nppm/
 │   ├── UnusedView.ts       per-project depcheck-style report (unused/misplaced/missing)
 │   ├── VulnerabilityTimelineView.ts  retroactive CVE exposure window per name@version
 │   ├── PrReviewView.ts     diffs package.json + lockfile between two git refs
-│   ├── DashboardView.ts    cross-project scanner matrix (rows × cols = scanners × projects, score rings; treeview __dashboard__ sentinel → SSE /api/dashboard/scan; cell click → FindingsModal; header click → project drill-down; snapshot first-paint)
+│   ├── DashboardView.ts    cross-project scanner matrix split into two tabs: **Scanner Score** (rows × cols = scanners × projects, score rings; treeview __dashboard__ sentinel → SSE /api/dashboard/scan; cell click → FindingsModal; header click → project drill-down; snapshot first-paint; per-package progress detail; survives view switches) and **Overall Evaluation** (ecosystem hero card built from `_columns` only — no extra fetch). Emits per-project averages on snapshot load + column-end + scan-end to drive the treeview ring (Dashboard-wins precedence; Matrix is fallback). Manifest-fallback projects render an orange ⓘ next to the column header carrying the `column.note` tooltip.
+│   ├── EcosystemBoxModal.ts  detail modal for the Overall-Evaluation hero card boxes. Dispatches on box id and renders the matching breakdown: project lists (Projects / Healthy / At-risk, with "Open in Matrix" CTA), per-scanner averages (Ecosystem health), per-scanner severity counts (Info / Risk roll-ups), per-package lists with project attribution (CVE / Deprecated / Maintainer / Typosquat). Package rows aren't clickable — cross-project matrix is the drill surface.
 │   ├── FindingsModal.ts    drill-down modal on Dashboard cell click — scanner label + project + top-50 findings + "Open in <view>" for cve/integrity/unused/template
 │   ├── ImpactModal.ts      cross-project blast-radius modal (topbar "Impact" button → /api/impact)
 │   ├── UpgradeModal.ts     overlay: preview → edit/install → lifecycle-scripts list + Run buttons
@@ -280,16 +284,53 @@ returns IDs only, no per-vuln severity — matches `npm audit`'s
   matches `GitResolver.isGitVersion()` (`git+`, `git://`, `git@`,
   `github:`, `gitlab:`, `bitbucket:`), every scanner that fetches
   data by *name* from the npm registry must return `null` for that
-  package — OSV / Maintainer / Churn / Integrity already do, plus
+  package — OSV / Maintainer / Churn / Integrity / License /
+  Provenance / Typosquat all do (see `SecurityScanner._reportOne`'s
+  `isGit` hoist + the gated `reg.license` fallback), plus
   `SecurityScanner._cadence/_freshnessSummary` and
   `/api/releases?version=`. The reason is collision: a user's
   private git dep (`git+https://.../figtree.git#claude`) shares a
   name with an unrelated public `figtree@0.0.0` from someone else.
-  `MatrixBuilder.build` forces `latest = null` for rows where every
-  cell is a git URL, and `Frontend/Matrix.setData` excludes git-only
-  rows from the `/api/matrix/heuristics` batch entirely. The
+  `MatrixBuilder.build` and `ProjectMatrixBuilder.build` both force
+  `latest = null` for rows where every cell is a git URL, and stamp
+  `gitLatest` (carrying the stripped origin + per-row HEAD info from
+  `GitHeadFetcher`) so the frontend can render `1.0.28 · 7d3f12a`.
+  `Frontend/Matrix.setData` excludes git-only rows from the
+  `/api/matrix/heuristics` batch entirely. The dashboard SSE +
+  per-/cross-project OSV scans in `vite.config.ts` use
+  `pkg.resolved` as the scanner-version when it's a git URL, keeping
+  the semver as `displayVersion` for the user-facing label so the
+  name-keyed guards in SecurityScanner fire on the right input. The
   fingerprint path still works because `FingerprintBuilder` resolves
-  git URLs via `GitResolver.resolveTarball` instead of the registry.
+  git URLs via `GitResolver.resolveTarball` instead of the registry;
+  non-SHA-pinned coordinates go through the cache-less variant so
+  HEAD content is never served stale.
+- **Dashboard manifest-fallback emits `column.note`, not
+  `column.error`.** Projects without a committed
+  `package-lock.json` build a best-effort package list from the
+  root manifest (each declared dep resolved to registry `latest`)
+  and feed it through the existing scanner pipeline. The dashboard
+  handler stamps `DashboardColumn.note = "no lockfile — scanned
+  against registry latest"` for the soft annotation — the frontend
+  paints an orange ⓘ next to the column header, *not* the red
+  `column.error` styling. IntegrityScanner and MutableResolutionScanner
+  stay `N/A` on this path because both need a lockfile to walk.
+  Don't add a `column.error` here on the assumption "missing
+  lockfile is an error" — most browser-extension and library repos
+  legitimately don't commit one.
+- **SafePath for every project-rooted write.** Two endpoints
+  (`POST /api/projects/:id/upgrade/apply` accepting `workspace`,
+  `POST /api/projects/:id/compliance/apply` accepting per-file
+  `path`) used to join user-supplied segments with the project
+  root unchecked. Every new endpoint that writes inside a project
+  must route through `Project/SafePath.ts`'s `join(root,
+  ...segments)` — it resolves the candidate, then refuses
+  anything that isn't either the root itself or a strict
+  descendant of `${root}${sep}`. The trailing-separator boundary
+  is load-bearing: a plain `startsWith(root)` would let
+  `/srv/project-evil` squeak past on a sibling project called
+  `/srv/project`. Tests cover trailing `..`, deep `../..` chains,
+  absolute segments, sibling-with-shared-prefix.
 
 ## Tests
 

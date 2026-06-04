@@ -132,10 +132,16 @@ einzelne Badge-Familien ausgeblendet werden können — siehe
 **Git-Dependencies** zeigen die *installierte* Version als Zellenwert
 plus ein kleines `git`-Chip; im Hover erscheint die Original-URL. Die
 **Latest**-Spalte für Zeilen, in denen *jede* Deklaration eine git-URL
-ist, zeigt `git` statt einer Registry-Version — das gleichnamige
-npm-Paket gilt als unverwandt, deshalb werden Cadence- / Freshness- /
-Maintainer- / CVE- / Bundle-Scans übersprungen, um keine fremden Daten
-deinem Repo zuzuschreiben.
+ist, zeigt den Upstream-HEAD als `1.0.28 · 7d3f12a` — die
+`package.json.version` aus dem HEAD-Tarball plus die kurze Commit-SHA
+— für GitHub- und Gitea-Hosts. Das gleichnamige npm-Paket gilt als
+unverwandt, deshalb werden Cadence- / Freshness- / Maintainer- /
+CVE- / Bundle- / Lizenz- / Provenance- / Typosquat-Scans
+übersprungen, um keine fremden Daten dem Repo zuzuschreiben. Wenn
+der Host nicht erreichbar ist, fällt die Zelle auf das schlichte
+`git`-Pill zurück und eine orange ⓘ daneben trägt den rohen Fehler
+("GitHub unreachable: …" / "Repository not found on GitHub") im
+Tooltip. Unbekannte Hosts bleiben stumm (kein Icon).
 
 Klick auf eine Zelle öffnet das
 [Paket-Detail-Panel](#3-paket-detail-panel). Klick auf einen
@@ -216,6 +222,16 @@ Workspaces eines einzelnen Projekts uneins sind.
 
 ![Projekt-Matrix](screenshots/04_project_matrix_de.png)
 
+Der gleiche Git-Only-Latest-Guard wie in der projektübergreifenden
+Matrix läuft auch hier: Zeilen, in denen jeder Workspace die Dep
+per git-URL deklariert, bekommen `latest=null` plus den
+Upstream-HEAD-Stempel (`1.0.28 · 7d3f12a` von GitHub / Gitea); die
+ⓘ neben dem Pill trägt jeden HEAD-Fetch-Fehler. Bei Remote-
+Projekten (GitHub / Gitea) ist der Upgrade-`↑`-Button ausgeblendet
+und oben im View sitzt ein kleines "Read-only: Remote-Projekt —
+Upgrades und Template-Apply sind deaktiviert."-Banner, damit der
+fehlende Button nicht wie ein Bug wirkt.
+
 ### 2.4 Abhängigkeitsbaum
 
 D3 collapsible Tree. Root = das Projekt, Kinder = Top-Level-Deps;
@@ -224,6 +240,17 @@ Knotenfarbe folgt der Status-Semantik; ein umrandeter Knoten hat noch
 versteckte Kinder.
 
 ![Tree](screenshots/05_tree_de.png)
+
+**Manifest-Fallback.** Projekte ohne committed
+`package-lock.json` (üblich bei Browser-Extensions und vielen
+Libraries) bekommen statt eines 404 einen flachen Baum, der aus
+den deklarierten Root-Deps der `package.json` synthetisiert
+wird: jeder Top-Level-Eintrag trägt seinen deklarierten Range
+als Versions-String und das Registry-`latest`, ohne Kinder.
+Eine einzeilige Banner-Notiz über dem Baum weist auf den
+Fallback hin, damit das leere `deps[]` nicht als "dieses Projekt
+hat keine transitiven Deps" missverstanden wird. Eine Lockfile
+committen, um den vollen transitiven Graph zu sehen.
 
 ### 2.5 History
 
@@ -325,15 +352,35 @@ Was das Paket selbst als `dependencies`, `devDependencies`,
 Vergleicht die Cell-Version mit der Registry-Latest, Datei für Datei:
 hinzugefügt / entfernt / geändert. Lazy-loaded beim ersten Tab-Klick.
 
+Bei **Git-Dependencies** mit einem fixierten `#ref`
+(`git+https://…#v1.2.3`, `github:owner/repo#abc1234`) vergleicht
+der Tab den gepinnten Tarball gegen den Upstream-HEAD. Nicht-
+SHA-fixierte Koordinaten (Branches / Tags) umgehen den permanenten
+Fingerprint-Cache, damit HEAD-Inhalt nie veraltet ausgeliefert
+wird. Unpinned git-URLs deaktivieren den Tab weiterhin — es gibt
+keine zweite Koordinate zum Diffen.
+
 ### 3.4 Releases
 
-Zusammengeführte Zeitleiste:
+Zusammengeführte Zeitleiste. Registry-veröffentlichte Pakete
+zeigen:
 
 - npm-Publish-Daten (immer verfügbar)
 - Publisher (`_npmUser`) pro Version — `by <name>` hinter dem Datum,
   damit du Owner-Wechsel direkt am Versionsverlauf siehst.
 - GitHub-Release-Titel + Body-Notes (wenn das `repository`-Feld des
   Pakets auf github.com zeigt)
+
+**Git-Dependencies** routen über die Commits-API des Hosts
+(GitHub REST, Gitea v1 mit dem per-Instanz-Token) und rendern
+jeden Commit im selben Release-Card-Format: SHA, Subject, Author.
+Bis zu 50 Einträge, neueste zuerst.
+
+Beide Modi starten eingeklappt mit fünf Karten plus einem
+"Alle laden (N)"-Button unten — `lodash` hat 60+ Versionen, und
+den Nutzer jedes Mal durch alle scrollen zu lassen unterläuft den
+Sinn. Beim Öffnen eines anderen Pakets startet die Ansicht wieder
+eingeklappt.
 
 Der Pfeil rechts ist ein direkter Link zur GitHub-Release-Seite. Setze
 `GH_TOKEN` in deinem `.env`, um das 60-req/h-Anonymous-Rate-Limit
@@ -810,8 +857,11 @@ mit der neuen aufgelösten Version. Klick auf eine GHSA-Pille
 **Scope-Hinweis:** V1 zeigt nur das CVE-Delta. Maintainer-Wechsel /
 Install-Skript / Pattern-Delta würden jeweils einen Tarball-Fetch
 pro Seite brauchen — auf einen späteren SSE-Endpoint verschoben.
-Nur lokale Projekte — Remote (GitHub / Gitea) PR-Review bräuchte
-die gleiche `git show`-API wie der Backfill-Walker.
+Nur lokale Projekte — beim Öffnen des PR-Tabs auf einem GitHub-/
+Gitea-Projekt erscheint statt des rohen 400 ein freundlicher
+Einzeiler, der auf die Lösung verweist ("Repo lokal klonen und
+als lokales Projekt konfigurieren"). Echtes Remote-PR-Review
+bräuchte die gleiche `git show`-API wie der Backfill-Walker.
 
 ---
 
@@ -957,10 +1007,16 @@ Templates) haben keinen Ring, weil sie keine Projekte sind.
 ## 16. Projektübergreifendes Dashboard
 
 Die **Dashboard**-Sentinel-Zeile in der linken Treeview (▣-Icon,
-über Matrix) landet auf einer `(Projekt × Scanner)`-Ring-Matrix:
-jedes konfigurierte Projekt wird zu einer Spalte, jeder Scanner
-zu einer Zeile, jede Zelle trägt einen 0–100 %-Score, der die
-Befunde des Scanners über das Lockfile des Projekts aggregiert.
+über Matrix) ist in zwei Tabs aufgeteilt, die sich denselben
+SSE-Stream teilen — Tab-Wechsel mitten im Scan startet ihn nicht
+neu.
+
+### 16.1 Scanner-Score-Tab
+
+Eine `(Projekt × Scanner)`-Ring-Matrix: jedes konfigurierte
+Projekt wird zu einer Spalte, jeder Scanner zu einer Zeile, jede
+Zelle trägt einen 0–100 %-Score, der die Befunde des Scanners
+über das Lockfile des Projekts aggregiert.
 
 ![Projektübergreifendes Dashboard](screenshots/19_dashboard_de.png)
 
@@ -969,13 +1025,36 @@ Befunde des Scanners über das Lockfile des Projekts aggregiert.
   `warn=10`, `risk=30`.
 - **Stufen:** ≥ 80 grün, ≥ 60 amber, < 60 rot. `N/A`-Zellen
   erscheinen, wenn der Scanner für das Projekt nicht zutrifft
-  (kein Lockfile, Remote-Source beim Unused-Scanner, kein
-  Template zugewiesen, keine externe Quelle konfiguriert,
-  synthetisiertes Lockfile bei MutableResolution).
+  (kein Lockfile + kein Manifest-Fallback, Remote-Source beim
+  Unused-Scanner, kein Template zugewiesen, keine externe Quelle
+  konfiguriert). Integrity und MutableResolution bleiben auf dem
+  Manifest-Fallback-Pfad immer N/A, weil beide ein Lockfile zum
+  Walken brauchen.
 - **Erster Paint** nutzt den persistierten Snapshot unter
   `.nppm-cache/dashboard-snapshot.json` — die Ansicht ist sofort
   da beim Öffnen. Im Header steht, wann er zuletzt aktualisiert
   wurde; **Re-Scan** streamt einen frischen Lauf via SSE.
+- **Progress-Detail.** Die Status-Zeile unter dem Fortschritts-
+  balken zeigt die jeweilige Unter-Phase wortwörtlich —
+  "Loading lockfile for kavula", "Querying OSV.dev for 84
+  package(s)", "Fingerprinting lodash@4.17.21 (32/84) —
+  kavula", "Churn for axios@1.6.0 (18/84) — kavula" — damit ein
+  langer Parallel-Batch nicht mehr eingefroren auf einem
+  "CVE (OSV) 0/84"-Zähler aussieht.
+- **Manifest-Fallback für Projekte ohne Lockfile.**
+  Browser-Extensions, viele Libraries und andere Repos, die
+  keine `package-lock.json` committen, kollabierten früher
+  jede Zelle auf N/A und färbten den Spaltenkopf rot. Ihre
+  deklarierten Deps werden jetzt zum Registry-`latest` aufgelöst
+  und durch die Scanner-Pipeline geschickt; dieselben Zellen
+  leuchten auf, nur fixiert auf das, was `npm install` heute
+  installieren würde, statt auf das, was committed wurde. Eine
+  kleine ⓘ neben dem Projektnamen trägt im Tooltip die Notiz
+  "no lockfile — scanned against registry latest".
+- **Persistenter SSE.** Der Wechsel in eine andere Ansicht
+  (Templates, Impact, ein Projekt) tötet den laufenden Scan
+  nicht mehr — bei Rückkehr ins Dashboard läuft der Stream
+  weiter, statt neu bei null zu starten.
 - **Zellklick** öffnet das [Findings-Modal](#3-paket-detail-panel)
   — Top-50 Beiträger sortiert risk → warn → info, mit
   Ein-Klick-Sprüngen in die relevante Per-Projekt-Ansicht
@@ -987,8 +1066,62 @@ Befunde des Scanners über das Lockfile des Projekts aggregiert.
   `i`-Info-Button mit Beschreibung, was der Scanner prüft + wie
   der Score berechnet wird.
 
+### 16.2 Overall-Evaluation-Tab
+
+Eine einzelne 3:2-Ecosystem-Hero-Card mit der Wald-Szene als
+Hintergrund und zehn transluzenten Metrik-Boxen rund um den
+zentralen Baum — grün umrandet auf der gesunden Seite, rot
+umrandet auf der riskanten Seite, jede mit einer dünnen
+glühenden SVG-Linie zum visuellen Anker verbunden.
+
+![Dashboard — Overall Evaluation](screenshots/21_dashboard_overall_de.png)
+
+Alle Metriken stammen aus derselben `_columns`-Map wie der
+Scanner-Score-Tab, deshalb füllt sich die Card live mit, während
+der Scan läuft — kein zusätzlicher Fetch, kein separater Scan.
+
+**Die zehn Boxen** (Hover für einen Einzeiler, Klick für das
+Detail-Modal):
+
+- **Projekte** — Gesamtzahl der Projekte.
+- **Gesunde Projekte** — Anzahl Projekte mit Gesamt-Score ≥ 80.
+- **Ecosystem-Health** — Durchschnitts-Score über alle
+  Nicht-N/A-Zellen.
+- **Info-Findings** — Gesamt-Info-Tier-Befundzahl.
+- **Risk-Findings** — Gesamt-Risk-Tier-Befundzahl.
+- **CVE-Flags** — Pakete mit mindestens einem CVE-Befund.
+- **Deprecated-Flags** — Pakete vom Deprecation-Scanner
+  markiert.
+- **Maintainer-Alerts** — Pakete vom Maintainer-Scanner
+  markiert.
+- **Typosquat-Treffer** — Pakete vom Typosquat-Scanner
+  markiert.
+- **At-Risk-Projekte** — Anzahl Projekte mit Score < 60.
+
+**Detail-Modals.** Klick auf eine Box öffnet
+`EcosystemBoxModal`, das per Box-ID dispatchet und die passende
+Aufschlüsselung rendert:
+
+- Projekt-förmige Boxen (Projekte / Gesund / At-Risk) listen
+  die betroffenen Projekte mit Score und bieten einen **In
+  Matrix öffnen**-Button, der die Ansicht wechselt.
+- Ecosystem-Health listet Pro-Scanner-Durchschnitte über das
+  Ökosystem.
+- Info / Risk Roll-ups schlüsseln Severity-Counts pro Scanner
+  auf.
+- CVE / Deprecated / Maintainer / Typosquat listen die
+  betroffenen Pakete mit Projektzuordnung. Paket-Zeilen sind
+  bewusst nicht klickbar — ein einzelnes Paket taucht oft in
+  mehreren Projekten auf, und die projektübergreifende Matrix
+  ist die richtige Fläche zum Drill-Down, nicht das
+  per-Projekt-Panel.
+
 Das Dashboard lässt sich als Default-Landing-View einstellen via
-Einstellungen → Allgemein → "Startseite".
+Einstellungen → Allgemein → "Startseite". Der per-Projekt-
+Durchschnitt des Dashboards füttert auch den Health-Ring im
+Treeview (mit dem Matrix-Score als Fallback für Projekte, die
+das Dashboard noch nicht gescort hat), damit die Zahl im
+Sidebar immer das wiedergibt, was das Dashboard sagt.
 
 ---
 

@@ -128,10 +128,15 @@ individual badge families when the row is too busy — see
 **Git-pinned dependencies** show the *installed* version as the cell
 value plus a small `git` chip; hovering reveals the original URL. The
 **Latest** column for rows where *every* declaration is a git URL
-renders `git` instead of a registry version — the npm-published
-package of the same name is treated as unrelated, so cadence /
-freshness / maintainer / CVE / bundle scans are skipped to avoid
-mis-attribution.
+shows the upstream HEAD as `1.0.28 · 7d3f12a` — `package.json.version`
+from the HEAD tarball plus the short commit SHA — for GitHub and
+Gitea hosts. The npm-published package of the same name is treated
+as unrelated, so cadence / freshness / maintainer / CVE / bundle /
+license / provenance / typosquat scans are skipped to avoid
+mis-attribution. When the host can't be reached, the cell falls back
+to a plain `git` pill with an orange ⓘ next to it — hover for the
+raw error ("GitHub unreachable: …" / "Repository not found on
+GitHub"). Unsupported hosts stay silent (no icon).
 
 Clicking a cell opens the [package detail panel](#3-package-detail-panel).
 Clicking a project column header drills into that project.
@@ -205,6 +210,16 @@ workspaces drift.
 
 ![Per-project matrix](screenshots/04_project_matrix.png)
 
+The same git-only Latest guard from the cross-project matrix runs
+here too: rows where every workspace declared the dep via a git URL
+get `latest=null` plus the upstream HEAD stamp
+(`1.0.28 · 7d3f12a` from GitHub / Gitea), and the ⓘ icon next to
+the pill carries any HEAD-fetch error. For remote (GitHub / Gitea)
+projects the upgrade `↑` button is hidden and a small "Read-only:
+remote project — upgrades and template apply are disabled." banner
+sits at the top of the view so the missing button doesn't look
+like a bug.
+
 ### 2.4 Dependency tree
 
 D3 collapsible tree. Root = the project, children = top-level deps,
@@ -213,6 +228,16 @@ matches the status semantics; an outlined node has hidden children left
 to expand.
 
 ![Dep tree](screenshots/05_tree.png)
+
+**Manifest fallback.** Projects without a committed
+`package-lock.json` (common for browser extensions and many
+libraries) get a shallow tree synthesised from the declared root
+deps in `package.json` instead of a 404: each top-level entry
+carries its declared range as the version string and the
+registry's `latest`, with no children. A one-line banner above
+the tree calls out the fallback so the empty `deps[]` doesn't get
+mistaken for "this project has no transitive deps". Commit a
+lockfile to get the full transitive graph.
 
 ### 2.5 History
 
@@ -308,15 +333,32 @@ tarball's `package.json` (cached permanently).
 Compares the cell version against the registry latest, file-by-file:
 added / removed / modified. Lazy-loaded the first time the tab opens.
 
+For **git-installed deps** pinned to a `#ref` (`git+https://…#v1.2.3`,
+`github:owner/repo#abc1234`), the tab compares the pinned tarball
+against the upstream HEAD. Non-SHA-pinned coordinates (branches /
+tags) skip the permanent fingerprint cache so HEAD content is never
+served stale. Unpinned git URLs still disable the tab — there's no
+second coordinate to diff against.
+
 ### 3.4 Releases
 
-Merged timeline:
+Merged timeline. Registry-published packages show:
 
 - Registry publish dates (always available)
 - Per-version publisher (`_npmUser`) — shown as `by <name>` next to the
   date so owner handovers are visible at a glance in the timeline.
 - GitHub release titles + notes (when the package's `repository` field
   points at github.com)
+
+**Git-installed deps** route through the host's commits API
+(GitHub REST, Gitea v1 with the per-instance token) and render
+each commit in the same release-card shape: SHA, subject and
+author. Up to 50 entries, sorted newest first.
+
+Both modes start collapsed at five cards with an "Alle laden (N)"
+button at the bottom — `lodash` is 60+ versions, and forcing the
+user to scroll past all of them every time defeats the point.
+Reopening a different package starts collapsed again.
 
 The number on the right is a direct link to the GitHub release page.
 Set `GH_TOKEN` in your `.env` to lift the 60 req/h anonymous rate
@@ -775,8 +817,11 @@ to open the OSV.dev page directly.
 **Scope note:** V1 surfaces the CVE delta only. Maintainer-change /
 install-script / pattern delta would each require a tarball fetch
 per side; deferred to a later SSE-driven endpoint. Local projects
-only — remote (GitHub / Gitea) PR review would need the same git-show
-API the backfill walker uses.
+only — opening PR Review on a GitHub / Gitea project renders a
+friendly one-liner pointing at the remediation ("clone the repo
+locally and configure it as a local project") instead of the raw
+400 the endpoint used to emit. Remote PR review would need the
+same git-show API the backfill walker uses.
 
 ---
 
@@ -920,10 +965,15 @@ because they aren't projects.
 ## 16. Cross-project Dashboard
 
 The **Dashboard** sentinel row in the left treeview (▣ icon, above
-Matrix) lands on a `(project × scanner)` ring matrix: every
-configured project becomes one column, every scanner becomes one
-row, every cell carries a 0–100 % score that aggregates the
-scanner's findings across that project's lockfile.
+Matrix) is split into two tabs that share the same SSE stream —
+switching tabs while a scan is in flight doesn't restart it.
+
+### 16.1 Scanner Score tab
+
+A `(project × scanner)` ring matrix: every configured project
+becomes one column, every scanner becomes one row, every cell
+carries a 0–100 % score that aggregates the scanner's findings
+across that project's lockfile.
 
 ![Cross-project Dashboard](screenshots/19_dashboard.png)
 
@@ -931,14 +981,34 @@ scanner's findings across that project's lockfile.
   `100 × (1 − Σ min(weight, 30) / (packages × 30))` with `info=1`,
   `warn=10`, `risk=30`.
 - **Tiers:** ≥ 80 green, ≥ 60 amber, < 60 red. `N/A` cells appear
-  when a scanner doesn't apply to that project (no lockfile,
-  remote source for the Unused scanner, no template assigned, no
-  external source configured, synthesized lockfile for
-  MutableResolution).
+  when a scanner doesn't apply to that project (no lockfile +
+  no manifest fallback, remote source for the Unused scanner,
+  no template assigned, no external source configured). Integrity
+  and MutableResolution are always N/A on the manifest-fallback
+  path because both need a lockfile to walk.
 - **First paint** uses the cached snapshot under
   `.nppm-cache/dashboard-snapshot.json` so the view is instant on
   startup. The header shows when it was last refreshed; **Re-scan**
   streams a fresh run via SSE.
+- **Progress detail.** The status line under the progress bar
+  reads the actual sub-phase verbatim — "Loading lockfile for
+  kavula", "Querying OSV.dev for 84 package(s)", "Fingerprinting
+  lodash@4.17.21 (32/84) — kavula", "Churn for axios@1.6.0
+  (18/84) — kavula" — so a long parallel batch no longer looks
+  frozen on a "CVE (OSV) 0/84" counter.
+- **Manifest fallback for lockfile-less projects.** Browser
+  extensions, many libraries and other repos that don't commit
+  `package-lock.json` used to collapse every cell to N/A and
+  paint the column header red. Their declared deps are now
+  resolved to the registry's `latest` and fed through the
+  scanner pipeline; the same cells light up, just pinned to what
+  `npm install` would pull today rather than what's committed.
+  A small ⓘ next to the project name carries the "no lockfile —
+  scanned against registry latest" note in its tooltip.
+- **Persistent SSE.** Navigating to another view (Templates,
+  Impact, a project) no longer kills the running scan — coming
+  back to Dashboard shows the live progress instead of
+  re-starting from zero.
 - **Cell click** opens the [findings modal](#3-package-detail-panel)
   — top-50 contributors sorted risk → warn → info, with one-click
   jumps into the relevant per-project view (Installed for CVE /
@@ -950,8 +1020,61 @@ scanner's findings across that project's lockfile.
   button with a description of what the scanner checks + how the
   score is computed.
 
+### 16.2 Overall Evaluation tab
+
+A single 3:2 ecosystem hero card with the forest scene as
+backdrop and ten translucent metric boxes around the central
+tree — green-bordered on the healthy side, red-bordered on the
+risky side, each connected to its visual anchor by a thin
+glowing SVG line.
+
+![Dashboard — Overall Evaluation](screenshots/21_dashboard_overall.png)
+
+All metrics derive from the same `_columns` map the Scanner
+Score tab uses, so the card fills in live as the scan
+progresses — no extra fetch, no separate scan.
+
+**The ten boxes** (hover for a one-sentence explanation, click
+for the detail modal):
+
+- **Projects** — total project count.
+- **Healthy projects** — count of projects with overall score
+  ≥ 80.
+- **Ecosystem health** — average score across all non-N/A
+  cells.
+- **Info-level findings** — total info-tier finding count.
+- **Risk findings** — total risk-tier finding count.
+- **CVE flags** — packages with at least one CVE finding.
+- **Deprecated flags** — packages flagged by the Deprecation
+  scanner.
+- **Maintainer alerts** — packages flagged by the Maintainer
+  scanner.
+- **Typosquat hits** — packages flagged by the Typosquat
+  scanner.
+- **At-risk projects** — count of projects with score < 60.
+
+**Detail modals.** Clicking any box opens
+`EcosystemBoxModal`, which dispatches on the box id and
+renders the right breakdown:
+
+- Project-shaped boxes (Projects / Healthy / At-risk) list the
+  matching projects with their score, plus an **Open in
+  Matrix** button that switches the view.
+- Ecosystem health lists per-scanner averages across the
+  ecosystem.
+- Info / Risk roll-ups break down severity counts per scanner.
+- CVE / Deprecated / Maintainer / Typosquat list the affected
+  packages with project attribution. Package rows aren't
+  clickable on purpose — a single package often shows up in
+  multiple projects and the cross-project matrix is the right
+  surface to drill from, not the per-project panel.
+
 The Dashboard can be picked as the default landing view via
-Settings → General → "Start page".
+Settings → General → "Start page". The Dashboard's per-project
+average also drives the treeview's health ring (with the
+Matrix's score as a fallback for projects the Dashboard hasn't
+scored yet), so the number in the sidebar always matches what
+the Dashboard says.
 
 ---
 

@@ -9,16 +9,139 @@ from `v1.0.0` onwards.
 ## [Unreleased]
 
 ### Added
-- Community-facing repository docs: `SECURITY.md` (private vulnerability
-  reporting via GitHub Security Advisories), `CONTRIBUTING.md`,
-  `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), issue + PR
-  templates, and this changelog itself.
+- **Dashboard: Scanner Score + Overall Evaluation tabs.** The
+  cross-project scanner matrix is now under the Scanner Score tab;
+  the new Overall Evaluation tab renders an ecosystem hero card —
+  a 3:2 forest-themed scene with ten translucent metric boxes
+  (projects, ecosystem health, healthy / at-risk counts, total
+  risk findings, CVE / deprecation / maintainer / typosquat flags)
+  laid out around a central tree, each connected to its visual
+  anchor by a glowing SVG line. Boxes carry hover tooltips and
+  click into a detail modal (`EcosystemBoxModal`) with the
+  matching breakdown (project lists, per-scanner averages, per-
+  package roll-ups). Both tabs render from the same `_columns`
+  map, so a live scan fills them in parallel.
+- **Dashboard: per-package progress detail.** The progress bar's
+  status line now reads sub-phases verbatim ("Querying OSV.dev
+  for 84 package(s)", "Fingerprinting lodash@4.17.21 (32/84) —
+  kavula", "Churn for axios@1.6.0 (18/84) — kavula") instead of
+  freezing on a "0/84" counter while parallel batches run.
+- **Dashboard: persistent SSE across tab switches.** Leaving and
+  returning to Dashboard no longer kills the running scan — the
+  stream survives view switches and the DOM is reused.
+- **Dashboard: manifest fallback for lockfile-less projects.**
+  Projects without a committed `package-lock.json` (browser
+  extensions, many libraries) used to collapse every cell to
+  N/A. They're now scanned against the registry's `latest` for
+  each declared dep; cells light up the same way, and a small ⓘ
+  next to the project name carries a "no lockfile — scanned
+  against registry latest" tooltip. Integrity and
+  MutableResolution stay N/A because they need a lockfile to
+  walk.
+- **Treeview rings driven by the Dashboard score.** The
+  per-project health ring is now fed by the Dashboard's
+  21-scanner score with a Matrix fallback for projects the
+  Dashboard hasn't scored yet, so the treeview number matches
+  what the Dashboard cell says.
+- **Matrix: git HEAD info.** The Latest column for git-only rows
+  now shows `1.0.28 · 7d3f12a` (version + short SHA from upstream
+  HEAD) instead of the bare `git` pill. Works for GitHub and
+  Gitea hosts; unsupported hosts stay silent. HEAD-lookup
+  failures surface an orange ⓘ next to the pill with the raw
+  error in the tooltip. The same path runs in the per-project
+  matrix.
+- **Releases tab for git deps.** Git-installed packages now
+  show their upstream commits (GitHub REST + Gitea v1) in the
+  same `Release`-card shape as registry publishes, with SHA,
+  subject and author.
+- **Releases tab: collapsed to 5 with "Load all".** Both git
+  commit timelines and long npm release histories (lodash is
+  60+ versions) now collapse to the five newest with an "Alle
+  laden (N)" button. Reopening a different package starts
+  collapsed again. Cap at 50 entries.
+- **Diff tab for git deps.** Packages installed via `git+…#ref`
+  now have a working Diff tab — the pinned tarball is compared
+  against HEAD. Non-SHA-pinned coordinates skip the permanent
+  fingerprint cache so HEAD content is never served stale.
+- **DepTree manifest fallback.** Projects without a lockfile
+  used to 404 the Tree view; it now synthesises a shallow first-
+  level tree from the declared root deps (range as version,
+  registry `latest`, empty `deps[]`) with a banner explaining
+  why no transitive deps are visible.
+- **PR Review: friendly remote banner.** Remote projects no
+  longer surface the raw 400 — the view short-circuits with a
+  one-liner pointing at the remediation ("clone locally").
+- **Read-only banners for remote projects.** ProjectMatrixView
+  and TemplateView hide the write affordances (upgrade `↑`,
+  "Apply selected") on GitHub / Gitea projects and render a
+  small "Read-only: remote project — upgrades and template apply
+  are disabled." banner so the missing button doesn't look like
+  a bug.
+- **Start-view sentinel selected on first paint.** Booting on
+  Dashboard or Matrix now highlights the matching treeview row,
+  matching the behaviour of every later view switch.
+- **`npm run typecheck`** — wired up so the tsc gap stays
+  visible going forward. `moduleResolution` switched to
+  `bundler` so Vite's exports-map types resolve.
 
 ### Changed
+- **GitHub URL normalisation in project create / edit.** The
+  form's "Repo (owner/name)" field now accepts the full
+  address-bar URL too (`https://github.com/owner/repo`,
+  `git@github.com:owner/repo.git`, `github:owner/repo`); the
+  entry writer collapses it to the canonical `owner/name` shape
+  before writing `nppm.json`. Already-broken entries from
+  earlier boots keep working silently.
+- **Background matrix fetch on Dashboard-first landings.**
+  `startView=dashboard` used to leave the treeview rings at "…"
+  until the user clicked Matrix manually. The matrix now fires
+  alongside the Dashboard show so the score side-effect runs
+  without rendering anything.
+- **Treeview rings stay at "…" until the first severity batch
+  lands** instead of flashing 100 % for a frame while the
+  badge loaders are still in flight.
+- **`Api._json` surfaces the backend's `msg` field on non-OK
+  responses** instead of hardcoding `${url} → 404 Not Found`,
+  so e.g. the DepTree view on a lockfile-less remote project
+  shows the actual remediation text. Two stray German backend
+  error strings flipped back to English for consistency with
+  the backend-strings-stay-English rule.
 - **Bumped minimum Node version from 20 to 22.** Node 20 went EOL on
   2026-04-30; current LTS is Node 22. The CI workflow already runs
   Node 22, and `puppeteer@25` (used by the screenshot generator)
   requires Node 22.12+.
+
+### Fixed
+- **Git-only Latest collision in the per-project matrix.** The
+  per-project matrix used to surface a foreign npm package's
+  `0.0.0` as the registry `latest` for a row where every
+  workspace declared the dep via a git URL. Same `latest=null`
+  + `gitLatest` HEAD-stamp pipeline as the cross-project matrix
+  is now applied to the per-project one.
+- **Name-keyed data leaks for git-sourced deps.** License,
+  provenance and typosquat checks used to take the foreign
+  packument at face value for git-installed deps that happened
+  to share a name with an unrelated npm package. The Dashboard
+  pipeline now feeds the git URL through as the scanner version
+  so the existing `isGitVersion` guards fire; License falls
+  back to silence, Provenance and Typosquat to null.
+
+### Security
+- **SafePath containment for project-rooted writes.** Two
+  endpoints used to join user-supplied path segments with the
+  project root unchecked. `POST /api/projects/:id/upgrade/apply`
+  trusted the `workspace` field (`../../etc/cron.d/evil`
+  collapsed to an out-of-root write), and
+  `POST /api/projects/:id/compliance/apply` trusted the `path`
+  of every template file entry (a malicious remote template
+  could ship a finding that escapes the root). Both endpoints
+  now route through `SafePath.join`, which resolves the
+  candidate against the root and refuses anything that isn't
+  either the root itself or a strict descendant of
+  `${root}${sep}` — the trailing-separator check stops a
+  sibling like `/srv/project-evil` from squeaking past a plain
+  `startsWith(root)`. Tests cover trailing `..`, deep `../..`
+  chains, absolute segments, and sibling-with-shared-prefix.
 
 ## [1.0.0] — initial public release
 

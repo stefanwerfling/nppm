@@ -2252,6 +2252,26 @@ class Server {
                             const seen = new Set<string>();
                             const packages: {name: string; version: string; displayVersion: string}[] = [];
                             if (lockfile) {
+                                // Record the snapshot so the Dashboard
+                                // Trend tab's "Packages" metric sees this
+                                // observation. Without this hook the
+                                // growth timeline would only fill in when
+                                // the user happens to open the per-project
+                                // Lockfile view — a Dashboard-only user
+                                // would never get a Trend line. Same
+                                // best-effort try/catch as the
+                                // /api/projects/:id/lockfile handler.
+                                try {
+                                    historyStore.recordSnapshot(
+                                        project.getKey(),
+                                        projectName,
+                                        lockfile.source,
+                                        lockfile.packages.map((p) => ({name: p.name, version: p.version}))
+                                    );
+                                } catch (e) {
+                                    console.warn(`nppm: dashboard history snapshot failed for ${projectName}: ${(e as Error).message}`);
+                                }
+
                                 // Git-sourced deps need the resolved URL as
                                 // the version coordinate, otherwise the
                                 // scanners see the inner semver

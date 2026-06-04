@@ -525,6 +525,12 @@ export class Nppm {
             this._treeview.setSelected(startView === 'dashboard' ? '__dashboard__' : '__matrix__');
             if (startView === 'dashboard') {
                 this._dashboardView.show();
+                // Pull the matrix in the background even though we're
+                // not showing it — the treeview health-ring scores
+                // are only emitted by `Matrix.setData()`, so without
+                // this fetch a Dashboard-first landing would leave
+                // the sidebar rings at "…" forever.
+                void this._loadMatrix();
             } else {
                 await this._loadMatrix();
             }

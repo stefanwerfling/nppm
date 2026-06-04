@@ -43,6 +43,15 @@ export type DepGraphResponse = {
     rootDeps: {name: string; version: string}[];
     /** All resolved packages, keyed by `<name>@<version>`. */
     packages: Record<string, DepGraphNode>;
+    /**
+     * `true` when the graph was synthesised from the project's
+     * `package.json` because no lockfile was available — only the
+     * declared top-level deps are present, transitive edges are
+     * absent. Drives a notice in the DepTree view so users don't
+     * mistake the shallow tree for "this project has no transitive
+     * deps".
+     */
+    fromManifestOnly?: boolean;
 };
 
 /**
@@ -78,7 +87,11 @@ export class DepGraphBuilder {
     ): Promise<DepGraphResponse|null> {
         const lockfile = await project.loadLockfile();
         if (!lockfile) {
-            return null;
+            // No lockfile: fall back to the declared root manifest so
+            // remote projects without a committed package-lock.json
+            // (typical for browser extensions and many libraries)
+            // still get a shallow first-level view instead of a 404.
+            return DepGraphBuilder._buildFromManifest(projectUnid, project, registry);
         }
 
         const byPath = new Map<string, LockedPackage>();
@@ -195,6 +208,73 @@ export class DepGraphBuilder {
             },
             rootDeps,
             packages
+        };
+    }
+
+    /**
+     * Manifest-only fallback. Walks the project root's declared deps,
+     * looks up `latest` for each via the registry, and emits one node
+     * per dep with an empty `deps[]` (no transitive resolution
+     * available without a lockfile). Returns `null` when even the
+     * root manifest is missing — that's a hard error worth surfacing
+     * upstream as 404.
+     */
+    private static async _buildFromManifest(
+        projectUnid: string,
+        project: Project,
+        registry: Registry
+    ): Promise<DepGraphResponse|null> {
+        let manifests;
+        try {
+            manifests = await project.loadManifests();
+        } catch {
+            return null;
+        }
+        const rootManifest = manifests.find((m) => m.workspace === undefined);
+        if (!rootManifest) {
+            return null;
+        }
+
+        const rootDeps: {name: string; version: string}[] = [];
+        const packages: Record<string, DepGraphNode> = {};
+        const seen = new Set<string>();
+
+        for (const dep of rootManifest.dependencies) {
+            if (seen.has(dep.name)) {
+                continue;
+            }
+            seen.add(dep.name);
+            const declared = dep.version;
+            rootDeps.push({name: dep.name, version: declared});
+
+            const key = `${dep.name}@${declared}`;
+            if (packages[key]) {
+                continue;
+            }
+            const regHit = await registry.fetchOne(dep.name);
+            const latest = regHit?.latest ?? null;
+            // CVE lookup needs an exact installed version which the
+            // manifest doesn't carry — leave at 0 / unknown so the
+            // shallow view doesn't lie about safety.
+            packages[key] = {
+                name: dep.name,
+                version: declared,
+                status: DepGraphBuilder._deriveStatus(declared, latest, 0),
+                vulnCount: 0,
+                latestVersion: latest,
+                deps: []
+            };
+        }
+
+        return {
+            project: {
+                unid: projectUnid,
+                name: project.getName(),
+                type: project.getType()
+            },
+            rootDeps,
+            packages,
+            fromManifestOnly: true
         };
     }
 

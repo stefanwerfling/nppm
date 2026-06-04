@@ -539,6 +539,8 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'Load all ({n})': 'Alle laden ({n})',
     'Read-only: remote project — upgrades and template apply are disabled.':
         'Nur lesend: Remote-Projekt — Upgrades und Template-Apply sind deaktiviert.',
+    'No lockfile available — showing declared top-level deps only (no transitive resolution).':
+        'Kein Lockfile vorhanden — nur deklarierte Top-Level-Deps sichtbar (keine transitive Auflösung).',
     'Browse …': 'Durchsuchen …',
     'Select a directory': 'Verzeichnis auswählen',
     'Select this directory': 'Dieses Verzeichnis übernehmen',

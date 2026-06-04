@@ -229,6 +229,15 @@ export class DepTreeView {
         );
         this._root.appendChild(meta);
 
+        if (this._data.fromManifestOnly) {
+            const note = document.createElement('div');
+            note.className = 'installed-meta installed-meta-readonly';
+            note.textContent = I18n.t(
+                'No lockfile available — showing declared top-level deps only (no transitive resolution).'
+            );
+            this._root.appendChild(note);
+        }
+
         this._root.appendChild(this._renderLegend());
 
         const svgHost = document.createElement('div');

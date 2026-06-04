@@ -78,10 +78,44 @@ describe('DepGraphBuilder.build', () => {
         fs.rmSync(dir, {recursive: true, force: true});
     });
 
-    it('returns null when the project has no lockfile', async () => {
+    it('returns null when the project has no lockfile AND no manifests', async () => {
         const project = new FakeProject([], null);
         const graph = await DepGraphBuilder.build('UNID', project, new FakeRegistry({}, dir), new JsonCache(dir, 60));
         expect(graph).toBeNull();
+    });
+
+    it('falls back to the manifest when no lockfile is present (remote projects without committed package-lock.json)', async () => {
+        // Models a github-hosted project that committed package.json
+        // but not the lockfile. The graph should still surface the
+        // declared top-level deps so the Tree view is not empty.
+        const project = new FakeProject(
+            [{
+                name: 'root',
+                version: '1.0.0',
+                dependencies: [
+                    {name: 'foo', version: '^1.0.0', type: DependencyType.dependency, workspace: undefined},
+                    {name: 'bar', version: '^2.0.0', type: DependencyType.dev, workspace: undefined}
+                ],
+                scripts: {}
+            }],
+            null
+        );
+        const graph = await DepGraphBuilder.build('UNID', project, new FakeRegistry({
+            foo: {name: 'foo', latest: '1.2.3', versions: ['1.2.3']},
+            bar: {name: 'bar', latest: '2.0.0', versions: ['2.0.0']}
+        }, dir), new JsonCache(dir, 60));
+
+        expect(graph).not.toBeNull();
+        expect(graph!.fromManifestOnly).toBe(true);
+        expect(graph!.rootDeps).toEqual([
+            {name: 'foo', version: '^1.0.0'},
+            {name: 'bar', version: '^2.0.0'}
+        ]);
+        // Nodes carry the registry latest and no transitive deps.
+        expect(graph!.packages['foo@^1.0.0'].latestVersion).toBe('1.2.3');
+        expect(graph!.packages['foo@^1.0.0'].deps).toEqual([]);
+        expect(graph!.packages['bar@^2.0.0'].latestVersion).toBe('2.0.0');
+        expect(graph!.packages['bar@^2.0.0'].deps).toEqual([]);
     });
 
     it('resolves root deps to hoisted lockfile entries', async () => {

@@ -16,6 +16,14 @@ export type GitHeadInfo = {
     sha: string|null;
     /** Short SHA convenience. `null` when `sha` is. */
     shortSha: string|null;
+    /**
+     * User-readable reason the HEAD lookup couldn't complete. Set on
+     * transient (network unreachable) and concrete (repo not found)
+     * failures so the UI can surface an info icon next to the "git"
+     * pill. Unset on success and on cases we want to stay silent for
+     * (e.g. unsupported host — caller returns `null` instead).
+     */
+    error?: string;
 };
 
 /**
@@ -84,15 +92,31 @@ export class GitHeadFetcher {
         let tgz: Buffer|null;
         try {
             tgz = await this._fetcher.fetch(spec.url);
-        } catch {
-            // Network / 5xx — don't poison the cache; the next caller
-            // can retry. Same shape as the FingerprintBuilder error
-            // path.
-            return null;
+        } catch (e) {
+            // Network / 5xx — surface the failure to the UI so the
+            // user can tell "no info because host is down" apart
+            // from "no info because we never looked", but skip the
+            // cache so a next page load can transparently retry.
+            return {
+                version: null,
+                sha: null,
+                shortSha: null,
+                error: `${GitHeadFetcher._hostLabel(parsed.host)} unreachable: ${(e as Error).message}`
+            };
         }
         if (!tgz) {
-            this._cache?.set<Wrap>(key, {data: null});
-            return null;
+            // 404 — repository really doesn't exist (or was made
+            // private / renamed). Cache the negative so we don't
+            // hammer the host on every paint; the user can clear the
+            // cache pocket once they fix the URL.
+            const info: GitHeadInfo = {
+                version: null,
+                sha: null,
+                shortSha: null,
+                error: `Repository not found on ${GitHeadFetcher._hostLabel(parsed.host)}`
+            };
+            this._cache?.set<Wrap>(key, {data: info});
+            return info;
         }
 
         const {entries, prefix} = TarballParser.parseWithPrefix(tgz);
@@ -147,6 +171,20 @@ export class GitHeadFetcher {
             }
         }
         return null;
+    }
+
+    /**
+     * Human-readable label for the four known hosts. Pure cosmetic —
+     * used to compose error messages like "GitHub unreachable" rather
+     * than "github unreachable".
+     */
+    private static _hostLabel(host: 'github'|'gitlab'|'bitbucket'|'gitea'): string {
+        switch (host) {
+            case 'github': return 'GitHub';
+            case 'gitlab': return 'GitLab';
+            case 'bitbucket': return 'Bitbucket';
+            case 'gitea': return 'Gitea';
+        }
     }
 
     private static _defaultFetcher(): HeadTarballFetcher {

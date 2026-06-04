@@ -132,6 +132,49 @@ describe('GitHeadFetcher', () => {
         expect(info?.sha).toBeNull();
     });
 
+    it('surfaces a user-readable error and skips the cache when the host throws (network error)', async () => {
+        const cache = new JsonCache('/tmp/nppm-githead-' + Math.random().toString(36).slice(2), 60);
+        let calls = 0;
+        const fetcher = new GitHeadFetcher(cache, {
+            fetcher: {
+                async fetch() {
+                    calls++;
+                    throw new Error('ECONNREFUSED');
+                }
+            }
+        });
+
+        const info = await fetcher.fetch('git+https://github.com/o/r.git');
+        expect(info?.version).toBeNull();
+        expect(info?.error).toBeDefined();
+        expect(info!.error).toMatch(/GitHub unreachable.*ECONNREFUSED/);
+
+        // Second call should retry (no cache poisoning on network errors).
+        const info2 = await fetcher.fetch('git+https://github.com/o/r.git');
+        expect(info2?.error).toBeDefined();
+        expect(calls).toBe(2);
+    });
+
+    it('caches a 404 with a "Repository not found" error so we do not hammer the host', async () => {
+        const cache = new JsonCache('/tmp/nppm-githead-' + Math.random().toString(36).slice(2), 60);
+        let calls = 0;
+        const fetcher = new GitHeadFetcher(cache, {
+            fetcher: {
+                async fetch() {
+                    calls++;
+                    return null; // 404 — fetcher returns null
+                }
+            }
+        });
+
+        const info = await fetcher.fetch('git+https://github.com/o/missing.git');
+        expect(info?.version).toBeNull();
+        expect(info?.error).toMatch(/Repository not found on GitHub/);
+
+        await fetcher.fetch('git+https://github.com/o/missing.git');
+        expect(calls).toBe(1); // second call hits the cache
+    });
+
     it('caches the result under a TTL pocket so a second call skips the fetch', async () => {
         const sha = 'd'.repeat(40);
         const buf = tgz(`figtree-${sha}`, '1.0.28');

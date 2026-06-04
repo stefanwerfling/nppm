@@ -212,7 +212,8 @@ export class ProjectMatrixBuilder {
                             ...r.gitLatest,
                             version: info.version,
                             sha: info.sha,
-                            shortSha: info.shortSha
+                            shortSha: info.shortSha,
+                            error: info.error
                         };
                     }
                 }

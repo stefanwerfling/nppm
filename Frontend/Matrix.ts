@@ -1462,7 +1462,10 @@ export class Matrix {
                 // Prefer the HEAD info the backend resolved (version +
                 // short SHA from the upstream repo). Fall back to the
                 // plain "git" pill when the resolver was disabled or
-                // the host couldn't be reached.
+                // the host couldn't be reached — in the latter case
+                // an info icon carries the reason as a tooltip so the
+                // user can tell "no data because host is down" from
+                // "no data because the row is fine".
                 if (row.gitLatest && (row.gitLatest.version || row.gitLatest.shortSha)) {
                     const parts: string[] = [];
                     if (row.gitLatest.version) {
@@ -1480,6 +1483,13 @@ export class Matrix {
                     latestTd.title = I18n.t('Git-only dependency — refs: {refs}', {
                         refs: Array.from(refs).join(', ')
                     });
+                }
+                if (row.gitLatest?.error) {
+                    const info = document.createElement('span');
+                    info.className = 'matrix-cell-latest-info';
+                    info.textContent = ' ⓘ';
+                    info.title = row.gitLatest.error;
+                    latestTd.appendChild(info);
                 }
             } else {
                 latestTd.textContent = '?';

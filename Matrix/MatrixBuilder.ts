@@ -65,6 +65,14 @@ export type MatrixGitLatest = {
     /** The git URL the HEAD info was resolved from. Used by the
      * frontend to construct the diff-against-HEAD coordinate. */
     sourceUrl: string;
+    /**
+     * Reason the HEAD lookup couldn't complete (e.g. "GitHub
+     * unreachable", "Repository not found"). Set only on transient or
+     * concrete failures; absent on success and on rows where the
+     * fetcher wasn't even invoked. Drives the info-icon next to the
+     * "git" pill in both matrices.
+     */
+    error?: string;
 };
 
 export type MatrixRow = {
@@ -285,7 +293,8 @@ export class MatrixBuilder {
                             ...r.gitLatest,
                             version: info.version,
                             sha: info.sha,
-                            shortSha: info.shortSha
+                            shortSha: info.shortSha,
+                            error: info.error
                         };
                     }
                 }

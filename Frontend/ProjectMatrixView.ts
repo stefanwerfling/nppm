@@ -260,6 +260,9 @@ export class ProjectMatrixView {
             // Symmetric with the cross-project matrix's git-pill: show
             // upstream version + short SHA when the HEAD fetcher
             // resolved them, fall back to a plain "git" pill when not.
+            // An info icon appears whenever the lookup failed
+            // (unreachable host / 404) so the user can tell that case
+            // apart from a fine-but-unfetched row.
             latestTd.classList.add('matrix-cell-latest-git');
             if (row.gitLatest.version || row.gitLatest.shortSha) {
                 const parts: string[] = [];
@@ -272,6 +275,13 @@ export class ProjectMatrixView {
                 latestTd.textContent = parts.join(' · ');
             } else {
                 latestTd.textContent = 'git';
+            }
+            if (row.gitLatest.error) {
+                const info = document.createElement('span');
+                info.className = 'matrix-cell-latest-info';
+                info.textContent = ' ⓘ';
+                info.title = row.gitLatest.error;
+                latestTd.appendChild(info);
             }
         } else {
             latestTd.textContent = '?';

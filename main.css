@@ -2190,6 +2190,12 @@ html, body {
     font-style: italic;
 }
 
+.matrix-cell-latest-info {
+    color: #e8a64a;
+    font-style: normal;
+    cursor: help;
+}
+
 .matrix-empty {
     text-align: center;
     color: var(--c-muted);

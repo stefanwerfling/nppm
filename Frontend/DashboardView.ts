@@ -665,16 +665,17 @@ export class DashboardView {
         ];
 
         // Draw connectors first so the boxes (added next) paint on
-        // top. Lines run from the centre of the box edge facing the
-        // anchor to the anchor itself; a small circle marks the tip.
+        // top. Start each line at the *centre* of its box and rely
+        // on the box's solid background + higher z-index to mask
+        // the portion that overlaps — the line then appears to
+        // emerge cleanly from the box edge facing the anchor,
+        // regardless of how tall the box wound up rendering at.
         for (const b of boxes) {
             const boxCenterX = b.left + b.w / 2;
-            const boxBottom = b.top + 12; // approx box height in %
-            const startX = b.anchorX < boxCenterX ? b.left + 2 : b.left + b.w - 2;
-            const startY = boxBottom;
+            const boxCenterY = b.top + 7; // boxes render at ~14% tall; centre ≈ top + 7
             const line = document.createElementNS(svgNs, 'line');
-            line.setAttribute('x1', String(startX));
-            line.setAttribute('y1', String(startY));
+            line.setAttribute('x1', String(boxCenterX));
+            line.setAttribute('y1', String(boxCenterY));
             line.setAttribute('x2', String(b.anchorX));
             line.setAttribute('y2', String(b.anchorY));
             line.setAttribute('class', `dash-eco-line dash-eco-line-${b.side}`);

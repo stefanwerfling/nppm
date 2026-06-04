@@ -545,6 +545,8 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     'Git HEAD — refs in projects: {refs}': 'Git HEAD — refs in projects: {refs}',
     'Diff against HEAD': 'Diff against HEAD',
     'Load all ({n})': 'Load all ({n})',
+    'Read-only: remote project — upgrades and template apply are disabled.':
+        'Read-only: remote project — upgrades and template apply are disabled.',
     'Browse …': 'Browse …',
     'Select a directory': 'Select a directory',
     'Select this directory': 'Select this directory',

@@ -1,3 +1,4 @@
+import {ConfigProjectType} from '../Config/Config.js';
 import {MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
 import {ProjectMatrixResponse, ProjectMatrixRow} from '../Matrix/ProjectMatrixBuilder.js';
 import {DependencyType} from '../Project/PackageManifest.js';
@@ -130,6 +131,17 @@ export class ProjectMatrixView {
             this._root.appendChild(note);
         }
 
+        if (this._data.project.type !== ConfigProjectType.local) {
+            // Remote projects (github / gitea) can be inspected but not
+            // written back to — nppm doesn't claim push access. Hide
+            // every write affordance and tell the user once at the
+            // top so the missing buttons aren't a mystery.
+            const note = document.createElement('div');
+            note.className = 'installed-meta installed-meta-readonly';
+            note.textContent = I18n.t('Read-only: remote project — upgrades and template apply are disabled.');
+            this._root.appendChild(note);
+        }
+
         const wrap = document.createElement('div');
         wrap.className = 'matrix-wrap';
         wrap.appendChild(this._renderTable());
@@ -224,11 +236,15 @@ export class ProjectMatrixView {
 
                 // Outdated cells get an Upgrade affordance. Skip git
                 // installs — the upgrader operates on registry ranges
-                // and a git URL has no `latest` to bump to.
+                // and a git URL has no `latest` to bump to. Skip
+                // remote (github/gitea) projects too because we can
+                // only read their working tree, not commit back to
+                // it.
                 if (
                     row.status === MatrixRowStatus.outdated
                     && row.latest
                     && !cellData.installedVersion
+                    && this._data?.project.type === ConfigProjectType.local
                 ) {
                     const up = document.createElement('button');
                     up.className = 'matrix-cell-upgrade';

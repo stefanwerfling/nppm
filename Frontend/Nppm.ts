@@ -644,7 +644,7 @@ export class Nppm {
     private async _loadProjectTemplate(project: ApiProject): Promise<void> {
         this._switchTo(View.template);
         this._currentProjectUnid = project.unid;
-        await this._templateView.show(project.unid, project.name);
+        await this._templateView.show(project.unid, project.name, project.type);
     }
 
     /**

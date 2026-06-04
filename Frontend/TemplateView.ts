@@ -1,4 +1,5 @@
 import {ApiComplianceFinding, ApiComplianceResponse} from '../Api/ApiTypes.js';
+import {ConfigProjectType} from '../Config/Config.js';
 import {I18n} from './I18n.js';
 import {TemplateApplyModal} from './TemplateApplyModal.js';
 
@@ -13,6 +14,7 @@ export class TemplateView {
     private readonly _root: HTMLElement;
     private _projectUnid: string|null = null;
     private _projectName: string|null = null;
+    private _projectType: ConfigProjectType = ConfigProjectType.local;
     private _onShowDeclared: ((unid: string) => void)|null = null;
     private _onShowInstalled: ((unid: string) => void)|null = null;
     private _onShowHistory: ((unid: string) => void)|null = null;
@@ -51,9 +53,10 @@ export class TemplateView {
         this._onShowPr = handler;
     }
 
-    public async show(unid: string, projectName: string): Promise<void> {
+    public async show(unid: string, projectName: string, projectType: ConfigProjectType): Promise<void> {
         this._projectUnid = unid;
         this._projectName = projectName;
+        this._projectType = projectType;
         this._renderLoading(projectName);
         try {
             const res = await fetch(`/api/projects/${encodeURIComponent(unid)}/compliance`);
@@ -122,27 +125,37 @@ export class TemplateView {
         }
 
         // Apply bar — opens TemplateApplyModal for the user to pick +
-        // apply a subset of findings.
-        const applyBar = document.createElement('div');
-        applyBar.className = 'tv-applybar';
-        const applyBtn = document.createElement('button');
-        applyBtn.type = 'button';
-        applyBtn.className = 'umd-btn umd-btn-primary';
-        applyBtn.textContent = I18n.t('Apply …');
-        applyBtn.addEventListener('click', () => {
-            if (!this._projectUnid) {
-                return;
-            }
-            const modal = new TemplateApplyModal();
-            modal.onApplied(() => {
-                if (this._projectUnid) {
-                    void this.show(this._projectUnid, this._projectName ?? '');
+        // apply a subset of findings. Skipped for remote projects:
+        // the backend rejects compliance-apply for non-local projects
+        // anyway, but we'd rather not even offer the button than show
+        // an error after the user clicked it.
+        if (this._projectType === ConfigProjectType.local) {
+            const applyBar = document.createElement('div');
+            applyBar.className = 'tv-applybar';
+            const applyBtn = document.createElement('button');
+            applyBtn.type = 'button';
+            applyBtn.className = 'umd-btn umd-btn-primary';
+            applyBtn.textContent = I18n.t('Apply …');
+            applyBtn.addEventListener('click', () => {
+                if (!this._projectUnid) {
+                    return;
                 }
+                const modal = new TemplateApplyModal();
+                modal.onApplied(() => {
+                    if (this._projectUnid) {
+                        void this.show(this._projectUnid, this._projectName ?? '', this._projectType);
+                    }
+                });
+                modal.open(this._projectUnid, this._projectName ?? '', data.findings);
             });
-            modal.open(this._projectUnid, this._projectName ?? '', data.findings);
-        });
-        applyBar.appendChild(applyBtn);
-        this._root.appendChild(applyBar);
+            applyBar.appendChild(applyBtn);
+            this._root.appendChild(applyBar);
+        } else {
+            const note = document.createElement('div');
+            note.className = 'installed-meta installed-meta-readonly';
+            note.textContent = I18n.t('Read-only: remote project — upgrades and template apply are disabled.');
+            this._root.appendChild(note);
+        }
 
         const grouped = TemplateView._groupBySeverity(data.findings);
         for (const sev of ['risk', 'warn', 'info'] as const) {

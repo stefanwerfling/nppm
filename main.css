@@ -1100,6 +1100,13 @@ html, body {
     margin-bottom: 12px;
 }
 
+.installed-meta-readonly {
+    color: #e8a64a;
+    border-left: 3px solid #e8a64a;
+    padding: 4px 8px;
+    background: rgba(232, 166, 74, 0.08);
+}
+
 .installed-analyze-bar {
     display: flex;
     align-items: center;

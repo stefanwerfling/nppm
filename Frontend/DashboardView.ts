@@ -66,8 +66,16 @@ export class DashboardView {
      * fresh scans via the Re-scan button. On a fresh installation
      * the snapshot is empty, so we kick off a scan automatically to
      * avoid greeting the user with a blank table.
+     *
+     * When a scan is already in flight from a previous `show()` (the
+     * user navigated to Templates and came back), we skip the
+     * scaffold-and-reload dance and keep the existing DOM + SSE in
+     * place so progress stays visible without restarting from zero.
      */
     public show(): void {
+        if (this._stream) {
+            return;
+        }
         this._scaffold();
         void this._loadSnapshot();
     }
@@ -209,9 +217,15 @@ export class DashboardView {
         es.addEventListener('progress', (e) => {
             const data = JSON.parse((e as MessageEvent).data) as ApiDashboardScanProgressEvent;
             const scannerLabel = data.scanner ? DashboardView._scannerLabel(data.scanner) : '';
-            const phase = scannerLabel
-                ? I18n.t('{project} — {scanner}', {project: data.projectName, scanner: scannerLabel})
-                : data.projectName;
+            // `detail` (when set) is the substring the user actually
+            // wants to read — "Fingerprinting lodash@4.17.21 (32/84)
+            // — kavula". It already encodes project/scanner context,
+            // so the original `{project} — {scanner}` fallback only
+            // kicks in for cell-level progress events.
+            const phase = data.detail
+                ?? (scannerLabel
+                    ? I18n.t('{project} — {scanner}', {project: data.projectName, scanner: scannerLabel})
+                    : data.projectName);
             this._updateProgress(data.current, data.total, phase);
         });
 

@@ -349,10 +349,12 @@ export class SecurityScanner {
      */
     public async scanChurnBatch(
         packages: {name: string; version: string}[],
-        concurrency = 10
+        concurrency = 10,
+        onProgress?: (done: number, total: number, pkg: {name: string; version: string}) => void
     ): Promise<(ChurnFinding|null)[]> {
         const result: (ChurnFinding|null)[] = new Array(packages.length);
         let cursor = 0;
+        let done = 0;
 
         const runOne = async (): Promise<void> => {
             while (true) {
@@ -366,6 +368,8 @@ export class SecurityScanner {
                 } catch {
                     result[i] = null;
                 }
+                done++;
+                onProgress?.(done, packages.length, pkg);
             }
         };
 
@@ -393,10 +397,12 @@ export class SecurityScanner {
      */
     public async scanHeuristicsBatch(
         packages: {name: string; version: string}[],
-        concurrency = 10
+        concurrency = 10,
+        onProgress?: (done: number, total: number, pkg: {name: string; version: string}) => void
     ): Promise<HeuristicsBatchEntry[]> {
         const result: HeuristicsBatchEntry[] = new Array(packages.length);
         let cursor = 0;
+        let done = 0;
 
         const runOne = async (): Promise<void> => {
             while (true) {
@@ -495,6 +501,8 @@ export class SecurityScanner {
                     manifestRedFlags: ManifestRedFlagsScanner.summarise(pkg.name, pkg.version, manifestRedFlags),
                     capability: CapabilityScanner.summarise(pkg.name, pkg.version, capability)
                 };
+                done++;
+                onProgress?.(done, packages.length, pkg);
             }
         };
 

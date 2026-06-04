@@ -731,6 +731,13 @@ export type ApiDashboardScanProgressEvent = {
     total: number;
     projectName: string;
     scanner: ScannerId|null;
+    /**
+     * Free-form sub-phase string ("Querying OSV.dev for 84 packages",
+     * "Fingerprinting lodash@4.17.21", "Loading lockfile"). Optional —
+     * older emit sites that only know cell-level progress can omit
+     * it; the frontend falls back to the project/scanner label.
+     */
+    detail?: string;
 };
 
 export type ApiDashboardScanCellEvent = {

@@ -721,10 +721,11 @@ export class Nppm {
         this._dashboardHost.style.display = view === View.dashboard ? '' : 'none';
         this._globalHost.style.display = view === View.global ? '' : 'none';
 
-        // Stop the SSE stream when leaving the dashboard so the user
-        // doesn't keep a dangling EventSource open in the background.
-        if (view !== View.dashboard) {
-            this._dashboardView.stop();
-        }
+        // Intentionally do NOT stop the dashboard SSE when leaving —
+        // a long-running scan should keep ticking so the user can
+        // jump to Templates / a project drill-down and find live
+        // progress (and detailed sub-phases) waiting when they come
+        // back. The stream closes itself on the `end` event; tab
+        // unload tears it down via the browser's EventSource cleanup.
     }
 }

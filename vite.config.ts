@@ -2119,6 +2119,13 @@ class Server {
                         };
 
                         try {
+                            send('progress', {
+                                current: cellsDone,
+                                total: totalCells,
+                                projectName,
+                                scanner: null,
+                                detail: `Loading lockfile for ${projectName}`
+                            });
                             const lockfile = await project.loadLockfile();
                             if (!lockfile) {
                                 skipColumnAsNa('no lockfile');
@@ -2156,17 +2163,35 @@ class Server {
                                 // Announce the slow phase first so the
                                 // progress bar already shows what's
                                 // happening while the parallel batches run.
+                                // We thread per-package onProgress callbacks
+                                // into the heuristics + churn batches so the
+                                // user sees "Fingerprinting lodash@4.17.21
+                                // (32/84)" instead of a frozen 0/84 — OSV is
+                                // one HTTP request so its only sub-phase is
+                                // "Querying OSV.dev for N packages".
                                 send('progress', {
                                     current: cellsDone,
                                     total: totalCells,
                                     projectName,
-                                    scanner: 'cve' as ScannerId
+                                    scanner: 'cve' as ScannerId,
+                                    detail: `Querying OSV.dev for ${packages.length} package(s) — ${projectName}`
                                 });
+
+                                const emitPkgDetail = (phase: string) =>
+                                    (pkgDone: number, pkgTotal: number, pkg: {name: string; version: string}) => {
+                                        send('progress', {
+                                            current: cellsDone,
+                                            total: totalCells,
+                                            projectName,
+                                            scanner: 'cve' as ScannerId,
+                                            detail: `${phase} ${pkg.name}@${pkg.version} (${pkgDone}/${pkgTotal}) — ${projectName}`
+                                        });
+                                    };
 
                                 const [osvMap, heuristics, churns] = await Promise.all([
                                     osvClient.queryBatch(packages),
-                                    securityScanner.scanHeuristicsBatch(packages),
-                                    securityScanner.scanChurnBatch(packages)
+                                    securityScanner.scanHeuristicsBatch(packages, 10, emitPkgDetail('Fingerprinting')),
+                                    securityScanner.scanChurnBatch(packages, 10, emitPkgDetail('Churn for'))
                                 ]);
 
                                 if (aborted) {

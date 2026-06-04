@@ -14,6 +14,9 @@ export type Release = {
     url?: string;
     /** `_npmUser.name` of the publisher of this version, when the registry recorded one. */
     publisher?: string;
+    /** Full commit SHA — only set on entries produced from the git
+     * commits fetcher; absent for registry-derived releases. */
+    sha?: string;
 };
 
 export type ReleasesResponse = {

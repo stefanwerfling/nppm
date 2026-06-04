@@ -65,6 +65,7 @@ import {
 import {JsonCache} from './Cache/JsonCache.js';
 import {ConfigProjectType, SchemaConfig} from './Config/Config.js';
 import {ConfigLoader} from './Config/ConfigLoader.js';
+import {FingerprintBuilder} from './Fingerprint/FingerprintBuilder.js';
 import {FingerprintDiffer} from './Fingerprint/FingerprintDiff.js';
 import {GitResolver} from './Fingerprint/GitResolver.js';
 import {GitHistoryBackfill} from './History/GitHistoryBackfill.js';
@@ -76,6 +77,8 @@ import {ImpactAnalyzer, ImpactProjectReport} from './Security/ImpactAnalyzer.js'
 import {MatrixBuilder} from './Matrix/MatrixBuilder.js';
 import {ProjectMatrixBuilder} from './Matrix/ProjectMatrixBuilder.js';
 import {Project} from './Project/Project.js';
+import {GitCommitsFetcher} from './Releases/GitCommitsFetcher.js';
+import {GitHeadFetcher} from './Releases/GitHeadFetcher.js';
 import {ReleasesFetcher} from './Releases/ReleasesFetcher.js';
 import {CycloneDxBuilder} from './Sbom/CycloneDxBuilder.js';
 import {SbomCollector} from './Sbom/SbomCollector.js';
@@ -188,6 +191,52 @@ class Server {
             const releasesFetcher = new ReleasesFetcher(registry, releasesCache, {
                 token: process.env.GH_TOKEN
             });
+
+            // Build the gitea host list + per-instance token map from
+            // the configured gitea projects. A git dep whose URL
+            // matches one of these hosts gets the same HEAD-info /
+            // commits-list treatment as github.com.
+            const giteaHosts: string[] = [];
+            const giteaTokens = new Map<string, string>();
+            for (const project of loaded.projects) {
+                if (project instanceof ProjectGitea) {
+                    const host = project.getHost();
+                    if (host && !giteaHosts.includes(host)) {
+                        giteaHosts.push(host);
+                    }
+                    const token = project.getToken();
+                    if (host && token) {
+                        giteaTokens.set(host, token);
+                    }
+                }
+            }
+            const gitHeadFetcher = new GitHeadFetcher(releasesCache, {giteaHosts});
+            const gitCommitsFetcher = new GitCommitsFetcher(releasesCache, {
+                giteaHosts,
+                githubToken: process.env.GH_TOKEN,
+                giteaTokens
+            });
+
+            /**
+             * For coordinates whose content is mutable (a git URL
+             * pointing at HEAD or a branch/tag — i.e. anything other
+             * than a 40-char SHA ref), permanent caching is wrong: the
+             * registered tarball moves under our feet. This helper
+             * decides between the permanent `fingerprintBuilder` and a
+             * cache-less HEAD-aware builder.
+             */
+            const headFingerprintBuilder = new FingerprintBuilder(null);
+            const pickFingerprintBuilder = (version: string): typeof fingerprintBuilder => {
+                if (!GitResolver.isGitVersion(version)) {
+                    return fingerprintBuilder;
+                }
+                const hash = version.indexOf('#');
+                if (hash < 0) {
+                    return headFingerprintBuilder;
+                }
+                const ref = version.slice(hash + 1);
+                return /^[0-9a-f]{40}$/i.test(ref) ? fingerprintBuilder : headFingerprintBuilder;
+            };
 
             // History persists next to nppm.json (not in cache) — the
             // user wants to keep / inspect / commit it independent of
@@ -2691,7 +2740,7 @@ class Server {
             // -------------------------------------------------------------
             app.get('/api/matrix', async (_req, res) => {
                 try {
-                    const matrix = await MatrixBuilder.build(projects, registry);
+                    const matrix = await MatrixBuilder.build(projects, registry, gitHeadFetcher);
                     res.status(200).json(matrix);
                 } catch (e) {
                     res.status(500).json({success: false, msg: (e as Error).message});
@@ -2718,7 +2767,7 @@ class Server {
                 }
 
                 try {
-                    const fingerprint = await fingerprintBuilder.build(name, version);
+                    const fingerprint = await pickFingerprintBuilder(version).build(name, version);
                     const response: ApiFingerprintResponse = {fingerprint};
                     res.status(200).json(response);
                 } catch (e) {
@@ -3109,11 +3158,13 @@ class Server {
             // timeline: registry-known versions + (when github.com)
             // GitHub release titles / bodies. Newest first.
             //
-            // When `version` is a git URL (`github:...`, `git+...`,
-            // etc.) the registry's `name` entry is an unrelated
-            // package — return an empty timeline so the UI doesn't
-            // mis-attribute another author's releases to the user's
-            // git dep.
+            // When `version` is a git URL we route to the commits
+            // fetcher instead of the registry — the npm packument of
+            // the same `name` belongs to an unrelated package (see the
+            // figtree / fundon collision). Each commit is mapped to
+            // the `Release` shape with sha + subject + author so the
+            // panel can show a per-commit timeline without a new
+            // UI surface.
             // -------------------------------------------------------------
             app.get('/api/releases', async (req, res) => {
                 const name = typeof req.query.name === 'string' ? req.query.name : '';
@@ -3123,11 +3174,29 @@ class Server {
                     return;
                 }
                 if (version && GitResolver.isGitVersion(version)) {
-                    const response: ApiReleasesResponse = {
-                        name,
-                        releases: []
-                    };
-                    res.status(200).json(response);
+                    try {
+                        const commits = await gitCommitsFetcher.fetch(version);
+                        if (!commits) {
+                            const empty: ApiReleasesResponse = {name, releases: []};
+                            res.status(200).json(empty);
+                            return;
+                        }
+                        const response: ApiReleasesResponse = {
+                            name,
+                            repository: commits.repoUrl,
+                            releases: commits.commits.map((c) => ({
+                                version: c.shortSha,
+                                publishedAt: c.date,
+                                name: c.subject,
+                                url: c.url,
+                                publisher: c.author ?? undefined,
+                                sha: c.sha
+                            }))
+                        };
+                        res.status(200).json(response);
+                    } catch (e) {
+                        res.status(500).json({success: false, msg: (e as Error).message});
+                    }
                     return;
                 }
                 try {
@@ -3189,8 +3258,8 @@ class Server {
 
                 try {
                     const [fpBefore, fpAfter] = await Promise.all([
-                        fingerprintBuilder.build(name, before),
-                        fingerprintBuilder.build(name, after)
+                        pickFingerprintBuilder(before).build(name, before),
+                        pickFingerprintBuilder(after).build(name, after)
                     ]);
 
                     const response: ApiFingerprintDiffResponse = {

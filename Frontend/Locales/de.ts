@@ -534,6 +534,8 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'Cache cleared ({n} files). Re-running OSV scan ({p} done) …': 'Cache geleert ({n} Dateien). OSV-Scan läuft neu ({p} fertig) …',
     'Cache rebuilt — {n} file(s) cleared, registry + OSV re-warmed across all projects.': 'Cache neu aufgebaut — {n} Datei(en) entfernt, Registry + OSV über alle Projekte neu geladen.',
     'Git-only dependency — refs: {refs}': 'Nur-Git-Abhängigkeit — Refs: {refs}',
+    'Git HEAD — refs in projects: {refs}': 'Git HEAD — Refs in Projekten: {refs}',
+    'Diff against HEAD': 'Diff gegen HEAD',
     'Browse …': 'Durchsuchen …',
     'Select a directory': 'Verzeichnis auswählen',
     'Select this directory': 'Dieses Verzeichnis übernehmen',

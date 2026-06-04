@@ -186,6 +186,78 @@ describe('MatrixBuilder.build', () => {
         expect(matrix.rows[0].status).toBe(MatrixRowStatus.drift);
     });
 
+    it('asks the GitHeadFetcher once per distinct git origin and surfaces version + short SHA on the row', async () => {
+        // Two projects both pull `figtree` from the same repo at two
+        // different commits. The HEAD lookup should still fire only
+        // once because the `#ref` is stripped before dedup.
+        const a = new FakeProject('a', [manifest('a', {
+            figtree: 'git+https://github.com/me/figtree.git#v1.0.20'
+        })]);
+        const b = new FakeProject('b', [manifest('b', {
+            figtree: 'git+https://github.com/me/figtree.git#main'
+        })]);
+        const projects = new Map<string, Project>([['1', a], ['2', b]]);
+
+        let calls = 0;
+        const stubHeadFetcher = {
+            fetch: async (url: string) => {
+                calls++;
+                expect(url).toBe('git+https://github.com/me/figtree.git');
+                return {version: '1.0.28', sha: 'a'.repeat(40), shortSha: 'aaaaaaa'};
+            }
+        };
+        const matrix = await MatrixBuilder.build(
+            projects,
+            new FakeRegistry({}),
+            stubHeadFetcher as any
+        );
+
+        expect(calls).toBe(1);
+        expect(matrix.rows[0].gitLatest?.version).toBe('1.0.28');
+        expect(matrix.rows[0].gitLatest?.shortSha).toBe('aaaaaaa');
+        expect(matrix.rows[0].gitLatest?.sourceUrl).toBe('git+https://github.com/me/figtree.git');
+    });
+
+    it('leaves gitLatest fields null when the head fetcher returns null (host unreachable)', async () => {
+        const a = new FakeProject('a', [manifest('a', {
+            figtree: 'git+https://forge.example.com/me/figtree.git#main'
+        })]);
+        const projects = new Map<string, Project>([['1', a]]);
+        const headFetcher = {fetch: async () => null};
+
+        const matrix = await MatrixBuilder.build(
+            projects, new FakeRegistry({}), headFetcher as any
+        );
+
+        expect(matrix.rows[0].gitLatest?.version).toBeNull();
+        expect(matrix.rows[0].gitLatest?.shortSha).toBeNull();
+        expect(matrix.rows[0].gitLatest?.sourceUrl).toBe('git+https://forge.example.com/me/figtree.git');
+    });
+
+    it('does not stamp gitLatest on rows that have any non-git cell', async () => {
+        const a = new FakeProject('a', [manifest('a', {
+            figtree: 'git+https://github.com/me/figtree.git#main'
+        })]);
+        const b = new FakeProject('b', [manifest('b', {figtree: '^1.2.0'})]);
+        const projects = new Map<string, Project>([['1', a], ['2', b]]);
+
+        let called = false;
+        const headFetcher = {
+            fetch: async () => {
+                called = true;
+                return null;
+            }
+        };
+        const matrix = await MatrixBuilder.build(
+            projects,
+            new FakeRegistry({figtree: {name: 'figtree', latest: '1.2.3', versions: ['1.2.3']}}),
+            headFetcher as any
+        );
+
+        expect(matrix.rows[0].gitLatest).toBeUndefined();
+        expect(called).toBe(false);
+    });
+
     it('marks the row as unknown when registry has no data', async () => {
         const a = new FakeProject('a', [manifest('a', {foo: '^1'})]);
         const projects = new Map<string, Project>([['1', a]]);

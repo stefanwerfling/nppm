@@ -109,6 +109,15 @@ export class PackageDetailPanel {
                 this._diffTarget = cleanedLatest;
             }
 
+            // Git deps that pinned a `#ref` can be diffed against
+            // the same URL stripped to HEAD (= current default
+            // branch tip). Without a ref the user's version *is*
+            // HEAD-effective, so the diff would be empty — leave
+            // `_diffTarget` null in that case.
+            if (PackageDetailPanel._isGitVersion(version) && version.includes('#')) {
+                this._diffTarget = version.replace(/#.*$/, '');
+            }
+
             this._renderTabs();
             this._renderActiveTab();
         } catch (e) {
@@ -203,7 +212,9 @@ export class PackageDetailPanel {
             {value: Tab.files, label: I18n.t('Files')},
             {value: Tab.deps, label: I18n.t('Dependencies')},
             {value: Tab.diff, label: this._diffTarget
-                ? I18n.t('Diff against {target}', {target: this._diffTarget})
+                ? (PackageDetailPanel._isGitVersion(this._diffTarget)
+                    ? I18n.t('Diff against HEAD')
+                    : I18n.t('Diff against {target}', {target: this._diffTarget}))
                 : I18n.t('Diff')},
             {value: Tab.releases, label: I18n.t('Releases')},
             {value: Tab.security, label: this._securityTabLabel()},

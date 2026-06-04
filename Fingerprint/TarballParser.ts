@@ -29,8 +29,32 @@ export class TarballParser {
      * `package/package.json` or `cookie-parser/package.json`.
      */
     public static parse(tgz: Buffer): TarEntry[] {
+        return TarballParser.parseWithPrefix(tgz).entries;
+    }
+
+    /**
+     * Like {@link parse} but also surfaces the stripped top-level
+     * directory name. GitHub's codeload encodes the commit SHA in
+     * that prefix (`<repo>-<sha>` for a SHA ref, `<repo>-<branch>`
+     * for a branch tarball) — `GitHeadFetcher` reads it to learn the
+     * HEAD commit without an extra API call.
+     */
+    public static parseWithPrefix(tgz: Buffer): {entries: TarEntry[]; prefix: string|null} {
         const tar = zlib.gunzipSync(tgz);
-        return TarballParser._stripCommonPrefix(TarballParser._walkTar(tar));
+        const raw = TarballParser._walkTar(tar);
+        const stripped = TarballParser._stripCommonPrefix(raw);
+        // If the prefix was stripped, `stripped` and `raw` differ in
+        // path lengths; otherwise they're the same array. Sniff the
+        // prefix off the first entry of `raw` only if stripping
+        // happened.
+        if (stripped === raw || raw.length === 0) {
+            return {entries: stripped, prefix: null};
+        }
+        const slash = raw[0].path.indexOf('/');
+        return {
+            entries: stripped,
+            prefix: slash >= 0 ? raw[0].path.slice(0, slash) : null
+        };
     }
 
     /**

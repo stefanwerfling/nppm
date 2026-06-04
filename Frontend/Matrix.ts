@@ -1458,11 +1458,29 @@ export class Matrix {
                     const m = c.version.match(/#(.+)$/);
                     refs.add(m ? m[1] : 'HEAD');
                 }
-                latestTd.textContent = 'git';
                 latestTd.classList.add('matrix-cell-latest-git');
-                latestTd.title = I18n.t('Git-only dependency — refs: {refs}', {
-                    refs: Array.from(refs).join(', ')
-                });
+                // Prefer the HEAD info the backend resolved (version +
+                // short SHA from the upstream repo). Fall back to the
+                // plain "git" pill when the resolver was disabled or
+                // the host couldn't be reached.
+                if (row.gitLatest && (row.gitLatest.version || row.gitLatest.shortSha)) {
+                    const parts: string[] = [];
+                    if (row.gitLatest.version) {
+                        parts.push(row.gitLatest.version);
+                    }
+                    if (row.gitLatest.shortSha) {
+                        parts.push(row.gitLatest.shortSha);
+                    }
+                    latestTd.textContent = parts.join(' · ');
+                    latestTd.title = I18n.t('Git HEAD — refs in projects: {refs}', {
+                        refs: Array.from(refs).join(', ')
+                    });
+                } else {
+                    latestTd.textContent = 'git';
+                    latestTd.title = I18n.t('Git-only dependency — refs: {refs}', {
+                        refs: Array.from(refs).join(', ')
+                    });
+                }
             } else {
                 latestTd.textContent = '?';
             }

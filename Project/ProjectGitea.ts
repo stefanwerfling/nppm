@@ -68,6 +68,29 @@ export class ProjectGitea extends ProjectRemote {
         return `gitea:${this._apiBase}@${this._ref ?? 'HEAD'}`;
     }
 
+    /**
+     * Bare host of the Gitea instance (e.g. `gitea.example.com`).
+     * Consumed by `GitHeadFetcher`/`GitCommitsFetcher` so a git dep
+     * pointing at the same instance routes through the gitea endpoints
+     * instead of being treated as an unknown host.
+     */
+    public getHost(): string|null {
+        try {
+            return new URL(this._apiBase).host;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Per-instance API token configured in `nppm.json`. Returned so
+     * the same credential can authenticate the commits fetcher
+     * without re-reading the config from disk.
+     */
+    public getToken(): string|undefined {
+        return this._token;
+    }
+
     protected async fetchFile(repoPath: string): Promise<string|null> {
         const data = await this._request(repoPath);
 

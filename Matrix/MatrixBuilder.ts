@@ -4,6 +4,7 @@ import {LockfileReader} from '../Project/Lockfile.js';
 import {PackageManifest, DependencyType} from '../Project/PackageManifest.js';
 import {Project} from '../Project/Project.js';
 import {Registry} from '../Registry/Registry.js';
+import {GitHeadFetcher, GitHeadInfo} from '../Releases/GitHeadFetcher.js';
 
 /**
  * Row-level status the frontend colours on.
@@ -49,12 +50,31 @@ export type MatrixCell = {
     workspace?: string;
 };
 
+/**
+ * HEAD-of-default-branch snapshot for a git-installed package. Only
+ * present on rows where every cell points at the same git origin; the
+ * matrix surfaces `gitLatest.version` (+ short SHA) in place of the
+ * "git" placeholder so the user can tell when their pinned ref is
+ * behind upstream. `null` everywhere — including the wrapper itself —
+ * means we couldn't reach the host or the HEAD didn't expose the data.
+ */
+export type MatrixGitLatest = {
+    version: string|null;
+    sha: string|null;
+    shortSha: string|null;
+    /** The git URL the HEAD info was resolved from. Used by the
+     * frontend to construct the diff-against-HEAD coordinate. */
+    sourceUrl: string;
+};
+
 export type MatrixRow = {
     name: string;
     cells: Record<string, MatrixCell>;
     latest: string|null;
     latestPublishedAt: string|null;
     status: MatrixRowStatus;
+    /** HEAD-info for git-only rows. `undefined` on registry rows. */
+    gitLatest?: MatrixGitLatest;
 };
 
 export type MatrixProject = {
@@ -131,7 +151,8 @@ export class MatrixBuilder {
      */
     public static async build(
         registeredProjects: Map<string, Project>,
-        registry: Registry
+        registry: Registry,
+        headFetcher: GitHeadFetcher|null = null
     ): Promise<MatrixResponse> {
         const projects: MatrixProject[] = [];
         const perProjectCells = new Map<string, Map<string, MatrixCell>>();
@@ -223,16 +244,75 @@ export class MatrixBuilder {
             const latest = reg?.latest ?? null;
             const latestPublishedAt = (latest && reg?.time?.[latest]) ?? null;
 
-            rows.push({
+            const row: MatrixRow = {
                 name: pkgName,
                 cells: rowCells,
                 latest,
                 latestPublishedAt,
                 status: MatrixBuilder._computeStatus(rowCells, latest)
-            });
+            };
+            if (allCellsGit) {
+                row.gitLatest = MatrixBuilder._pickRowGitOrigin(rowCells);
+            }
+            rows.push(row);
+        }
+
+        // Resolve HEAD info for every git-only row. Done after the
+        // initial rows are built so each unique origin is fetched
+        // exactly once even when the same package appears in N
+        // projects. Failures stay as `{version:null, sha:null}` so
+        // the UI can fall back to the "git" pill cleanly.
+        if (headFetcher) {
+            const distinctUrls = new Set<string>();
+            for (const r of rows) {
+                if (r.gitLatest?.sourceUrl) {
+                    distinctUrls.add(r.gitLatest.sourceUrl);
+                }
+            }
+            const resolved = new Map<string, GitHeadInfo|null>();
+            await Promise.all(Array.from(distinctUrls).map(async (url) => {
+                try {
+                    resolved.set(url, await headFetcher.fetch(url));
+                } catch {
+                    resolved.set(url, null);
+                }
+            }));
+            for (const r of rows) {
+                if (r.gitLatest) {
+                    const info = resolved.get(r.gitLatest.sourceUrl) ?? null;
+                    if (info) {
+                        r.gitLatest = {
+                            ...r.gitLatest,
+                            version: info.version,
+                            sha: info.sha,
+                            shortSha: info.shortSha
+                        };
+                    }
+                }
+            }
         }
 
         return {projects, rows};
+    }
+
+    /**
+     * Pick a representative git URL for the row. We strip the user's
+     * `#ref` so two projects pinning the same repo at different commits
+     * still share one HEAD lookup.
+     */
+    private static _pickRowGitOrigin(cells: Record<string, MatrixCell>): MatrixGitLatest {
+        const values = Object.values(cells);
+        // First cell wins — the matrix is most useful when projects
+        // agree on the origin, and an upstream that disagrees would
+        // surface as drift anyway.
+        const first = values[0]?.version ?? '';
+        const stripped = first.replace(/#.*$/, '');
+        return {
+            version: null,
+            sha: null,
+            shortSha: null,
+            sourceUrl: stripped
+        };
     }
 
     /**

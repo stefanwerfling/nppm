@@ -5,6 +5,22 @@ export type GitTarballSpec = {
     source: string;
 };
 
+/**
+ * Generic, host-agnostic shape of a parsed git dependency string. The
+ * HEAD-info + commits fetchers consume this instead of re-parsing the
+ * URL themselves so adding a new host adds one match below, not three
+ * regexes spread across files.
+ */
+export type GitDepInfo = {
+    host: 'github'|'gitlab'|'bitbucket'|'gitea';
+    /** Bare host name (`github.com`, `gitea.example.com`, …). */
+    hostname: string;
+    owner: string;
+    repo: string;
+    /** Fragment after `#`, or `null` when the user pinned no ref. */
+    ref: string|null;
+};
+
 type HostHandler = {
     patterns: {regex: RegExp}[];
     tarball: (owner: string, repo: string, ref: string|undefined, source: string) => GitTarballSpec;
@@ -89,10 +105,11 @@ export class GitResolver {
      * "tarball unavailable".
      *
      * Currently supported: github.com (codeload), gitlab.com (archive
-     * endpoint), bitbucket.org (`/get/` endpoint). All three serve
-     * public repos without auth.
+     * endpoint), bitbucket.org (`/get/` endpoint). Any host listed in
+     * `giteaHosts` resolves via Gitea's `/<owner>/<repo>/archive/<ref>.tar.gz`
+     * endpoint.
      */
-    public static resolveTarball(version: string): GitTarballSpec|null {
+    public static resolveTarball(version: string, giteaHosts: string[] = []): GitTarballSpec|null {
         const v = version.trim();
 
         for (const host of HOSTS) {
@@ -104,6 +121,91 @@ export class GitResolver {
             }
         }
 
+        const giteaInfo = GitResolver._parseGitea(v, giteaHosts);
+        if (giteaInfo) {
+            const ref = giteaInfo.ref ?? DEFAULT_REF;
+            return {
+                url: `https://${giteaInfo.hostname}/${giteaInfo.owner}/${giteaInfo.repo}/archive/${ref}.tar.gz`,
+                source: v
+            };
+        }
+
+        return null;
+    }
+
+    /**
+     * Host-agnostic parse. Returns `null` for shapes we don't know how
+     * to dispatch on. Same set of recognised hosts as
+     * {@link resolveTarball}; both methods stay in sync so a URL the
+     * tarball resolver succeeds on also produces a `GitDepInfo`.
+     */
+    public static parse(version: string, giteaHosts: string[] = []): GitDepInfo|null {
+        const v = version.trim();
+        const known = GitResolver._parseKnown(v);
+        if (known) {
+            return known;
+        }
+        return GitResolver._parseGitea(v, giteaHosts);
+    }
+
+    private static _parseKnown(v: string): GitDepInfo|null {
+        // Each host's patterns capture (owner, repo, ref?). The shape
+        // mirrors `HOSTS` above — we don't reuse the entries directly
+        // because they're keyed on tarball construction, not on the
+        // host name we need to report.
+        const matchers: {host: GitDepInfo['host']; hostname: string; res: RegExp[]}[] = [
+            {host: 'github', hostname: 'github.com', res: [
+                /^git\+https?:\/\/github\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/i,
+                /^git\+ssh:\/\/git@github\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/i,
+                /^git@github\.com:([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/i,
+                /^github:([^/]+)\/([^/#]+?)(?:#(.+))?$/i
+            ]},
+            {host: 'gitlab', hostname: 'gitlab.com', res: [
+                /^git\+https?:\/\/gitlab\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/i,
+                /^git\+ssh:\/\/git@gitlab\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/i,
+                /^git@gitlab\.com:([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/i,
+                /^gitlab:([^/]+)\/([^/#]+?)(?:#(.+))?$/i
+            ]},
+            {host: 'bitbucket', hostname: 'bitbucket.org', res: [
+                /^git\+https?:\/\/bitbucket\.org\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/i,
+                /^git\+ssh:\/\/git@bitbucket\.org\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/i,
+                /^git@bitbucket\.org:([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/i,
+                /^bitbucket:([^/]+)\/([^/#]+?)(?:#(.+))?$/i
+            ]}
+        ];
+        for (const m of matchers) {
+            for (const re of m.res) {
+                const r = re.exec(v);
+                if (r) {
+                    return {host: m.host, hostname: m.hostname, owner: r[1], repo: r[2], ref: r[3] ?? null};
+                }
+            }
+        }
+        return null;
+    }
+
+    private static _parseGitea(v: string, giteaHosts: string[]): GitDepInfo|null {
+        if (giteaHosts.length === 0) {
+            return null;
+        }
+        // Accept the same four shapes as the known hosts, but with the
+        // hostname pinned by the caller's allow-list. The leading
+        // host-shorthand (`gitea:owner/repo`) is intentionally out —
+        // there is no single Gitea instance to map it to.
+        for (const host of giteaHosts) {
+            const escaped = host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const patterns = [
+                new RegExp(`^git\\+https?:\\/\\/${escaped}\\/([^/]+)\\/([^/#]+?)(?:\\.git)?(?:#(.+))?$`, 'i'),
+                new RegExp(`^git\\+ssh:\\/\\/git@${escaped}\\/([^/]+)\\/([^/#]+?)(?:\\.git)?(?:#(.+))?$`, 'i'),
+                new RegExp(`^git@${escaped}:([^/]+)\\/([^/#]+?)(?:\\.git)?(?:#(.+))?$`, 'i')
+            ];
+            for (const re of patterns) {
+                const r = re.exec(v);
+                if (r) {
+                    return {host: 'gitea', hostname: host, owner: r[1], repo: r[2], ref: r[3] ?? null};
+                }
+            }
+        }
         return null;
     }
 }

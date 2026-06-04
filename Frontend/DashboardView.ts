@@ -48,6 +48,7 @@ export class DashboardView {
     private _snapshotTimestamp: string|null = null;
     private _onCellClick: DashboardCellClickHandler|null = null;
     private _onProjectClick: DashboardProjectClickHandler|null = null;
+    private _onScoresChanged: ((scores: Map<string, number>) => void)|null = null;
     private _activeTab: 'scanner-score'|'overall' = 'scanner-score';
 
     constructor(root: HTMLElement) {
@@ -60,6 +61,44 @@ export class DashboardView {
 
     public onProjectClick(handler: DashboardProjectClickHandler): void {
         this._onProjectClick = handler;
+    }
+
+    /**
+     * Listener for per-project aggregate scores derived from the
+     * scanner-score cells. Same shape as `Matrix.onScoresChanged`:
+     * Nppm merges both feeds (dashboard-wins) and pushes the result
+     * to the treeview health rings.
+     */
+    public onScoresChanged(handler: (scores: Map<string, number>) => void): void {
+        this._onScoresChanged = handler;
+    }
+
+    /**
+     * Compute per-project average score over non-N/A cells and fire
+     * the listener. Public so the snapshot path can call it after
+     * loading without having to know the internals.
+     */
+    public emitScores(): void {
+        if (!this._onScoresChanged) {
+            return;
+        }
+        const scores = new Map<string, number>();
+        for (const [unid, col] of this._columns) {
+            let sum = 0;
+            let scanned = 0;
+            for (const cell of Object.values(col.cells)) {
+                if (cell.score !== null) {
+                    sum += cell.score;
+                    scanned++;
+                }
+            }
+            if (scanned > 0) {
+                scores.set(unid, Math.round(sum / scanned));
+            }
+        }
+        if (scores.size > 0) {
+            this._onScoresChanged(scores);
+        }
     }
 
     /**
@@ -109,6 +148,7 @@ export class DashboardView {
         }
         this._snapshotTimestamp = timestamp;
         this._renderTable();
+        this.emitScores();
         if (this._rescanBtn) {
             this._rescanBtn.disabled = false;
             this._rescanBtn.textContent = I18n.t('Re-scan');
@@ -279,6 +319,10 @@ export class DashboardView {
             const data = JSON.parse((e as MessageEvent).data) as ApiDashboardScanColumnEndEvent;
             this._columns.set(data.column.project.unid, data.column);
             this._renderTable();
+            // Per-project score is final once the column ends — emit
+            // so the treeview ring updates progressively instead of
+            // waiting for the whole scan.
+            this.emitScores();
         });
 
         es.addEventListener('end', (e) => {
@@ -289,6 +333,7 @@ export class DashboardView {
                 this._columns.set(col.project.unid, col);
             }
             this._renderTable();
+            this.emitScores();
             this._finishScan(I18n.t('Scan complete — {n} cells', {
                 n: String(data.dashboard.scanners.length * data.dashboard.columns.length)
             }));

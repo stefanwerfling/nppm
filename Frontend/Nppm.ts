@@ -99,6 +99,13 @@ export class Nppm {
      * Nppm in its callbacks.
      */
     private _currentProjectUnid: string|null = null;
+    /**
+     * Last score map emitted by the cross-project Matrix view. Stored
+     * separately from the Dashboard map so we can merge with
+     * dashboard-wins precedence in {@link _pushScoresToTreeview}.
+     */
+    private _matrixScores: Map<string, number> = new Map();
+    private _dashboardScores: Map<string, number> = new Map();
 
     constructor() {
         const treeRoot = document.getElementById('treeview');
@@ -471,8 +478,20 @@ export class Nppm {
             void this._workspaceDriftModal.open(unid, projectName, pkg);
         });
 
+        // Two score sources race into the treeview rings: the
+        // cross-project Matrix (per-package severity rollup) and the
+        // Dashboard (per-scanner cell averages). Dashboard is the
+        // more comprehensive measurement, so its values win when both
+        // know a project. Matrix is the fallback for projects the
+        // Dashboard hasn't scored yet (e.g. before the first dashboard
+        // visit) so the ring isn't empty.
         this._matrix.onScoresChanged((scores) => {
-            this._treeview.setProjectScores(scores);
+            this._matrixScores = scores;
+            this._pushScoresToTreeview();
+        });
+        this._dashboardView.onScoresChanged((scores) => {
+            this._dashboardScores = scores;
+            this._pushScoresToTreeview();
         });
 
         this._workspaceDriftModal.onOpenProjectMatrix((unid) => {
@@ -568,6 +587,21 @@ export class Nppm {
         } catch (e) {
             console.error('Refreshing project list failed', e);
         }
+    }
+
+    /**
+     * Combine the two score sources with Dashboard-wins precedence
+     * and push the result to the treeview. Called whenever either
+     * source emits — both maps are kept around so a later Matrix
+     * update doesn't accidentally erase Dashboard data and vice
+     * versa.
+     */
+    private _pushScoresToTreeview(): void {
+        const merged = new Map<string, number>(this._matrixScores);
+        for (const [unid, score] of this._dashboardScores) {
+            merged.set(unid, score);
+        }
+        this._treeview.setProjectScores(merged);
     }
 
     private async _loadMatrix(): Promise<void> {

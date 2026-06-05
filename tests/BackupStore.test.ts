@@ -10,7 +10,7 @@ describe('BackupStore.save', () => {
 
     beforeEach(() => {
         tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nppm-backup-'));
-        store = new BackupStore(path.join(tmp, '.nppm-backups'));
+        store = new BackupStore(path.join(tmp, '.nppm', 'backups'));
     });
 
     afterEach(() => {

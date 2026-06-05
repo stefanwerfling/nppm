@@ -68,6 +68,7 @@ import {
 import {JsonCache} from './Cache/JsonCache.js';
 import {ConfigProjectType, SchemaConfig} from './Config/Config.js';
 import {ConfigLoader} from './Config/ConfigLoader.js';
+import {NppmDirs} from './Config/NppmDirs.js';
 import {FingerprintBuilder} from './Fingerprint/FingerprintBuilder.js';
 import {FingerprintDiffer} from './Fingerprint/FingerprintDiff.js';
 import {GitResolver} from './Fingerprint/GitResolver.js';
@@ -249,9 +250,9 @@ class Server {
 
             // History persists next to nppm.json (not in cache) — the
             // user wants to keep / inspect / commit it independent of
-            // the cache directory. Hidden dot-prefix to match the
-            // `.nppm-cache` convention.
-            const historyDir = path.join(projectRoot, '.nppm-history');
+            // the cache directory. Lives under the shared `.nppm/`
+            // parent (alongside `cache/` and `backups/`).
+            const historyDir = NppmDirs.history(projectRoot);
             const historyStore = new HistoryStore(historyDir);
             const gitBackfill = new GitHistoryBackfill();
             const remoteBackfill = new RemoteGitHistoryBackfill();
@@ -287,7 +288,7 @@ class Server {
             // `nppm-templates/<id>/template.json` (one folder per
             // template). CRUD routes refresh on every read so user
             // edits are picked up live. Remote sources are fetched
-            // once at boot into `.nppm-cache/templates-remote/` and
+            // once at boot into `.nppm/cache/templates-remote/` and
             // surfaced as read-only entries in the loader.
             const templatesDir = path.join(projectRoot, 'nppm-templates');
             const remoteTemplatesDir = path.join(cacheDir, 'templates-remote');
@@ -572,11 +573,11 @@ class Server {
             // POST /api/cache/clear — wipe every cache pocket
             // (registry / fingerprint / releases / security / osv /
             // bundlephobia / npm-user / npm-2fa / templates-remote /
-            // remote …) for all projects in one shot. The .nppm-cache
+            // remote …) for all projects in one shot. The .nppm/cache/
             // directory itself + its subdirectories stay in place so
             // the JsonCache instances spun up at boot keep writing
             // successfully; only the files are removed. The
-            // .nppm-history/ store lives at projectRoot, not under
+            // .nppm/history/ store lives at projectRoot, not under
             // cacheDir, so it is never touched.
             // -------------------------------------------------------------
             app.post('/api/cache/clear', async (_req, res) => {
@@ -896,7 +897,7 @@ class Server {
                     const resolved = resolver.resolve(knownIds);
                     const manifests = await project.loadManifests();
                     const projectRoot = project.getRoot();
-                    const backupStore = new BackupStore(path.join(projectRoot, '.nppm-backups'));
+                    const backupStore = new BackupStore(NppmDirs.backups(projectRoot));
                     const applier = new TemplateApplier();
 
                     const start: ApiComplianceApplyStartEvent = {count: targets.length, backupDir: null};
@@ -2095,7 +2096,7 @@ class Server {
             // -------------------------------------------------------------
             // GET /api/dashboard/growth?days=N — per-project installed-
             // package count over time + carry-forward ecosystem total.
-            // Reconstructed from each project's `.nppm-history/...json`
+            // Reconstructed from each project's `.nppm/history/...json`
             // (HistoryStore) by replaying add/remove deltas backward from
             // the latest snapshot. Drives the Dashboard Trend tab's
             // "Packages" metric.

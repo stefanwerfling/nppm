@@ -3,7 +3,7 @@ import path from 'path';
 
 /**
  * Stamp for a single backup snapshot. `dir` is the timestamped folder
- * under `.nppm-backups/`; `files` are the relative paths we copied.
+ * under `.nppm/backups/`; `files` are the relative paths we copied.
  * The caller logs/streams this back to the UI so the user can find
  * the snapshot quickly if they want to roll back manually.
  */
@@ -15,10 +15,11 @@ export type BackupStamp = {
 /**
  * Per-project backup pocket. One folder per `save()` call so two
  * upgrades in sequence don't overwrite each other. Stored *next to*
- * `nppm.json` (not under `.nppm-cache/`) so the user can keep them
- * out of band of the cache lifecycle and commit them if they want.
+ * `nppm.json` (under `.nppm/backups/`, alongside `cache/` + `history/`)
+ * so the user can keep them out of band of the cache lifecycle and
+ * commit them if they want.
  *
- * Naming: `.nppm-backups/<isoTimestamp>/<relative-path>`.
+ * Naming: `.nppm/backups/<isoTimestamp>/<relative-path>`.
  */
 export class BackupStore {
 
@@ -33,7 +34,7 @@ export class BackupStore {
      * Snapshot a list of absolute file paths into a fresh timestamped
      * directory. `baseDir` is the project root — relative paths inside
      * `baseDir` are preserved so a workspace at `apps/api/package.json`
-     * lands under `.nppm-backups/<ts>/apps/api/package.json`.
+     * lands under `.nppm/backups/<ts>/apps/api/package.json`.
      */
     public save(baseDir: string, absPaths: string[]): BackupStamp {
         const stamp = BackupStore._timestamp();

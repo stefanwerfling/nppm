@@ -142,7 +142,7 @@ export class TemplateApplyModal {
         const hint = document.createElement('div');
         hint.className = 'umd-note';
         hint.textContent = I18n.t(
-            'A timestamped snapshot of every touched file is written to .nppm-backups/ before any change.'
+            'A timestamped snapshot of every touched file is written to .nppm/backups/ before any change.'
         );
         this._panel.appendChild(hint);
 

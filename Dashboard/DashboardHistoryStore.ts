@@ -56,11 +56,11 @@ export type DashboardHistoryEntry = {
  * Per-day persistence of dashboard scan averages, mirroring the
  * `HistoryStore` shape (atomic write-then-rename, one file per
  * logical key). One file per UTC date in
- * `<projectRoot>/.nppm-history/dashboard/YYYY-MM-DD.json` — the last
+ * `<projectRoot>/.nppm/history/dashboard/YYYY-MM-DD.json` — the last
  * scan of a given day wins so re-running the scan multiple times in
  * a day doesn't bloat the trend line.
  *
- * Lives under `.nppm-history/` (not `.nppm-cache/`) so the user can
+ * Lives under `.nppm/history/` (not `.nppm/cache/`) so the user can
  * commit it if they want a long-term ecosystem-health record under
  * source control. Same rationale as `HistoryStore`.
  */

@@ -217,7 +217,7 @@ export class SettingsModal {
             ]
         ));
         body.appendChild(this._sectionHead(I18n.t('Cache')));
-        body.appendChild(this._textField('sm-cdir', I18n.t('Cache directory'), c.dir, '.nppm-cache'));
+        body.appendChild(this._textField('sm-cdir', I18n.t('Cache directory'), c.dir, '.nppm/cache'));
         body.appendChild(this._numberField('sm-cttl', I18n.t('Cache TTL (minutes)'), c.ttlMinutes, '60'));
         body.appendChild(this._cacheClearRow());
     }
@@ -226,7 +226,7 @@ export class SettingsModal {
      * "Clear cache now" row in the Cache section. Wipes every file in
      * the on-disk cache (registry / fingerprint / releases / OSV /
      * bundlephobia / templates-remote / …) across all projects so the
-     * next scan rebuilds against fresh registry data. `.nppm-history/`
+     * next scan rebuilds against fresh registry data. `.nppm/history/`
      * is preserved — it's the user's audit log, not a cache.
      */
     private _cacheClearRow(): HTMLElement {
@@ -250,7 +250,7 @@ export class SettingsModal {
         const status = document.createElement('span');
         status.className = 'sm-cache-clear-status';
         status.textContent = I18n.t(
-            'Wipes every cache pocket across all projects. History (.nppm-history/) is kept.'
+            'Wipes every cache pocket across all projects. History (.nppm/history/) is kept.'
         );
         right.appendChild(status);
 

@@ -17,6 +17,7 @@ import {OsvClient} from '../Security/OsvClient.js';
 import {SecurityScanner} from '../Security/SecurityScanner.js';
 import {UnusedDetector} from '../Unused/UnusedDetector.js';
 import {ConfigProjectType} from './Config.js';
+import {NppmDirs} from './NppmDirs.js';
 
 /**
  * Optional hooks the caller can plug in. `onProjectLoaded` is the
@@ -160,7 +161,7 @@ export class ConfigLoader {
         const registryAuth = cfg.registry?.auth;
         const cacheDir = cfg.cache?.dir
             ? path.resolve(projectRoot, cfg.cache.dir)
-            : path.resolve(projectRoot, '.nppm-cache');
+            : NppmDirs.cache(projectRoot);
         const cacheTtlMinutes = typeof cfg.cache?.ttlMinutes === 'number' ? cfg.cache.ttlMinutes : 60;
 
         const registryCache = new JsonCache(path.join(cacheDir, 'registry'), cacheTtlMinutes);

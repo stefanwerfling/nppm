@@ -12,7 +12,7 @@ describe('TemplateLoader', () => {
     beforeEach(() => {
         tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nppm-tplldr-'));
         localDir = path.join(tmp, 'nppm-templates');
-        remoteDir = path.join(tmp, '.nppm-cache', 'templates-remote');
+        remoteDir = path.join(tmp, '.nppm', 'cache', 'templates-remote');
         fs.mkdirSync(localDir, {recursive: true});
     });
 

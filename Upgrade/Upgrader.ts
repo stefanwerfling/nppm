@@ -2,6 +2,7 @@ import {ChildProcess, spawn} from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import {ApiUpgradeRequest} from '../Api/ApiTypes.js';
+import {NppmDirs} from '../Config/NppmDirs.js';
 import {SafePath} from '../Project/SafePath.js';
 import {BackupStamp, BackupStore} from './BackupStore.js';
 import {EditResult, PackageJsonEditor} from './PackageJsonEditor.js';
@@ -46,7 +47,7 @@ export class Upgrader {
 
     constructor(projectRoot: string, spawnFn: SpawnFn = spawn) {
         this._projectRoot = projectRoot;
-        this._backups = new BackupStore(path.join(projectRoot, '.nppm-backups'));
+        this._backups = new BackupStore(NppmDirs.backups(projectRoot));
         this._spawn = spawnFn;
     }
 

@@ -167,7 +167,7 @@ export type ApiConfigMutationResponse = {
  * cache directory (registry / fingerprint / releases / security /
  * osv / bundlephobia / templates-remote / …) while preserving the
  * directory structure so the in-memory JsonCache instances keep
- * working. `.nppm-history/` lives outside the cache and is never
+ * working. `.nppm/history/` lives outside the cache and is never
  * touched.
  */
 export type ApiCacheClearResponse = {
@@ -692,7 +692,7 @@ export type ApiDashboardResponse = DashboardResponse;
 
 /**
  * Response shape of `GET /api/dashboard/snapshot`. Returns the most
- * recent scan result persisted to `.nppm-cache/dashboard-snapshot.json`
+ * recent scan result persisted to `.nppm/cache/dashboard-snapshot.json`
  * — used by the Dashboard view to render an immediate first-paint
  * while the user decides whether to trigger a fresh SSE scan.
  *
@@ -779,7 +779,7 @@ export type ApiDashboardHistoryResponse = {
 /**
  * Response shape of `GET /api/dashboard/growth?days=`. Per-project
  * installed-package-count timelines reconstructed from each project's
- * `.nppm-history/<project>.json` (HistoryStore), plus a carry-forward
+ * `.nppm/history/<project>.json` (HistoryStore), plus a carry-forward
  * ecosystem-total series. Drives the Dashboard Trend tab's "Packages"
  * metric.
  */

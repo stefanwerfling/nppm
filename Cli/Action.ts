@@ -247,7 +247,7 @@ async function postPrComment(
 /**
  * Mirror of `runScan`'s config loader — we re-read because the
  * scanner exits at the end and we need a fresh `OsvClient` instance
- * keyed against the same `.nppm-cache/`. Returns `null` and logs
+ * keyed against the same `.nppm/cache/`. Returns `null` and logs
  * when the config is missing or malformed.
  */
 function loadConfig(io: RunActionIO, configPath: string|undefined): LoadedConfig|null {

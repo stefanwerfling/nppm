@@ -57,7 +57,7 @@ const SOURCE_EXTENSIONS = new Set([
  */
 const SKIP_DIRS = new Set([
     'node_modules', '.git', '.svn', '.hg', 'dist', 'build', 'out',
-    'coverage', '.nppm-cache', '.nppm-history', '.next', '.nuxt',
+    'coverage', '.nppm', '.nppm-cache', '.nppm-history', '.next', '.nuxt',
     '.cache', '.parcel-cache', '.turbo', '.vite'
 ]);
 

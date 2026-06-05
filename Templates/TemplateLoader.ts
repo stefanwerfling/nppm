@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import {SchemaErrors} from 'vts';
+import {NppmDirs} from '../Config/NppmDirs.js';
 import {SchemaTemplate, Template} from './Template.js';
 
 /**
@@ -40,7 +41,7 @@ export class TemplateLoader {
 
     constructor(dir: string, remoteDir?: string) {
         this._dir = dir;
-        this._remoteDir = remoteDir ?? path.join(dir, '..', '.nppm-cache', 'templates-remote');
+        this._remoteDir = remoteDir ?? path.join(NppmDirs.cache(path.join(dir, '..')), 'templates-remote');
     }
 
     public getDir(): string {

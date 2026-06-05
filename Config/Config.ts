@@ -231,7 +231,7 @@ export const SchemaConfig = Vts.object({
     /**
      * Remote template-catalogue URLs. Each entry must serve a
      * `template.json`-shaped JSON body. Fetched + validated at server
-     * boot, cached in `.nppm-cache/templates-remote/<id>/`. Remote
+     * boot, cached in `.nppm/cache/templates-remote/<id>/`. Remote
      * templates are read-only in the UI (CRUD routes refuse to mutate
      * them).
      */

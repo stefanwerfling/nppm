@@ -7,7 +7,9 @@ codebase. It is *not* user-facing documentation — that lives in
 ## What nppm is
 
 A Vite-hosted dev tool. Backend = Express middleware mounted inside
-`vite.config.ts`. Frontend = plain TypeScript + DOM, no framework, no
+`vite.config.ts`; every HTTP route lives in a `backend/Api/*Controller.ts`
+class and is wired by `vite.config.ts` through a shared
+`ServerContext`. Frontend = plain TypeScript + DOM, no framework, no
 build other than what Vite does. Mirrors the architecture of `vtseditor`
 in the sibling repo.
 
@@ -44,7 +46,36 @@ nppm/
 ├── shared/
 │   └── Api/ApiTypes.ts     wire types shared between backend & frontend
 │
-├── backend/                Express side: 20 modules, one folder each
+├── backend/                Express side
+│   ├── Api/                        HTTP-route Controllers + body schemas
+│   │   ├── ServerContext.ts            shared state bag passed to every Controller (~20 fields + getProject/refreshTemplates/mutateConfig/pickFingerprintBuilder)
+│   │   ├── ConfigController.ts         GET /api/config + PUT /api/config + POST /api/cache/clear
+│   │   ├── FsController.ts             GET /api/fs/browse (directory picker)
+│   │   ├── ProjectsController.ts       GET/POST/PUT/DELETE /api/projects + GET /api/projects/:id/config
+│   │   ├── TemplatesController.ts      template CRUD + sources + cross-project matrix + per-project compliance + apply SSE
+│   │   ├── UpgradeController.ts        per-project upgrade preview + apply SSE + lifecycle list/run SSE
+│   │   ├── MatrixController.ts         per-project + cross-project matrix + batched security/heuristics/bundles + integrity + bulk-upgrade preview/apply SSE
+│   │   ├── LockfileController.ts       per-project lockfile (with HistoryStore auto-snapshot) + depgraph + analyze SSE + cross-project analyze-all SSE
+│   │   ├── DashboardController.ts      dashboard snapshot/history/growth + per-package trends + scanner × project sweep SSE (split into _scanProject/_runPerPackageScanners/_runPerProjectScanners/_packagesFromLockfile/_packagesFromManifest/_fetchDownloads/_persistSnapshot)
+│   │   ├── HistoryController.ts        per-project change log + backfill SSE
+│   │   ├── VulnerabilityController.ts  per-project vulnerability timeline + scan SSE
+│   │   ├── PackagesController.ts       per-project manifest list
+│   │   ├── ReleasesController.ts       npm + GitHub releases merged
+│   │   ├── SecurityController.ts       aggregated SecurityReport for one pkg@version
+│   │   ├── FingerprintController.ts    GET /api/fingerprint + /api/fingerprint/diff
+│   │   ├── ImpactController.ts         cross-project blast-radius for a pkg@version
+│   │   ├── PrReviewController.ts       branch-vs-branch dep delta + CVE delta
+│   │   ├── IntegrityController.ts      per-project lockfile integrity cross-check
+│   │   ├── UnusedController.ts         per-project depcheck-style report
+│   │   ├── SbomController.ts           per-project SBOM emit (CycloneDX / SPDX)
+│   │   └── Schemas/                    VTS body/query schemas used by the Controllers
+│   │       ├── SchemaApiConfig.ts
+│   │       ├── SchemaApiFsBrowse.ts
+│   │       ├── SchemaApiProjects.ts
+│   │       ├── SchemaApiTemplates.ts
+│   │       ├── SchemaApiUpgrade.ts
+│   │       └── SchemaApiMatrix.ts
+│   │
 │   ├── Config/Config.ts            VTS schemas for nppm.json
 │   ├── Config/ConfigLoader.ts      buildLoadedConfig() — shared bootstrap used by vite.config.ts + cli/Scan.ts
 │   ├── Config/NppmDirs.ts          single source of truth for `.nppm/{cache,history,backups}` + idempotent legacy-folder migration

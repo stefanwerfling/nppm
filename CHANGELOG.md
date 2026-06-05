@@ -9,6 +9,20 @@ from `v1.0.0` onwards.
 ## [Unreleased]
 
 ### Changed
+- **HTTP routes moved out of `vite.config.ts` into one Controller
+  class per topic.** Every API route now lives in a
+  `backend/Api/*Controller.ts` with a `static register(ctx)` entry
+  point; shared state (loaded config, project map, history store,
+  fingerprint builders, …) travels through a single `ServerContext`.
+  `vite.config.ts` shrinks to a thin wiring file (1991 → ~324 lines)
+  that constructs `ServerContext` and calls `register()` on each
+  Controller. Body validation moves to VTS schemas under
+  `backend/Api/Schemas/*.ts` (one schema file per topic). Nineteen
+  Controllers in total: Config, Fs, Projects, Templates, Upgrade,
+  Matrix, Lockfile, Dashboard, History, Vulnerability, Packages,
+  Releases, Security, Fingerprint, Impact, PrReview, Integrity,
+  Unused, Sbom. The API surface is unchanged; this is purely an
+  internal refactor.
 - **Source-tree restructure.** Top-level folders are now lowercase
   (`backend/`, `frontend/`, `shared/`, `cli/`) with PascalCase modules
   inside. The twenty backend modules (Bundle, Cache, …, Vulnerability)

@@ -31,30 +31,21 @@ import {ConfigLoader} from './backend/Config/ConfigLoader.js';
 import {NppmDirs} from './backend/Config/NppmDirs.js';
 import {FingerprintBuilder} from './backend/Fingerprint/FingerprintBuilder.js';
 import {FingerprintDiffer} from './backend/Fingerprint/FingerprintDiff.js';
-import {GitResolver} from './backend/Fingerprint/GitResolver.js';
 import {GitHistoryBackfill} from './backend/History/GitHistoryBackfill.js';
 import {HistoryStore} from './backend/History/HistoryStore.js';
 import {RemoteGitHistoryBackfill} from './backend/History/RemoteGitHistoryBackfill.js';
 import {DashboardHistoryStore} from './backend/Dashboard/DashboardHistoryStore.js';
 import {NpmDownloadsFetcher} from './backend/Downloads/NpmDownloadsFetcher.js';
-import {ImpactAnalyzer, ImpactProjectReport} from './backend/Security/ImpactAnalyzer.js';
 import {Project} from './backend/Project/Project.js';
 import {GitCommitsFetcher} from './backend/Releases/GitCommitsFetcher.js';
 import {GitHeadFetcher} from './backend/Releases/GitHeadFetcher.js';
 import {ReleasesFetcher} from './backend/Releases/ReleasesFetcher.js';
-import {CycloneDxBuilder} from './backend/Sbom/CycloneDxBuilder.js';
-import {SbomCollector} from './backend/Sbom/SbomCollector.js';
-import {SpdxBuilder} from './backend/Sbom/SpdxBuilder.js';
 import {IntegrityScanner} from './backend/Security/IntegrityScanner.js';
 import {PrReviewBuilder} from './backend/PrReview/PrReviewBuilder.js';
 import {ProjectGitea} from './backend/Project/ProjectGitea.js';
-import {ProjectGithub} from './backend/Project/ProjectGithub.js';
-import {ProjectRemote} from './backend/Project/ProjectRemote.js';
-import {SchemaTemplate, Template} from './backend/Templates/Template.js';
-import {TemplateApplier} from './backend/Templates/TemplateApplier.js';
+import {Template} from './backend/Templates/Template.js';
 import {TemplateComplianceChecker} from './backend/Templates/TemplateComplianceChecker.js';
 import {TemplateLoader} from './backend/Templates/TemplateLoader.js';
-import {BackupStore} from './backend/Upgrade/BackupStore.js';
 import {TimelineBuilder} from './backend/Vulnerability/TimelineBuilder.js';
 
 /**
@@ -128,7 +119,6 @@ class Server {
                     cacheDir,
                     cacheTtlMinutes,
                     registry,
-                    fingerprintBuilder,
                     osvClient,
                     securityCache
                 } = loaded;
@@ -179,22 +169,11 @@ class Server {
                  * For coordinates whose content is mutable (a git URL
                  * pointing at HEAD or a branch/tag — i.e. anything other
                  * than a 40-char SHA ref), permanent caching is wrong: the
-                 * registered tarball moves under our feet. This helper
-                 * decides between the permanent `fingerprintBuilder` and a
-                 * cache-less HEAD-aware builder.
+                 * tarball moves under our feet. Both builders go into the
+                 * ServerContext; `ctx.pickFingerprintBuilder(version)` is
+                 * what the Controllers call to pick between them.
                  */
                 const headFingerprintBuilder = new FingerprintBuilder(null);
-                const pickFingerprintBuilder = (version: string): typeof fingerprintBuilder => {
-                    if (!GitResolver.isGitVersion(version)) {
-                        return fingerprintBuilder;
-                    }
-                    const hash = version.indexOf('#');
-                    if (hash < 0) {
-                        return headFingerprintBuilder;
-                    }
-                    const ref = version.slice(hash + 1);
-                    return /^[0-9a-f]{40}$/i.test(ref) ? fingerprintBuilder : headFingerprintBuilder;
-                };
 
                 /*
                  * History persists next to nppm.json (not in cache) — the

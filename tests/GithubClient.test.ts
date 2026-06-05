@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {GithubClient} from '../Cli/GithubClient.js';
-import {STICKY_MARKER} from '../Cli/ActionFormat.js';
+import {GithubClient} from '../cli/GithubClient.js';
+import {STICKY_MARKER} from '../cli/ActionFormat.js';
 
 /**
  * Lightweight fetch double — captures every request and returns a

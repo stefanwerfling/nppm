@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {ApiDepGraphResponse} from '../shared/Api/ApiTypes.js';
-import {WhyModal} from '../Frontend/WhyModal.js';
+import {WhyModal} from '../frontend/WhyModal.js';
 
 /**
  * Build a synthetic flat dep-graph matching `ApiDepGraphResponse` —

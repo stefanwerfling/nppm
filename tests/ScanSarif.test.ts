@@ -3,8 +3,8 @@ import {ConfigProjectType} from '../backend/Config/Config.js';
 import {LicenseSeverity} from '../backend/Security/LicenseScanner.js';
 import {ScriptSeverity} from '../backend/Security/ScriptScanner.js';
 import {HeuristicsBatchEntry} from '../backend/Security/SecurityScanner.js';
-import {ScanReportBuilder, UnifiedSeverity} from '../Cli/ScanReport.js';
-import {SarifBuilder} from '../Cli/ScanSarif.js';
+import {ScanReportBuilder, UnifiedSeverity} from '../cli/ScanReport.js';
+import {SarifBuilder} from '../cli/ScanSarif.js';
 import {UnusedSeverity} from '../backend/Unused/UnusedReport.js';
 
 function heuristic(name: string, version: string): HeuristicsBatchEntry {

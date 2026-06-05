@@ -6,9 +6,9 @@ import {MaintainerSeverity} from '../backend/Security/MaintainerScanner.js';
 import {PatternSeverity} from '../backend/Security/PatternScanner.js';
 import {ScriptSeverity} from '../backend/Security/ScriptScanner.js';
 import {HeuristicsBatchEntry} from '../backend/Security/SecurityScanner.js';
-import {ScanReportBuilder, UnifiedSeverity} from '../Cli/ScanReport.js';
-import {FailOnLevel} from '../Cli/CliArgs.js';
-import {ScanFormatter} from '../Cli/ScanFormat.js';
+import {ScanReportBuilder, UnifiedSeverity} from '../cli/ScanReport.js';
+import {FailOnLevel} from '../cli/CliArgs.js';
+import {ScanFormatter} from '../cli/ScanFormat.js';
 import {UnusedSeverity} from '../backend/Unused/UnusedReport.js';
 
 function baseHeuristic(name: string, version: string): HeuristicsBatchEntry {

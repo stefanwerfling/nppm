@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {EditorUrl} from '../Frontend/EditorUrl.js';
+import {EditorUrl} from '../frontend/EditorUrl.js';
 
 describe('EditorUrl', () => {
 

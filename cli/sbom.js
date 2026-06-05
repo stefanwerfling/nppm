@@ -18,7 +18,7 @@ const vite = await createServer({
 });
 
 try {
-    const mod = await vite.ssrLoadModule('./Cli/Sbom.ts');
+    const mod = await vite.ssrLoadModule('./cli/Sbom.ts');
     const exit = await mod.SbomRunner.run({
         argv: process.argv.slice(2),
         cwd: process.cwd(),

@@ -19,7 +19,7 @@ import {ExternalSourcesScanner} from '../backend/Security/ExternalSourcesScanner
 import {OsvClient} from '../backend/Security/OsvClient.js';
 import {SecurityScanner} from '../backend/Security/SecurityScanner.js';
 import {UnusedDetector, UnusedFs} from '../backend/Unused/UnusedDetector.js';
-import {runScan, RunScanIO} from '../Cli/Scan.js';
+import {runScan, RunScanIO} from '../cli/Scan.js';
 
 /**
  * Buffered IO captures so each test can assert on the exact bytes

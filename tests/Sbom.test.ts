@@ -18,7 +18,7 @@ import {ExternalSourcesScanner} from '../backend/Security/ExternalSourcesScanner
 import {OsvClient} from '../backend/Security/OsvClient.js';
 import {SecurityScanner} from '../backend/Security/SecurityScanner.js';
 import {UnusedDetector} from '../backend/Unused/UnusedDetector.js';
-import {SbomCliArgsError, SbomCliArgsParser, SbomFormat, SbomIO, SbomRunner} from '../Cli/Sbom.js';
+import {SbomCliArgsError, SbomCliArgsParser, SbomFormat, SbomIO, SbomRunner} from '../cli/Sbom.js';
 
 class FakeLocalProject extends ProjectLocal {
     private readonly _manifests: PackageManifest[];

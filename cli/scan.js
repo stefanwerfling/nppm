@@ -20,7 +20,7 @@ const vite = await createServer({
 });
 
 try {
-    const mod = await vite.ssrLoadModule('./Cli/Scan.ts');
+    const mod = await vite.ssrLoadModule('./cli/Scan.ts');
     const exit = await mod.runScan({
         argv: process.argv.slice(2),
         cwd: process.cwd(),

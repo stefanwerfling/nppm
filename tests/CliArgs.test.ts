@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {CliArgsError, FailOnLevel, CliArgsParser} from '../Cli/CliArgs.js';
+import {CliArgsError, FailOnLevel, CliArgsParser} from '../cli/CliArgs.js';
 
 describe('CliArgsParser', () => {
     it('returns defaults for an empty argv', () => {

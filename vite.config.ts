@@ -65,6 +65,9 @@ import {
     ApiLifecycleScriptsResponse,
     ApiLifecycleRunRequest
 } from './shared/Api/ApiTypes.js';
+import {ConfigController} from './backend/Api/ConfigController.js';
+import {FsController} from './backend/Api/FsController.js';
+import {ServerContext} from './backend/Api/ServerContext.js';
 import {JsonCache} from './backend/Cache/JsonCache.js';
 import {ConfigProjectType, SchemaConfig} from './backend/Config/Config.js';
 import {ConfigLoader} from './backend/Config/ConfigLoader.js';
@@ -324,6 +327,24 @@ class Server {
                 const templateChecker = new TemplateComplianceChecker();
 
                 /*
+                 * Shared bag of state + helpers passed to every
+                 * extracted Controller. Routes that still live inline
+                 * inside this closure read the same local variables
+                 * directly; the migration to controllers is incremental.
+                 */
+                const ctx = new ServerContext({
+                    app: app,
+                    projectRoot: projectRoot,
+                    configFile: configFile,
+                    loaded: loaded,
+                    projects: projects,
+                    templateLoader: templateLoader,
+                    initialTemplates: templates
+                });
+                ConfigController.register(ctx);
+                FsController.register(ctx);
+
+                /*
                  * -------------------------------------------------------------
                  * GET /api/projects — one row per configured project, with a
                  * best-effort packageCount so the treeview can show a hint
@@ -536,111 +557,6 @@ class Server {
                     }
                 });
 
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/config — the non-`projects` sections of nppm.json
-                 * (server / browser / registry / cache / actions / security)
-                 * verbatim from disk. The settings modal reads this on open
-                 * so unsaved disk-side edits don't get clobbered.
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/config', async(_req, res) => {
-                    try {
-                        if (!configFile || !fs.existsSync(configFile)) {
-                            res.status(404).json({success: false, msg: 'nppm.json not found'});
-                            return;
-                        }
-                        const cfg = JSON.parse(fs.readFileSync(configFile, 'utf-8')) as Record<string, unknown>;
-                        const {projects: _ignored, ...rest} = cfg;
-                        const response: ApiConfigResponse = rest as ApiConfigResponse;
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
-                /*
-                 * -------------------------------------------------------------
-                 * PUT /api/config — full replacement of the non-`projects`
-                 * sections in nppm.json. The `projects` array is left
-                 * untouched (managed by /api/projects routes). Body is
-                 * validated against `SchemaConfig` after merge so partial
-                 * shapes that violate the schema are rejected.
-                 * 
-                 * Most settings only take effect on a dev-server restart
-                 * (port, registry URL, cache dir, …). `actions.editor` and
-                 * `actions.allowInstall` are read fresh per request so they
-                 * pick up live — but the frontend should still surface a
-                 * "restart" hint for the others.
-                 * -------------------------------------------------------------
-                 */
-                app.put('/api/config', async(req, res) => {
-                    const body = req.body as ApiConfigMutationRequest;
-                    if (!body || typeof body !== 'object' || Array.isArray(body)) {
-                        res.status(400).json({success: false, msg: 'request body required'});
-                        return;
-                    }
-                    try {
-                        Server._mutateConfig(configFile, (cfg) => {
-                        /*
-                         * Replace every known section explicitly; absent
-                         * keys in `body` drop the section entirely so
-                         * the on-disk shape stays clean.
-                         */
-                            for (const key of ['server', 'browser', 'registry', 'cache', 'actions', 'security', 'ui']) {
-                                delete cfg[key];
-                            }
-                            for (const [key, value] of Object.entries(body)) {
-                                cfg[key] = value;
-                            }
-                            const errors: SchemaErrors = [];
-                            if (!SchemaConfig.validate(cfg, errors)) {
-                                throw new Error(`Invalid config: ${JSON.stringify(errors)}`);
-                            }
-                        });
-                        const response: ApiConfigMutationResponse = {success: true};
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
-                /*
-                 * -------------------------------------------------------------
-                 * POST /api/cache/clear — wipe every cache pocket
-                 * (registry / fingerprint / releases / security / osv /
-                 * bundlephobia / npm-user / npm-2fa / templates-remote /
-                 * remote …) for all projects in one shot. The .nppm/cache/
-                 * directory itself + its subdirectories stay in place so
-                 * the JsonCache instances spun up at boot keep writing
-                 * successfully; only the files are removed. The
-                 * .nppm/history/ store lives at projectRoot, not under
-                 * cacheDir, so it is never touched.
-                 * -------------------------------------------------------------
-                 */
-                app.post('/api/cache/clear', async(_req, res) => {
-                    try {
-                        let removed = 0;
-                        if (fs.existsSync(cacheDir)) {
-                            const walk = (dir: string): void => {
-                                for (const e of fs.readdirSync(dir, {withFileTypes: true})) {
-                                    const full = path.join(dir, e.name);
-                                    if (e.isDirectory()) {
-                                        walk(full);
-                                    } else {
-                                        fs.unlinkSync(full);
-                                        removed++;
-                                    }
-                                }
-                            };
-                            walk(cacheDir);
-                        }
-                        const response: ApiCacheClearResponse = {success: true, removed: removed};
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
 
                 /*
                  * -------------------------------------------------------------
@@ -1062,59 +978,6 @@ class Server {
                     res.status(200).json(response);
                 });
 
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/fs/browse?path=<absolute>[&showHidden=1] — list
-                 * the directory at `path` so the frontend directory picker
-                 * can navigate the user's filesystem. The dev server runs
-                 * on the user's box (bound to localhost), so the user
-                 * already has full filesystem access via their shell —
-                 * no traversal guard required; `path` must just be
-                 * absolute (a relative path would be ambiguous w.r.t the
-                 * server cwd).
-                 * 
-                 * Defaults to `process.cwd()` when `path` is omitted (matches
-                 * the initial-state the picker wants on first open).
-                 * 
-                 * Per-entry EACCES is swallowed silently — the offending
-                 * row just disappears from the list rather than failing the
-                 * whole request.
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/fs/browse', async(req, res) => {
-                    const requested = typeof req.query.path === 'string' && req.query.path.length > 0
-                        ? req.query.path
-                        : process.cwd();
-                    const showHidden = req.query.showHidden === '1';
-
-                    if (!path.isAbsolute(requested)) {
-                        res.status(400).json({success: false, msg: `path must be absolute, got "${requested}"`});
-                        return;
-                    }
-
-                    try {
-                        const response = await Server._listDirectory(requested, showHidden);
-                        res.status(200).json(response);
-                    } catch (e) {
-                        const err = e as NodeJS.ErrnoException;
-                        if (err.code === 'ENOENT') {
-                        /*
-                         * Fall back to home directory when the
-                         * requested path doesn't exist — most likely
-                         * a stale value from the form field.
-                         */
-                            try {
-                                const fallback = await Server._listDirectory(os.homedir(), showHidden);
-                                res.status(200).json(fallback);
-                                return;
-                            } catch (e2) {
-                                res.status(500).json({success: false, msg: (e2 as Error).message});
-                                return;
-                            }
-                        }
-                        res.status(500).json({success: false, msg: err.message});
-                    }
-                });
 
                 /*
                  * -------------------------------------------------------------
@@ -3879,44 +3742,6 @@ class Server {
         };
     }
 
-    private static async _listDirectory(absPath: string, showHidden: boolean): Promise<ApiFsBrowseResponse> {
-        const dirents = await fs.promises.readdir(absPath, {withFileTypes: true});
-        const entries: ApiFsBrowseEntry[] = [];
-        for (const d of dirents) {
-            if (!showHidden && d.name.startsWith('.')) {
-                continue;
-            }
-            let kind: 'dir'|'file'|null = null;
-            if (d.isDirectory()) {
-                kind = 'dir';
-            } else if (d.isFile()) {
-                kind = 'file';
-            } else if (d.isSymbolicLink()) {
-                try {
-                    const stat = await fs.promises.stat(path.join(absPath, d.name));
-                    kind = stat.isDirectory() ? 'dir' : 'file';
-                } catch {
-                    continue;
-                }
-            }
-            if (kind === null) {
-                continue;
-            }
-            entries.push({name: d.name, type: kind});
-        }
-        entries.sort((a, b) => {
-            if (a.type !== b.type) {
-                return a.type === 'dir' ? -1 : 1;
-            }
-            return a.name.localeCompare(b.name, undefined, {sensitivity: 'base'});
-        });
-        const parent = path.dirname(absPath);
-        return {
-            path: absPath,
-            parent: parent === absPath ? null : parent,
-            entries: entries
-        };
-    }
 
     /**
      * Read → mutate → write helper for nppm.json. Used by the

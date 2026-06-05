@@ -252,7 +252,7 @@ Entries are rendered as a vertical timeline. Each date gets its own
 pill at the top of its group; each entry has a coloured icon on the
 track — `+` (green) for add-only changes, `~` (yellow) for pure
 updates, `−` (red) for remove-only, `●` (accent) for anything mixed.
-History files live in `.nppm-history/` next to your `nppm.json` —
+History files live in `.nppm/history/` next to your `nppm.json` —
 safe to commit if you want long-term audit trails.
 
 **Git backfill.** The scan bar above the timeline carries a
@@ -559,7 +559,7 @@ audit --audit-level=high`).
 Output is human-readable text by default; pass `--json` for a
 machine-readable payload or `--sarif` for a SARIF 2.1.0 envelope that
 GitHub Code Scanning ingests directly (`actions/upload-sarif`). The
-CLI reuses `.nppm-cache/` and `.nppm-history/`, so a warm CI run is
+CLI reuses `.nppm/cache/` and `.nppm/history/`, so a warm CI run is
 fast: warm OSV + warm fingerprint = no network for already-seen
 packages.
 
@@ -642,7 +642,7 @@ it to open the Upgrade modal — a focused, per-cell flow:
    context. Indentation and trailing newline are preserved.
 5. **Action**:
    - **Apply edit only** (always available). Writes the file, takes a
-     backup to `.nppm-backups/<timestamp>/`, and reminds you to run
+     backup to `.nppm/backups/<timestamp>/`, and reminds you to run
      `npm install` by hand.
    - **Apply edit + install (--ignore-scripts)**. Only shown when
      `actions.allowInstall: true` in `nppm.json`. Streams the install
@@ -710,7 +710,7 @@ Clicking **Update selected** opens the wizard:
 5. **Actions**:
    - **Apply edits only** — writes every changed `package.json`, one
      shared backup folder per project under
-     `.nppm-backups/<timestamp>/`, then reminds you to run `npm
+     `.nppm/backups/<timestamp>/`, then reminds you to run `npm
      install` by hand in each project.
    - **Apply edits + install per project (--ignore-scripts)** —
      same plus a sequential install. One `npm install` per project,
@@ -721,7 +721,7 @@ The live log groups events per project:
 
 ```
 ── kavula (3 picks) ──
-  ✓ Backup saved to .nppm-backups/2026-05-29T11-15-02Z
+  ✓ Backup saved to .nppm/backups/2026-05-29T11-15-02Z
     · package.json
     · package-lock.json
   ✓ vitest → package.json
@@ -889,7 +889,7 @@ Two action buttons sit in the title bar:
 - **+ Add remote source** — paste a URL pointing at a raw
   `template.json` file. It's appended to the top-level
   `templateSources: string[]` in `nppm.json`, fetched into
-  `.nppm-cache/templates-remote/<id>/`, and shows up immediately
+  `.nppm/cache/templates-remote/<id>/`, and shows up immediately
   with a green `REMOTE` badge. Edit and delete are disabled on
   remote templates (the source is read-only); to change one,
   edit the upstream file and refresh.
@@ -907,7 +907,7 @@ workspace missing.
 The **Apply selected** button opens a pick-checkbox modal — risk +
 warn findings are pre-selected, info entries are opt-in. The applier
 writes a timestamped snapshot of every touched file to
-`.nppm-backups/<timestamp>/` *before* the first edit. `merge-json`
+`.nppm/backups/<timestamp>/` *before* the first edit. `merge-json`
 mode deep-merges JSON files (the existing keys win on conflict);
 `create` mode writes files only when they're missing and never
 overwrites; `report-only` files never touch disk.
@@ -946,7 +946,7 @@ instances stay valid. Right after the clear it walks
 `/api/matrix` (warm-up of the registry pocket) and streams
 `/api/lockfile/analyze-all` (warm-up of the OSV pocket) so the
 next interaction hits a populated cache. The button status line
-reflects each phase. `.nppm-history/` is **not** under
+reflects each phase. `.nppm/history/` is **not** under
 `cacheDir` and is never touched.
 
 ---
@@ -1016,7 +1016,7 @@ across that project's lockfile.
   and MutableResolution are always N/A on the manifest-fallback
   path because both need a lockfile to walk.
 - **First paint** uses the cached snapshot under
-  `.nppm-cache/dashboard-snapshot.json` so the view is instant on
+  `.nppm/cache/dashboard-snapshot.json` so the view is instant on
   startup. The header shows when it was last refreshed; **Re-scan**
   streams a fresh run via SSE.
 - **Progress detail.** The status line under the progress bar
@@ -1108,7 +1108,7 @@ the Dashboard says.
 ### 16.3 Trend tab
 
 Each scan persists a compact daily entry into
-`.nppm-history/dashboard/YYYY-MM-DD.json` (last scan of the day
+`.nppm/history/dashboard/YYYY-MM-DD.json` (last scan of the day
 wins). The **Trend** tab plots that history as a multi-line chart,
 one line per project plus a heavier ecosystem-overall line on top.
 

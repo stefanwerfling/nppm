@@ -33,7 +33,7 @@ export type LoadedConfigHooks = {
 
 /**
  * Everything the two top-level callers (`vite.config.ts` and
- * `Cli/Scan.ts`) need to share. Extras specific to one caller (the
+ * `cli/Scan.ts`) need to share. Extras specific to one caller (the
  * Vite plugin builds a `ReleasesFetcher` + `HistoryStore`; the CLI
  * doesn't) are constructed at the call site, not here — this loader
  * stops at the scanner layer.
@@ -84,7 +84,7 @@ export type LoadedConfig = {
 };
 
 /**
- * Bootstrap builder shared by `vite.config.ts` and `Cli/Scan.ts`.
+ * Bootstrap builder shared by `vite.config.ts` and `cli/Scan.ts`.
  * `build()` takes an already-validated raw config object and the
  * absolute project root; callers handle the validation step
  * themselves (Vite logs errors, CLI exits with code 2) so the loader

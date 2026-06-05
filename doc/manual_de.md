@@ -266,7 +266,7 @@ Die Einträge werden als vertikale Timeline gerendert. Jedes Datum
 bekommt seinen eigenen Pill am Gruppenkopf; jeder Eintrag hat ein
 farbiges Icon auf der Spur — `+` (grün) für reine Adds, `~` (gelb)
 für reine Updates, `−` (rot) für reine Removes, `●` (Akzent) für
-gemischte Änderungen. Die History-Dateien liegen in `.nppm-history/`
+gemischte Änderungen. Die History-Dateien liegen in `.nppm/history/`
 neben deiner `nppm.json` — kannst du committen, wenn du langfristige
 Audit-Spuren willst.
 
@@ -585,8 +585,8 @@ einheitlich `risk` (entspricht `npm audit --audit-level=high`).
 
 Output ist standardmäßig Text; `--json` liefert maschinenlesbares
 JSON, `--sarif` ein SARIF-2.1.0-Envelope, das GitHub Code Scanning
-direkt frisst (`actions/upload-sarif`). Die CLI nutzt `.nppm-cache/`
-und `.nppm-history/` mit — ein warmer CI-Lauf ist schnell, weil OSV-
+direkt frisst (`actions/upload-sarif`). Die CLI nutzt `.nppm/cache/`
+und `.nppm/history/` mit — ein warmer CI-Lauf ist schnell, weil OSV-
 und Fingerprint-Cache schon gefüllt sind.
 
 Exit-Codes:
@@ -671,7 +671,7 @@ Flow:
    Kontext. Indent und Tail-Newline bleiben erhalten.
 5. **Aktion**:
    - **Nur package.json anpassen** (immer verfügbar). Schreibt die
-     Datei, legt ein Backup nach `.nppm-backups/<timestamp>/` und
+     Datei, legt ein Backup nach `.nppm/backups/<timestamp>/` und
      erinnert dich daran, `npm install` von Hand zu starten.
    - **Anpassen + Installieren (--ignore-scripts)**. Nur sichtbar bei
      `actions.allowInstall: true` in `nppm.json`. Streamt das
@@ -743,7 +743,7 @@ Klick auf **Auswahl aktualisieren** öffnet den Wizard:
 5. **Aktionen**:
    - **Nur package.json-Änderungen anwenden** — schreibt jede
      geänderte `package.json`, ein geteiltes Backup-Verzeichnis
-     pro Projekt unter `.nppm-backups/<timestamp>/`, dann der
+     pro Projekt unter `.nppm/backups/<timestamp>/`, dann der
      Hinweis pro Projekt `npm install` von Hand zu starten.
    - **Änderungen + Install pro Projekt (--ignore-scripts)** —
      dasselbe plus sequenzielles `npm install`. Ein Install pro
@@ -755,7 +755,7 @@ Das Live-Log ist nach Projekt gruppiert:
 
 ```
 ── kavula (3 picks) ──
-  ✓ Backup gespeichert nach .nppm-backups/2026-05-29T11-15-02Z
+  ✓ Backup gespeichert nach .nppm/backups/2026-05-29T11-15-02Z
     · package.json
     · package-lock.json
   ✓ vitest → package.json
@@ -932,7 +932,7 @@ Zwei Action-Buttons in der Titelleiste:
 - **+ Remote-Quelle hinzufügen** — URL zu einer rohen `template.json`-
   Datei einfügen. Sie wird an das Top-Level-Feld
   `templateSources: string[]` in `nppm.json` angehängt, nach
-  `.nppm-cache/templates-remote/<id>/` gefetched und erscheint mit einem
+  `.nppm/cache/templates-remote/<id>/` gefetched und erscheint mit einem
   grünen `REMOTE`-Badge. Bearbeiten und Löschen sind bei Remote-
   Templates deaktiviert (die Quelle ist read-only); zum Ändern muss die
   Upstream-Datei editiert und ein Refresh ausgelöst werden.
@@ -950,7 +950,7 @@ Workspace fehlt.
 Der **Auswahl anwenden**-Button öffnet einen Pick-Checkbox-Modal —
 risk + warn Findings sind vorgewählt, info Einträge sind opt-in. Der
 Applier schreibt einen Zeitstempel-Snapshot aller berührten Dateien
-nach `.nppm-backups/<timestamp>/` *vor* der ersten Änderung.
+nach `.nppm/backups/<timestamp>/` *vor* der ersten Änderung.
 `merge-json`-Mode mergt JSON-Dateien tief (existierende Keys gewinnen
 bei Konflikt); `create`-Mode legt Dateien nur an, wenn sie fehlen, und
 überschreibt nie; `report-only`-Dateien werden nie geschrieben.
@@ -989,7 +989,7 @@ in-Memory `JsonCache`-Instanzen weiterschreiben können. Direkt danach
 wird `/api/matrix` (Registry-Pocket warmziehen) und der SSE-Stream
 `/api/lockfile/analyze-all` (OSV-Pocket warmziehen) ausgeführt, damit
 die nächste Interaktion einen gefüllten Cache trifft. Die Statuszeile
-des Buttons reflektiert jede Phase. `.nppm-history/` liegt *nicht*
+des Buttons reflektiert jede Phase. `.nppm/history/` liegt *nicht*
 unter `cacheDir` und wird nicht angefasst.
 
 ---
@@ -1062,7 +1062,7 @@ Zelle trägt einen 0–100 %-Score, der die Befunde des Scanners
   Manifest-Fallback-Pfad immer N/A, weil beide ein Lockfile zum
   Walken brauchen.
 - **Erster Paint** nutzt den persistierten Snapshot unter
-  `.nppm-cache/dashboard-snapshot.json` — die Ansicht ist sofort
+  `.nppm/cache/dashboard-snapshot.json` — die Ansicht ist sofort
   da beim Öffnen. Im Header steht, wann er zuletzt aktualisiert
   wurde; **Re-Scan** streamt einen frischen Lauf via SSE.
 - **Progress-Detail.** Die Status-Zeile unter dem Fortschritts-
@@ -1157,7 +1157,7 @@ Sidebar immer das wiedergibt, was das Dashboard sagt.
 ### 16.3 Trend-Tab
 
 Pro-Scan persistiert ein kompakter Tages-Eintrag in
-`.nppm-history/dashboard/YYYY-MM-DD.json` (letzter Scan des Tages
+`.nppm/history/dashboard/YYYY-MM-DD.json` (letzter Scan des Tages
 gewinnt). Der **Trend**-Tab plottet diese Historie als
 Multi-Linie-Chart, eine Linie pro Projekt plus eine dickere
 Ökosystem-Linie obendrauf.

@@ -269,7 +269,7 @@ class Server {
             const dashboardSnapshotPath = path.join(cacheDir, 'dashboard-snapshot.json');
 
             // Per-day rolling history of dashboard averages — lives under
-            // `.nppm-history/` (not the cache) so the user can commit
+            // `.nppm/history/` (not the cache) so the user can commit
             // it for a long-term ecosystem-health record. Drives the
             // Dashboard "Trend" tab and the macro-donut delta widget.
             const dashboardHistoryStore = new DashboardHistoryStore(

@@ -38,7 +38,7 @@ Node ≥ 22 is required (see `package.json` `engines`).
   for the shape — they're the smallest working examples.
 - **Bug fixes in the docs / manual** — typos, broken links, outdated
   screenshots.
-- **Translations** — new languages drop in as `Frontend/Locales/<id>.ts`
+- **Translations** — new languages drop in as `frontend/Locales/<id>.ts`
   + registration in `I18n.ts`. See `de.ts` for the reference.
 - **Performance improvements** when backed by a measurement (`vitest
   bench` welcome).
@@ -66,7 +66,7 @@ Node ≥ 22 is required (see `package.json` `engines`).
    description. Re-generate the manual screenshots with `npm run
    docs:screenshots` when applicable.
 5. **i18n:** every new user-visible string lands in both
-   `Frontend/Locales/en.ts` *and* `Frontend/Locales/de.ts`. The
+   `frontend/Locales/en.ts` *and* `frontend/Locales/de.ts`. The
    English string is also the cache key, so don't change existing
    keys without a migration.
 6. **PR description:** what + why + how-to-test. Link the related
@@ -79,8 +79,8 @@ Node ≥ 22 is required (see `package.json` `engines`).
 - All logic in classes. Avoid module-level free functions; the
   exceptions are the CLI entry points (`runScan`, `runAction`, ...).
 - Backend stays English: source, comments, error messages, log lines.
-  German lives in `Frontend/Locales/de.ts` exclusively.
-- Cache pockets live under `.nppm-cache/<pocket>/`. Use the
+  German lives in `frontend/Locales/de.ts` exclusively.
+- Cache pockets live under `.nppm/cache/<pocket>/`. Use the
   `JsonCache` class; don't roll your own.
 - Don't break the "git-version skip" convention. Every name-keyed
   scanner returns null for `GitResolver.isGitVersion(version)`.

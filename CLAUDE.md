@@ -13,130 +13,146 @@ in the sibling repo.
 
 ## Top-level layout
 
+Top-level folders are lowercase (`backend`, `frontend`, `shared`, `cli`,
+`tests`, `doc`). Everything below them keeps PascalCase. The four Vite
+entries — `index.html`, `main.ts`, `main.css`, `vite.config.ts` — sit at
+the repo root because Vite expects them there.
+
 ```
 nppm/
-├── cli/nppm.js             top-level subcommand router (dev | scan | --help)
-├── cli/dev.js              CLI shim: writes default config, starts Vite
-├── cli/scan.js             CLI shim: uses Vite.ssrLoadModule to run Cli/Scan.ts
 ├── index.html              entry, contains topbar + main panes
 ├── main.ts                 mounts language picker + boots Nppm
 ├── main.css                all styling
 ├── vite.config.ts          Express middleware + every API route
 │
-├── Api/ApiTypes.ts         wire types shared between backend & frontend
-├── Config/Config.ts        VTS schemas for nppm.json
-├── Config/ConfigLoader.ts  buildLoadedConfig() — shared bootstrap used by vite.config.ts + Cli/Scan.ts
-├── Cache/JsonCache.ts      one-file-per-key disk cache (TTL or permanent)
-│
-├── Project/                project sources (local + remote bases)
-│   ├── Project.ts          common interface (loadManifests, loadLockfile, getKey, …)
-│   ├── ProjectLocal.ts     local-dir reader, includes workspace expansion
-│   ├── ProjectRemote.ts    abstract base for GitHub/Gitea
-│   ├── ProjectGithub.ts    contents API; constructor normalises full URLs (https://, git@, github:, .git suffix) to owner/name
-│   ├── ProjectGitea.ts     contents API (different URL shape, token format); exposes getHost()/getToken() for the Gitea-host allow-list in GitResolver/GitHeadFetcher
-│   ├── PackageManifest.ts  flat DependencyType + PackageDependency types
-│   ├── Lockfile.ts         parsePackageLock v2/v3, scanNodeModules fallback
-│   └── SafePath.ts         join() containment helper — resolves a candidate against a root, refuses anything that isn't the root itself or a strict descendant of `${root}${sep}`. Used by Upgrader.resolvePackageJson + TemplateApplier._packageJsonFor/_fileAbs.
-│
-├── Registry/Registry.ts    npm-registry client with batched concurrency
-│
-├── Matrix/                 two matrix variants
-│   ├── MatrixBuilder.ts    cross-project (rows = pkgs, cols = projects)
-│   └── ProjectMatrixBuilder.ts  per-project (rows = pkgs, cols = workspaces)
-│
-├── Fingerprint/            tarball-level scanning
-│   ├── TarballParser.ts    zlib + manual 512-byte tar walk (no `tar` dep); exposes the stripped top-level folder so GitHeadFetcher can lift the SHA out of GitHub codeload's `<repo>-<sha>` prefix
-│   ├── Fingerprint.ts      File / Package / Diff types
-│   ├── FingerprintBuilder.ts  fetch+gunzip+hash, content cache for JS files; cache-less variant for non-SHA-pinned git coordinates so HEAD content is never served stale
-│   ├── FingerprintDiff.ts  added/removed/modified
-│   └── GitResolver.ts      git URLs → codeload/gitlab/bitbucket/gitea tarball URLs. Host-agnostic `parse()` extracts host/owner/repo/ref; tarball resolver accepts a `giteaHosts` allow-list so any configured Gitea project routes through `/archive/<ref>.tar.gz`.
-│
-├── Security/               heuristic + CVE scanners
-│   ├── OsvClient.ts        OSV.dev (single + batch), envelope-cached
-│   ├── ScriptScanner.ts    lifecycle-script heuristic
-│   ├── PatternScanner.ts   eval/Function/child_process/base64 regex
-│   ├── ChurnScanner.ts     diff prev stable vs current, threshold by bump
-│   ├── BinaryScanner.ts    extension- + bin/-path classification
-│   ├── MaintainerScanner.ts  _npmUser handover detection, gap-based severity
-│   ├── LicenseScanner.ts   SPDX classifier (permissive/weak/strong/proprietary/unknown) + mini expr parser
-│   ├── IntegrityScanner.ts lockfile `resolved+integrity` vs registry `dist` cross-check
-│   ├── ImpactAnalyzer.ts   cross-project blast-radius: BFS shortest path from root deps to a queried name(+version)
-│   ├── DeprecationScanner.ts   reads per-version `deprecated` from the packument — risk (installed) / warn (latest) / info (only older)
-│   ├── ObfuscationScanner.ts   per-JS-file heuristic over the tarball fingerprint — eval(atob(...)) / _0x density / hex-string arrays / long lines, with `dist/`/min path classification so legit minification stays at info
-│   ├── ManifestRedFlagsScanner.ts  pure heuristics over the fingerprint manifest — no README / no description / no files[] / many bins / native+postinstall combo / dated engines
-│   ├── CapabilityScanner.ts    per-package capability inventory (fs read/write, network, raw socket, child_process, credential-shaped env, native bindings, eval); severity by *combination*
-│   ├── MutableResolutionScanner.ts  per-project lockfile sweep — mutable git refs / missing integrity / file:/link: protocols
-│   ├── ExternalSourcesScanner.ts  aggregator over three third-party reputation APIs (socket.dev + OpenSSF Scorecard + deps.dev), worst-of-three severity per package
-│   ├── External/SocketDevFetcher.ts  per-package socket.dev score (needs API key)
-│   ├── External/OpenSsfFetcher.ts   OpenSSF Scorecard fetch + npm `repository` → host/owner/repo parser
-│   ├── External/DepsDevFetcher.ts   deps.dev v3 version metadata (free, no auth)
-│   └── SecurityScanner.ts  aggregator + batched matrix-heuristics
-│
-├── Unused/                 depcheck-style per-project hygiene scan
-│   ├── UnusedReport.ts     UnusedFinding/Misplaced/Missing/ScanLimit + severity
-│   └── UnusedDetector.ts   regex-based file walk + bin-tool allowlist + scripts/`@types`/workspace heuristics
-│
-├── Cli/                    headless `nppm scan` (CI gate) + `nppm sbom`
+├── cli/                    user-facing CLI (shims + TS runners co-located)
+│   ├── nppm.js             top-level subcommand router (dev | scan | sbom | action | --help)
+│   ├── dev.js              shim: writes default config, starts Vite
+│   ├── scan.js             shim: Vite.ssrLoadModule('./cli/Scan.ts')
+│   ├── sbom.js             shim: Vite.ssrLoadModule('./cli/Sbom.ts')
+│   ├── action.js           shim: GitHub Actions entry (Vite.ssrLoadModule('./cli/Action.ts'))
 │   ├── CliArgs.ts          CliArgsParser + FailOnLevel ladder + HELP_TEXT
 │   ├── ScanReport.ts       ScanReportBuilder — per-scanner→unified severity
 │   ├── ScanFormat.ts       ScanFormatter — text + JSON + SARIF + shouldFail
 │   ├── ScanSarif.ts        SarifBuilder — SARIF 2.1.0 (rules + results + partialFingerprints)
 │   ├── Scan.ts             runScan() orchestrator (OSV / heuristics / unused)
-│   └── Sbom.ts             SbomRunner + SbomCliArgsParser — CycloneDX/SPDX CLI
+│   ├── Sbom.ts             SbomRunner + SbomCliArgsParser — CycloneDX/SPDX CLI
+│   ├── Action.ts           runAction() — GitHub Actions PR-comment + SARIF flow
+│   ├── ActionFormat.ts     ActionFormatter — sticky PR-comment markdown body
+│   └── GithubClient.ts     thin REST client for the issue-comment endpoints
 │
-├── Sbom/                   format-agnostic SBOM emitters
-│   ├── Purl.ts             Purl.npm() — PURL encoder for npm packages
-│   ├── SbomCollector.ts    SbomCollector — lockfile + registry → SbomData
-│   ├── CycloneDxBuilder.ts CycloneDX 1.6 JSON converter
-│   └── SpdxBuilder.ts      SPDX 2.3 JSON converter
+├── shared/
+│   └── Api/ApiTypes.ts     wire types shared between backend & frontend
 │
-├── Upgrade/                one-click dep upgrade pipeline
-│   ├── PackageJsonEditor.ts  surgical range bump, preserves indent + trailing-newline
-│   ├── BackupStore.ts        timestamped snapshots in .nppm-backups/
-│   ├── LifecycleScriptScanner.ts  walks node_modules/* for install hooks
-│   └── Upgrader.ts           orchestrator: preview / applyEdit / runInstall / runRebuild
+├── backend/                Express side: 20 modules, one folder each
+│   ├── Config/Config.ts            VTS schemas for nppm.json
+│   ├── Config/ConfigLoader.ts      buildLoadedConfig() — shared bootstrap used by vite.config.ts + cli/Scan.ts
+│   ├── Config/NppmDirs.ts          single source of truth for `.nppm/{cache,history,backups}` + idempotent legacy-folder migration
+│   ├── Cache/JsonCache.ts          one-file-per-key disk cache (TTL or permanent)
+│   │
+│   ├── Project/                    project sources (local + remote bases)
+│   │   ├── Project.ts              common interface (loadManifests, loadLockfile, getKey, …)
+│   │   ├── ProjectLocal.ts         local-dir reader, includes workspace expansion
+│   │   ├── ProjectRemote.ts        abstract base for GitHub/Gitea
+│   │   ├── ProjectGithub.ts        contents API; constructor normalises full URLs (https://, git@, github:, .git suffix) to owner/name
+│   │   ├── ProjectGitea.ts         contents API (different URL shape, token format); exposes getHost()/getToken() for the Gitea-host allow-list in GitResolver/GitHeadFetcher
+│   │   ├── PackageManifest.ts      flat DependencyType + PackageDependency types
+│   │   ├── Lockfile.ts             parsePackageLock v2/v3, scanNodeModules fallback
+│   │   └── SafePath.ts             join() containment helper — resolves a candidate against a root, refuses anything that isn't the root itself or a strict descendant of `${root}${sep}`. Used by Upgrader.resolvePackageJson + TemplateApplier._packageJsonFor/_fileAbs.
+│   │
+│   ├── Registry/Registry.ts        npm-registry client with batched concurrency
+│   │
+│   ├── Matrix/                     two matrix variants
+│   │   ├── MatrixBuilder.ts        cross-project (rows = pkgs, cols = projects)
+│   │   └── ProjectMatrixBuilder.ts per-project (rows = pkgs, cols = workspaces)
+│   │
+│   ├── Fingerprint/                tarball-level scanning
+│   │   ├── TarballParser.ts        zlib + manual 512-byte tar walk (no `tar` dep); exposes the stripped top-level folder so GitHeadFetcher can lift the SHA out of GitHub codeload's `<repo>-<sha>` prefix
+│   │   ├── Fingerprint.ts          File / Package / Diff types
+│   │   ├── FingerprintBuilder.ts   fetch+gunzip+hash, content cache for JS files; cache-less variant for non-SHA-pinned git coordinates so HEAD content is never served stale
+│   │   ├── FingerprintDiff.ts      added/removed/modified
+│   │   └── GitResolver.ts          git URLs → codeload/gitlab/bitbucket/gitea tarball URLs. Host-agnostic `parse()` extracts host/owner/repo/ref; tarball resolver accepts a `giteaHosts` allow-list so any configured Gitea project routes through `/archive/<ref>.tar.gz`.
+│   │
+│   ├── Security/                   heuristic + CVE scanners
+│   │   ├── OsvClient.ts            OSV.dev (single + batch), envelope-cached
+│   │   ├── ScriptScanner.ts        lifecycle-script heuristic
+│   │   ├── PatternScanner.ts       eval/Function/child_process/base64 regex
+│   │   ├── ChurnScanner.ts         diff prev stable vs current, threshold by bump
+│   │   ├── BinaryScanner.ts        extension- + bin/-path classification
+│   │   ├── MaintainerScanner.ts    _npmUser handover detection, gap-based severity
+│   │   ├── LicenseScanner.ts       SPDX classifier (permissive/weak/strong/proprietary/unknown) + mini expr parser
+│   │   ├── IntegrityScanner.ts     lockfile `resolved+integrity` vs registry `dist` cross-check
+│   │   ├── ImpactAnalyzer.ts       cross-project blast-radius: BFS shortest path from root deps to a queried name(+version)
+│   │   ├── DeprecationScanner.ts   reads per-version `deprecated` from the packument — risk (installed) / warn (latest) / info (only older)
+│   │   ├── ObfuscationScanner.ts   per-JS-file heuristic over the tarball fingerprint — eval(atob(...)) / _0x density / hex-string arrays / long lines, with `dist/`/min path classification so legit minification stays at info
+│   │   ├── ManifestRedFlagsScanner.ts  pure heuristics over the fingerprint manifest — no README / no description / no files[] / many bins / native+postinstall combo / dated engines
+│   │   ├── CapabilityScanner.ts    per-package capability inventory (fs read/write, network, raw socket, child_process, credential-shaped env, native bindings, eval); severity by *combination*
+│   │   ├── MutableResolutionScanner.ts  per-project lockfile sweep — mutable git refs / missing integrity / file:/link: protocols
+│   │   ├── ExternalSourcesScanner.ts  aggregator over three third-party reputation APIs (socket.dev + OpenSSF Scorecard + deps.dev), worst-of-three severity per package
+│   │   ├── External/SocketDevFetcher.ts  per-package socket.dev score (needs API key)
+│   │   ├── External/OpenSsfFetcher.ts   OpenSSF Scorecard fetch + npm `repository` → host/owner/repo parser
+│   │   ├── External/DepsDevFetcher.ts   deps.dev v3 version metadata (free, no auth)
+│   │   └── SecurityScanner.ts      aggregator + batched matrix-heuristics
+│   │
+│   ├── Unused/                     depcheck-style per-project hygiene scan
+│   │   ├── UnusedReport.ts         UnusedFinding/Misplaced/Missing/ScanLimit + severity
+│   │   └── UnusedDetector.ts       regex-based file walk + bin-tool allowlist + scripts/`@types`/workspace heuristics
+│   │
+│   ├── Sbom/                       format-agnostic SBOM emitters
+│   │   ├── Purl.ts                 Purl.npm() — PURL encoder for npm packages
+│   │   ├── SbomCollector.ts        SbomCollector — lockfile + registry → SbomData
+│   │   ├── CycloneDxBuilder.ts     CycloneDX 1.6 JSON converter
+│   │   └── SpdxBuilder.ts          SPDX 2.3 JSON converter
+│   │
+│   ├── Upgrade/                    one-click dep upgrade pipeline
+│   │   ├── PackageJsonEditor.ts    surgical range bump, preserves indent + trailing-newline
+│   │   ├── BackupStore.ts          timestamped snapshots in `.nppm/backups/`
+│   │   ├── LifecycleScriptScanner.ts  walks node_modules/* for install hooks
+│   │   └── Upgrader.ts             orchestrator: preview / applyEdit / runInstall / runRebuild
+│   │
+│   ├── Releases/                   npm registry + GitHub Releases merge
+│   │   ├── Releases.ts
+│   │   ├── ReleasesFetcher.ts
+│   │   ├── GitHeadFetcher.ts       TTL-cached HEAD-tarball fetcher: resolves the upstream HEAD via GitResolver, lifts `package.json.version` + commit SHA out of the codeload prefix. Returns `GitHeadInfo` carrying an `error` field on failure (`GitHub unreachable: …` not cached, `Repository not found` cached). Per-instance Gitea token routing.
+│   │   └── GitCommitsFetcher.ts    GitHub REST `/commits` + Gitea v1 `/repos/.../commits` (per-instance token); maps each row into the existing `Release` shape with `sha`, `subject`, `author`. TTL-cached against the releases pocket. Drives /api/releases for git-versions.
+│   │
+│   ├── Dashboard/
+│   │   ├── DashboardBuilder.ts        per-(project, scanner) scoring helpers — unified info/warn/risk → 0–100 ring score; reused by /api/dashboard/scan
+│   │   ├── DashboardHistoryStore.ts   per-UTC-day JSON in `.nppm/history/dashboard/YYYY-MM-DD.json` (last scan of day wins); summarize() + recordScan() + readRange() + readPrevious(). Drives the Trend tab + macro-donut "↑X pts vs last scan" delta.
+│   │   ├── DashboardGrowthBuilder.ts  per-project package-count timeline replayed from HistoryStore (baseline = lastSnapshot.length − Σ(added − removed); walk forward emitting points). Carry-forward sum across non-aligned per-project timestamps for ecosystem total. Drives Trend tab "Packages" metric.
+│   │   ├── InstalledSize.ts           sums `dist.unpackedSize` across a lockfile-derived package set via the packument cache; returns {totalBytes, coveredCount, totalCount} so the UI labels the number as a best-effort floor.
+│   │   └── DownloadsAggregator.ts     two-layer dedupe: per-project sums distinct names once; ecosystem total dedupes across all projects. Gap = dep-tree-overlap signal.
+│   │
+│   ├── Downloads/NpmDownloadsFetcher.ts  `api.npmjs.org/downloads/point/last-week/<pkg>` with comma-bulk for unscoped (128-batch) + per-name fetch for scoped; 24h TTL cache; null-envelope for misses. `fetchRange()` for the per-package last-year daily downloads line, cached under a separate key.
+│   │
+│   ├── Package/PackageTrendsBuilder.ts  folds RegistryPackage → {versions: [{version, releasedAt, unpackedSize, fileCount, publisher, maintainerCount, depCount}], releasesByMonth: [{month, count}]}. Strips aux `created`/`modified` keys from `time` map. Versions without a date sort to the tail.
+│   │
+│   ├── DepGraph/DepGraphBuilder.ts  flat-graph walker, npm hoisting algorithm
+│   ├── History/                    per-project change log
+│   │   ├── History.ts
+│   │   ├── HistoryStore.ts         atomic-write JSON in `.nppm/history/`
+│   │   ├── BackfillCommon.ts       parseLockfile/parsePackageJson + snapshots → entries
+│   │   ├── GitHistoryBackfill.ts   walks `git log -- package-lock.json`, falls back to package.json
+│   │   └── RemoteGitHistoryBackfill.ts  GitHub/Gitea commits API → HistoryEntry[]
+│   │
+│   ├── Vulnerability/              retroactive CVE-exposure timeline
+│   │   ├── Timeline.ts             VersionPresenceInterval / VulnerabilityExposure / ExposureClass
+│   │   └── TimelineBuilder.ts      forward-replay history × OSV cache → exposure windows
+│   │
+│   ├── PrReview/                   branch-vs-branch dep delta with CVE delta
+│   │   ├── PrReview.ts             PrDepChange / PrSummary / PrReviewReport
+│   │   └── PrReviewBuilder.ts      diff package.json + lockfile at two refs + OSV batch
+│   │
+│   ├── Templates/                  project-standards / standards-enforcement
+│   │   ├── Template.ts                       Vts schema + types (Template / ResolvedTemplate / ComplianceFinding)
+│   │   ├── TemplateLoader.ts                 reads nppm-templates/<id>/template.json + files/ per folder
+│   │   ├── TemplateResolver.ts               flattens `extends` graph + per-project chain (later wins)
+│   │   ├── TemplateComplianceChecker.ts      diff resolved template × project → ComplianceReport (packages, root, files, workspaces)
+│   │   └── TemplateApplier.ts                applies selected findings to disk (package.json edits + file copies + merge-json) with BackupStore snapshot
+│   │
+│   └── Bundle/BundlephobiaFetcher.ts  permanent-cache bundlephobia client
 │
-├── Releases/               npm registry + GitHub Releases merge
-│   ├── Releases.ts
-│   ├── ReleasesFetcher.ts
-│   ├── GitHeadFetcher.ts   TTL-cached HEAD-tarball fetcher: resolves the upstream HEAD via GitResolver, lifts `package.json.version` + commit SHA out of the codeload prefix. Returns `GitHeadInfo` carrying an `error` field on failure (`GitHub unreachable: …` not cached, `Repository not found` cached). Per-instance Gitea token routing.
-│   └── GitCommitsFetcher.ts  GitHub REST `/commits` + Gitea v1 `/repos/.../commits` (per-instance token); maps each row into the existing `Release` shape with `sha`, `subject`, `author`. TTL-cached against the releases pocket. Drives /api/releases for git-versions.
-│
-├── Dashboard/
-│   ├── DashboardBuilder.ts        per-(project, scanner) scoring helpers — unified info/warn/risk → 0–100 ring score; reused by /api/dashboard/scan
-│   ├── DashboardHistoryStore.ts   per-UTC-day JSON in `.nppm-history/dashboard/YYYY-MM-DD.json` (last scan of day wins); summarize() + recordScan() + readRange() + readPrevious(). Drives the Trend tab + macro-donut "↑X pts vs last scan" delta.
-│   ├── DashboardGrowthBuilder.ts  per-project package-count timeline replayed from HistoryStore (baseline = lastSnapshot.length − Σ(added − removed); walk forward emitting points). Carry-forward sum across non-aligned per-project timestamps for ecosystem total. Drives Trend tab "Packages" metric.
-│   ├── InstalledSize.ts           sums `dist.unpackedSize` across a lockfile-derived package set via the packument cache; returns {totalBytes, coveredCount, totalCount} so the UI labels the number as a best-effort floor.
-│   └── DownloadsAggregator.ts     two-layer dedupe: per-project sums distinct names once; ecosystem total dedupes across all projects. Gap = dep-tree-overlap signal.
-│
-├── Downloads/NpmDownloadsFetcher.ts  `api.npmjs.org/downloads/point/last-week/<pkg>` with comma-bulk for unscoped (128-batch) + per-name fetch for scoped; 24h TTL cache; null-envelope for misses. `fetchRange()` for the per-package last-year daily downloads line, cached under a separate key.
-│
-├── Package/PackageTrendsBuilder.ts  folds RegistryPackage → {versions: [{version, releasedAt, unpackedSize, fileCount, publisher, maintainerCount, depCount}], releasesByMonth: [{month, count}]}. Strips aux `created`/`modified` keys from `time` map. Versions without a date sort to the tail.
-│
-├── DepGraph/DepGraphBuilder.ts  flat-graph walker, npm hoisting algorithm
-├── History/                per-project change log
-│   ├── History.ts
-│   ├── HistoryStore.ts     atomic-write JSON in .nppm-history/
-│   ├── BackfillCommon.ts   parseLockfile/parsePackageJson + snapshots → entries
-│   ├── GitHistoryBackfill.ts  walks `git log -- package-lock.json`, falls back to package.json
-│   └── RemoteGitHistoryBackfill.ts  GitHub/Gitea commits API → HistoryEntry[]
-│
-├── Vulnerability/          retroactive CVE-exposure timeline
-│   ├── Timeline.ts         VersionPresenceInterval / VulnerabilityExposure / ExposureClass
-│   └── TimelineBuilder.ts  forward-replay history × OSV cache → exposure windows
-│
-├── PrReview/               branch-vs-branch dep delta with CVE delta
-│   ├── PrReview.ts         PrDepChange / PrSummary / PrReviewReport
-│   └── PrReviewBuilder.ts  diff package.json + lockfile at two refs + OSV batch
-│
-├── Templates/              project-standards / standards-enforcement
-│   ├── Template.ts                       Vts schema + types (Template / ResolvedTemplate / ComplianceFinding)
-│   ├── TemplateLoader.ts                 reads nppm-templates/<id>/template.json + files/ per folder
-│   ├── TemplateResolver.ts               flattens `extends` graph + per-project chain (later wins)
-│   ├── TemplateComplianceChecker.ts      diff resolved template × project → ComplianceReport (packages, root, files, workspaces)
-│   └── TemplateApplier.ts                applies selected findings to disk (package.json edits + file copies + merge-json) with BackupStore snapshot
-│
-├── Frontend/               every browser-side module
+├── frontend/               every browser-side module
 │   ├── Nppm.ts             top-level orchestrator (panes, routing)
 │   ├── Matrix.ts           global matrix view
 │   ├── ProjectMatrixView.ts  per-project matrix
@@ -173,7 +189,8 @@ nppm/
 │   └── logo.svg            32×32 brand mark
 │
 ├── tests/                  vitest, all unit, no network
-└── doc/                    user-facing manuals + screenshot script
+├── doc/                    user-facing manuals + screenshot script
+└── nppm-templates/         shipped local template catalogue
 ```
 
 ## API routes (in `vite.config.ts`)
@@ -203,8 +220,8 @@ nppm/
 | GET    | `/api/projects/:id/depgraph`                          | flat resolved dep graph |
 | GET    | `/api/impact?name=&version=`                          | cross-project blast-radius: every reachable instance of `name`, direct + transitive, with shortest dep path |
 | GET    | `/api/dashboard/scan`                                 | SSE: per-(project, scanner) score matrix — emits `start` / `column-start` / `progress` / `cell` / `column-end` / `end`, drives the Dashboard view's progress bar (cold cache ≈ 1 min). Post-loop fetches per-package downloads and attaches per-project `downloadsLastWeek` + ecosystem-deduped total to the response. |
-| GET    | `/api/dashboard/snapshot`                             | last persisted scan result (`.nppm-cache/dashboard-snapshot.json`), or `{snapshot:null,timestamp:null}` when none — drives the Dashboard view's first-paint |
-| GET    | `/api/dashboard/history?days=`                        | rolling daily history `{entries, previous}` from `.nppm-history/dashboard/YYYY-MM-DD.json`; entries clipped to `days` (default 90, clamp 1..3650); `previous` is the entry immediately before the most-recent regardless of range. Drives the Trend tab (Score metric) + macro-donut delta. |
+| GET    | `/api/dashboard/snapshot`                             | last persisted scan result (`.nppm/cache/dashboard-snapshot.json`), or `{snapshot:null,timestamp:null}` when none — drives the Dashboard view's first-paint |
+| GET    | `/api/dashboard/history?days=`                        | rolling daily history `{entries, previous}` from `.nppm/history/dashboard/YYYY-MM-DD.json`; entries clipped to `days` (default 90, clamp 1..3650); `previous` is the entry immediately before the most-recent regardless of range. Drives the Trend tab (Score metric) + macro-donut delta. |
 | GET    | `/api/dashboard/growth?days=`                        | per-project package-count timelines `{series, total}` reconstructed from per-project HistoryStore replays; carry-forward ecosystem total. Drives the Trend tab (Packages metric). |
 | GET    | `/api/packages/:name/trends`                          | per-version timeline (size/files/publisher/maintainer/dep counts) from the packument cache + releases-by-month + last-year daily downloads. Drives the PackageDetailPanel Trends tab. |
 | GET    | `/api/projects/:id/unused`                            | depcheck-style hygiene scan (unused / misplaced / missing) |
@@ -222,10 +239,10 @@ nppm/
 
 ## Headless CLI
 
-`nppm scan` reuses the same `nppm.json`, `.nppm-cache/`, and scanner
+`nppm scan` reuses the same `nppm.json`, `.nppm/cache/`, and scanner
 classes as the dev server. It does *not* serve HTTP — `cli/scan.js`
 spins up a Vite dev server in `middlewareMode:true, appType:'custom'`
-purely to call `ssrLoadModule('./Cli/Scan.ts')`, then closes it. No
+purely to call `ssrLoadModule('./cli/Scan.ts')`, then closes it. No
 new dependency: Vite is already a runtime dep.
 
 The runner pipeline per project:
@@ -240,7 +257,7 @@ The runner pipeline per project:
    (skipped on `--no-unused`).
 
 The per-scanner severity enums are mapped to a unified
-`UnifiedSeverity` (`info|warn|risk`) in `Cli/ScanReport.ts`. License
+`UnifiedSeverity` (`info|warn|risk`) in `cli/ScanReport.ts`. License
 classifications collapse via `licenseToUnified`: `permissive` drops
 out, `weak-copyleft`/`unknown` → info, `strong-copyleft` → warn,
 `proprietary` → risk. OSV vulns are uniformly risk (the batch endpoint
@@ -257,10 +274,23 @@ returns IDs only, no per-vuln severity — matches `npm audit`'s
 
 ## Storage
 
-- `.nppm-cache/` — TTL caches (registry, remote, security, releases) and a
-  permanent fingerprint cache. Safe to delete; auto-rebuilt.
-- `.nppm-history/` — append-only per-project history JSON. **Do not** put
-  in `.nppm-cache/` because the user wants to keep / commit it.
+Everything nppm writes into a project root lives under one `.nppm/`
+parent so the consumer sees one folder instead of three (the legacy
+`.nppm-cache/`, `.nppm-history/`, `.nppm-backups/`). `backend/Config/
+NppmDirs.ts` is the single source of truth for these paths and runs an
+idempotent migration on first access — when an old sibling folder
+exists and the new bucket is empty, it `rename()`s into place. Partial
+migrations leave both sides alone rather than merging.
+
+- `.nppm/cache/` — TTL caches (registry, remote, security, releases,
+  downloads) and a permanent fingerprint cache. Safe to delete;
+  auto-rebuilt.
+- `.nppm/history/` — append-only per-project history JSON + per-day
+  dashboard rolling history. **Do not** put under `cache/` because the
+  user wants to keep / commit it.
+- `.nppm/backups/` — pre-write snapshots from Upgrade / Template-Apply
+  flows. Lives next to history for the same reason: it's audit trail,
+  not throwaway state.
 
 ## Conventions Claude should not break
 
@@ -282,13 +312,13 @@ returns IDs only, no per-vuln severity — matches `npm audit`'s
   `security.maintainer.{quickHandoverDays,suspiciousGapDays}` in
   `nppm.json`.
 - **i18n** — every user-visible string in the frontend goes through
-  `t()`. Add new strings to `Frontend/Locales/en.ts` AND `de.ts` (or
+  `t()`. Add new strings to `frontend/Locales/en.ts` AND `de.ts` (or
   rely on the en-fallback for a while).
 - **No new framework dependency.** D3 is the only client lib; everything
   else is hand-rolled DOM.
 - **Templates: local-overrides-remote.** `templateSources: string[]` in
   nppm.json fetches `template.json` files into
-  `.nppm-cache/templates-remote/<id>/`. On id conflict the local
+  `.nppm/cache/templates-remote/<id>/`. On id conflict the local
   `nppm-templates/<id>/` wins. CRUD endpoints (`POST`/`PUT`/`DELETE
   /api/templates/:id`) refuse with `403` for ids whose source is
   remote — remote templates are read-only mirrors.
@@ -307,7 +337,7 @@ returns IDs only, no per-vuln severity — matches `npm audit`'s
   `latest = null` for rows where every cell is a git URL, and stamp
   `gitLatest` (carrying the stripped origin + per-row HEAD info from
   `GitHeadFetcher`) so the frontend can render `1.0.28 · 7d3f12a`.
-  `Frontend/Matrix.setData` excludes git-only rows from the
+  `frontend/Matrix.setData` excludes git-only rows from the
   `/api/matrix/heuristics` batch entirely. The dashboard SSE +
   per-/cross-project OSV scans in `vite.config.ts` use
   `pkg.resolved` as the scanner-version when it's a git URL, keeping
@@ -335,7 +365,7 @@ returns IDs only, no per-vuln severity — matches `npm audit`'s
   `POST /api/projects/:id/compliance/apply` accepting per-file
   `path`) used to join user-supplied segments with the project
   root unchecked. Every new endpoint that writes inside a project
-  must route through `Project/SafePath.ts`'s `join(root,
+  must route through `backend/Project/SafePath.ts`'s `join(root,
   ...segments)` — it resolves the candidate, then refuses
   anything that isn't either the root itself or a strict
   descendant of `${root}${sep}`. The trailing-separator boundary

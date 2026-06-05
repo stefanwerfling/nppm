@@ -71,7 +71,7 @@ export type ScanReport = {
 
 /**
  * Inputs for one project's report build. Bundled so the orchestrator
- * (Cli/Scan.ts) can populate fields independently — each scanner is
+ * (cli/Scan.ts) can populate fields independently — each scanner is
  * optional because the CLI flags can switch any of them off.
  */
 export type ProjectScanInputs = {

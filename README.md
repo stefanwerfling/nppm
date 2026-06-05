@@ -134,7 +134,7 @@ server, frontend is plain TypeScript + DOM (no framework).
   scores under the **Scanner Score** tab. SSE-streamed per cell so a
   cold scan shows progress immediately (per-package sub-phase shown
   in the status line: "Fingerprinting lodash@4.17.21 (32/84) —
-  kavula"); a snapshot under `.nppm-cache/` makes the next open
+  kavula"); a snapshot under `.nppm/cache/` makes the next open
   instant. Lockfile-less projects (browser extensions, many
   libraries) are scanned against the registry's `latest` for every
   declared dep — same cells light up, with a small ⓘ on the project
@@ -207,7 +207,7 @@ server, frontend is plain TypeScript + DOM (no framework).
   `nppm.json`). After install, the modal lists every install
   lifecycle hook in `node_modules` with a per-package "Run" button
   (`npm rebuild <pkg>`) so the user can re-fire only the scripts
-  they've reviewed. Backups land in `.nppm-backups/<timestamp>/`.
+  they've reviewed. Backups land in `.nppm/backups/<timestamp>/`.
   Every project-rooted write is routed through `SafePath.join`,
   which refuses anything that isn't a strict descendant of the
   project root — `../../etc/cron.d/evil` workspace paths and
@@ -249,7 +249,7 @@ server, frontend is plain TypeScript + DOM (no framework).
   not in scope for v1. Own `Unused` tab in every per-project view.
 - **History** per project — every lockfile call snapshots the package state
   and appends an entry for adds/removes/version changes (with CVE-hint
-  reason when applicable). Stored next to `nppm.json` in `.nppm-history/`.
+  reason when applicable). Stored next to `nppm.json` in `.nppm/history/`.
   Rendered as a vertical timeline with date-grouped pills and per-entry
   icons (`+` add-only, `~` update-only, `−` remove-only, `●` mixed).
 - **Releases tab** — registry timeline merged with GitHub release notes.
@@ -287,10 +287,10 @@ server, frontend is plain TypeScript + DOM (no framework).
   backend uses on load). The Cache section ships a "Clear cache
   now" button that wipes every pocket on disk, warms the registry
   via a fresh matrix walk, then re-runs the global OSV scan so
-  the next interaction is against fresh data. `.nppm-history/` is
+  the next interaction is against fresh data. `.nppm/history/` is
   kept.
 - **i18n** — English by default, German included. Add a third language by
-  dropping `Frontend/Locales/<id>.ts` and registering it in `I18n.ts`.
+  dropping `frontend/Locales/<id>.ts` and registering it in `I18n.ts`.
 
 ## Requirements
 
@@ -333,7 +333,7 @@ Create a `nppm.json` next to where you run `nppm`. Minimal example:
   "server": {"port": 5190},
   "browser": {"open": false},
   "registry": {"url": "https://registry.npmjs.org"},
-  "cache": {"dir": ".nppm-cache", "ttlMinutes": 60},
+  "cache": {"dir": ".nppm/cache", "ttlMinutes": 60},
   "security": {
     "maintainer": {
       "quickHandoverDays": 30,
@@ -482,7 +482,7 @@ Same data via REST:
 Content-Type is set to `application/vnd.cyclonedx+json` /
 `application/spdx+json` so MIME-aware tooling can route the payload.
 
-`nppm scan` reuses the same `nppm.json` and `.nppm-cache/` as the dev
+`nppm scan` reuses the same `nppm.json` and `.nppm/cache/` as the dev
 server, so a warm CI run skips network calls that have already been
 made locally. Exit codes: `0` clean (or below threshold), `1` threshold
 breached, `2` usage error (bad flag, missing config). Drop it into any
@@ -509,7 +509,7 @@ linked at the top of this README. Quick chapter pointers:
 
 ## Caches
 
-Cache pockets under `.nppm-cache/` (configurable):
+Cache pockets under `.nppm/cache/` (configurable):
 
 - `registry/` — npm registry metadata (TTL)
 - `remote/` — GitHub/Gitea contents API responses (TTL, `{data: null}`
@@ -530,7 +530,7 @@ every pocket in one shot (preserves the directory layout so the
 in-memory `JsonCache` instances keep working) and re-warms the
 registry + OSV cache afterwards.
 
-History is **not** in the cache — it lives in `.nppm-history/` next to
+History is **not** in the cache — it lives in `.nppm/history/` next to
 `nppm.json` so you can commit / inspect it independently.
 
 ## Tests

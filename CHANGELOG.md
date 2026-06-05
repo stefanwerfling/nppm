@@ -8,10 +8,27 @@ from `v1.0.0` onwards.
 
 ## [Unreleased]
 
+### Changed
+- **Source-tree restructure.** Top-level folders are now lowercase
+  (`backend/`, `frontend/`, `shared/`, `cli/`) with PascalCase modules
+  inside. The twenty backend modules (Bundle, Cache, …, Vulnerability)
+  live under `backend/`; the formerly split `Cli/` (TS) and `cli/`
+  (shims) are merged into a single `cli/`; the shared `Api/ApiTypes.ts`
+  moves to `shared/Api/`. Vite-required entries (`index.html`,
+  `main.ts`, `main.css`, `vite.config.ts`) stay at the repo root. Move
+  preserves git history (95-100 % rename detection).
+- **Single `.nppm/` parent for cache / history / backups.** What used
+  to be three sibling dot-folders (`.nppm-cache/`, `.nppm-history/`,
+  `.nppm-backups/`) now lives under one `.nppm/{cache,history,backups}/`
+  parent. `backend/Config/NppmDirs.ts` is the new single source of truth
+  and runs an idempotent first-touch migration that renames legacy
+  folders into place when the new target is empty (partial migrations
+  are left alone rather than merged).
+
 ### Added
 - **Dashboard: Trend tab with four metric chips.** Each scan now
   persists a compact daily record into
-  `.nppm-history/dashboard/YYYY-MM-DD.json` (last scan of the day
+  `.nppm/history/dashboard/YYYY-MM-DD.json` (last scan of the day
   wins), and the new third Dashboard tab plots that history as a
   hand-rolled SVG multi-line chart (one line per project plus a
   heavier ecosystem-overall line on top). Range chips 30 d / 90 d /
@@ -369,7 +386,7 @@ The baseline shipped surface — everything reachable from the current
 
 ### History (separate from cache)
 
-- `.nppm-history/` — append-only per-project change log next to
+- `.nppm/history/` — append-only per-project change log next to
   `nppm.json` so it's safe to commit / inspect / audit
   independently of the caches.
 

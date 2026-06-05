@@ -67,9 +67,14 @@ import {
 } from './shared/Api/ApiTypes.js';
 import {ConfigController} from './backend/Api/ConfigController.js';
 import {FsController} from './backend/Api/FsController.js';
+import {ImpactController} from './backend/Api/ImpactController.js';
+import {IntegrityController} from './backend/Api/IntegrityController.js';
+import {PrReviewController} from './backend/Api/PrReviewController.js';
 import {ProjectsController} from './backend/Api/ProjectsController.js';
+import {SbomController} from './backend/Api/SbomController.js';
 import {ServerContext} from './backend/Api/ServerContext.js';
 import {TemplatesController} from './backend/Api/TemplatesController.js';
+import {UnusedController} from './backend/Api/UnusedController.js';
 import {UpgradeController} from './backend/Api/UpgradeController.js';
 import {JsonCache} from './backend/Cache/JsonCache.js';
 import {ConfigProjectType, SchemaConfig} from './backend/Config/Config.js';
@@ -344,13 +349,24 @@ class Server {
                     templatesDir: templatesDir,
                     templateLoader: templateLoader,
                     templateChecker: templateChecker,
-                    initialTemplates: templates
+                    initialTemplates: templates,
+                    historyStore: historyStore,
+                    gitBackfill: gitBackfill,
+                    remoteBackfill: remoteBackfill,
+                    timelineBuilder: timelineBuilder,
+                    prReviewBuilder: prReviewBuilder,
+                    integrityScanner: integrityScanner
                 });
                 ConfigController.register(ctx);
                 FsController.register(ctx);
                 ProjectsController.register(ctx);
                 TemplatesController.register(ctx);
                 UpgradeController.register(ctx);
+                ImpactController.register(ctx);
+                PrReviewController.register(ctx);
+                IntegrityController.register(ctx);
+                UnusedController.register(ctx);
+                SbomController.register(ctx);
 
 
                 /*
@@ -455,62 +471,6 @@ class Server {
                     }
                 });
 
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/impact?name=<name>[&version=<pattern>] — cross-
-                 * project blast-radius lookup. Iterates every configured
-                 * project, builds its DepGraph (warm-cache fast), runs the
-                 * ImpactAnalyzer, and returns the aggregate report. The
-                 * version pattern is the permissive shape documented on
-                 * `ImpactAnalyzer.versionMatches`; missing/empty = match
-                 * every version.
-                 * 
-                 * Hidden projects are scanned too — incident response cares
-                 * about all repos, not just the matrix-visible ones.
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/impact', async(req, res) => {
-                    const name = typeof req.query.name === 'string' ? req.query.name.trim() : '';
-                    if (name === '') {
-                        res.status(400).json({success: false, msg: 'name query param required'});
-                        return;
-                    }
-                    const rawVersion = typeof req.query.version === 'string' ? req.query.version.trim() : '';
-                    const versionPattern = rawVersion === '' ? null : rawVersion;
-
-                    const perProject: ImpactProjectReport[] = [];
-                    const skipped: {unid: string; name: string; type: string; reason: string;}[] = [];
-
-                    for (const [unid, project] of projects.entries()) {
-                        try {
-                            const graph = await DepGraphBuilder.build(unid, project, registry, securityCache);
-                            if (!graph) {
-                                skipped.push({
-                                    unid: unid,
-                                    name: project.getName(),
-                                    type: project.getType(),
-                                    reason: 'no lockfile'
-                                });
-                                continue;
-                            }
-                            perProject.push(ImpactAnalyzer.analyzeGraph(graph, name, versionPattern));
-                        } catch (e) {
-                            skipped.push({
-                                unid: unid,
-                                name: project.getName(),
-                                type: project.getType(),
-                                reason: (e as Error).message
-                            });
-                        }
-                    }
-
-                    const report: ApiImpactResponse = ImpactAnalyzer.buildReport(
-                        {name: name, versionPattern: versionPattern},
-                        perProject,
-                        skipped
-                    );
-                    res.status(200).json(report);
-                });
 
                 /*
                  * -------------------------------------------------------------
@@ -956,175 +916,6 @@ class Server {
                         send('error', {msg: (e as Error).message});
                     } finally {
                         res.end();
-                    }
-                });
-
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/projects/:id/pr-review?base=&head= — diff
-                 * `package.json` + `package-lock.json` between two git
-                 * refs (default `main` vs `HEAD`), surface every changed
-                 * dep with its CVE delta from the cached OSV pocket. Local
-                 * projects only in v1 — remote would need API-driven
-                 * git-show.
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/projects/:id/pr-review', async(req, res) => {
-                    const project = projects.get(req.params.id);
-                    if (!project) {
-                        res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
-                        return;
-                    }
-                    if (!(project instanceof ProjectLocal)) {
-                        res.status(400).json({success: false, msg: 'PR review only supported for local projects'});
-                        return;
-                    }
-
-                    const base = typeof req.query.base === 'string' && req.query.base.length > 0
-                        ? req.query.base
-                        : 'main';
-                    const head = typeof req.query.head === 'string' && req.query.head.length > 0
-                        ? req.query.head
-                        : 'HEAD';
-
-                    try {
-                        const report = await prReviewBuilder.build(project.getRoot(), base, head, {
-                            unid: req.params.id,
-                            name: project.getName(),
-                            type: project.getType()
-                        });
-                        res.status(200).json(report);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/projects/:id/integrity — cross-check the
-                 * lockfile's pinned `resolved` + `integrity` per entry
-                 * against what the registry currently serves. Surfaces
-                 * mirror-hijack / dependency-confusion / lockfile-
-                 * injection as risk-level findings. Works on any
-                 * project type — `loadLockfile()` returns null cleanly
-                 * for sources without one (signals via `noLockfile`).
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/projects/:id/integrity', async(req, res) => {
-                    const project = projects.get(req.params.id);
-                    if (!project) {
-                        res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
-                        return;
-                    }
-
-                    try {
-                        const lockfile = await project.loadLockfile();
-                        if (!lockfile) {
-                            const response: ApiIntegrityResponse = {
-                                project: {
-                                    unid: req.params.id,
-                                    name: project.getName(),
-                                    type: project.getType()
-                                },
-                                findings: [],
-                                summary: IntegrityScanner.summarize([], 0),
-                                noLockfile: true
-                            };
-                            res.status(200).json(response);
-                            return;
-                        }
-
-                        const findings = await integrityScanner.scan(lockfile.packages);
-                        const totalScanned = new Set(
-                            lockfile.packages
-                            .filter((p) => p.name && p.version)
-                            .map((p) => `${p.name}@${p.version}`)
-                        ).size;
-                        const summary = IntegrityScanner.summarize(findings, totalScanned);
-                        const response: ApiIntegrityResponse = {
-                            project: {
-                                unid: req.params.id,
-                                name: project.getName(),
-                                type: project.getType()
-                            },
-                            findings: findings,
-                            summary: summary,
-                            noLockfile: false
-                        };
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/projects/:id/unused — depcheck-style hygiene scan
-                 * for one local project. Returns three buckets (unused /
-                 * misplaced / missing) plus the list of files the regex
-                 * scanner couldn't fully resolve (dynamic specs). Remote
-                 * projects respond with `supported: false` rather than a
-                 * 4xx, so the UI can render an info banner.
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/projects/:id/unused', async(req, res) => {
-                    const project = projects.get(req.params.id);
-
-                    if (!project) {
-                        res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
-                        return;
-                    }
-
-                    try {
-                        const report = await unusedDetector.scan(project);
-                        report.project.unid = req.params.id;
-                        const response: ApiUnusedResponse = report;
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/projects/:id/sbom?format=cyclonedx|spdx — emit a
-                 * Software Bill of Materials for one project. Walks the
-                 * lockfile + registry (no fingerprint downloads) and emits
-                 * the requested format. `format` defaults to `cyclonedx`.
-                 * Content-Type is `application/vnd.cyclonedx+json` or
-                 * `application/spdx+json` so downstream tooling can route
-                 * the response by MIME.
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/projects/:id/sbom', async(req, res) => {
-                    const project = projects.get(req.params.id);
-
-                    if (!project) {
-                        res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
-                        return;
-                    }
-
-                    const format = (req.query.format as string|undefined) ?? 'cyclonedx';
-                    if (format !== 'cyclonedx' && format !== 'spdx') {
-                        res.status(400).json({
-                            success: false,
-                            msg: `Unsupported format "${format}" — expected cyclonedx | spdx`
-                        });
-                        return;
-                    }
-
-                    try {
-                        const collector = new SbomCollector(registry);
-                        const data = await collector.collect(project);
-                        if (format === 'cyclonedx') {
-                            res.set('Content-Type', 'application/vnd.cyclonedx+json');
-                            res.status(200).json(CycloneDxBuilder.build(data, '1'));
-                        } else {
-                            res.set('Content-Type', 'application/spdx+json');
-                            res.status(200).json(SpdxBuilder.build(data, '1'));
-                        }
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
                     }
                 });
 

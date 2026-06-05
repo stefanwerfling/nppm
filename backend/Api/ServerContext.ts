@@ -1,10 +1,16 @@
 import {Express} from 'express';
 import fs from 'fs';
 import {LoadedConfig} from '../Config/ConfigLoader.js';
+import {GitHistoryBackfill} from '../History/GitHistoryBackfill.js';
+import {HistoryStore} from '../History/HistoryStore.js';
+import {RemoteGitHistoryBackfill} from '../History/RemoteGitHistoryBackfill.js';
+import {PrReviewBuilder} from '../PrReview/PrReviewBuilder.js';
 import {Project} from '../Project/Project.js';
+import {IntegrityScanner} from '../Security/IntegrityScanner.js';
 import {TemplateComplianceChecker} from '../Templates/TemplateComplianceChecker.js';
 import {TemplateLoader} from '../Templates/TemplateLoader.js';
 import {Template} from '../Templates/Template.js';
+import {TimelineBuilder} from '../Vulnerability/TimelineBuilder.js';
 
 export type MutableConfig = {projects?: unknown[];} & Record<string, unknown>;
 
@@ -33,6 +39,12 @@ export type ServerContextOpts = {
     templateLoader: TemplateLoader;
     templateChecker: TemplateComplianceChecker;
     initialTemplates: Map<string, Template>;
+    historyStore: HistoryStore;
+    gitBackfill: GitHistoryBackfill;
+    remoteBackfill: RemoteGitHistoryBackfill;
+    timelineBuilder: TimelineBuilder;
+    prReviewBuilder: PrReviewBuilder;
+    integrityScanner: IntegrityScanner;
 };
 
 /**
@@ -57,6 +69,12 @@ export class ServerContext {
     public readonly templatesDir: string;
     public readonly templateLoader: TemplateLoader;
     public readonly templateChecker: TemplateComplianceChecker;
+    public readonly historyStore: HistoryStore;
+    public readonly gitBackfill: GitHistoryBackfill;
+    public readonly remoteBackfill: RemoteGitHistoryBackfill;
+    public readonly timelineBuilder: TimelineBuilder;
+    public readonly prReviewBuilder: PrReviewBuilder;
+    public readonly integrityScanner: IntegrityScanner;
     private _templates: Map<string, Template>;
 
     public constructor(opts: ServerContextOpts) {
@@ -68,6 +86,12 @@ export class ServerContext {
         this.templatesDir = opts.templatesDir;
         this.templateLoader = opts.templateLoader;
         this.templateChecker = opts.templateChecker;
+        this.historyStore = opts.historyStore;
+        this.gitBackfill = opts.gitBackfill;
+        this.remoteBackfill = opts.remoteBackfill;
+        this.timelineBuilder = opts.timelineBuilder;
+        this.prReviewBuilder = opts.prReviewBuilder;
+        this.integrityScanner = opts.integrityScanner;
         this._templates = opts.initialTemplates;
     }
 

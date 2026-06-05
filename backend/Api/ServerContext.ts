@@ -1,6 +1,8 @@
 import {Express} from 'express';
 import fs from 'fs';
 import {LoadedConfig} from '../Config/ConfigLoader.js';
+import {DashboardHistoryStore} from '../Dashboard/DashboardHistoryStore.js';
+import {NpmDownloadsFetcher} from '../Downloads/NpmDownloadsFetcher.js';
 import {FingerprintBuilder} from '../Fingerprint/FingerprintBuilder.js';
 import {GitResolver} from '../Fingerprint/GitResolver.js';
 import {GitHistoryBackfill} from '../History/GitHistoryBackfill.js';
@@ -54,6 +56,9 @@ export type ServerContextOpts = {
     releasesFetcher: ReleasesFetcher;
     gitHeadFetcher: GitHeadFetcher;
     gitCommitsFetcher: GitCommitsFetcher;
+    dashboardSnapshotPath: string;
+    dashboardHistoryStore: DashboardHistoryStore;
+    downloadsFetcher: NpmDownloadsFetcher;
 };
 
 /**
@@ -88,6 +93,9 @@ export class ServerContext {
     public readonly releasesFetcher: ReleasesFetcher;
     public readonly gitHeadFetcher: GitHeadFetcher;
     public readonly gitCommitsFetcher: GitCommitsFetcher;
+    public readonly dashboardSnapshotPath: string;
+    public readonly dashboardHistoryStore: DashboardHistoryStore;
+    public readonly downloadsFetcher: NpmDownloadsFetcher;
     private _templates: Map<string, Template>;
 
     public constructor(opts: ServerContextOpts) {
@@ -109,6 +117,9 @@ export class ServerContext {
         this.releasesFetcher = opts.releasesFetcher;
         this.gitHeadFetcher = opts.gitHeadFetcher;
         this.gitCommitsFetcher = opts.gitCommitsFetcher;
+        this.dashboardSnapshotPath = opts.dashboardSnapshotPath;
+        this.dashboardHistoryStore = opts.dashboardHistoryStore;
+        this.downloadsFetcher = opts.downloadsFetcher;
         this._templates = opts.initialTemplates;
     }
 
@@ -168,4 +179,5 @@ export class ServerContext {
         mutator(cfg);
         fs.writeFileSync(this.configFile, `${JSON.stringify(cfg, null, 2)}\n`, 'utf-8');
     }
+
 }

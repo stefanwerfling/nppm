@@ -66,13 +66,17 @@ import {
     ApiLifecycleRunRequest
 } from './shared/Api/ApiTypes.js';
 import {ConfigController} from './backend/Api/ConfigController.js';
+import {FingerprintController} from './backend/Api/FingerprintController.js';
 import {FsController} from './backend/Api/FsController.js';
 import {HistoryController} from './backend/Api/HistoryController.js';
 import {ImpactController} from './backend/Api/ImpactController.js';
 import {IntegrityController} from './backend/Api/IntegrityController.js';
+import {PackagesController} from './backend/Api/PackagesController.js';
 import {PrReviewController} from './backend/Api/PrReviewController.js';
 import {ProjectsController} from './backend/Api/ProjectsController.js';
+import {ReleasesController} from './backend/Api/ReleasesController.js';
 import {SbomController} from './backend/Api/SbomController.js';
+import {SecurityController} from './backend/Api/SecurityController.js';
 import {ServerContext} from './backend/Api/ServerContext.js';
 import {TemplatesController} from './backend/Api/TemplatesController.js';
 import {UnusedController} from './backend/Api/UnusedController.js';
@@ -357,7 +361,11 @@ class Server {
                     remoteBackfill: remoteBackfill,
                     timelineBuilder: timelineBuilder,
                     prReviewBuilder: prReviewBuilder,
-                    integrityScanner: integrityScanner
+                    integrityScanner: integrityScanner,
+                    headFingerprintBuilder: headFingerprintBuilder,
+                    releasesFetcher: releasesFetcher,
+                    gitHeadFetcher: gitHeadFetcher,
+                    gitCommitsFetcher: gitCommitsFetcher
                 });
                 ConfigController.register(ctx);
                 FsController.register(ctx);
@@ -371,6 +379,10 @@ class Server {
                 SbomController.register(ctx);
                 HistoryController.register(ctx);
                 VulnerabilityController.register(ctx);
+                PackagesController.register(ctx);
+                ReleasesController.register(ctx);
+                SecurityController.register(ctx);
+                FingerprintController.register(ctx);
 
 
                 /*
@@ -1532,44 +1544,6 @@ class Server {
                     }
                 });
 
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/projects/:id/packages — full manifest list for one
-                 * project. 404 on unknown UUID (the frontend can then trigger
-                 * a resync via /api/projects).
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/projects/:id/packages', async(req, res) => {
-                    const project = projects.get(req.params.id);
-
-                    if (!project) {
-                        res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
-                        return;
-                    }
-
-                    try {
-                        const manifests = await project.loadManifests();
-                        const apiManifests: ApiManifest[] = manifests.map((m) => ({
-                            name: m.name,
-                            version: m.version,
-                            workspace: m.workspace,
-                            dependencies: m.dependencies
-                        }));
-
-                        const response: ApiPackagesResponse = {
-                            project: {
-                                unid: req.params.id,
-                                name: project.getName(),
-                                type: project.getType()
-                            },
-                            manifests: apiManifests
-                        };
-
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
 
                 /*
                  * -------------------------------------------------------------
@@ -1587,35 +1561,6 @@ class Server {
                     }
                 });
 
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/fingerprint?name=...&version=... — per-file SHA-256
-                 * map of a published `pkg@version`. Tarball is fetched from the
-                 * npm registry and cached permanently (immutable). Name +
-                 * version travel as query params so scoped names (`@scope/foo`)
-                 * don't break Express route parsing.
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/fingerprint', async(req, res) => {
-                    const name = typeof req.query.name === 'string' ? req.query.name : '';
-                    const version = typeof req.query.version === 'string' ? req.query.version : '';
-
-                    if (!name || !version) {
-                        res.status(400).json({
-                            success: false,
-                            msg: 'name and version query params are required'
-                        });
-                        return;
-                    }
-
-                    try {
-                        const fingerprint = await pickFingerprintBuilder(version).build(name, version);
-                        const response: ApiFingerprintResponse = {fingerprint: fingerprint};
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
 
                 /*
                  * -------------------------------------------------------------
@@ -2015,163 +1960,12 @@ class Server {
                     }
                 });
 
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/releases?name=...[&version=...] — merged release
-                 * timeline: registry-known versions + (when github.com)
-                 * GitHub release titles / bodies. Newest first.
-                 * 
-                 * When `version` is a git URL we route to the commits
-                 * fetcher instead of the registry — the npm packument of
-                 * the same `name` belongs to an unrelated package (see the
-                 * figtree / fundon collision). Each commit is mapped to
-                 * the `Release` shape with sha + subject + author so the
-                 * panel can show a per-commit timeline without a new
-                 * UI surface.
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/releases', async(req, res) => {
-                    const name = typeof req.query.name === 'string' ? req.query.name : '';
-                    const version = typeof req.query.version === 'string' ? req.query.version : '';
-                    if (!name) {
-                        res.status(400).json({success: false, msg: 'name query param is required'});
-                        return;
-                    }
-                    if (version && GitResolver.isGitVersion(version)) {
-                        try {
-                            const commits = await gitCommitsFetcher.fetch(version);
-                            if (!commits) {
-                                const empty: ApiReleasesResponse = {name: name, releases: []};
-                                res.status(200).json(empty);
-                                return;
-                            }
-                            const response: ApiReleasesResponse = {
-                                name: name,
-                                repository: commits.repoUrl,
-                                releases: commits.commits.map((c) => ({
-                                    version: c.shortSha,
-                                    publishedAt: c.date,
-                                    name: c.subject,
-                                    url: c.url,
-                                    publisher: c.author ?? undefined,
-                                    sha: c.sha
-                                }))
-                            };
-                            res.status(200).json(response);
-                        } catch (e) {
-                            res.status(500).json({success: false, msg: (e as Error).message});
-                        }
-                        return;
-                    }
-                    try {
-                        const out = await releasesFetcher.fetch(name);
-                        if (!out) {
-                            res.status(404).json({success: false, msg: `Unknown package ${name}`});
-                            return;
-                        }
-                        const response: ApiReleasesResponse = out;
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/security?name=...&version=... — OSV.dev vuln list
-                 * + lifecycle-script heuristic for one `pkg@version`. Same
-                 * query-param convention as the fingerprint routes so scoped
-                 * names survive.
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/security', async(req, res) => {
-                    const name = typeof req.query.name === 'string' ? req.query.name : '';
-                    const version = typeof req.query.version === 'string' ? req.query.version : '';
-
-                    if (!name || !version) {
-                        res.status(400).json({
-                            success: false,
-                            msg: 'name and version query params are required'
-                        });
-                        return;
-                    }
-
-                    try {
-                        const report = await securityScanner.scan(name, version);
-                        const response: ApiSecurityResponse = report;
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/fingerprint/diff?name=...&before=...&after=... —
-                 * file-level diff between two versions of the same package.
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/fingerprint/diff', async(req, res) => {
-                    const name = typeof req.query.name === 'string' ? req.query.name : '';
-                    const before = typeof req.query.before === 'string' ? req.query.before : '';
-                    const after = typeof req.query.after === 'string' ? req.query.after : '';
-
-                    if (!name || !before || !after) {
-                        res.status(400).json({
-                            success: false,
-                            msg: 'name, before and after query params are required'
-                        });
-                        return;
-                    }
-
-                    try {
-                        const [fpBefore, fpAfter] = await Promise.all([
-                            pickFingerprintBuilder(before).build(name, before),
-                            pickFingerprintBuilder(after).build(name, after)
-                        ]);
-
-                        const response: ApiFingerprintDiffResponse = {
-                            before: {name: name, version: before},
-                            after: {name: name, version: after},
-                            diff: fpBefore && fpAfter ? FingerprintDiffer.diff(fpBefore, fpAfter) : null
-                        };
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
                 server.middlewares.use(app);
             }
         };
     }
 
 
-    /**
-     * Read → mutate → write helper for nppm.json. Used by the
-     * visibility, add, and edit routes so all three follow the
-     * same atomic-write pattern: read fresh from disk, hand the
-     * parsed object to `mutator`, then serialise with 2-space
-     * indent and trailing newline. Throws when no config file
-     * path is configured (the CLI can run with an inline rawConfig
-     * but no on-disk file; mutations against that combination
-     * fail loudly rather than silently dropping the change).
-     */
-    private static _mutateConfig(
-        configFile: string|undefined,
-        mutator: (cfg: {projects?: unknown[];} & Record<string, unknown>) => void
-    ): void {
-        if (!configFile) {
-            throw new Error('nppm.json path not configured — cannot persist changes');
-        }
-        if (!fs.existsSync(configFile)) {
-            throw new Error(`nppm.json not found at ${configFile}`);
-        }
-        const raw = fs.readFileSync(configFile, 'utf-8');
-        const cfg = JSON.parse(raw) as {projects?: unknown[];} & Record<string, unknown>;
-        mutator(cfg);
-        fs.writeFileSync(configFile, `${JSON.stringify(cfg, null, 2)}\n`, 'utf-8');
-    }
 
     /**
      * Shape guard for one Bulk-Upgrade pick. Used by both the

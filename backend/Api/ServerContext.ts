@@ -1,11 +1,16 @@
 import {Express} from 'express';
 import fs from 'fs';
 import {LoadedConfig} from '../Config/ConfigLoader.js';
+import {FingerprintBuilder} from '../Fingerprint/FingerprintBuilder.js';
+import {GitResolver} from '../Fingerprint/GitResolver.js';
 import {GitHistoryBackfill} from '../History/GitHistoryBackfill.js';
 import {HistoryStore} from '../History/HistoryStore.js';
 import {RemoteGitHistoryBackfill} from '../History/RemoteGitHistoryBackfill.js';
 import {PrReviewBuilder} from '../PrReview/PrReviewBuilder.js';
 import {Project} from '../Project/Project.js';
+import {GitCommitsFetcher} from '../Releases/GitCommitsFetcher.js';
+import {GitHeadFetcher} from '../Releases/GitHeadFetcher.js';
+import {ReleasesFetcher} from '../Releases/ReleasesFetcher.js';
 import {IntegrityScanner} from '../Security/IntegrityScanner.js';
 import {TemplateComplianceChecker} from '../Templates/TemplateComplianceChecker.js';
 import {TemplateLoader} from '../Templates/TemplateLoader.js';
@@ -45,6 +50,10 @@ export type ServerContextOpts = {
     timelineBuilder: TimelineBuilder;
     prReviewBuilder: PrReviewBuilder;
     integrityScanner: IntegrityScanner;
+    headFingerprintBuilder: FingerprintBuilder;
+    releasesFetcher: ReleasesFetcher;
+    gitHeadFetcher: GitHeadFetcher;
+    gitCommitsFetcher: GitCommitsFetcher;
 };
 
 /**
@@ -75,6 +84,10 @@ export class ServerContext {
     public readonly timelineBuilder: TimelineBuilder;
     public readonly prReviewBuilder: PrReviewBuilder;
     public readonly integrityScanner: IntegrityScanner;
+    public readonly headFingerprintBuilder: FingerprintBuilder;
+    public readonly releasesFetcher: ReleasesFetcher;
+    public readonly gitHeadFetcher: GitHeadFetcher;
+    public readonly gitCommitsFetcher: GitCommitsFetcher;
     private _templates: Map<string, Template>;
 
     public constructor(opts: ServerContextOpts) {
@@ -92,7 +105,31 @@ export class ServerContext {
         this.timelineBuilder = opts.timelineBuilder;
         this.prReviewBuilder = opts.prReviewBuilder;
         this.integrityScanner = opts.integrityScanner;
+        this.headFingerprintBuilder = opts.headFingerprintBuilder;
+        this.releasesFetcher = opts.releasesFetcher;
+        this.gitHeadFetcher = opts.gitHeadFetcher;
+        this.gitCommitsFetcher = opts.gitCommitsFetcher;
         this._templates = opts.initialTemplates;
+    }
+
+    /**
+     * For coordinates whose content is mutable (a git URL pointing at
+     * HEAD or a branch/tag — i.e. anything other than a 40-char SHA
+     * ref), permanent caching is wrong: the tarball moves under our
+     * feet. This helper picks between the permanent
+     * `loaded.fingerprintBuilder` and the cache-less HEAD-aware
+     * `headFingerprintBuilder`.
+     */
+    public pickFingerprintBuilder(version: string): FingerprintBuilder {
+        if (!GitResolver.isGitVersion(version)) {
+            return this.loaded.fingerprintBuilder;
+        }
+        const hash = version.indexOf('#');
+        if (hash < 0) {
+            return this.headFingerprintBuilder;
+        }
+        const ref = version.slice(hash + 1);
+        return /^[0-9a-f]{40}$/iu.test(ref) ? this.loaded.fingerprintBuilder : this.headFingerprintBuilder;
     }
 
     public getProject(unid: string): Project|null {

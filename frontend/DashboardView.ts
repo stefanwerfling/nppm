@@ -13,6 +13,9 @@ import {
 } from '../shared/Api/ApiTypes.js';
 import {DashboardCell, DashboardColumn, ScannerId} from '../backend/Dashboard/DashboardBuilder.js';
 import {DashboardHistoryEntry} from '../backend/Dashboard/DashboardHistoryStore.js';
+import {ChartRenderer} from './Dashboard/ChartRenderer.js';
+import {Formatters} from './Dashboard/Formatters.js';
+import {ScannerMeta} from './Dashboard/ScannerMeta.js';
 import {EcoBoxId, EcosystemBoxModal} from './EcosystemBoxModal.js';
 import {I18n} from './I18n.js';
 import {ImpactModal} from './ImpactModal.js';
@@ -248,7 +251,7 @@ export class DashboardView {
         }
         if (this._progressText) {
             this._progressText.textContent = timestamp
-                ? I18n.t('Showing cached snapshot from {time}', {time: DashboardView._formatTimestamp(timestamp)})
+                ? I18n.t('Showing cached snapshot from {time}', {time: Formatters.timestamp(timestamp)})
                 : I18n.t('Showing cached snapshot');
         }
     }
@@ -396,7 +399,7 @@ export class DashboardView {
 
         es.addEventListener('progress', (e) => {
             const data = JSON.parse((e as MessageEvent).data) as ApiDashboardScanProgressEvent;
-            const scannerLabel = data.scanner ? DashboardView._scannerLabel(data.scanner) : '';
+            const scannerLabel = data.scanner ? ScannerMeta.label(data.scanner) : '';
             /*
              * `detail` (when set) is the substring the user actually
              * wants to read — "Fingerprinting lodash@4.17.21 (32/84)
@@ -561,7 +564,7 @@ export class DashboardView {
         for (const scanner of this._scanners) {
             const row = document.createElement('tr');
             row.className = 'dash-row';
-            row.appendChild(DashboardView._renderScannerCell(scanner));
+            row.appendChild(ScannerMeta.renderScannerCell(scanner));
 
             for (const unid of this._columnOrder) {
                 const col = this._columns.get(unid);
@@ -569,13 +572,13 @@ export class DashboardView {
                 const td = document.createElement('td');
                 td.className = 'dash-td-cell';
                 if (cell) {
-                    td.appendChild(DashboardView._renderRing(cell));
-                    td.title = DashboardView._cellTooltip(cell, scanner);
+                    td.appendChild(ScannerMeta.renderRing(cell));
+                    td.title = ScannerMeta.cellTooltip(cell);
                     td.classList.add('dash-td-clickable');
                     const projectName = col?.project.name ?? unid;
                     td.addEventListener('click', () => {
                         this._onCellClick?.(unid, projectName, scanner,
-                            DashboardView._scannerLabel(scanner), cell);
+                            ScannerMeta.label(scanner), cell);
                     });
                 } else {
                     const placeholder = document.createElement('div');
@@ -969,7 +972,7 @@ export class DashboardView {
             });
             row.appendChild(scoreEl);
 
-            row.appendChild(DashboardView._renderPills(a.risk, a.warn, a.info));
+            row.appendChild(Formatters.renderPills(a.risk, a.warn, a.info));
             section.appendChild(row);
         }
         return section;
@@ -1039,7 +1042,7 @@ export class DashboardView {
                 : I18n.t('in {n} projects', {n: a.projects.size});
             row.appendChild(projEl);
 
-            row.appendChild(DashboardView._renderPills(a.risk, a.warn, a.info));
+            row.appendChild(Formatters.renderPills(a.risk, a.warn, a.info));
             section.appendChild(row);
         }
         return section;
@@ -1296,7 +1299,7 @@ export class DashboardView {
             row.className = 'dash-topworst-row';
             row.title = I18n.t('Open Impact analysis for this package');
             row.addEventListener('click', () => {
-                const parsed = DashboardView._parseFindingLabel(a.label);
+                const parsed = Formatters.parseFindingLabel(a.label);
                 new ImpactModal().open(parsed);
             });
 
@@ -1317,7 +1320,7 @@ export class DashboardView {
             const scannerEl = document.createElement('div');
             scannerEl.className = 'dash-topworst-scanner';
             scannerEl.textContent = topScanner
-                ? DashboardView._scannerLabel(topScanner[0] as ScannerId)
+                ? ScannerMeta.label(topScanner[0] as ScannerId)
                 : '';
             row.appendChild(scannerEl);
 
@@ -1513,7 +1516,7 @@ export class DashboardView {
         const overall: Pt[] = entries
         .filter((e) => e.overall !== null)
         .map((e) => ({timestamp: e.timestamp, value: e.overall!}));
-        return this._renderChartSvg({
+        return ChartRenderer.render({
             series: Array.from(seriesByUnid.values()),
             overall: overall,
             yMin: 0,
@@ -1552,9 +1555,9 @@ export class DashboardView {
                 max = p.value;
             }
         }
-        const yMax = DashboardView._niceCeil(Math.max(max, 1));
+        const yMax = Formatters.niceCeil(Math.max(max, 1));
         const yTicks = [0, Math.round(yMax * 0.25), Math.round(yMax * 0.5), Math.round(yMax * 0.75), yMax];
-        return this._renderChartSvg({
+        return ChartRenderer.render({
             series: series,
             overall: overall,
             yMin: 0,
@@ -1603,16 +1606,16 @@ export class DashboardView {
                 max = p.value;
             }
         }
-        const yMax = DashboardView._niceCeil(Math.max(max, 1));
+        const yMax = Formatters.niceCeil(Math.max(max, 1));
         const yTicks = [0, Math.round(yMax * 0.25), Math.round(yMax * 0.5), Math.round(yMax * 0.75), yMax];
-        return this._renderChartSvg({
+        return ChartRenderer.render({
             series: Array.from(seriesByUnid.values()),
             overall: overall,
             yMin: 0,
             yMax: yMax,
             yTicks: yTicks,
             overallLabel: I18n.t('Ecosystem total'),
-            valueFormatter: (v) => DashboardView._formatBytes(v)
+            valueFormatter: (v) => Formatters.bytes(v)
         });
     }
 
@@ -1653,833 +1656,18 @@ export class DashboardView {
                 max = p.value;
             }
         }
-        const yMax = DashboardView._niceCeil(Math.max(max, 1));
+        const yMax = Formatters.niceCeil(Math.max(max, 1));
         const yTicks = [0, Math.round(yMax * 0.25), Math.round(yMax * 0.5), Math.round(yMax * 0.75), yMax];
-        return this._renderChartSvg({
+        return ChartRenderer.render({
             series: Array.from(seriesByUnid.values()),
             overall: overall,
             yMin: 0,
             yMax: yMax,
             yTicks: yTicks,
             overallLabel: I18n.t('Ecosystem total (deduplicated)'),
-            valueFormatter: (v) => DashboardView._formatCount(v)
+            valueFormatter: (v) => Formatters.count(v)
         });
     }
 
-    /**
-     * Abbreviated count formatter — 12_345 → "12.3k", 9_876_543 →
-     * "9.9M". Below 1000 we render the raw integer so the gridlines
-     * don't pretend precision the data doesn't have.
-     */
-    private static _formatCount(n: number): string {
-        if (n < 1000) {
-            return String(Math.round(n));
-        }
-        if (n < 1_000_000) {
-            const v = n / 1000;
-            return v >= 100 ? `${Math.round(v)}k` : `${v.toFixed(1)}k`;
-        }
-        if (n < 1_000_000_000) {
-            const v = n / 1_000_000;
-            return v >= 100 ? `${Math.round(v)}M` : `${v.toFixed(1)}M`;
-        }
-        const v = n / 1_000_000_000;
-        return v >= 100 ? `${Math.round(v)}G` : `${v.toFixed(1)}G`;
-    }
-
-    /**
-     * Human-readable byte count. Snaps to the largest unit that keeps
-     * the number ≥ 1 — 1024-based since that's what npm reports
-     * (`du`-style). One decimal for the < 100 range, none above so
-     * the labels don't visually drift.
-     */
-    private static _formatBytes(n: number): string {
-        if (n < 1024) {
-            return `${n} B`;
-        }
-        const units = ['kB', 'MB', 'GB', 'TB'];
-        let v = n / 1024;
-        let i = 0;
-        while (v >= 1024 && i < units.length - 1) {
-            v /= 1024;
-            i++;
-        }
-        return v >= 100 ? `${Math.round(v)} ${units[i]}` : `${v.toFixed(1)} ${units[i]}`;
-    }
-
-    /**
-     * Round up to a "nice" Y-axis ceiling so the gridlines hit round
-     * numbers. Pick the leading digit and snap up to the next
-     * 1 / 2 / 2.5 / 5 / 10 multiple of the magnitude.
-     */
-    private static _niceCeil(n: number): number {
-        if (n <= 1) {
-            return 1;
-        }
-        const mag = 10**Math.floor(Math.log10(n));
-        const lead = n / mag;
-        let snap: number;
-        if (lead <= 1) {
-            snap = 1;
-        } else if (lead <= 2) {
-            snap = 2;
-        } else if (lead <= 2.5) {
-            snap = 2.5;
-        } else if (lead <= 5) {
-            snap = 5;
-        } else {
-            snap = 10;
-        }
-        return snap * mag;
-    }
-
-    /**
-     * Pure-SVG line chart. Layout: 880×360 viewport; 44px padding
-     * left for Y labels, 200px right for the legend column, 16px
-     * top, 36px bottom for X tick labels. One `<polyline>` per
-     * project, plus the ecosystem-overall line on top in a heavier
-     * stroke. Hover-tooltip via title attributes on the data dots —
-     * cheap and accessible.
-     */
-    private _renderChartSvg(input: {
-        series: {unid: string; name: string; points: {timestamp: string; value: number;}[];}[];
-        overall: {timestamp: string; value: number;}[];
-        yMin: number;
-        yMax: number;
-        yTicks: number[];
-        overallLabel: string;
-        valueFormatter: (v: number) => string;
-    }): SVGElement {
-        const svgNs = 'http://www.w3.org/2000/svg';
-        const W = 880;
-        const H = 360;
-        const PAD_L = 44;
-        const PAD_R = 200; // legend column
-        const PAD_T = 16;
-        const PAD_B = 36;
-        const PLOT_W = W - PAD_L - PAD_R;
-        const PLOT_H = H - PAD_T - PAD_B;
-
-        const svg = document.createElementNS(svgNs, 'svg');
-        svg.setAttribute('class', 'dash-trend-svg');
-        svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-
-        /*
-         * Collect every timestamp across series + overall so the X
-         * scale spans the full union — a project that only logged
-         * points before another project started shouldn't get
-         * squished into the right edge.
-         */
-        const allTimes: number[] = [];
-        for (const s of input.series) {
-            for (const p of s.points) {
-                allTimes.push(new Date(p.timestamp).getTime());
-            }
-        }
-        for (const p of input.overall) {
-            allTimes.push(new Date(p.timestamp).getTime());
-        }
-        if (allTimes.length === 0) {
-            /*
-             * Defensive — callers should have returned early when no
-             * data is available, but render a friendly empty SVG
-             * rather than crash on the maths below.
-             */
-            return svg;
-        }
-        const tStart = Math.min(...allTimes);
-        const tEnd = Math.max(...allTimes);
-        const tSpan = Math.max(1, tEnd - tStart);
-        const xPx = (iso: string): number => {
-            const t = new Date(iso).getTime();
-            return PAD_L + ((t - tStart) / tSpan) * PLOT_W;
-        };
-        const yRange = Math.max(1, input.yMax - input.yMin);
-        const yPx = (v: number): number =>
-            PAD_T + (1 - (v - input.yMin) / yRange) * PLOT_H;
-
-        // Y gridlines + labels from the caller-supplied tick set.
-        for (const tick of input.yTicks) {
-            const y = yPx(tick);
-            const line = document.createElementNS(svgNs, 'line');
-            line.setAttribute('class', 'dash-trend-grid');
-            line.setAttribute('x1', String(PAD_L));
-            line.setAttribute('y1', String(y));
-            line.setAttribute('x2', String(PAD_L + PLOT_W));
-            line.setAttribute('y2', String(y));
-            svg.appendChild(line);
-            const lbl = document.createElementNS(svgNs, 'text');
-            lbl.setAttribute('class', 'dash-trend-axis');
-            lbl.setAttribute('x', String(PAD_L - 6));
-            lbl.setAttribute('y', String(y + 4));
-            lbl.setAttribute('text-anchor', 'end');
-            lbl.textContent = input.valueFormatter(tick);
-            svg.appendChild(lbl);
-        }
-
-        // X-axis date ticks: start / middle / end of the union span.
-        const tickTimes = tStart === tEnd
-            ? [tStart]
-            : [tStart, (tStart + tEnd) / 2, tEnd];
-        for (const t of tickTimes) {
-            const iso = new Date(t).toISOString();
-            const lbl = document.createElementNS(svgNs, 'text');
-            lbl.setAttribute('class', 'dash-trend-axis');
-            lbl.setAttribute('x', String(xPx(iso)));
-            lbl.setAttribute('y', String(PAD_T + PLOT_H + 18));
-            lbl.setAttribute('text-anchor', 'middle');
-            lbl.textContent = DashboardView._formatShortDate(iso);
-            svg.appendChild(lbl);
-        }
-
-        /*
-         * Sort projects by latest value asc so the lowest series is
-         * first in the legend (matches "worst-first" semantics for
-         * the score metric; for packages it shows the smallest
-         * project first, which is also a reasonable default).
-         */
-        const seriesList = input.series.slice()
-        .sort((a, b) => {
-            const la = a.points[a.points.length - 1]?.value ?? Infinity;
-            const lb = b.points[b.points.length - 1]?.value ?? Infinity;
-            return la - lb;
-        });
-
-        /*
-         * Colour palette — cycles for projects beyond the 12th. Picked
-         * so adjacent hues stay distinguishable on a dark background.
-         */
-        const palette = [
-            '#ff6b6b', '#feca57', '#48dbfb', '#1dd1a1', '#5f27cd', '#ff9ff3',
-            '#54a0ff', '#00d2d3', '#c8d6e5', '#ee5253', '#10ac84', '#ff9f43'
-        ];
-
-        for (let i = 0; i < seriesList.length; i++) {
-            const s = seriesList[i];
-            const colour = palette[i % palette.length];
-            const poly = document.createElementNS(svgNs, 'polyline');
-            poly.setAttribute('class', 'dash-trend-line');
-            poly.setAttribute('points',
-                s.points.map((p) => `${xPx(p.timestamp)},${yPx(p.value)}`).join(' '));
-            poly.setAttribute('stroke', colour);
-            svg.appendChild(poly);
-            for (const p of s.points) {
-                const dot = document.createElementNS(svgNs, 'circle');
-                dot.setAttribute('class', 'dash-trend-dot');
-                dot.setAttribute('cx', String(xPx(p.timestamp)));
-                dot.setAttribute('cy', String(yPx(p.value)));
-                dot.setAttribute('r', '2.5');
-                dot.setAttribute('fill', colour);
-                const title = document.createElementNS(svgNs, 'title');
-                title.textContent = `${s.name}: ${input.valueFormatter(p.value)} · ${DashboardView._formatShortDate(p.timestamp)}`;
-                dot.appendChild(title);
-                svg.appendChild(dot);
-            }
-        }
-
-        /*
-         * Ecosystem-overall line — heavier stroke, painted last so it
-         * sits on top.
-         */
-        if (input.overall.length > 1) {
-            const poly = document.createElementNS(svgNs, 'polyline');
-            poly.setAttribute('class', 'dash-trend-line dash-trend-line-overall');
-            poly.setAttribute('points',
-                input.overall.map((p) => `${xPx(p.timestamp)},${yPx(p.value)}`).join(' '));
-            svg.appendChild(poly);
-        }
-        for (const p of input.overall) {
-            const dot = document.createElementNS(svgNs, 'circle');
-            dot.setAttribute('class', 'dash-trend-dot dash-trend-dot-overall');
-            dot.setAttribute('cx', String(xPx(p.timestamp)));
-            dot.setAttribute('cy', String(yPx(p.value)));
-            dot.setAttribute('r', '3.5');
-            const title = document.createElementNS(svgNs, 'title');
-            title.textContent = `${input.overallLabel}: ${input.valueFormatter(p.value)} · ${DashboardView._formatShortDate(p.timestamp)}`;
-            dot.appendChild(title);
-            svg.appendChild(dot);
-        }
-
-        /*
-         * Legend column on the right. Overall sits on top, then
-         * per-project sorted.
-         */
-        const legendX = PAD_L + PLOT_W + 16;
-        let legendY = PAD_T + 4;
-        const legendEntry = (colour: string, text: string, isOverall: boolean): void => {
-            const swatch = document.createElementNS(svgNs, 'line');
-            swatch.setAttribute('x1', String(legendX));
-            swatch.setAttribute('y1', String(legendY));
-            swatch.setAttribute('x2', String(legendX + 18));
-            swatch.setAttribute('y2', String(legendY));
-            swatch.setAttribute('stroke', colour);
-            swatch.setAttribute('stroke-width', isOverall ? '3' : '2');
-            swatch.setAttribute('stroke-linecap', 'round');
-            svg.appendChild(swatch);
-            const lbl = document.createElementNS(svgNs, 'text');
-            lbl.setAttribute('class', isOverall
-                ? 'dash-trend-legend dash-trend-legend-overall'
-                : 'dash-trend-legend');
-            lbl.setAttribute('x', String(legendX + 24));
-            lbl.setAttribute('y', String(legendY + 4));
-            lbl.textContent = text;
-            svg.appendChild(lbl);
-            legendY += 18;
-        };
-        legendEntry('currentColor', input.overallLabel, true);
-        for (let i = 0; i < seriesList.length && i < 12; i++) {
-            legendEntry(palette[i % palette.length], seriesList[i].name, false);
-        }
-        if (seriesList.length > 12) {
-            const lbl = document.createElementNS(svgNs, 'text');
-            lbl.setAttribute('class', 'dash-trend-legend');
-            lbl.setAttribute('x', String(legendX + 24));
-            lbl.setAttribute('y', String(legendY + 4));
-            lbl.textContent = I18n.t('+ {n} more', {n: seriesList.length - 12});
-            svg.appendChild(lbl);
-        }
-
-        return svg;
-    }
-
-    /**
-     * Parse a CellFinding label into name + version. Per-package
-     * scanners emit `name@version`; per-project scanners (template,
-     * unused, mutableResolution) emit either `name` or
-     * `name@version` depending on the finding. ImpactModal handles
-     * both — name-only seeds skip the version filter.
-     */
-    private static _parseFindingLabel(label: string): {name?: string; version?: string;} {
-        /*
-         * Scoped packages start with `@scope/name@version`; only the
-         * *last* `@` separates name from version.
-         */
-        const at = label.lastIndexOf('@');
-        if (at <= 0) {
-            return {name: label};
-        }
-        return {name: label.slice(0, at), version: label.slice(at + 1)};
-    }
-
-    /** YYYY-MM-DD without leading century — tighter on the X axis. */
-    private static _formatShortDate(iso: string): string {
-        const d = new Date(iso);
-        if (Number.isNaN(d.getTime())) {
-            return iso;
-        }
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${d.getFullYear() % 100}-${m}-${day}`;
-    }
-
-    private static _renderPills(risk: number, warn: number, info: number): HTMLElement {
-        const pills = document.createElement('div');
-        pills.className = 'dash-overall-pills';
-        if (risk > 0) {
-            const pill = document.createElement('span');
-            pill.className = 'dash-overall-pill dash-overall-pill-risk';
-            pill.textContent = String(risk);
-            pill.title = I18n.t('{n} risk-level finding(s)', {n: risk});
-            pills.appendChild(pill);
-        }
-        if (warn > 0) {
-            const pill = document.createElement('span');
-            pill.className = 'dash-overall-pill dash-overall-pill-warn';
-            pill.textContent = String(warn);
-            pill.title = I18n.t('{n} warn-level finding(s)', {n: warn});
-            pills.appendChild(pill);
-        }
-        if (info > 0) {
-            const pill = document.createElement('span');
-            pill.className = 'dash-overall-pill dash-overall-pill-info';
-            pill.textContent = String(info);
-            pill.title = I18n.t('{n} info-level finding(s)', {n: info});
-            pills.appendChild(pill);
-        }
-        return pills;
-    }
-
-    /**
-     * Translated label for one scanner id. Centralised here so the
-     * column-progress phrasing ("{project} — {scanner}") and the row
-     * label use the same string.
-     */
-    private static _scannerLabel(id: ScannerId): string {
-        switch (id) {
-            case 'cve': return I18n.t('CVE (OSV)');
-            case 'license': return I18n.t('License');
-            case 'scripts': return I18n.t('Install scripts');
-            case 'patterns': return I18n.t('Code patterns');
-            case 'binaries': return I18n.t('Binaries');
-            case 'obfuscation': return I18n.t('Obfuscation');
-            case 'manifestRedFlags': return I18n.t('Manifest red-flags');
-            case 'capability': return I18n.t('Capabilities');
-            case 'maintainer': return I18n.t('Maintainer');
-            case 'churn': return I18n.t('Churn');
-            case 'cadence': return I18n.t('Cadence');
-            case 'freshness': return I18n.t('Freshness');
-            case 'ignoreScripts': return I18n.t('Ignore-scripts safety');
-            case 'typosquat': return I18n.t('Typosquat');
-            case 'provenance': return I18n.t('Provenance');
-            case 'external': return I18n.t('External sources');
-            case 'deprecation': return I18n.t('Deprecation');
-            case 'integrity': return I18n.t('Integrity');
-            case 'mutableResolution': return I18n.t('Mutable resolution');
-            case 'unused': return I18n.t('Unused deps');
-            case 'template': return I18n.t('Template compliance');
-        }
-    }
-
-    /**
-     * Left-most cell of each row — composes a 16×16 monoline icon, the
-     * scanner label, and an info button. The info button hosts a
-     * sibling tooltip that the CSS reveals on hover/focus — single DOM
-     * node per row keeps event handling cheap (one `:hover` rule
-     * covers all 15 rows).
-     */
-    private static _renderScannerCell(id: ScannerId): HTMLElement {
-        /*
-         * `<td>` keeps its native `display: table-cell` so the column
-         * sizes correctly with the rest of the table; the flex layout
-         * lives one level down on a wrapper div.
-         */
-        const td = document.createElement('td');
-        td.className = 'dash-td-scanner';
-
-        const inner = document.createElement('div');
-        inner.className = 'dash-scanner-inner';
-
-        const iconWrap = document.createElement('span');
-        iconWrap.className = 'dash-scanner-icon';
-        iconWrap.innerHTML = DashboardView._scannerIcon(id);
-        inner.appendChild(iconWrap);
-
-        const label = document.createElement('span');
-        label.className = 'dash-scanner-label';
-        label.textContent = DashboardView._scannerLabel(id);
-        inner.appendChild(label);
-
-        const info = document.createElement('span');
-        info.className = 'dash-scanner-info';
-        info.tabIndex = 0;
-        info.setAttribute('role', 'button');
-        info.setAttribute('aria-label', I18n.t('Scanner info'));
-        info.innerHTML = DashboardView._INFO_SVG;
-
-        const tip = document.createElement('div');
-        tip.className = 'dash-tooltip';
-
-        const whatHead = document.createElement('strong');
-        whatHead.textContent = I18n.t('What it scans');
-        tip.appendChild(whatHead);
-        const whatBody = document.createElement('p');
-        whatBody.textContent = DashboardView._scannerWhat(id);
-        tip.appendChild(whatBody);
-
-        const howHead = document.createElement('strong');
-        howHead.textContent = I18n.t('How the score is computed');
-        tip.appendChild(howHead);
-        const howBody = document.createElement('p');
-        howBody.textContent = DashboardView._scannerHow(id);
-        tip.appendChild(howBody);
-
-        info.appendChild(tip);
-        DashboardView._wireTooltip(info, tip);
-
-        inner.appendChild(info);
-        td.appendChild(inner);
-        return td;
-    }
-
-    /**
-     * Position the tooltip on hover / focus so it never overflows the
-     * viewport. `position: fixed` escapes both the table-host overflow
-     * and the pane-scroll, so the tooltip can render outside the
-     * table's clip rect even for the bottom-most rows.
-     *
-     * Anchoring rules (default → fallbacks):
-     *   • right of the info button, top-aligned with it
-     *   • bottom-overflow → shift up so the bottom edge sits a margin
-     *     above the viewport bottom
-     *   • right-overflow → flip to the left side of the button
-     */
-    private static _wireTooltip(info: HTMLElement, tip: HTMLElement): void {
-        const position = (): void => {
-            const infoRect = info.getBoundingClientRect();
-            const margin = 12;
-            const gap = 8;
-
-            /*
-             * Switch to fixed first; sizes were already computed by the
-             * initial absolute-positioned render, so offsetWidth/Height
-             * remain accurate.
-             */
-            tip.style.position = 'fixed';
-            tip.style.left = '0px';
-            tip.style.top = '0px';
-
-            const tipWidth = tip.offsetWidth;
-            const tipHeight = tip.offsetHeight;
-
-            let left = infoRect.right + gap;
-            let top = infoRect.top - 6;
-
-            if (left + tipWidth > window.innerWidth - margin) {
-                left = infoRect.left - tipWidth - gap;
-            }
-            if (left < margin) {
-                left = margin;
-            }
-
-            if (top + tipHeight > window.innerHeight - margin) {
-                top = window.innerHeight - margin - tipHeight;
-            }
-            if (top < margin) {
-                top = margin;
-            }
-
-            tip.style.left = `${left}px`;
-            tip.style.top = `${top}px`;
-        };
-
-        info.addEventListener('mouseenter', position);
-        info.addEventListener('focus', position);
-    }
-
-    /**
-     * 16×16 outline icon per scanner. All paths share the same stroke
-     * conventions (currentColor, stroke-width 2, round caps/joins)
-     * so they pick up the row's text colour and look uniform when
-     * placed side by side. Inline SVG strings keep the bundle a single
-     * `.ts` file — no extra fetches.
-     */
-    private static _scannerIcon(id: ScannerId): string {
-        const s = (path: string): string =>
-            '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" '
-            + `stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${  path  }</svg>`;
-
-        switch (id) {
-            case 'cve':
-                // Shield with exclamation
-                return s('<path d="M12 2 4 5v6c0 5 4 9 8 11 4-2 8-6 8-11V5l-8-3z"/>'
-                    + '<line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12" y2="16"/>');
-            case 'license':
-                // Scroll / document
-                return s('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
-                    + '<polyline points="14 2 14 8 20 8"/>'
-                    + '<line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>');
-            case 'scripts':
-                // Terminal
-                return s('<polyline points="4 7 9 12 4 17"/><line x1="12" y1="19" x2="20" y2="19"/>');
-            case 'patterns':
-                // Curly braces — code pattern matching
-                return s('<path d="M8 3H6a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2"/>'
-                    + '<path d="M16 3h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2"/>');
-            case 'binaries':
-                // Cube
-                return s('<path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/>'
-                    + '<polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/>');
-            case 'obfuscation':
-                // Eye-off — hidden / masked code
-                return s('<path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 4.22-5.21"/>'
-                    + '<path d="M10.58 5.08A10.43 10.43 0 0 1 12 5c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>'
-                    + '<path d="M9.88 9.88a3 3 0 0 0 4.24 4.24"/>'
-                    + '<line x1="3" y1="3" x2="21" y2="21"/>');
-            case 'manifestRedFlags':
-                // Flag — a manifest-level signal
-                return s('<line x1="4" y1="22" x2="4" y2="3"/>'
-                    + '<path d="M4 4h13l-2 4 2 4H4"/>');
-            case 'capability':
-                // Key — what does the package have permission to do
-                return s('<circle cx="7" cy="14" r="4"/>'
-                    + '<path d="M10 14l11-11"/><path d="M17 7l3 3"/><path d="M19 5l2 2"/>');
-            case 'maintainer':
-                // Person
-                return s('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>'
-                    + '<circle cx="12" cy="7" r="4"/>');
-            case 'churn':
-                // Trending up + spike
-                return s('<polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/>');
-            case 'cadence':
-                // Calendar
-                return s('<rect x="3" y="4" width="18" height="18" rx="2"/>'
-                    + '<line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>'
-                    + '<line x1="3" y1="10" x2="21" y2="10"/>');
-            case 'freshness':
-                // Clock
-                return s('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>');
-            case 'ignoreScripts':
-                // Shield with no-entry slash
-                return s('<path d="M12 2 4 5v6c0 5 4 9 8 11 4-2 8-6 8-11V5l-8-3z"/>'
-                    + '<line x1="8" y1="8" x2="16" y2="16"/>');
-            case 'typosquat':
-                // Magnifier over text
-                return s('<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16" y2="16"/>'
-                    + '<line x1="8" y1="11" x2="14" y2="11"/>');
-            case 'provenance':
-                // Badge / sealed
-                return s('<circle cx="12" cy="12" r="9"/><polyline points="8 12 11 15 16 9"/>');
-            case 'external':
-                // Globe / world — external/internet reputation sources
-                return s('<circle cx="12" cy="12" r="9"/>'
-                    + '<line x1="3" y1="12" x2="21" y2="12"/>'
-                    + '<path d="M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18"/>');
-            case 'deprecation':
-                /*
-                 * Crossed-out package — old release the maintainer
-                 * wants users to move off
-                 */
-                return s('<path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/>'
-                    + '<line x1="5" y1="5" x2="19" y2="19"/>');
-            case 'integrity':
-                // Lock
-                return s('<rect x="4" y="11" width="16" height="10" rx="2"/>'
-                    + '<path d="M8 11V7a4 4 0 0 1 8 0v4"/>');
-            case 'mutableResolution':
-                // Link with broken middle — non-reproducible resolution
-                return s('<path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07L11.5 4.5"/>'
-                    + '<path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07L12.5 19.5"/>'
-                    + '<line x1="3" y1="3" x2="21" y2="21"/>');
-            case 'unused':
-                // Trash
-                return s('<polyline points="3 6 5 6 21 6"/>'
-                    + '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>'
-                    + '<path d="M10 11v6"/><path d="M14 11v6"/>'
-                    + '<path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>');
-            case 'template':
-                // Clipboard with check
-                return s('<rect x="6" y="4" width="12" height="18" rx="2"/>'
-                    + '<rect x="9" y="2" width="6" height="4" rx="1"/>'
-                    + '<polyline points="9 13 11 15 15 11"/>');
-        }
-    }
-
-    /**
-     * Two-line description per scanner (what + how). Kept in the view
-     * because the strings only ever surface in this one tooltip — no
-     * other view needs them.
-     */
-    private static _scannerWhat(id: ScannerId): string {
-        switch (id) {
-            case 'cve':
-                return I18n.t('Queries OSV.dev for known vulnerabilities affecting each installed name@version.');
-            case 'license':
-                return I18n.t('Classifies the SPDX expression of every package against the configured allow/denylist (permissive / weak-copyleft / strong-copyleft / proprietary / unknown).');
-            case 'scripts':
-                return I18n.t('Detects preinstall / install / postinstall / prepare hooks declared in each package.json. Higher severity for scripts that fetch the network or exec child processes.');
-            case 'patterns':
-                return I18n.t('Regex-scans tarball JavaScript for risky patterns: eval / Function / child_process / base64-decoded eval, etc.');
-            case 'binaries':
-                return I18n.t('Classifies binary files inside the tarball by extension and whether they sit on the bin/ path (executables the publisher exposes to npm install).');
-            case 'obfuscation':
-                return I18n.t('Looks for code-obfuscation fingerprints inside JS files: obfuscator.io _0x identifiers, eval(atob(...)) chains, hex-string arrays, and pathologically long lines outside of dist/min paths.');
-            case 'manifestRedFlags':
-                return I18n.t('Pure heuristics over `package.json`: missing README, missing description, missing files[] allowlist, many bin entries, the native-build+postinstall combo, or an engines.node range that excludes modern Node.');
-            case 'capability':
-                return I18n.t('Per-package capability inventory: which APIs the JS files touch (fs read/write, http/fetch, raw sockets, child_process, credential-shaped env vars, native bindings, eval). Severity is by combination, not by individual capability.');
-            case 'maintainer':
-                return I18n.t('Spots publisher handovers on mature packages. A short gap between the previous and current publisher on a long-lived package matches the event-stream / ua-parser-js takeover pattern.');
-            case 'churn':
-                return I18n.t('Diffs the current tarball against the previous stable release. Outsized add/remove/modify counts for a patch or minor bump are flagged.');
-            case 'cadence':
-                return I18n.t('Looks at the registry release timeline. Very stale (no recent releases) or unusually bursty cadence both raise the level.');
-            case 'freshness':
-                return I18n.t('Combines package age (first publish) with publisher account age. A brand-new package by a brand-new account is the highest-risk pair.');
-            case 'ignoreScripts':
-                return I18n.t('Derives a recommendation for `npm install --ignore-scripts`. Packages whose hooks do non-trivial work (compile, fetch, write to disk) flip the recommendation away from "ignore".');
-            case 'typosquat':
-                return I18n.t('Levenshtein distance to popular packages plus Unicode confusables (homoglyph attacks). Distance 1 / Unicode = risk; distance 2 = warn.');
-            case 'provenance':
-                return I18n.t('Reads the registry dist record for SLSA / sigstore attestation. Provenance + signed land in the no-finding bucket; unsigned counts as info.');
-            case 'external':
-                return I18n.t('Aggregates third-party reputation: socket.dev (supply-chain risk score), OpenSSF Scorecard (repo development practices), deps.dev (Google package index). Worst-of-three severity per package.');
-            case 'deprecation':
-                return I18n.t('Reads the per-version `deprecated` flag from the npm packument. Flags packages where the installed version, or the registry latest, was marked deprecated by the maintainer.');
-            case 'integrity':
-                return I18n.t('Cross-checks the lockfile `resolved` URL + `integrity` hash against what the registry currently serves. Mismatches and mirror redirects are surfaced.');
-            case 'mutableResolution':
-                return I18n.t('Walks the lockfile for entries that can\'t be reproduced deterministically: mutable git refs (branch/tag instead of SHA), missing integrity hashes on registry tarballs, file:/link: local protocols.');
-            case 'unused':
-                return I18n.t('Walks project source files for unused declared deps, misplaced (dev imports under runtime), and missing (imported but undeclared) packages.');
-            case 'template':
-                return I18n.t('Compares the project against the templates it declares — required deps + forbidden ranges + root metadata + file rules.');
-        }
-    }
-
-    /**
-     * Scoring-formula explanation. The first sentence is the same
-     * everywhere (the unified formula); the second is scanner-specific
-     * so the user understands what counts as info / warn / risk for
-     * this particular row.
-     */
-    private static _scannerHow(id: ScannerId): string {
-        const base = I18n.t('Unified formula: 100 × (1 − Σ min(weight, 30) / (packages × 30)) with info=1, warn=10, risk=30.');
-        let specific: string;
-        switch (id) {
-            case 'cve':
-                specific = I18n.t('Every OSV hit counts as risk (no per-vuln severity is fetched in batch).');
-                break;
-            case 'license':
-                specific = I18n.t('Permissive licenses do not count. Unknown / weak-copyleft = info, strong-copyleft = warn, proprietary = risk.');
-                break;
-            case 'scripts':
-            case 'patterns':
-            case 'binaries':
-            case 'obfuscation':
-            case 'manifestRedFlags':
-            case 'capability':
-            case 'maintainer':
-            case 'churn':
-            case 'cadence':
-            case 'freshness':
-                specific = I18n.t('The scanner\'s native info / warn / risk severity is used as-is.');
-                break;
-            case 'ignoreScripts':
-                specific = I18n.t('needs-scripts = info, avoid-scripts = risk. unaffected / safe-to-ignore do not count.');
-                break;
-            case 'typosquat':
-                specific = I18n.t('exact / unrelated do not count. Distance 2 = warn; distance 1 or Unicode confusable = risk.');
-                break;
-            case 'provenance':
-                specific = I18n.t('provenance / signed are clean. Only unsigned counts (as info).');
-                break;
-            case 'external':
-                specific = I18n.t('Per-source severity (socket overall <50 = risk, <80 = warn; OpenSSF <5 = risk, <7 = warn; deps.dev = info only) reduced to worst-of-three per package.');
-                break;
-            case 'deprecation':
-                specific = I18n.t('Installed version deprecated = risk, latest deprecated = warn, only older versions deprecated = info.');
-                break;
-            case 'integrity':
-                specific = I18n.t('Per-finding info / warn / risk applied; total is divided by the package count for the score.');
-                break;
-            case 'mutableResolution':
-                specific = I18n.t('Mutable git ref = risk, missing integrity hash = warn, file:/link: protocol = info. Synthesized lockfiles render N/A.');
-                break;
-            case 'unused':
-                specific = I18n.t('Each unused entry uses its own severity. Misplaced and missing each count as warn.');
-                break;
-            case 'template':
-                specific = I18n.t('Each compliance finding contributes its native severity. Projects without a declared template render N/A.');
-                break;
-        }
-        return `${base} ${specific}`;
-    }
-
-    /** 14×14 outline info "i" inside a circle — feather-style. */
-    private static readonly _INFO_SVG =
-        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" '
-        + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-        + '<circle cx="12" cy="12" r="10"/>'
-        + '<line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12" y2="8"/>'
-        + '</svg>';
-
-    /**
-     * SVG progress-ring with the score in the centre. Mirrors the
-     * Treeview health-ring so the dashboard and treeview rings move
-     * in lockstep for the same numbers. `score: null` renders an
-     * em-dash inside a neutral ring.
-     */
-    private static _renderRing(cell: DashboardCell): SVGElement {
-        const svgNs = 'http://www.w3.org/2000/svg';
-        const svg = document.createElementNS(svgNs, 'svg');
-        svg.setAttribute('viewBox', '0 0 36 36');
-        svg.setAttribute('width', '36');
-        svg.setAttribute('height', '36');
-
-        const score = cell.score;
-        const tier = score === null
-            ? 'na'
-            : score >= 80 ? 'good' : score >= 60 ? 'warn' : 'risk';
-        svg.setAttribute('class', `dash-ring dash-ring-${tier}`);
-
-        const bg = document.createElementNS(svgNs, 'circle');
-        bg.setAttribute('class', 'dash-ring-bg');
-        bg.setAttribute('cx', '18');
-        bg.setAttribute('cy', '18');
-        bg.setAttribute('r', '15');
-        bg.setAttribute('fill', 'none');
-        svg.appendChild(bg);
-
-        if (score !== null) {
-            const fg = document.createElementNS(svgNs, 'circle');
-            fg.setAttribute('class', 'dash-ring-fg');
-            fg.setAttribute('cx', '18');
-            fg.setAttribute('cy', '18');
-            fg.setAttribute('r', '15');
-            fg.setAttribute('fill', 'none');
-            fg.setAttribute('pathLength', '100');
-            fg.setAttribute('stroke-dasharray', `${score}, 100`);
-            fg.setAttribute('stroke-linecap', 'round');
-            fg.setAttribute('transform', 'rotate(-90 18 18)');
-            svg.appendChild(fg);
-        }
-
-        const text = document.createElementNS(svgNs, 'text');
-        text.setAttribute('class', 'dash-ring-text');
-        text.setAttribute('x', '18');
-        text.setAttribute('y', '22');
-        text.setAttribute('text-anchor', 'middle');
-        text.textContent = score === null ? '—' : String(score);
-        svg.appendChild(text);
-
-        return svg;
-    }
-
-    private static _cellTooltip(cell: DashboardCell, _scanner: ScannerId): string {
-        if (cell.score === null) {
-            return cell.note ?? I18n.t('N/A');
-        }
-        const summary: string[] = [`${cell.score}%`];
-        if (cell.counts.risk > 0) {
-            summary.push(`${cell.counts.risk} risk`);
-        }
-        if (cell.counts.warn > 0) {
-            summary.push(`${cell.counts.warn} warn`);
-        }
-        if (cell.counts.info > 0) {
-            summary.push(`${cell.counts.info} info`);
-        }
-        if (cell.total > 0) {
-            summary.push(I18n.t('over {n} packages', {n: String(cell.total)}));
-        }
-        let text = summary.join(' · ');
-
-        /*
-         * Top-3 findings as separate lines — the native `title`
-         * attribute renders newlines reliably in modern browsers.
-         * Full list is available in the FindingsModal on click.
-         */
-        const topFindings = cell.findings.slice(0, 3);
-        if (topFindings.length > 0) {
-            const lines = topFindings.map((f) =>
-                `${f.severity.toUpperCase()} ${f.label}${f.detail ? ` · ${f.detail}` : ''}`);
-            text = `${text}\n\n${lines.join('\n')}`;
-            const flagged = cell.counts.risk + cell.counts.warn + cell.counts.info;
-            if (flagged > topFindings.length) {
-                text = `${text}\n…${flagged - topFindings.length} more (click to see all)`;
-            }
-        }
-        return text;
-    }
-
-    /** Format an ISO timestamp into a short relative-ish string. */
-    private static _formatTimestamp(iso: string): string {
-        const d = new Date(iso);
-        if (Number.isNaN(d.getTime())) {
-            return iso;
-        }
-        const ageSec = (Date.now() - d.getTime()) / 1000;
-        if (ageSec < 60) {
-            return I18n.t('just now');
-        }
-        if (ageSec < 3600) {
-            return I18n.t('{n} min ago', {n: String(Math.floor(ageSec / 60))});
-        }
-        if (ageSec < 86400) {
-            return I18n.t('{n} h ago', {n: String(Math.floor(ageSec / 3600))});
-        }
-        return d.toLocaleString();
-    }
 
 }

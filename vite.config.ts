@@ -6,15 +6,8 @@ import path from 'path';
 import {defineConfig, Plugin, ViteDevServer} from 'vite';
 import {SchemaErrors} from 'vts';
 import {
-    ApiBulkUpgradeApplyRequest,
-    ApiBulkUpgradePick,
-    ApiBulkUpgradePreviewRequest,
-    ApiBulkUpgradePreviewResponse,
     ApiAddTemplateSourceRequest,
     ApiAddTemplateSourceResponse,
-    ApiBulkUpgradePreviewResult,
-    ApiBundlesRequest,
-    ApiBundlesResponse,
     ApiCacheClearResponse,
     ApiComplianceApplyEndEvent,
     ApiComplianceApplyProgressEvent,
@@ -45,11 +38,6 @@ import {
     ApiImpactResponse,
     ApiIntegrityResponse,
     ApiManifest,
-    ApiMatrixHeuristicsRequest,
-    ApiMatrixHeuristicsResponse,
-    ApiMatrixIntegrityResponse,
-    ApiMatrixSecurityRequest,
-    ApiMatrixSecurityResponse,
     ApiPackagesResponse,
     ApiProject,
     ApiProjectConfigResponse,
@@ -59,8 +47,6 @@ import {
     ApiReleasesResponse,
     ApiSecurityResponse,
     ApiUnusedResponse,
-    ApiUpgradePreviewResponse,
-    ApiUpgradeRequest,
     ApiLifecycleScriptsResponse,
     ApiLifecycleRunRequest
 } from './shared/Api/ApiTypes.js';
@@ -71,6 +57,7 @@ import {HistoryController} from './backend/Api/HistoryController.js';
 import {ImpactController} from './backend/Api/ImpactController.js';
 import {IntegrityController} from './backend/Api/IntegrityController.js';
 import {LockfileController} from './backend/Api/LockfileController.js';
+import {MatrixController} from './backend/Api/MatrixController.js';
 import {PackagesController} from './backend/Api/PackagesController.js';
 import {PrReviewController} from './backend/Api/PrReviewController.js';
 import {ProjectsController} from './backend/Api/ProjectsController.js';
@@ -100,8 +87,6 @@ import {DownloadsAggregator} from './backend/Dashboard/DownloadsAggregator.js';
 import {NpmDownloadsFetcher} from './backend/Downloads/NpmDownloadsFetcher.js';
 import {PackageTrendsBuilder} from './backend/Package/PackageTrendsBuilder.js';
 import {ImpactAnalyzer, ImpactProjectReport} from './backend/Security/ImpactAnalyzer.js';
-import {MatrixBuilder} from './backend/Matrix/MatrixBuilder.js';
-import {ProjectMatrixBuilder} from './backend/Matrix/ProjectMatrixBuilder.js';
 import {Project} from './backend/Project/Project.js';
 import {GitCommitsFetcher} from './backend/Releases/GitCommitsFetcher.js';
 import {GitHeadFetcher} from './backend/Releases/GitHeadFetcher.js';
@@ -109,9 +94,6 @@ import {ReleasesFetcher} from './backend/Releases/ReleasesFetcher.js';
 import {CycloneDxBuilder} from './backend/Sbom/CycloneDxBuilder.js';
 import {SbomCollector} from './backend/Sbom/SbomCollector.js';
 import {SpdxBuilder} from './backend/Sbom/SpdxBuilder.js';
-import {LifecycleScriptScanner} from './backend/Upgrade/LifecycleScriptScanner.js';
-import {PackageJsonEditor} from './backend/Upgrade/PackageJsonEditor.js';
-import {Upgrader} from './backend/Upgrade/Upgrader.js';
 import {IntegrityScanner} from './backend/Security/IntegrityScanner.js';
 import {MutableResolutionScanner} from './backend/Security/MutableResolutionScanner.js';
 import {PrReviewBuilder} from './backend/PrReview/PrReviewBuilder.js';
@@ -198,15 +180,11 @@ class Server {
                     cacheDir,
                     cacheTtlMinutes,
                     registry,
-                    remoteCache,
                     fingerprintBuilder,
                     osvClient,
                     securityCache,
                     securityScanner,
-                    unusedDetector,
-                    bundlephobiaFetcher,
-                    allowInstall,
-                    editor
+                    unusedDetector
                 } = loaded;
 
                 for (const project of loaded.projects) {
@@ -383,32 +361,7 @@ class Server {
                 SecurityController.register(ctx);
                 FingerprintController.register(ctx);
                 LockfileController.register(ctx);
-
-
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/projects/:id/matrix — per-project matrix with one
-                 * column per workspace (root first) + a Latest column from
-                 * the registry. Independent of the global matrix, but reuses
-                 * the same status semantics.
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/projects/:id/matrix', async(req, res) => {
-                    const project = projects.get(req.params.id);
-
-                    if (!project) {
-                        res.status(404).json({success: false, msg: `Unknown project ${req.params.id}`});
-                        return;
-                    }
-
-                    try {
-                        const matrix = await ProjectMatrixBuilder.build(req.params.id, project, registry, gitHeadFetcher);
-                        res.status(200).json(matrix);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
+                MatrixController.register(ctx);
 
 
                 /*
@@ -1191,444 +1144,9 @@ class Server {
                     }
                 });
 
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/matrix — the cross-project view. Builds once per
-                 * request from the current on-disk manifests; registry data
-                 * is cached per package on disk (TTL).
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/matrix', async(_req, res) => {
-                    try {
-                        const matrix = await MatrixBuilder.build(projects, registry, gitHeadFetcher);
-                        res.status(200).json(matrix);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
-
-                /*
-                 * -------------------------------------------------------------
-                 * POST /api/matrix/security — bulk vuln-count lookup used by
-                 * the matrix badge. Body: `{packages: [{name, version}]}`.
-                 * Responds with `vulnIds` per coordinate (or `null` when OSV
-                 * failed for that one). Single call lets the frontend
-                 * populate every row badge in one round-trip.
-                 * -------------------------------------------------------------
-                 */
-                app.post('/api/matrix/security', async(req, res) => {
-                    const body = req.body as Partial<ApiMatrixSecurityRequest>;
-
-                    if (!body || !Array.isArray(body.packages)) {
-                        res.status(400).json({
-                            success: false,
-                            msg: 'body must contain a `packages` array'
-                        });
-                        return;
-                    }
-
-                    const packages = body.packages.filter(
-                        (p): p is {name: string; version: string;} =>
-                            typeof p?.name === 'string' && typeof p?.version === 'string'
-                    );
-
-                    try {
-                        const map = await osvClient.queryBatch(packages);
-                        const results = packages.map((p) => ({
-                            name: p.name,
-                            version: p.version,
-                            vulnIds: map.get(`${p.name}@${p.version}`) ?? null
-                        }));
-
-                        const response: ApiMatrixSecurityResponse = {results: results};
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
-                /*
-                 * -------------------------------------------------------------
-                 * POST /api/matrix/heuristics — bulk fingerprint-derived scan
-                 * (lifecycle scripts + code patterns) for the matrix badge.
-                 * Body: `{packages: [{name, version}]}`. Slow cold path
-                 * (downloads tarballs at concurrency=10); warm path hits the
-                 * permanent fingerprint cache and runs in milliseconds.
-                 * -------------------------------------------------------------
-                 */
-                app.post('/api/matrix/heuristics', async(req, res) => {
-                    const body = req.body as Partial<ApiMatrixHeuristicsRequest>;
-
-                    if (!body || !Array.isArray(body.packages)) {
-                        res.status(400).json({
-                            success: false,
-                            msg: 'body must contain a `packages` array'
-                        });
-                        return;
-                    }
-
-                    const packages = body.packages.filter(
-                        (p): p is {name: string; version: string;} =>
-                            typeof p?.name === 'string' && typeof p?.version === 'string'
-                    );
-
-                    try {
-                        const results = await securityScanner.scanHeuristicsBatch(packages);
-                        const response: ApiMatrixHeuristicsResponse = {results: results};
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
-                /*
-                 * -------------------------------------------------------------
-                 * POST /api/matrix/bundles — bundlephobia batched lookup for
-                 * the matrix size column. Body: `{packages: [{name, version}]}`.
-                 * Permanent cache (immutable `name@version`) so warm runs
-                 * return instantly; cold runs queue under the fetcher's
-                 * concurrency cap.
-                 * -------------------------------------------------------------
-                 */
-                app.post('/api/matrix/bundles', async(req, res) => {
-                    const body = req.body as Partial<ApiBundlesRequest>;
-
-                    if (!body || !Array.isArray(body.packages)) {
-                        res.status(400).json({
-                            success: false,
-                            msg: 'body must contain a `packages` array'
-                        });
-                        return;
-                    }
-
-                    const packages = body.packages.filter(
-                        (p): p is {name: string; version: string;} =>
-                            typeof p?.name === 'string' && typeof p?.version === 'string'
-                    );
-
-                    try {
-                        const map = await bundlephobiaFetcher.fetchMany(packages);
-                        const results = packages.map((p) => {
-                            const hit = map.get(`${p.name}@${p.version}`);
-                            return {
-                                name: p.name,
-                                version: p.version,
-                                size: hit?.size ?? null,
-                                gzip: hit?.gzip ?? null,
-                                dependencyCount: hit?.dependencyCount ?? null
-                            };
-                        });
-                        const response: ApiBundlesResponse = {results: results};
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
-                /*
-                 * -------------------------------------------------------------
-                 * GET /api/matrix/integrity — cross-project integrity roll-up
-                 * for the global matrix badge. Runs `IntegrityScanner.scan`
-                 * per project lockfile, merges findings, then collapses by
-                 * package name to the worst severity + risk-tier count.
-                 * No body: the route always acts on every configured
-                 * project. Best-effort per project — a single lockfile read
-                 * error skips that project, not the whole response.
-                 * -------------------------------------------------------------
-                 */
-                app.get('/api/matrix/integrity', async(_req, res) => {
-                    try {
-                        const allFindings = [];
-                        for (const project of projects.values()) {
-                            try {
-                                const lockfile = await project.loadLockfile();
-                                if (!lockfile) {
-                                    continue;
-                                }
-                                const findings = await integrityScanner.scan(lockfile.packages);
-                                allFindings.push(...findings);
-                            } catch {
-                            /*
-                             * Skip projects whose lockfile cannot be
-                             * parsed — the matrix view still gets the
-                             * healthy ones.
-                             */
-                            }
-                        }
-
-                        const aggregated = IntegrityScanner.aggregateByName(allFindings);
-                        const results = Array.from(aggregated.entries()).map(([name, v]) => ({
-                            name: name,
-                            severity: v.severity,
-                            riskCount: v.riskCount
-                        }));
-                        const response: ApiMatrixIntegrityResponse = {results: results};
-                        res.status(200).json(response);
-                    } catch (e) {
-                        res.status(500).json({success: false, msg: (e as Error).message});
-                    }
-                });
-
-                /*
-                 * -------------------------------------------------------------
-                 * POST /api/matrix/upgrade/preview — Bulk-Upgrade Wizard.
-                 * Takes an array of picks (one per checked cross-project
-                 * matrix cell), plans each as a single-project upgrade
-                 * preview, and returns the union. Picks targeting remote
-                 * or unknown projects, or deps not present in the target
-                 * package.json, come back as `skipped` envelopes so the
-                 * modal can still list them.
-                 * -------------------------------------------------------------
-                 */
-                app.post('/api/matrix/upgrade/preview', async(req, res) => {
-                    const body = req.body as Partial<ApiBulkUpgradePreviewRequest>;
-                    if (!body || !Array.isArray(body.picks)) {
-                        res.status(400).json({success: false, msg: 'body must contain a `picks` array'});
-                        return;
-                    }
-
-                    const picks = body.picks.filter(Server._isValidPick);
-                    const results: ApiBulkUpgradePreviewResult[] = [];
-
-                    for (const pick of picks) {
-                        const project = projects.get(pick.projectUnid);
-                        if (!project) {
-                            results.push({pick: pick, skipped: 'unknown-project'});
-                            continue;
-                        }
-                        if (!(project instanceof ProjectLocal)) {
-                            results.push({pick: pick, skipped: 'not-local'});
-                            continue;
-                        }
-
-                        try {
-                            const upgrader = new Upgrader(project.getRoot());
-                            const single: ApiUpgradeRequest = {
-                                workspace: pick.workspace,
-                                name: pick.name,
-                                depType: pick.depType,
-                                fromRange: pick.fromRange,
-                                toRange: pick.toRange
-                            };
-                            const {path: abs, rel, result} = upgrader.preview(single);
-                            if (!result.changed && result.before === result.after) {
-                            /*
-                             * PackageJsonEditor returns changed:false both
-                             * when the dep is missing AND when it's already
-                             * at the target. Distinguish via currentRange.
-                             */
-                                const current = PackageJsonEditor.currentRange(
-                                    result.before, pick.depType, pick.name
-                                );
-                                results.push({
-                                    pick: pick,
-                                    skipped: current === null ? 'not-found' : 'no-change'
-                                });
-                                continue;
-                            }
-
-                            let latestResolved: string|null = null;
-                            let heads = null;
-                            try {
-                                const pack = await registry.fetchOne(pick.name);
-                                latestResolved = pack?.latest ?? null;
-                                if (latestResolved) {
-                                    heads = await securityScanner.scan(pick.name, latestResolved);
-                                }
-                            } catch {
-                            /*
-                             * Registry / scanner outages must not block
-                             * the bulk preview.
-                             */
-                            }
-
-                            const preview: ApiUpgradePreviewResponse = {
-                                project: {unid: pick.projectUnid, name: project.getName()},
-                                request: single,
-                                packageJsonPath: abs,
-                                packageJsonRel: rel,
-                                before: result.before,
-                                after: result.after,
-                                latestResolvedVersion: latestResolved,
-                                securityHeadsUp: heads,
-                                allowInstall: allowInstall
-                            };
-                            results.push({pick: pick, preview: preview});
-                        } catch (e) {
-                            results.push({pick: pick, skipped: 'not-found', msg: (e as Error).message});
-                        }
-                    }
-
-                    const response: ApiBulkUpgradePreviewResponse = {results: results, allowInstall: allowInstall};
-                    res.status(200).json(response);
-                });
-
-                /*
-                 * -------------------------------------------------------------
-                 * POST /api/matrix/upgrade/apply — SSE. Groups picks by
-                 * project, snapshots each project's touched files into ONE
-                 * backup folder, applies the edits, then (if mode=install)
-                 * runs `npm install --ignore-scripts` once per project,
-                 * sequentially. Streams events:
-                 * 
-                 *   project-start  { unid, name, picks }
-                 *   pick-result    { unid, rel, name, changed, skipped? }
-                 *   start          { command, cwd }        // install only
-                 *   stdout|stderr  { chunk }
-                 *   end            { unid, exitCode }
-                 *   done           { totalProjects }
-                 * -------------------------------------------------------------
-                 */
-                app.post('/api/matrix/upgrade/apply', async(req, res) => {
-                    const body = req.body as Partial<ApiBulkUpgradeApplyRequest>;
-                    if (!body || !Array.isArray(body.picks)) {
-                        res.status(400).json({success: false, msg: 'body must contain a `picks` array'});
-                        return;
-                    }
-                    const mode = body.mode === 'install' ? 'install' : 'edit';
-                    if (mode === 'install' && !allowInstall) {
-                        res.status(403).json({
-                            success: false,
-                            msg: 'Install path disabled — set actions.allowInstall=true in nppm.json'
-                        });
-                        return;
-                    }
-                    const picks = body.picks.filter(Server._isValidPick);
-
-                    res.set({
-                        'Content-Type': 'text/event-stream',
-                        'Cache-Control': 'no-cache',
-                        'Connection': 'keep-alive',
-                        'X-Accel-Buffering': 'no'
-                    });
-                    res.flushHeaders();
-
-                    const send = (event: string, data: object): void => {
-                        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-                    };
-
-                    /*
-                     * Group by projectUnid, preserving first-seen order so
-                     * the UI log reads top-to-bottom by what the user picked.
-                     */
-                    const groups = new Map<string, ApiBulkUpgradePick[]>();
-                    for (const pick of picks) {
-                        let list = groups.get(pick.projectUnid);
-                        if (!list) {
-                            list = [];
-                            groups.set(pick.projectUnid, list);
-                        }
-                        list.push(pick);
-                    }
-
-                    let aborted = false;
-                    let currentChild: ReturnType<typeof Upgrader.prototype.runInstall>|null = null;
-                    req.on('close', () => {
-                        aborted = true;
-                        try {
-                            currentChild?.kill();
-                        } catch {
-                        // ignore
-                        }
-                    });
-
-                    try {
-                        for (const [unid, list] of groups.entries()) {
-                            if (aborted) {
-                                return;
-                            }
-                            const project = projects.get(unid);
-                            if (!project) {
-                                send('project-skip', {unid: unid, reason: 'unknown-project'});
-                                continue;
-                            }
-                            if (!(project instanceof ProjectLocal)) {
-                                send('project-skip', {unid: unid, reason: 'not-local'});
-                                continue;
-                            }
-
-                            send('project-start', {
-                                unid: unid,
-                                name: project.getName(),
-                                picks: list.length
-                            });
-
-                            let backupDir: string|null = null;
-                            try {
-                                const upgrader = new Upgrader(project.getRoot());
-                                const apply = upgrader.applyMany(list.map((p) => ({
-                                    workspace: p.workspace,
-                                    name: p.name,
-                                    depType: p.depType,
-                                    fromRange: p.fromRange,
-                                    toRange: p.toRange
-                                })));
-                                backupDir = apply.backup.dir;
-                                send('backup', {unid: unid, dir: apply.backup.dir, files: apply.backup.files});
-                                for (const out of apply.results) {
-                                    send('pick-result', {
-                                        unid: unid,
-                                        name: out.request.name,
-                                        rel: out.rel,
-                                        changed: out.result.changed
-                                    });
-                                }
-
-                                if (mode === 'install') {
-                                    await new Promise<void>((resolve) => {
-                                        const sink = {
-                                            onStart: (command: string, cwd: string) => send('start', {unid: unid, command: command, cwd: cwd}),
-                                            onStdout: (chunk: string) => send('stdout', {unid: unid, chunk: chunk}),
-                                            onStderr: (chunk: string) => send('stderr', {unid: unid, chunk: chunk}),
-                                            onEnd: (exitCode: number|null) => {
-                                                send('end', {unid: unid, exitCode: exitCode});
-                                                currentChild = null;
-                                                resolve();
-                                            },
-                                            onError: (msg: string) => send('error', {unid: unid, msg: msg})
-                                        };
-                                        currentChild = upgrader.runInstall(sink);
-                                    });
-                                }
-                            } catch (e) {
-                                send('error', {unid: unid, msg: (e as Error).message, backupDir: backupDir});
-                            }
-                        }
-
-                        if (!aborted) {
-                            send('done', {totalProjects: groups.size});
-                        }
-                    } catch (e) {
-                        send('error', {msg: (e as Error).message});
-                    } finally {
-                        res.end();
-                    }
-                });
-
                 server.middlewares.use(app);
             }
         };
-    }
-
-
-
-    /**
-     * Shape guard for one Bulk-Upgrade pick. Used by both the
-     * `/api/matrix/upgrade/preview` and `/api/matrix/upgrade/apply`
-     * routes — the body comes off the wire untyped, so a single
-     * narrowing predicate keeps the route handlers readable.
-     */
-    private static _isValidPick(p: unknown): p is ApiBulkUpgradePick {
-        if (!p || typeof p !== 'object') {
-            return false;
-        }
-        const o = p as Record<string, unknown>;
-        return typeof o.projectUnid === 'string'
-            && typeof o.name === 'string'
-            && typeof o.depType === 'string'
-            && typeof o.fromRange === 'string'
-            && typeof o.toRange === 'string';
     }
 
 }

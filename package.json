@@ -15,10 +15,16 @@
   },
   "description": "Node Project Package Manager",
   "devDependencies": {
+    "@stylistic/eslint-plugin-ts": "^2.13.0",
     "@types/d3-hierarchy": "^3.1.7",
     "@types/d3-selection": "^3.0.11",
     "@types/express": "^5.0.6",
     "@types/node": "^22.15.18",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prefer-arrow": "^1.2.3",
     "puppeteer": "^25.1.0",
     "typescript": "^5.8.3",
     "vitest": "^4.1.8"
@@ -44,8 +50,9 @@
     "sbom": "node ./cli/sbom.js",
     "docs:screenshots": "node ./doc/screenshots.mjs",
     "test": "vitest run",
-     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts"
   },
   "type": "module",
   "version": "1.0.0"

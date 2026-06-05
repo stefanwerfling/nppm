@@ -7,7 +7,7 @@ import {
 import {Release, ReleasesResponse} from '../backend/Releases/Releases.js';
 import {BinaryFinding, BinarySeverity} from '../backend/Security/BinaryScanner.js';
 import {ChurnFinding, ChurnSeverity} from '../backend/Security/ChurnScanner.js';
-import {LicenseFinding, LicenseSeverity} from '../backend/Security/LicenseScanner.js';
+import {LicenseSeverity} from '../backend/Security/LicenseScanner.js';
 import {CadenceFinding, CadenceLevel} from '../backend/Security/CadenceScanner.js';
 import {FreshnessFinding, FreshnessLevel} from '../backend/Security/FreshnessScanner.js';
 import {IgnoreScriptsFinding, IgnoreScriptsLevel} from '../backend/Security/IgnoreScriptsScanner.js';

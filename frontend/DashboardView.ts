@@ -658,7 +658,6 @@ export class DashboardView {
 
         // Compute ecosystem aggregates over every column we've seen.
         let totalRisk = 0;
-        let totalWarn = 0;
         let totalInfo = 0;
         let cveCount = 0;
         let deprecationCount = 0;
@@ -677,7 +676,6 @@ export class DashboardView {
                     projScored++;
                 }
                 totalRisk += cell.counts.risk;
-                totalWarn += cell.counts.warn;
                 totalInfo += cell.counts.info;
                 if (scanner === 'cve') {
                     cveCount += cell.counts.risk + cell.counts.warn;

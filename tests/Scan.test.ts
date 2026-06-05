@@ -4,7 +4,6 @@ import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {BundlephobiaFetcher} from '../backend/Bundle/BundlephobiaFetcher.js';
 import {JsonCache} from '../backend/Cache/JsonCache.js';
-import {ConfigProjectType} from '../backend/Config/Config.js';
 import {LoadedConfig} from '../backend/Config/ConfigLoader.js';
 import {FingerprintBuilder} from '../backend/Fingerprint/FingerprintBuilder.js';
 import {Lockfile} from '../backend/Project/Lockfile.js';

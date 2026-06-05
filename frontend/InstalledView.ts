@@ -7,7 +7,7 @@ import {
     ApiIntegrityResponse
 } from '../shared/Api/ApiTypes.js';
 import {Lockfile, LockedPackage} from '../backend/Project/Lockfile.js';
-import {IntegrityFinding, IntegritySeverity} from '../backend/Security/IntegrityScanner.js';
+import {IntegrityFinding} from '../backend/Security/IntegrityScanner.js';
 import {Api} from './Api.js';
 import {EditorUrl} from './EditorUrl.js';
 import {I18n} from './I18n.js';
@@ -529,7 +529,7 @@ export class InstalledView {
             const data = JSON.parse((e as MessageEvent).data) as ApiAnalyzeResultEvent;
             const key = `${data.name}@${data.version}`;
             this._vulnsByKey.set(key, data.vulnIds);
-            this._updateRowCve(key, data.vulnIds);
+            this._updateRowCve(key);
         });
 
         es.addEventListener('progress', (e) => {
@@ -591,7 +591,7 @@ export class InstalledView {
      * may list the same `name@version` under several `path`s (nested
      * installs), so all of them get the same badge.
      */
-    private _updateRowCve(key: string, vulnIds: string[]|null): void {
+    private _updateRowCve(key: string): void {
         if (!this._lockfile) {
             return;
         }

@@ -42,8 +42,10 @@
       "error",
       {
         "args": "after-used",
+        "argsIgnorePattern": "^_",
         "ignoreRestSiblings": false,
-        "vars": "all"
+        "vars": "all",
+        "varsIgnorePattern": "^_"
       }
     ],
     "@typescript-eslint/no-use-before-define": "error",

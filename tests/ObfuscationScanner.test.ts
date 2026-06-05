@@ -3,7 +3,7 @@ import {FileFingerprint} from '../backend/Fingerprint/Fingerprint.js';
 import {ObfuscationScanner, ObfuscationSeverity} from '../backend/Security/ObfuscationScanner.js';
 
 function f(path: string, content: string): FileFingerprint {
-    return {path, sha256: 'x', size: content.length, content};
+    return {path: path, sha256: 'x', size: content.length, content: content};
 }
 
 describe('ObfuscationScanner.isBuildArtifact', () => {
@@ -79,7 +79,7 @@ describe('ObfuscationScanner.scan', () => {
     });
 
     it('flags long-line obfuscation in a source path as warn', () => {
-        const longLine = 'var x = ' + '"a"+'.repeat(2000) + '"end";';
+        const longLine = `var x = ${  '"a"+'.repeat(2000)  }"end";`;
         const findings = ObfuscationScanner.scan([f('pkg/src/main.js', longLine)]);
         expect(findings).toHaveLength(1);
         expect(findings[0].severity).toBe(ObfuscationSeverity.warn);
@@ -87,7 +87,7 @@ describe('ObfuscationScanner.scan', () => {
     });
 
     it('does NOT fire long-line in build paths', () => {
-        const longLine = 'var x = ' + '"a"+'.repeat(2000) + '"end";';
+        const longLine = `var x = ${  '"a"+'.repeat(2000)  }"end";`;
         const findings = ObfuscationScanner.scan([f('pkg/dist/bundle.js', longLine)]);
         // Long lines in dist/ are normal minification — no finding from that signal.
         expect(findings).toEqual([]);

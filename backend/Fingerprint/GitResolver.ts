@@ -22,7 +22,7 @@ export type GitDepInfo = {
 };
 
 type HostHandler = {
-    patterns: {regex: RegExp}[];
+    patterns: {regex: RegExp;}[];
     tarball: (owner: string, repo: string, ref: string|undefined, source: string) => GitTarballSpec;
 };
 
@@ -44,12 +44,14 @@ const HOSTS: HostHandler[] = [
         ],
         tarball: (owner, repo, ref, source) => ({
             url: `https://codeload.github.com/${owner}/${repo}/tar.gz/${ref || DEFAULT_REF}`,
-            source
+            source: source
         })
     },
-    // GitLab — archive endpoint. Filename has to be `<repo>-<ref>.tar.gz`;
-    // GitLab will redirect a wrong filename, but to keep things tidy we
-    // build the expected one.
+    /*
+     * GitLab — archive endpoint. Filename has to be `<repo>-<ref>.tar.gz`;
+     * GitLab will redirect a wrong filename, but to keep things tidy we
+     * build the expected one.
+     */
     {
         patterns: [
             {regex: /^git\+https?:\/\/gitlab\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/i},
@@ -61,7 +63,7 @@ const HOSTS: HostHandler[] = [
             const target = ref || DEFAULT_REF;
             return {
                 url: `https://gitlab.com/${owner}/${repo}/-/archive/${target}/${repo}-${target}.tar.gz`,
-                source
+                source: source
             };
         }
     },
@@ -75,7 +77,7 @@ const HOSTS: HostHandler[] = [
         ],
         tarball: (owner, repo, ref, source) => ({
             url: `https://bitbucket.org/${owner}/${repo}/get/${ref || DEFAULT_REF}.tar.gz`,
-            source
+            source: source
         })
     }
 ];
@@ -149,11 +151,13 @@ export class GitResolver {
     }
 
     private static _parseKnown(v: string): GitDepInfo|null {
-        // Each host's patterns capture (owner, repo, ref?). The shape
-        // mirrors `HOSTS` above — we don't reuse the entries directly
-        // because they're keyed on tarball construction, not on the
-        // host name we need to report.
-        const matchers: {host: GitDepInfo['host']; hostname: string; res: RegExp[]}[] = [
+        /*
+         * Each host's patterns capture (owner, repo, ref?). The shape
+         * mirrors `HOSTS` above — we don't reuse the entries directly
+         * because they're keyed on tarball construction, not on the
+         * host name we need to report.
+         */
+        const matchers: {host: GitDepInfo['host']; hostname: string; res: RegExp[];}[] = [
             {host: 'github', hostname: 'github.com', res: [
                 /^git\+https?:\/\/github\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/i,
                 /^git\+ssh:\/\/git@github\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/i,
@@ -188,10 +192,12 @@ export class GitResolver {
         if (giteaHosts.length === 0) {
             return null;
         }
-        // Accept the same four shapes as the known hosts, but with the
-        // hostname pinned by the caller's allow-list. The leading
-        // host-shorthand (`gitea:owner/repo`) is intentionally out —
-        // there is no single Gitea instance to map it to.
+        /*
+         * Accept the same four shapes as the known hosts, but with the
+         * hostname pinned by the caller's allow-list. The leading
+         * host-shorthand (`gitea:owner/repo`) is intentionally out —
+         * there is no single Gitea instance to map it to.
+         */
         for (const host of giteaHosts) {
             const escaped = host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const patterns = [
@@ -208,4 +214,5 @@ export class GitResolver {
         }
         return null;
     }
+
 }

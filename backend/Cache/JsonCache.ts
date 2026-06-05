@@ -77,4 +77,5 @@ export class JsonCache {
         const safe = key.replace(/[^a-zA-Z0-9._@-]/g, '__');
         return path.join(this._dir, `${safe}.json`);
     }
+
 }

@@ -98,10 +98,12 @@ export class PackageList {
 
         const tbody = document.createElement('tbody');
 
-        // Flatten all manifests into rows. The root manifest writes its
-        // workspace label as "root"; workspace manifests write their
-        // relative path so the user can see where the dependency was
-        // declared.
+        /*
+         * Flatten all manifests into rows. The root manifest writes its
+         * workspace label as "root"; workspace manifests write their
+         * relative path so the user can see where the dependency was
+         * declared.
+         */
         for (const manifest of data.manifests) {
             const source = manifest.workspace ?? 'root';
 
@@ -249,8 +251,9 @@ export class PackageList {
 
     private static _esc(s: string): string {
         return s
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
     }
+
 }

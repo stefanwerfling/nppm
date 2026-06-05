@@ -157,8 +157,10 @@ export class UpgradeModal {
         plan.textContent = I18n.t('Plan: {rel}', {rel: preview.packageJsonRel || 'package.json'});
         this._panel.appendChild(plan);
 
-        // No-op short-circuit — the input was already on the target
-        // range. Display a friendly message + close.
+        /*
+         * No-op short-circuit — the input was already on the target
+         * range. Display a friendly message + close.
+         */
         if (preview.before === preview.after) {
             const noop = document.createElement('div');
             noop.className = 'umd-noop';
@@ -288,8 +290,8 @@ export class UpgradeModal {
             if (b === a) {
                 lines.push(`  ${b}`);
             } else {
-                if (b) lines.push(`- ${b}`);
-                if (a) lines.push(`+ ${a}`);
+                if (b) {lines.push(`- ${b}`);}
+                if (a) {lines.push(`+ ${a}`);}
             }
         }
         pre.textContent = lines.join('\n');
@@ -333,8 +335,10 @@ export class UpgradeModal {
         if (!this._seed || !this._panel) {
             return;
         }
-        // Replace the action area with a streaming log view. The
-        // header stays so the user can still close the modal.
+        /*
+         * Replace the action area with a streaming log view. The
+         * header stays so the user can still close the modal.
+         */
         const log = document.createElement('div');
         log.className = 'umd-log';
         const head = document.createElement('div');
@@ -352,9 +356,9 @@ export class UpgradeModal {
             (btn as HTMLButtonElement).disabled = true;
         }
 
-        const body: ApiUpgradeRequest & {mode: 'edit'|'install'} = {
+        const body: ApiUpgradeRequest & {mode: 'edit'|'install';} = {
             ...this._buildRequest(),
-            mode
+            mode: mode
         };
         const abort = new AbortController();
         this._activeAbort = abort;
@@ -370,31 +374,33 @@ export class UpgradeModal {
                 return;
             }
             await this._consumeSse(res.body, {
-                'edit-done': (data: {rel: string; backupDir: string; backupFiles: string[]}) => {
+                'edit-done': (data: {rel: string; backupDir: string; backupFiles: string[];}) => {
                     this._appendLog(`✓ ${I18n.t('Backup saved to {dir}', {dir: data.backupDir})}\n`);
                     this._appendLog(`✓ Edited ${data.rel}\n`);
                     if (mode === 'edit') {
                         this._appendLog(`\n${I18n.t('Run `{cmd}` once you\'re ready to install.', {cmd: 'npm install'})}\n`);
-                        // Edit-only path completes here — no install
-                        // follows, so this is the right moment to
-                        // notify the orchestrator. The install path
-                        // fires on `end` below instead.
+                        /*
+                         * Edit-only path completes here — no install
+                         * follows, so this is the right moment to
+                         * notify the orchestrator. The install path
+                         * fires on `end` below instead.
+                         */
                         this._onAfterApply?.();
                     }
                 },
-                start: (data: {command: string; cwd: string}) => {
+                'start': (data: {command: string; cwd: string;}) => {
                     this._appendLog(`\n$ ${data.command}\n  (cwd: ${data.cwd})\n\n`);
                 },
-                stdout: (data: {chunk: string}) => this._appendLog(data.chunk),
-                stderr: (data: {chunk: string}) => this._appendLog(data.chunk),
-                end: (data: {exitCode: number|null}) => {
+                'stdout': (data: {chunk: string;}) => this._appendLog(data.chunk),
+                'stderr': (data: {chunk: string;}) => this._appendLog(data.chunk),
+                'end': (data: {exitCode: number|null;}) => {
                     this._appendLog(`\n${I18n.t('Install finished (exit {code})', {code: data.exitCode ?? 'null'})}\n`);
                     if (mode === 'install') {
                         void this._loadLifecycleScripts(preview);
                         this._onAfterApply?.();
                     }
                 },
-                error: (data: {msg: string}) => {
+                'error': (data: {msg: string;}) => {
                     this._appendLog(`\n${I18n.t('Install failed: {msg}', {msg: data.msg})}\n`);
                 }
             });
@@ -459,7 +465,7 @@ export class UpgradeModal {
         const cmd = `npm rebuild ${s.name}`;
         const manual = document.createElement('div');
         manual.className = 'umd-note';
-        manual.textContent = I18n.t('Manual: {cmd}', {cmd});
+        manual.textContent = I18n.t('Manual: {cmd}', {cmd: cmd});
         row.appendChild(manual);
 
         if (allowInstall) {
@@ -491,24 +497,26 @@ export class UpgradeModal {
                 return;
             }
             await this._consumeSse(res.body, {
-                start: (data: {command: string; cwd: string}) => {
+                start: (data: {command: string; cwd: string;}) => {
                     this._appendLog(`\n$ ${data.command}\n  (cwd: ${data.cwd})\n\n`);
                 },
-                stdout: (data: {chunk: string}) => this._appendLog(data.chunk),
-                stderr: (data: {chunk: string}) => this._appendLog(data.chunk),
-                end: (data: {exitCode: number|null}) => {
+                stdout: (data: {chunk: string;}) => this._appendLog(data.chunk),
+                stderr: (data: {chunk: string;}) => this._appendLog(data.chunk),
+                end: (data: {exitCode: number|null;}) => {
                     this._appendLog(`\n${I18n.t('Script finished (exit {code})', {code: data.exitCode ?? 'null'})}\n`);
                 },
-                error: (data: {msg: string}) => this._appendLog(`\n${data.msg}\n`)
+                error: (data: {msg: string;}) => this._appendLog(`\n${data.msg}\n`)
             });
         } catch (e) {
             this._appendLog(`\n${(e as Error).message}\n`);
         } finally {
             this._activeAbort = null;
         }
-        // Re-render the lifecycle section so the row's "Run" button
-        // re-enables; we intentionally keep the list around so the
-        // user can hit several hooks in sequence.
+        /*
+         * Re-render the lifecycle section so the row's "Run" button
+         * re-enables; we intentionally keep the list around so the
+         * user can hit several hooks in sequence.
+         */
         void this._loadLifecycleScripts(preview);
     }
 
@@ -521,10 +529,12 @@ export class UpgradeModal {
      */
     private async _consumeSse(
         body: ReadableStream<Uint8Array>,
-        // SSE payloads come from our own backend; trust the shape at the
-// edge of the dispatcher so each callback can declare its narrow type.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-handlers: Record<string, (data: any) => void>
+        /*
+         * SSE payloads come from our own backend; trust the shape at the
+         * edge of the dispatcher so each callback can declare its narrow type.
+         */
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        handlers: Record<string, (data: any) => void>
     ): Promise<void> {
         const reader = body.getReader();
         const decoder = new TextDecoder();
@@ -549,9 +559,9 @@ handlers: Record<string, (data: any) => void>
     }
 
     private static _dispatchEvent(raw: string, // SSE payloads come from our own backend; trust the shape at the
-// edge of the dispatcher so each callback can declare its narrow type.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-handlers: Record<string, (data: any) => void>): void {
+        // edge of the dispatcher so each callback can declare its narrow type.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        handlers: Record<string, (data: any) => void>): void {
         let name = 'message';
         const dataLines: string[] = [];
         for (const line of raw.split('\n')) {
@@ -571,8 +581,10 @@ handlers: Record<string, (data: any) => void>): void {
         try {
             handler(JSON.parse(dataLines.join('\n')));
         } catch {
-            // Ignore malformed events — log silently rather than tear
-            // down the modal mid-stream.
+            /*
+             * Ignore malformed events — log silently rather than tear
+             * down the modal mid-stream.
+             */
         }
     }
 
@@ -583,4 +595,5 @@ handlers: Record<string, (data: any) => void>): void {
         this._logEl.textContent += text;
         this._logEl.scrollTop = this._logEl.scrollHeight;
     }
+
 }

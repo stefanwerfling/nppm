@@ -11,8 +11,10 @@ import {TarballParser} from '../Fingerprint/TarballParser.js';
 export type GitHeadInfo = {
     /** `package.json.version` from the HEAD tree. */
     version: string|null;
-    /** Full commit SHA when the host encodes it in the tarball top
-     * folder (GitHub codeload), otherwise null. */
+    /**
+     * Full commit SHA when the host encodes it in the tarball top
+     * folder (GitHub codeload), otherwise null. 
+     */
     sha: string|null;
     /** Short SHA convenience. `null` when `sha` is. */
     shortSha: string|null;
@@ -53,7 +55,7 @@ export class GitHeadFetcher {
 
     constructor(
         cache: JsonCache|null,
-        opts: {giteaHosts?: string[]; fetcher?: HeadTarballFetcher} = {}
+        opts: {giteaHosts?: string[]; fetcher?: HeadTarballFetcher;} = {}
     ) {
         this._cache = cache;
         this._giteaHosts = opts.giteaHosts ?? [];
@@ -63,7 +65,7 @@ export class GitHeadFetcher {
     public async fetch(gitUrl: string): Promise<GitHeadInfo|null> {
         const v = gitUrl.trim();
         const key = `githead_${v}`;
-        type Wrap = {data: GitHeadInfo|null};
+        type Wrap = {data: GitHeadInfo|null;};
 
         if (this._cache) {
             const hit = this._cache.get<Wrap>(key);
@@ -77,11 +79,13 @@ export class GitHeadFetcher {
             this._cache?.set<Wrap>(key, {data: null});
             return null;
         }
-        // Force the HEAD ref regardless of what the user pinned —
-        // we want "what's at the tip right now", not "what was at the
-        // tip when this version was tagged". Reuse `resolveTarball`
-        // with a synthetic URL that drops the user's `#ref` and so
-        // collapses to the host's DEFAULT_REF (`HEAD`).
+        /*
+         * Force the HEAD ref regardless of what the user pinned —
+         * we want "what's at the tip right now", not "what was at the
+         * tip when this version was tagged". Reuse `resolveTarball`
+         * with a synthetic URL that drops the user's `#ref` and so
+         * collapses to the host's DEFAULT_REF (`HEAD`).
+         */
         const headUrl = `git+https://${parsed.hostname}/${parsed.owner}/${parsed.repo}.git`;
         const spec = GitResolver.resolveTarball(headUrl, this._giteaHosts);
         if (!spec) {
@@ -93,10 +97,12 @@ export class GitHeadFetcher {
         try {
             tgz = await this._fetcher.fetch(spec.url);
         } catch (e) {
-            // Network / 5xx — surface the failure to the UI so the
-            // user can tell "no info because host is down" apart
-            // from "no info because we never looked", but skip the
-            // cache so a next page load can transparently retry.
+            /*
+             * Network / 5xx — surface the failure to the UI so the
+             * user can tell "no info because host is down" apart
+             * from "no info because we never looked", but skip the
+             * cache so a next page load can transparently retry.
+             */
             return {
                 version: null,
                 sha: null,
@@ -105,10 +111,12 @@ export class GitHeadFetcher {
             };
         }
         if (!tgz) {
-            // 404 — repository really doesn't exist (or was made
-            // private / renamed). Cache the negative so we don't
-            // hammer the host on every paint; the user can clear the
-            // cache pocket once they fix the URL.
+            /*
+             * 404 — repository really doesn't exist (or was made
+             * private / renamed). Cache the negative so we don't
+             * hammer the host on every paint; the user can clear the
+             * cache pocket once they fix the URL.
+             */
             const info: GitHeadInfo = {
                 version: null,
                 sha: null,
@@ -124,19 +132,21 @@ export class GitHeadFetcher {
         let version: string|null = null;
         if (pkgJson) {
             try {
-                const parsedJson = JSON.parse(pkgJson.content.toString('utf-8')) as {version?: unknown};
+                const parsedJson = JSON.parse(pkgJson.content.toString('utf-8')) as {version?: unknown;};
                 if (typeof parsedJson.version === 'string' && parsedJson.version.length > 0) {
                     version = parsedJson.version;
                 }
             } catch {
-                // Malformed package.json — keep version null, still
-                // surface the SHA below.
+                /*
+                 * Malformed package.json — keep version null, still
+                 * surface the SHA below.
+                 */
             }
         }
         const sha = GitHeadFetcher._extractSha(prefix, parsed.repo);
         const info: GitHeadInfo = {
-            version,
-            sha,
+            version: version,
+            sha: sha,
             shortSha: sha ? sha.slice(0, 7) : null
         };
         this._cache?.set<Wrap>(key, {data: info});
@@ -189,7 +199,7 @@ export class GitHeadFetcher {
 
     private static _defaultFetcher(): HeadTarballFetcher {
         return {
-            async fetch(url: string): Promise<Buffer|null> {
+            fetch: async function(url: string): Promise<Buffer|null> {
                 const res = await fetch(url, {headers: {'User-Agent': 'nppm'}});
                 if (res.status === 404) {
                     return null;
@@ -201,4 +211,5 @@ export class GitHeadFetcher {
             }
         };
     }
+
 }

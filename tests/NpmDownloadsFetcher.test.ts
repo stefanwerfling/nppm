@@ -22,7 +22,7 @@ describe('NpmDownloadsFetcher', () => {
     const mockJson = (
         handler: (url: string) => unknown
     ): void => {
-        globalThis.fetch = vi.fn(async (input: RequestInfo|URL) => {
+        globalThis.fetch = vi.fn(async(input: RequestInfo|URL) => {
             const url = typeof input === 'string' ? input : input.toString();
             const body = handler(url);
             return new Response(JSON.stringify(body), {
@@ -32,7 +32,7 @@ describe('NpmDownloadsFetcher', () => {
         }) as unknown as typeof globalThis.fetch;
     };
 
-    it('bulk-fetches unscoped names in a single call', async () => {
+    it('bulk-fetches unscoped names in a single call', async() => {
         let callCount = 0;
         mockJson((url) => {
             callCount++;
@@ -53,7 +53,7 @@ describe('NpmDownloadsFetcher', () => {
         expect(out.get('axios')).toBe(300);
     });
 
-    it('falls back to per-name fetch for scoped packages', async () => {
+    it('falls back to per-name fetch for scoped packages', async() => {
         const calls: string[] = [];
         mockJson((url) => {
             calls.push(url);
@@ -75,7 +75,7 @@ describe('NpmDownloadsFetcher', () => {
         expect(calls.length).toBe(2);
     });
 
-    it('caches successful results so repeated fetchMany skips the HTTP', async () => {
+    it('caches successful results so repeated fetchMany skips the HTTP', async() => {
         let callCount = 0;
         mockJson(() => {
             callCount++;
@@ -89,7 +89,7 @@ describe('NpmDownloadsFetcher', () => {
         expect(callCount).toBe(1);
     });
 
-    it('caches null results so a missing package does not keep re-hitting', async () => {
+    it('caches null results so a missing package does not keep re-hitting', async() => {
         let callCount = 0;
         mockJson(() => {
             callCount++;
@@ -106,9 +106,11 @@ describe('NpmDownloadsFetcher', () => {
         expect(callCount).toBe(1);
     });
 
-    it('handles single-name bulk responses without a wrapping map', async () => {
-        // npm returns the bare object (no {name: object} envelope)
-        // when the bulk URL has exactly one package.
+    it('handles single-name bulk responses without a wrapping map', async() => {
+        /*
+         * npm returns the bare object (no {name: object} envelope)
+         * when the bulk URL has exactly one package.
+         */
         mockJson(() => ({downloads: 99}));
         const cache = new JsonCache(dir, 60);
         const f = new NpmDownloadsFetcher(cache);

@@ -73,7 +73,7 @@ export class GithubClient {
                 if (!c || typeof c !== 'object') {
                     continue;
                 }
-                const cc = c as {id?: unknown; body?: unknown};
+                const cc = c as {id?: unknown; body?: unknown;};
                 if (typeof cc.body === 'string' && cc.body.includes(STICKY_MARKER)
                         && typeof cc.id === 'number') {
                     return {id: cc.id, body: cc.body};
@@ -91,7 +91,7 @@ export class GithubClient {
             const res = await this._fetch(url, {
                 method: 'PATCH',
                 headers: {...this._headers(), 'Content-Type': 'application/json'},
-                body: JSON.stringify({body})
+                body: JSON.stringify({body: body})
             });
             return res.ok;
         } catch {
@@ -105,14 +105,14 @@ export class GithubClient {
             const res = await this._fetch(url, {
                 method: 'POST',
                 headers: {...this._headers(), 'Content-Type': 'application/json'},
-                body: JSON.stringify({body})
+                body: JSON.stringify({body: body})
             });
             if (!res.ok) {
                 return null;
             }
             const raw = await res.json() as unknown;
-            if (raw && typeof raw === 'object' && typeof (raw as {id?: unknown}).id === 'number') {
-                return (raw as {id: number}).id;
+            if (raw && typeof raw === 'object' && typeof (raw as {id?: unknown;}).id === 'number') {
+                return (raw as {id: number;}).id;
             }
             return null;
         } catch {
@@ -122,10 +122,11 @@ export class GithubClient {
 
     private _headers(): Record<string, string> {
         return {
-            Accept: 'application/vnd.github+json',
-            Authorization: `Bearer ${this._token}`,
+            'Accept': 'application/vnd.github+json',
+            'Authorization': `Bearer ${this._token}`,
             'X-GitHub-Api-Version': '2022-11-28',
             'User-Agent': 'nppm-action'
         };
     }
+
 }

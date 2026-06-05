@@ -115,9 +115,11 @@ export class CadenceScanner {
         const last = stamps[stamps.length - 1];
         const daysSinceLastRelease = Math.max(0, Math.floor((now - last) / MS_PER_DAY));
 
-        // Median of consecutive gaps over the recent window.
-        // `windowSize` is the number of *gaps* we want — that
-        // requires `windowSize + 1` adjacent stamps to derive.
+        /*
+         * Median of consecutive gaps over the recent window.
+         * `windowSize` is the number of *gaps* we want — that
+         * requires `windowSize + 1` adjacent stamps to derive.
+         */
         const gapWindow = stamps.slice(-(windowSize + 1));
         const gaps: number[] = [];
         for (let i = 1; i < gapWindow.length; i++) {
@@ -134,10 +136,10 @@ export class CadenceScanner {
                 : CadenceLevel.info;
 
         return {
-            level,
+            level: level,
             lastReleaseAt: new Date(last).toISOString(),
-            daysSinceLastRelease,
-            medianCadenceDays,
+            daysSinceLastRelease: daysSinceLastRelease,
+            medianCadenceDays: medianCadenceDays,
             releaseCount: stamps.length,
             reason: CadenceScanner._reason(level, daysSinceLastRelease, medianCadenceDays, warnDays, riskDays)
         };
@@ -175,4 +177,5 @@ export class CadenceScanner {
         }
         return `Last release ${daysSinceLastRelease} days ago${cadence} — actively maintained`;
     }
+
 }

@@ -19,18 +19,18 @@ type SarifLevel = 'note'|'warning'|'error';
 type SarifRule = {
     id: string;
     name: string;
-    shortDescription: {text: string};
-    fullDescription: {text: string};
-    defaultConfiguration: {level: SarifLevel};
+    shortDescription: {text: string;};
+    fullDescription: {text: string;};
+    defaultConfiguration: {level: SarifLevel;};
 };
 
 type SarifResult = {
     ruleId: string;
     level: SarifLevel;
-    message: {text: string};
+    message: {text: string;};
     locations: {
         physicalLocation: {
-            artifactLocation: {uri: string};
+            artifactLocation: {uri: string;};
         };
     }[];
     partialFingerprints: Record<string, string>;
@@ -71,7 +71,7 @@ type SarifLog = {
  */
 export class SarifBuilder {
 
-    private static readonly _CATEGORY_DEFS: Record<string, {name: string; description: string; defaultLevel: SarifLevel}> = {
+    private static readonly _CATEGORY_DEFS: Record<string, {name: string; description: string; defaultLevel: SarifLevel;}> = {
         vuln: {
             name: 'Known vulnerability',
             description: 'OSV.dev recorded one or more CVEs against this package version.',
@@ -167,9 +167,9 @@ export class SarifBuilder {
                 }
 
                 results.push({
-                    ruleId,
+                    ruleId: ruleId,
                     level: SarifBuilder._severityToLevel(f.severity),
-                    message: {text: `${f.name}${f.version ? '@' + f.version : ''}: ${f.message}`},
+                    message: {text: `${f.name}${f.version ? `@${  f.version}` : ''}: ${f.message}`},
                     locations: [SarifBuilder._locationFor(project, f)],
                     partialFingerprints: SarifBuilder._fingerprintFor(project, f),
                     properties: {
@@ -191,10 +191,10 @@ export class SarifBuilder {
                         name: 'nppm',
                         informationUri: 'https://github.com/stefanwerfling/nppm',
                         version: toolVersion,
-                        rules
+                        rules: rules
                     }
                 },
-                results,
+                results: results,
                 invocations: [{
                     executionSuccessful: report.projects.every((p) => p.error === null)
                 }]
@@ -215,19 +215,22 @@ export class SarifBuilder {
     }
 
     private static _locationFor(project: ProjectScanReport, f: ScanFinding): SarifResult['locations'][number] {
-        // SARIF requires *some* location. We don't have a per-finding
-        // source file in most cases (the finding is about a published
-        // package, not a checked-in source file), so we synthesise a
-        // URI that names the project + package — GitHub displays this
-        // verbatim and it's stable for fingerprinting.
+        /*
+         * SARIF requires *some* location. We don't have a per-finding
+         * source file in most cases (the finding is about a published
+         * package, not a checked-in source file), so we synthesise a
+         * URI that names the project + package — GitHub displays this
+         * verbatim and it's stable for fingerprinting.
+         */
         const ver = f.version ? `@${f.version}` : '';
         const uri = `nppm-project/${project.project.name}/${f.name}${ver}`;
-        return {physicalLocation: {artifactLocation: {uri}}};
+        return {physicalLocation: {artifactLocation: {uri: uri}}};
     }
 
     private static _fingerprintFor(project: ProjectScanReport, f: ScanFinding): Record<string, string> {
         return {
-            nppmCoord: `${project.project.name}|${f.category}|${f.name}${f.version ? '@' + f.version : ''}`
+            nppmCoord: `${project.project.name}|${f.category}|${f.name}${f.version ? `@${  f.version}` : ''}`
         };
     }
+
 }

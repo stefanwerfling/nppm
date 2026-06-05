@@ -18,10 +18,10 @@ const mkDashboard = (rows: {
         cells: Object.fromEntries(
             Object.entries(r.cells).map(([scanner, score]) => [
                 scanner,
-                {score, counts: {info: 0, warn: 0, risk: 0}, total: 0, findings: []}
+                {score: score, counts: {info: 0, warn: 0, risk: 0}, total: 0, findings: []}
             ])
         ),
-        ...(r.sizeBytes !== undefined ? {sizeBytes: r.sizeBytes} : {})
+        ...r.sizeBytes !== undefined ? {sizeBytes: r.sizeBytes} : {}
     }))
 });
 

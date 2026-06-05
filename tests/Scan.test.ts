@@ -19,7 +19,7 @@ import {ExternalSourcesScanner} from '../backend/Security/ExternalSourcesScanner
 import {OsvClient} from '../backend/Security/OsvClient.js';
 import {SecurityScanner} from '../backend/Security/SecurityScanner.js';
 import {UnusedDetector, UnusedFs} from '../backend/Unused/UnusedDetector.js';
-import {runScan, RunScanIO} from '../cli/Scan.js';
+import {ScanRunner, RunScanIO} from '../cli/Scan.js';
 
 /**
  * Buffered IO captures so each test can assert on the exact bytes
@@ -53,6 +53,7 @@ function makeIO(overrides: Partial<RunScanIO> & Pick<RunScanIO, 'argv'>): RunSca
  * crafted manifests and an empty lockfile without disk I/O.
  */
 class FakeLocalProject extends ProjectLocal {
+
     private readonly _manifests: PackageManifest[];
     private readonly _lockfile: Lockfile|null;
 
@@ -69,6 +70,7 @@ class FakeLocalProject extends ProjectLocal {
     public async loadLockfile(): Promise<Lockfile|null> {
         return this._lockfile;
     }
+
 }
 
 function makeEnvironment(opts: {
@@ -99,26 +101,26 @@ function makeEnvironment(opts: {
         projectRoot: opts.cacheDir,
         cacheDir: opts.cacheDir,
         cacheTtlMinutes: 60,
-        registry,
-        registryCache,
-        remoteCache,
-        fingerprintCache,
-        fingerprintBuilder,
-        osvClient,
-        securityCache,
-        securityScanner,
-        unusedDetector,
-        bundlephobiaFetcher,
+        registry: registry,
+        registryCache: registryCache,
+        remoteCache: remoteCache,
+        fingerprintCache: fingerprintCache,
+        fingerprintBuilder: fingerprintBuilder,
+        osvClient: osvClient,
+        securityCache: securityCache,
+        securityScanner: securityScanner,
+        unusedDetector: unusedDetector,
+        bundlephobiaFetcher: bundlephobiaFetcher,
         allowInstall: false,
         editor: undefined,
         projects: opts.projects,
-        externalScanner
+        externalScanner: externalScanner
     };
 }
 
 function makeFs(files: Record<string, string>): UnusedFs {
     return {
-        existsSync: (p) => Object.prototype.hasOwnProperty.call(files, p),
+        existsSync: (p) => Object.hasOwn(files, p),
         readdirSync: (p) => {
             const prefix = `${p}/`;
             const out = new Set<string>();
@@ -145,7 +147,7 @@ function makeFs(files: Record<string, string>): UnusedFs {
 
 function emptyManifest(name: string, deps: Record<string, string> = {}): PackageManifest {
     return {
-        name,
+        name: name,
         version: '1.0.0',
         scripts: {},
         dependencies: Object.entries(deps).map(([n, v]) => ({
@@ -167,32 +169,32 @@ describe('runScan — surface behaviour', () => {
         fs.rmSync(tmp, {recursive: true, force: true});
     });
 
-    it('exits 0 and prints help on --help', async () => {
+    it('exits 0 and prints help on --help', async() => {
         const io = makeIO({argv: ['--help'], cwd: tmp});
-        const code = await runScan(io);
+        const code = await ScanRunner.run(io);
         expect(code).toBe(0);
         expect(io.out()).toMatch(/nppm scan/);
     });
 
-    it('exits 2 with usage when the config is missing', async () => {
+    it('exits 2 with usage when the config is missing', async() => {
         const io = makeIO({argv: [], cwd: tmp});
-        const code = await runScan(io);
+        const code = await ScanRunner.run(io);
         expect(code).toBe(2);
         expect(io.err()).toMatch(/config file not found/);
     });
 
-    it('exits 2 when the config fails schema validation', async () => {
+    it('exits 2 when the config fails schema validation', async() => {
         const io = makeIO({
             argv: [],
             cwd: tmp,
             configOverride: {projects: 'not-an-array'}
         });
-        const code = await runScan(io);
+        const code = await ScanRunner.run(io);
         expect(code).toBe(2);
         expect(io.err()).toMatch(/invalid structure/);
     });
 
-    it('exits 2 when --project filter matches nothing', async () => {
+    it('exits 2 when --project filter matches nothing', async() => {
         const env = makeEnvironment({
             projects: [new FakeLocalProject('/p', 'alpha', [emptyManifest('alpha')])],
             unusedFs: makeFs({'/p': '<dir>'}),
@@ -203,27 +205,29 @@ describe('runScan — surface behaviour', () => {
             cwd: tmp,
             environmentOverride: env
         });
-        const code = await runScan(io);
+        const code = await ScanRunner.run(io);
         expect(code).toBe(2);
         expect(io.err()).toMatch(/no projects matched/);
     });
 
-    it('exits 0 on a clean environment with no projects', async () => {
+    it('exits 0 on a clean environment with no projects', async() => {
         const env = makeEnvironment({
             projects: [],
             cacheDir: tmp
         });
         const io = makeIO({argv: ['--json'], cwd: tmp, environmentOverride: env});
-        const code = await runScan(io);
+        const code = await ScanRunner.run(io);
         expect(code).toBe(0);
         const parsed = JSON.parse(io.out());
         expect(parsed.summary.totalProjects).toBe(0);
         expect(parsed.summary.maxSeverity).toBeNull();
     });
 
-    it('exits 1 when unused findings reach the risk threshold', async () => {
-        // Project declares `dangling-dep` but no source file imports
-        // it → unused/risk → breach `--fail-on=risk`.
+    it('exits 1 when unused findings reach the risk threshold', async() => {
+        /*
+         * Project declares `dangling-dep` but no source file imports
+         * it → unused/risk → breach `--fail-on=risk`.
+         */
         const project = new FakeLocalProject(
             '/p',
             'alpha',
@@ -239,12 +243,12 @@ describe('runScan — surface behaviour', () => {
             cacheDir: tmp
         });
         const io = makeIO({argv: ['--fail-on=risk'], cwd: tmp, environmentOverride: env});
-        const code = await runScan(io);
+        const code = await ScanRunner.run(io);
         expect(code).toBe(1);
         expect(io.out()).toMatch(/Result: FAIL/);
     });
 
-    it('--fail-on=none never trips the gate', async () => {
+    it('--fail-on=none never trips the gate', async() => {
         const project = new FakeLocalProject(
             '/p',
             'alpha',
@@ -260,29 +264,29 @@ describe('runScan — surface behaviour', () => {
             cacheDir: tmp
         });
         const io = makeIO({argv: ['--fail-on=none'], cwd: tmp, environmentOverride: env});
-        const code = await runScan(io);
+        const code = await ScanRunner.run(io);
         expect(code).toBe(0);
     });
 
-    it('--json emits a parseable payload to stdout and nothing to stderr', async () => {
+    it('--json emits a parseable payload to stdout and nothing to stderr', async() => {
         const env = makeEnvironment({
             projects: [],
             cacheDir: tmp
         });
         const io = makeIO({argv: ['--json'], cwd: tmp, environmentOverride: env});
-        const code = await runScan(io);
+        const code = await ScanRunner.run(io);
         expect(code).toBe(0);
         expect(() => JSON.parse(io.out())).not.toThrow();
         expect(io.err()).toBe('');
     });
 
-    it('--sarif emits a SARIF 2.1.0 envelope to stdout', async () => {
+    it('--sarif emits a SARIF 2.1.0 envelope to stdout', async() => {
         const env = makeEnvironment({
             projects: [],
             cacheDir: tmp
         });
         const io = makeIO({argv: ['--sarif'], cwd: tmp, environmentOverride: env});
-        const code = await runScan(io);
+        const code = await ScanRunner.run(io);
         expect(code).toBe(0);
         const parsed = JSON.parse(io.out());
         expect(parsed.version).toBe('2.1.0');
@@ -290,13 +294,13 @@ describe('runScan — surface behaviour', () => {
         expect(io.err()).toBe('');
     });
 
-    it('--project filter scans only matching projects', async () => {
+    it('--project filter scans only matching projects', async() => {
         const projects = [
             new FakeLocalProject('/p/a', 'alpha', [emptyManifest('alpha')]),
             new FakeLocalProject('/p/b', 'beta', [emptyManifest('beta')])
         ];
         const env = makeEnvironment({
-            projects,
+            projects: projects,
             unusedFs: makeFs({'/p/a': '<dir>', '/p/b': '<dir>'}),
             cacheDir: tmp
         });
@@ -305,24 +309,24 @@ describe('runScan — surface behaviour', () => {
             cwd: tmp,
             environmentOverride: env
         });
-        await runScan(io);
+        await ScanRunner.run(io);
         const parsed = JSON.parse(io.out());
         expect(parsed.projects).toHaveLength(1);
         expect(parsed.projects[0].project.name).toBe('alpha');
     });
 
-    it('rejects --json + --sarif at the argument layer', async () => {
+    it('rejects --json + --sarif at the argument layer', async() => {
         const io = makeIO({argv: ['--json', '--sarif'], cwd: tmp});
-        const code = await runScan(io);
+        const code = await ScanRunner.run(io);
         expect(code).toBe(2);
         expect(io.err()).toMatch(/mutually exclusive/);
     });
 
-    it('loads a config from disk and runs against an empty project list', async () => {
+    it('loads a config from disk and runs against an empty project list', async() => {
         const configPath = path.join(tmp, 'nppm.json');
         fs.writeFileSync(configPath, JSON.stringify({projects: []}));
         const io = makeIO({argv: ['--json'], cwd: tmp});
-        const code = await runScan(io);
+        const code = await ScanRunner.run(io);
         expect(code).toBe(0);
         const parsed = JSON.parse(io.out());
         expect(parsed.summary.totalProjects).toBe(0);

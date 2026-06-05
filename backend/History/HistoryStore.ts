@@ -62,23 +62,27 @@ export class HistoryStore {
         const file = this._fileFor(projectKey, projectName);
 
         if (!fs.existsSync(file)) {
-            return {projectKey, projectName, lastSnapshot: null, entries: [], gitBackfilledHead: null};
+            return {projectKey: projectKey, projectName: projectName, lastSnapshot: null, entries: [], gitBackfilledHead: null};
         }
 
         try {
             const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as HistoryFile;
-            // Keep the display name in sync if the user renamed the
-            // project in the config — the key is what's stable.
+            /*
+             * Keep the display name in sync if the user renamed the
+             * project in the config — the key is what's stable.
+             */
             parsed.projectName = projectName;
             if (parsed.gitBackfilledHead === undefined) {
                 parsed.gitBackfilledHead = null;
             }
             return parsed;
         } catch {
-            // Corrupt file → start fresh. We don't rename/back up
-            // because the only way to corrupt this file is a crash
-            // mid-write, and the next snapshot will overwrite it.
-            return {projectKey, projectName, lastSnapshot: null, entries: [], gitBackfilledHead: null};
+            /*
+             * Corrupt file → start fresh. We don't rename/back up
+             * because the only way to corrupt this file is a crash
+             * mid-write, and the next snapshot will overwrite it.
+             */
+            return {projectKey: projectKey, projectName: projectName, lastSnapshot: null, entries: [], gitBackfilledHead: null};
         }
     }
 
@@ -106,19 +110,21 @@ export class HistoryStore {
         projectName: string,
         gitEntries: HistoryEntry[],
         headSha: string|null,
-        finalGitState: {name: string; version: string}[],
+        finalGitState: {name: string; version: string;}[],
         seedLastSnapshot: boolean = true
     ): HistoryBackfillSummary {
         const state = this.read(projectKey, projectName);
 
-        // Watermark hits short-circuit the walk — but only when we
-        // actually have entries to show for it. A previous run that
-        // set `gitBackfilledHead` and wrote no entries (e.g. a
-        // crashed walk) would otherwise lock the project into an
-        // empty history forever, since the watermark would keep
-        // matching HEAD.
+        /*
+         * Watermark hits short-circuit the walk — but only when we
+         * actually have entries to show for it. A previous run that
+         * set `gitBackfilledHead` and wrote no entries (e.g. a
+         * crashed walk) would otherwise lock the project into an
+         * empty history forever, since the watermark would keep
+         * matching HEAD.
+         */
         if (headSha && state.gitBackfilledHead === headSha && state.entries.length > 0) {
-            return {mergedCount: 0, headSha, skippedReason: 'head-unchanged'};
+            return {mergedCount: 0, headSha: headSha, skippedReason: 'head-unchanged'};
         }
 
         const seenShas = new Set<string>();
@@ -137,7 +143,7 @@ export class HistoryStore {
         }
 
         if (fresh.length === 0 && state.gitBackfilledHead === headSha) {
-            return {mergedCount: 0, headSha, skippedReason: 'head-unchanged'};
+            return {mergedCount: 0, headSha: headSha, skippedReason: 'head-unchanged'};
         }
 
         const merged = [...state.entries, ...fresh];
@@ -146,14 +152,16 @@ export class HistoryStore {
         state.entries = merged;
         state.gitBackfilledHead = headSha;
 
-        // Seed lastSnapshot only when truly empty AND the caller
-        // explicitly opts in — once nppm has observed anything live,
-        // that observation wins over the git state. The git walk's
-        // final commit might pre-date a live install that didn't get
-        // committed. Skipping the seed when entries hold ranges
-        // (`package.json` fallback path) also keeps `recordSnapshot`
-        // from emitting a false "every dep changed" delta on the
-        // next lockfile read.
+        /*
+         * Seed lastSnapshot only when truly empty AND the caller
+         * explicitly opts in — once nppm has observed anything live,
+         * that observation wins over the git state. The git walk's
+         * final commit might pre-date a live install that didn't get
+         * committed. Skipping the seed when entries hold ranges
+         * (`package.json` fallback path) also keeps `recordSnapshot`
+         * from emitting a false "every dep changed" delta on the
+         * next lockfile read.
+         */
         if (seedLastSnapshot && state.lastSnapshot === null && finalGitState.length > 0) {
             const tail = fresh.length > 0
                 ? fresh[fresh.length - 1].timestamp
@@ -165,7 +173,7 @@ export class HistoryStore {
         }
 
         this._write(projectKey, projectName, state);
-        return {mergedCount: fresh.length, headSha, skippedReason: null};
+        return {mergedCount: fresh.length, headSha: headSha, skippedReason: null};
     }
 
     /**
@@ -182,25 +190,29 @@ export class HistoryStore {
         projectKey: string,
         projectName: string,
         lockfileSource: string,
-        currentPackages: {name: string; version: string}[],
+        currentPackages: {name: string; version: string;}[],
         ctx: HistoryReasonContext = {}
     ): HistoryEntry|null {
         const state = this.read(projectKey, projectName);
 
-        // Dedupe within the input — the lockfile lists nested installs
-        // separately. We track at the (name, version) level; multiple
-        // copies of the same `name@version` collapse to one.
-        const currentSet = new Map<string, {name: string; version: string}>();
+        /*
+         * Dedupe within the input — the lockfile lists nested installs
+         * separately. We track at the (name, version) level; multiple
+         * copies of the same `name@version` collapse to one.
+         */
+        const currentSet = new Map<string, {name: string; version: string;}>();
         for (const p of currentPackages) {
             currentSet.set(`${p.name}@${p.version}`, {name: p.name, version: p.version});
         }
-        const previousSet = new Map<string, {name: string; version: string}>();
+        const previousSet = new Map<string, {name: string; version: string;}>();
         for (const p of state.lastSnapshot?.packages ?? []) {
             previousSet.set(`${p.name}@${p.version}`, {name: p.name, version: p.version});
         }
 
-        // Group by name so we can detect same-name-version-changed as
-        // an update rather than add+remove.
+        /*
+         * Group by name so we can detect same-name-version-changed as
+         * an update rather than add+remove.
+         */
         const currentByName = new Map<string, string>();
         for (const p of currentSet.values()) {
             currentByName.set(p.name, p.version);
@@ -217,15 +229,15 @@ export class HistoryStore {
         for (const [name, version] of currentByName) {
             const prev = previousByName.get(name);
             if (prev === undefined) {
-                added.push({name, version});
+                added.push({name: name, version: version});
             } else if (prev !== version) {
                 const bumpType = HistoryStore._detectBumpType(prev, version);
                 const cves = ctx.cvesForOldVersion?.(name, prev) ?? null;
                 updated.push({
-                    name,
+                    name: name,
                     fromVersion: prev,
                     toVersion: version,
-                    bumpType,
+                    bumpType: bumpType,
                     reason: HistoryStore._describeReason(bumpType, cves)
                 });
             }
@@ -233,14 +245,16 @@ export class HistoryStore {
 
         for (const [name, version] of previousByName) {
             if (!currentByName.has(name)) {
-                removed.push({name, version});
+                removed.push({name: name, version: version});
             }
         }
 
-        // First-ever snapshot is special — no prior state, so "added"
-        // would otherwise list every single package and dwarf the
-        // entries timeline. We *do* persist the snapshot itself (so
-        // the next call has a baseline) but skip writing an entry.
+        /*
+         * First-ever snapshot is special — no prior state, so "added"
+         * would otherwise list every single package and dwarf the
+         * entries timeline. We *do* persist the snapshot itself (so
+         * the next call has a baseline) but skip writing an entry.
+         */
         const isInitial = state.lastSnapshot === null;
 
         if (isInitial) {
@@ -256,18 +270,20 @@ export class HistoryStore {
             return null;
         }
 
-        // Sort each list by name so the JSON file diffs cleanly in a
-        // git context (when the user inspects the cache out of band).
+        /*
+         * Sort each list by name so the JSON file diffs cleanly in a
+         * git context (when the user inspects the cache out of band).
+         */
         added.sort((a, b) => a.name.localeCompare(b.name));
         removed.sort((a, b) => a.name.localeCompare(b.name));
         updated.sort((a, b) => a.name.localeCompare(b.name));
 
         const entry: HistoryEntry = {
             timestamp: Date.now(),
-            lockfileSource,
-            added,
-            removed,
-            updated,
+            lockfileSource: lockfileSource,
+            added: added,
+            removed: removed,
+            updated: updated,
             source: 'snapshot'
         };
 
@@ -319,7 +335,7 @@ export class HistoryStore {
 
     private static _parseTriple(v: string): [number, number, number]|null {
         const m = VERSION_REGEX.exec(v.trim());
-        return m ? [+m[1], +m[2], +m[3]] : null;
+        return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
     }
 
     private static _detectBumpType(from: string, to: string): HistoryBumpType|null {
@@ -359,4 +375,5 @@ export class HistoryStore {
         const hex = (h >>> 0).toString(16).padStart(8, '0');
         return `${sanitised}-${hex}.json`;
     }
+
 }

@@ -3,7 +3,7 @@ import {FileFingerprint} from '../backend/Fingerprint/Fingerprint.js';
 import {BinaryScanner, BinarySeverity} from '../backend/Security/BinaryScanner.js';
 
 function f(path: string, size = 1): FileFingerprint {
-    return {path, sha256: 'x', size};
+    return {path: path, sha256: 'x', size: size};
 }
 
 describe('BinaryScanner.scan', () => {

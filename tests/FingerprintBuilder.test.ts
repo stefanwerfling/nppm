@@ -15,7 +15,7 @@ function tarHeader(name: string, size: number): Buffer {
     h.write('0000644 ', 100, 8, 'ascii');
     h.write('0000000 ', 108, 8, 'ascii');
     h.write('0000000 ', 116, 8, 'ascii');
-    h.write(size.toString(8).padStart(11, '0') + ' ', 124, 12, 'ascii');
+    h.write(`${size.toString(8).padStart(11, '0')  } `, 124, 12, 'ascii');
     h.write('00000000000 ', 136, 12, 'ascii');
     h.write('        ', 148, 8, 'ascii');
     h.write('0', 156, 1, 'ascii');
@@ -26,11 +26,11 @@ function tarHeader(name: string, size: number): Buffer {
     for (let i = 0; i < BLOCK; i++) {
         sum += h[i];
     }
-    h.write(sum.toString(8).padStart(6, '0') + '\0 ', 148, 8, 'ascii');
+    h.write(`${sum.toString(8).padStart(6, '0')  }\0 `, 148, 8, 'ascii');
     return h;
 }
 
-function buildTgz(files: {name: string; content: string}[]): Buffer {
+function buildTgz(files: {name: string; content: string;}[]): Buffer {
     const parts: Buffer[] = [];
 
     for (const f of files) {
@@ -60,13 +60,13 @@ describe('FingerprintBuilder', () => {
         fs.rmSync(dir, {recursive: true, force: true});
     });
 
-    it('hashes each tarball file with sha256 and sorts by path', async () => {
+    it('hashes each tarball file with sha256 and sorts by path', async() => {
         const tgz = buildTgz([
             {name: 'package/index.js', content: 'console.log(1)'},
             {name: 'package/package.json', content: '{"name":"x"}'}
         ]);
 
-        const builder = new FingerprintBuilder(null, async () => tgz);
+        const builder = new FingerprintBuilder(null, async() => tgz);
         const fp = await builder.build('x', '1.0.0');
 
         expect(fp).not.toBeNull();
@@ -78,16 +78,16 @@ describe('FingerprintBuilder', () => {
         expect(fp!.files[0].size).toBe('console.log(1)'.length);
     });
 
-    it('returns null for a 404 tarball', async () => {
-        const builder = new FingerprintBuilder(null, async () => null);
+    it('returns null for a 404 tarball', async() => {
+        const builder = new FingerprintBuilder(null, async() => null);
         expect(await builder.build('missing', '0.0.1')).toBeNull();
     });
 
-    it('caches successful fingerprints (no second fetch)', async () => {
+    it('caches successful fingerprints (no second fetch)', async() => {
         const tgz = buildTgz([{name: 'package/a.js', content: 'a'}]);
         let calls = 0;
         const cache = new JsonCache(dir, 60, {permanent: true});
-        const builder = new FingerprintBuilder(cache, async () => {
+        const builder = new FingerprintBuilder(cache, async() => {
             calls++;
             return tgz;
         });
@@ -99,7 +99,7 @@ describe('FingerprintBuilder', () => {
         expect(second).toEqual(first);
     });
 
-    it('extracts deps and scripts from the tarball package.json', async () => {
+    it('extracts deps and scripts from the tarball package.json', async() => {
         const tgz = buildTgz([
             {
                 name: 'package/package.json',
@@ -113,7 +113,7 @@ describe('FingerprintBuilder', () => {
             }
         ]);
 
-        const builder = new FingerprintBuilder(null, async () => tgz);
+        const builder = new FingerprintBuilder(null, async() => tgz);
         const fp = await builder.build('foo', '1.0.0');
 
         expect(fp!.manifest).not.toBeNull();
@@ -123,14 +123,14 @@ describe('FingerprintBuilder', () => {
         expect(fp!.manifest!.scripts).toEqual({postinstall: 'node hack.js'});
     });
 
-    it('stores content only for small non-binary JS files', async () => {
+    it('stores content only for small non-binary JS files', async() => {
         const tgz = buildTgz([
             {name: 'package/index.js', content: 'console.log("hi")'},
             {name: 'package/types.d.ts', content: 'export {};'},
             {name: 'package/README.md', content: '# hi'}
         ]);
 
-        const builder = new FingerprintBuilder(null, async () => tgz);
+        const builder = new FingerprintBuilder(null, async() => tgz);
         const fp = await builder.build('foo', '1.0.0');
 
         const byPath = new Map(fp!.files.map((f) => [f.path, f]));
@@ -139,11 +139,11 @@ describe('FingerprintBuilder', () => {
         expect(byPath.get('README.md')!.content).toBeUndefined();
     });
 
-    it('skips content for JS files past the size cap', async () => {
+    it('skips content for JS files past the size cap', async() => {
         const big = 'x'.repeat(101 * 1024); // 101 KiB > 100 KiB cap
         const tgz = buildTgz([{name: 'package/big.js', content: big}]);
 
-        const builder = new FingerprintBuilder(null, async () => tgz);
+        const builder = new FingerprintBuilder(null, async() => tgz);
         const fp = await builder.build('foo', '1.0.0');
 
         expect(fp!.files[0].path).toBe('big.js');
@@ -151,10 +151,12 @@ describe('FingerprintBuilder', () => {
         expect(fp!.files[0].content).toBeUndefined();
     });
 
-    it('skips content for binary JS-named files', async () => {
-        // Some packages ship `.js.gz` (treated as `.gz` by extension)
-        // but also occasionally ship binaries that someone mis-named.
-        // The NUL-byte sniff keeps them out of the content cache.
+    it('skips content for binary JS-named files', async() => {
+        /*
+         * Some packages ship `.js.gz` (treated as `.gz` by extension)
+         * but also occasionally ship binaries that someone mis-named.
+         * The NUL-byte sniff keeps them out of the content cache.
+         */
         const binary = Buffer.from([0x42, 0x00, 0x42, 0x00, 0x42]);
         const padded = Buffer.alloc(512);
         binary.copy(padded);
@@ -167,7 +169,7 @@ describe('FingerprintBuilder', () => {
             h.write('0000644 ', 100, 8, 'ascii');
             h.write('0000000 ', 108, 8, 'ascii');
             h.write('0000000 ', 116, 8, 'ascii');
-            h.write(binary.length.toString(8).padStart(11, '0') + ' ', 124, 12, 'ascii');
+            h.write(`${binary.length.toString(8).padStart(11, '0')  } `, 124, 12, 'ascii');
             h.write('00000000000 ', 136, 12, 'ascii');
             h.write('        ', 148, 8, 'ascii');
             h.write('0', 156, 1, 'ascii');
@@ -177,30 +179,30 @@ describe('FingerprintBuilder', () => {
             for (let i = 0; i < 512; i++) {
                 sum += h[i];
             }
-            h.write(sum.toString(8).padStart(6, '0') + '\0 ', 148, 8, 'ascii');
+            h.write(`${sum.toString(8).padStart(6, '0')  }\0 `, 148, 8, 'ascii');
             return h;
         })();
 
         const tgz = zlib.gzipSync(Buffer.concat([headerBytes, padded, Buffer.alloc(512)]));
 
-        const builder = new FingerprintBuilder(null, async () => tgz);
+        const builder = new FingerprintBuilder(null, async() => tgz);
         const fp = await builder.build('foo', '1.0.0');
 
         expect(fp!.files[0].content).toBeUndefined();
     });
 
-    it('survives a missing or malformed package.json (manifest = null)', async () => {
+    it('survives a missing or malformed package.json (manifest = null)', async() => {
         const broken = buildTgz([{name: 'package/package.json', content: 'not json'}]);
-        const builder = new FingerprintBuilder(null, async () => broken);
+        const builder = new FingerprintBuilder(null, async() => broken);
         const fp = await builder.build('foo', '1.0.0');
 
         expect(fp!.manifest).toBeNull();
     });
 
-    it('caches 404s so they do not refetch', async () => {
+    it('caches 404s so they do not refetch', async() => {
         let calls = 0;
         const cache = new JsonCache(dir, 60, {permanent: true});
-        const builder = new FingerprintBuilder(cache, async () => {
+        const builder = new FingerprintBuilder(cache, async() => {
             calls++;
             return null;
         });

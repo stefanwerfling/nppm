@@ -34,7 +34,7 @@ type RawPackageJson = {
  */
 type RefDepState = {
     /** Declared deps from `package.json`: name → {bucket, range}. */
-    declared: Map<string, {bucket: DependencyType; range: string}>;
+    declared: Map<string, {bucket: DependencyType; range: string;}>;
     /** Top-level resolved versions from `package-lock.json`: name → version. */
     resolved: Map<string, string>;
     /** True when the lockfile was readable at this ref. */
@@ -83,7 +83,7 @@ export class PrReviewBuilder {
         cwd: string,
         baseRef: string,
         headRef: string,
-        meta: {unid: string; name: string; type: ConfigProjectType}
+        meta: {unid: string; name: string; type: ConfigProjectType;}
     ): Promise<PrReviewReport> {
         const notes: string[] = [];
 
@@ -117,11 +117,11 @@ export class PrReviewBuilder {
             project: meta,
             base: baseRef,
             head: headRef,
-            baseExists,
-            headExists,
-            changes,
-            summary,
-            notes
+            baseExists: baseExists,
+            headExists: headExists,
+            changes: changes,
+            summary: summary,
+            notes: notes
         };
     }
 
@@ -135,7 +135,7 @@ export class PrReviewBuilder {
             return PrReviewBuilder._emptyState();
         }
 
-        const declared = new Map<string, {bucket: DependencyType; range: string}>();
+        const declared = new Map<string, {bucket: DependencyType; range: string;}>();
         PrReviewBuilder._extractBucket(pkgJson.dependencies, DependencyType.dependency, declared);
         PrReviewBuilder._extractBucket(pkgJson.devDependencies, DependencyType.dev, declared);
         PrReviewBuilder._extractBucket(pkgJson.peerDependencies, DependencyType.peer, declared);
@@ -149,30 +149,34 @@ export class PrReviewBuilder {
             resolved = LockfileReader.topLevelVersionMap(lockfile);
             lockfilePresent = true;
         } catch {
-            // Missing lockfile at this ref is fine — the diff still
-            // works off the declared deps. Resolved-version columns
-            // just stay blank.
+            /*
+             * Missing lockfile at this ref is fine — the diff still
+             * works off the declared deps. Resolved-version columns
+             * just stay blank.
+             */
             notes.push(`${side}: package-lock.json not committed at ${ref} — resolved-version delta omitted for that side.`);
         }
 
-        return {declared, resolved, lockfilePresent};
+        return {declared: declared, resolved: resolved, lockfilePresent: lockfilePresent};
     }
 
     private static _extractBucket(
         raw: unknown,
         bucket: DependencyType,
-        out: Map<string, {bucket: DependencyType; range: string}>
+        out: Map<string, {bucket: DependencyType; range: string;}>
     ): void {
         if (!raw || typeof raw !== 'object') {
             return;
         }
         for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
             if (typeof value === 'string') {
-                // First-bucket-wins matches npm semantics — a dep
-                // accidentally listed in both `dependencies` and
-                // `devDependencies` follows the runtime bucket.
+                /*
+                 * First-bucket-wins matches npm semantics — a dep
+                 * accidentally listed in both `dependencies` and
+                 * `devDependencies` follows the runtime bucket.
+                 */
                 if (!out.has(name)) {
-                    out.set(name, {bucket, range: value});
+                    out.set(name, {bucket: bucket, range: value});
                 }
             }
         }
@@ -222,8 +226,8 @@ export class PrReviewBuilder {
             }
 
             out.push({
-                name,
-                kind,
+                name: name,
+                kind: kind,
                 declaredBucketBefore: beforeDecl?.bucket,
                 declaredBucketAfter: afterDecl?.bucket,
                 declaredRangeBefore: beforeDecl?.range,
@@ -240,10 +244,12 @@ export class PrReviewBuilder {
     }
 
     private async _annotateVulns(changes: PrDepChange[]): Promise<void> {
-        // Collect every (name, version) we want vuln data for. Only the
-        // resolved (lockfile-pinned) versions go through OSV — the
-        // declared ranges aren't OSV-queryable as-is.
-        const coords: {name: string; version: string}[] = [];
+        /*
+         * Collect every (name, version) we want vuln data for. Only the
+         * resolved (lockfile-pinned) versions go through OSV — the
+         * declared ranges aren't OSV-queryable as-is.
+         */
+        const coords: {name: string; version: string;}[] = [];
         for (const c of changes) {
             if (c.resolvedBefore) {
                 coords.push({name: c.name, version: c.resolvedBefore});
@@ -290,7 +296,7 @@ export class PrReviewBuilder {
             totalVulnsAdded += c.vulnsAdded.length;
             totalVulnsRemoved += c.vulnsRemoved.length;
         }
-        return {added, removed, updated, bucketChanged, totalVulnsAdded, totalVulnsRemoved};
+        return {added: added, removed: removed, updated: updated, bucketChanged: bucketChanged, totalVulnsAdded: totalVulnsAdded, totalVulnsRemoved: totalVulnsRemoved};
     }
 
     private static _compareChanges(a: PrDepChange, b: PrDepChange): number {
@@ -308,7 +314,7 @@ export class PrReviewBuilder {
     }
 
     private static _emptyReport(
-        meta: {unid: string; name: string; type: ConfigProjectType},
+        meta: {unid: string; name: string; type: ConfigProjectType;},
         base: string,
         head: string,
         baseExists: boolean,
@@ -317,10 +323,10 @@ export class PrReviewBuilder {
     ): PrReviewReport {
         return {
             project: meta,
-            base,
-            head,
-            baseExists,
-            headExists,
+            base: base,
+            head: head,
+            baseExists: baseExists,
+            headExists: headExists,
             changes: [],
             summary: {
                 added: 0,
@@ -330,7 +336,7 @@ export class PrReviewBuilder {
                 totalVulnsAdded: 0,
                 totalVulnsRemoved: 0
             },
-            notes
+            notes: notes
         };
     }
 
@@ -344,7 +350,7 @@ export class PrReviewBuilder {
             isRepo: (cwd) => fs.existsSync(path.join(cwd, '.git')),
             refExists: (cwd, ref) => {
                 try {
-                    execFileSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], {...opts, cwd});
+                    execFileSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], {...opts, cwd: cwd});
                     return true;
                 } catch {
                     return false;
@@ -353,8 +359,9 @@ export class PrReviewBuilder {
             show: (cwd, ref, file) => execFileSync(
                 'git',
                 ['show', `${ref}:${file}`],
-                {...opts, cwd}
+                {...opts, cwd: cwd}
             )
         };
     }
+
 }

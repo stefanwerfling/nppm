@@ -18,8 +18,10 @@ describe('TyposquatScanner.levenshtein', () => {
     });
 
     it('honours the maxDist short-circuit', () => {
-        // Two strings whose true distance is 6 — but with maxDist=2
-        // we should bail out after reaching 3 (=maxDist+1).
+        /*
+         * Two strings whose true distance is 6 — but with maxDist=2
+         * we should bail out after reaching 3 (=maxDist+1).
+         */
         const out = TyposquatScanner.levenshtein('aaaaaa', 'bbbbbb', 2);
         expect(out).toBeGreaterThan(2);
     });
@@ -55,8 +57,10 @@ describe('TyposquatScanner.classify', () => {
     });
 
     it('flips to risk on any non-ASCII character, even when distance would say unrelated', () => {
-        // Cyrillic 'е' (U+0435) for ASCII 'e' inside something not on
-        // the list — still a homoglyph attack signal.
+        /*
+         * Cyrillic 'е' (U+0435) for ASCII 'e' inside something not on
+         * the list — still a homoglyph attack signal.
+         */
         const f = TyposquatScanner.classify('totally-niche-еvil-name');
         expect(f.level).toBe(TyposquatLevel.risk);
         expect(f.hasConfusables).toBe(true);
@@ -71,9 +75,11 @@ describe('TyposquatScanner.classify', () => {
     });
 
     it('does not match a popular entry when the byte string is unicode-encoded', () => {
-        // The bytes for cyrillic 'expreѕs' differ from ASCII
-        // 'express' even though the glyph looks identical, so
-        // POPULAR_SET.has(...) must return false.
+        /*
+         * The bytes for cyrillic 'expreѕs' differ from ASCII
+         * 'express' even though the glyph looks identical, so
+         * POPULAR_SET.has(...) must return false.
+         */
         const f = TyposquatScanner.classify('expreѕs');
         expect(f.level).not.toBe(TyposquatLevel.exact);
     });

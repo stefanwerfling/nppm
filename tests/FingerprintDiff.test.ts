@@ -2,10 +2,10 @@ import {describe, expect, it} from 'vitest';
 import {PackageFingerprint} from '../backend/Fingerprint/Fingerprint.js';
 import {FingerprintDiffer} from '../backend/Fingerprint/FingerprintDiff.js';
 
-function fp(name: string, version: string, files: {path: string; sha256: string}[]): PackageFingerprint {
+function fp(name: string, version: string, files: {path: string; sha256: string;}[]): PackageFingerprint {
     return {
-        name,
-        version,
+        name: name,
+        version: version,
         files: files.map((f) => ({path: f.path, sha256: f.sha256, size: 1})),
         manifest: null,
         fetchedAt: 0

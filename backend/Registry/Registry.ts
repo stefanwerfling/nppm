@@ -31,7 +31,7 @@ export type RegistryPublisher = {
 export type RegistryDist = {
     tarball: string;
     integrity?: string;
-    signatures?: {keyid: string; sig: string}[];
+    signatures?: {keyid: string; sig: string;}[];
     attestations?: {
         url: string;
         provenance?: {
@@ -163,7 +163,7 @@ export class Registry {
                 headers.Authorization = `Bearer ${this._auth}`;
             }
 
-            const res = await fetch(url, {headers});
+            const res = await fetch(url, {headers: headers});
 
             if (!res.ok) {
                 return null;
@@ -171,7 +171,7 @@ export class Registry {
 
             const raw = await res.json() as {
                 name?: string;
-                'dist-tags'?: {latest?: string};
+                'dist-tags'?: {latest?: string;};
                 versions?: Record<string, unknown>;
                 time?: Record<string, string>;
                 repository?: unknown;
@@ -215,7 +215,7 @@ export class Registry {
 
         const workers: Promise<void>[] = [];
 
-        const runOne = async (): Promise<void> => {
+        const runOne = async(): Promise<void> => {
             while (queue.length > 0) {
                 const name = queue.shift();
 
@@ -248,7 +248,7 @@ export class Registry {
             return raw;
         }
         if (raw && typeof raw === 'object') {
-            const url = (raw as {url?: unknown}).url;
+            const url = (raw as {url?: unknown;}).url;
             if (typeof url === 'string') {
                 return url;
             }
@@ -271,24 +271,24 @@ export class Registry {
             return license;
         }
         if (license && typeof license === 'object') {
-            const type = (license as {type?: unknown}).type;
+            const type = (license as {type?: unknown;}).type;
             if (typeof type === 'string' && type.length > 0) {
                 return type;
             }
         }
         if (Array.isArray(licenses) && licenses.length > 0) {
             const ids = licenses
-                .map((l) => {
-                    if (typeof l === 'string') {
-                        return l;
-                    }
-                    if (l && typeof l === 'object') {
-                        const t = (l as {type?: unknown}).type;
-                        return typeof t === 'string' ? t : null;
-                    }
-                    return null;
-                })
-                .filter((s): s is string => typeof s === 'string' && s.length > 0);
+            .map((l) => {
+                if (typeof l === 'string') {
+                    return l;
+                }
+                if (l && typeof l === 'object') {
+                    const t = (l as {type?: unknown;}).type;
+                    return typeof t === 'string' ? t : null;
+                }
+                return null;
+            })
+            .filter((s): s is string => typeof s === 'string' && s.length > 0);
             if (ids.length === 1) {
                 return ids[0];
             }
@@ -327,11 +327,11 @@ export class Registry {
             if (!entry || typeof entry !== 'object') {
                 continue;
             }
-            const dist = (entry as {dist?: unknown}).dist;
+            const dist = (entry as {dist?: unknown;}).dist;
             if (!dist || typeof dist !== 'object') {
                 continue;
             }
-            const d = dist as {tarball?: unknown; integrity?: unknown};
+            const d = dist as {tarball?: unknown; integrity?: unknown;};
             if (typeof d.tarball !== 'string' || d.tarball.length === 0) {
                 continue;
             }
@@ -340,22 +340,22 @@ export class Registry {
                 distEntry.integrity = d.integrity;
             }
             const sigs = Registry._extractSignatures(
-                (d as {signatures?: unknown}).signatures
+                (d as {signatures?: unknown;}).signatures
             );
             if (sigs) {
                 distEntry.signatures = sigs;
             }
             const att = Registry._extractAttestations(
-                (d as {attestations?: unknown}).attestations
+                (d as {attestations?: unknown;}).attestations
             );
             if (att) {
                 distEntry.attestations = att;
             }
-            const sz = (d as {unpackedSize?: unknown}).unpackedSize;
+            const sz = (d as {unpackedSize?: unknown;}).unpackedSize;
             if (typeof sz === 'number' && Number.isFinite(sz) && sz >= 0) {
                 distEntry.unpackedSize = sz;
             }
-            const fc = (d as {fileCount?: unknown}).fileCount;
+            const fc = (d as {fileCount?: unknown;}).fileCount;
             if (typeof fc === 'number' && Number.isFinite(fc) && fc >= 0) {
                 distEntry.fileCount = fc;
             }
@@ -384,7 +384,7 @@ export class Registry {
             if (!entry || typeof entry !== 'object') {
                 continue;
             }
-            const dep = (entry as {deprecated?: unknown}).deprecated;
+            const dep = (entry as {deprecated?: unknown;}).deprecated;
             if (typeof dep === 'string' && dep.length > 0) {
                 out[version] = dep;
                 any = true;
@@ -407,7 +407,7 @@ export class Registry {
             if (!entry || typeof entry !== 'object') {
                 continue;
             }
-            const maintainers = (entry as {maintainers?: unknown}).maintainers;
+            const maintainers = (entry as {maintainers?: unknown;}).maintainers;
             if (Array.isArray(maintainers)) {
                 out[version] = maintainers.length;
                 any = true;
@@ -434,14 +434,16 @@ export class Registry {
             if (!entry || typeof entry !== 'object') {
                 continue;
             }
-            const deps = (entry as {dependencies?: unknown}).dependencies;
+            const deps = (entry as {dependencies?: unknown;}).dependencies;
             if (deps && typeof deps === 'object') {
                 out[version] = Object.keys(deps as Record<string, unknown>).length;
                 any = true;
             } else {
-                // Version object exists but no dependencies map — that
-                // *is* "0 runtime deps", record it explicitly so the
-                // Trends chart sees a real datapoint instead of a gap.
+                /*
+                 * Version object exists but no dependencies map — that
+                 * *is* "0 runtime deps", record it explicitly so the
+                 * Trends chart sees a real datapoint instead of a gap.
+                 */
                 out[version] = 0;
                 any = true;
             }
@@ -449,16 +451,16 @@ export class Registry {
         return any ? out : undefined;
     }
 
-    private static _extractSignatures(raw: unknown): {keyid: string; sig: string}[]|undefined {
+    private static _extractSignatures(raw: unknown): {keyid: string; sig: string;}[]|undefined {
         if (!Array.isArray(raw) || raw.length === 0) {
             return undefined;
         }
-        const out: {keyid: string; sig: string}[] = [];
+        const out: {keyid: string; sig: string;}[] = [];
         for (const item of raw) {
             if (!item || typeof item !== 'object') {
                 continue;
             }
-            const o = item as {keyid?: unknown; sig?: unknown};
+            const o = item as {keyid?: unknown; sig?: unknown;};
             if (typeof o.keyid === 'string' && typeof o.sig === 'string') {
                 out.push({keyid: o.keyid, sig: o.sig});
             }
@@ -470,13 +472,13 @@ export class Registry {
         if (!raw || typeof raw !== 'object') {
             return undefined;
         }
-        const o = raw as {url?: unknown; provenance?: unknown};
+        const o = raw as {url?: unknown; provenance?: unknown;};
         if (typeof o.url !== 'string' || o.url.length === 0) {
             return undefined;
         }
         const out: NonNullable<RegistryDist['attestations']> = {url: o.url};
         if (o.provenance && typeof o.provenance === 'object') {
-            const p = o.provenance as {predicateType?: unknown};
+            const p = o.provenance as {predicateType?: unknown;};
             if (typeof p.predicateType === 'string' && p.predicateType.length > 0) {
                 out.provenance = {predicateType: p.predicateType};
             } else {
@@ -498,11 +500,11 @@ export class Registry {
             if (!entry || typeof entry !== 'object') {
                 continue;
             }
-            const user = (entry as {_npmUser?: unknown})._npmUser;
+            const user = (entry as {_npmUser?: unknown;})._npmUser;
             if (!user || typeof user !== 'object') {
                 continue;
             }
-            const u = user as {name?: unknown; email?: unknown};
+            const u = user as {name?: unknown; email?: unknown;};
             if (typeof u.name !== 'string' || u.name.length === 0) {
                 continue;
             }
@@ -514,4 +516,5 @@ export class Registry {
 
         return any ? out : undefined;
     }
+
 }

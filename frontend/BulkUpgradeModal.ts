@@ -123,9 +123,11 @@ export class BulkUpgradeModal {
         const actionable = preview.results.filter(BulkUpgradeModal._isActionable);
         const skipped = preview.results.filter((r) => !BulkUpgradeModal._isActionable(r));
 
-        // Group actionable picks by project so the user sees the
-        // per-project blast radius before clicking apply.
-        const groups = new Map<string, {name: string; entries: ApiBulkUpgradePreviewResult[]}>();
+        /*
+         * Group actionable picks by project so the user sees the
+         * per-project blast radius before clicking apply.
+         */
+        const groups = new Map<string, {name: string; entries: ApiBulkUpgradePreviewResult[];}>();
         for (const r of actionable) {
             const unid = r.pick.projectUnid;
             const projName = 'preview' in r ? r.preview.project.name : unid;
@@ -212,7 +214,7 @@ export class BulkUpgradeModal {
         return box;
     }
 
-    private _renderPickRow(entry: {pick: ApiBulkUpgradePick; preview: ApiUpgradePreviewResponse}): HTMLElement {
+    private _renderPickRow(entry: {pick: ApiBulkUpgradePick; preview: ApiUpgradePreviewResponse;}): HTMLElement {
         const row = document.createElement('div');
         row.className = 'bumd-pick';
 
@@ -273,7 +275,7 @@ export class BulkUpgradeModal {
             }
             const line = document.createElement('div');
             line.className = 'bumd-skipped-row';
-            line.textContent = `${r.pick.name} · ${r.skipped}${r.msg ? ' — ' + r.msg : ''}`;
+            line.textContent = `${r.pick.name} · ${r.skipped}${r.msg ? ` — ${  r.msg}` : ''}`;
             box.appendChild(line);
         }
         return box;
@@ -338,7 +340,7 @@ export class BulkUpgradeModal {
             (btn as HTMLButtonElement).disabled = true;
         }
 
-        const body: ApiBulkUpgradeApplyRequest = {picks: this._picks, mode};
+        const body: ApiBulkUpgradeApplyRequest = {picks: this._picks, mode: mode};
         const abort = new AbortController();
         this._activeAbort = abort;
         try {
@@ -353,40 +355,40 @@ export class BulkUpgradeModal {
                 return;
             }
             await this._consumeSse(res.body, {
-                'project-start': (d: {unid: string; name: string; picks: number}) => {
+                'project-start': (d: {unid: string; name: string; picks: number;}) => {
                     this._appendLog(`\n── ${d.name} (${d.picks} pick${d.picks === 1 ? '' : 's'}) ──\n`);
                 },
-                'project-skip': (d: {unid: string; reason: string}) => {
+                'project-skip': (d: {unid: string; reason: string;}) => {
                     this._appendLog(`  ⤳ ${I18n.t('Project skipped: {reason}', {reason: d.reason})}\n`);
                 },
-                backup: (d: {unid: string; dir: string; files: string[]}) => {
+                'backup': (d: {unid: string; dir: string; files: string[];}) => {
                     this._appendLog(`  ✓ ${I18n.t('Backup saved to {dir}', {dir: d.dir})}\n`);
                     for (const f of d.files) {
                         this._appendLog(`    · ${f}\n`);
                     }
                 },
-                'pick-result': (d: {unid: string; name: string; rel: string; changed: boolean}) => {
+                'pick-result': (d: {unid: string; name: string; rel: string; changed: boolean;}) => {
                     this._appendLog(
                         d.changed
                             ? `  ✓ ${d.name} → ${d.rel}\n`
                             : `  ⤳ ${d.name} ${I18n.t('(no change)')}\n`
                     );
                 },
-                start: (d: {unid: string; command: string; cwd: string}) => {
+                'start': (d: {unid: string; command: string; cwd: string;}) => {
                     this._appendLog(`\n  $ ${d.command}\n    (cwd: ${d.cwd})\n\n`);
                 },
-                stdout: (d: {unid: string; chunk: string}) => this._appendLog(d.chunk),
-                stderr: (d: {unid: string; chunk: string}) => this._appendLog(d.chunk),
-                end: (d: {unid: string; exitCode: number|null}) => {
+                'stdout': (d: {unid: string; chunk: string;}) => this._appendLog(d.chunk),
+                'stderr': (d: {unid: string; chunk: string;}) => this._appendLog(d.chunk),
+                'end': (d: {unid: string; exitCode: number|null;}) => {
                     this._appendLog(
                         `\n  ${I18n.t('Install finished (exit {code})', {code: d.exitCode ?? 'null'})}\n`
                     );
                 },
-                error: (d: {unid?: string; msg: string}) => {
+                'error': (d: {unid?: string; msg: string;}) => {
                     const scope = d.unid ? ` [${d.unid}]` : '';
-                    this._appendLog(`\n  ${I18n.t('Error{scope}: {msg}', {scope, msg: d.msg})}\n`);
+                    this._appendLog(`\n  ${I18n.t('Error{scope}: {msg}', {scope: scope, msg: d.msg})}\n`);
                 },
-                done: (d: {totalProjects: number}) => {
+                'done': (d: {totalProjects: number;}) => {
                     this._appendLog(
                         `\n${I18n.t('Bulk update finished — {n} project(s) processed', {n: d.totalProjects})}\n`
                     );
@@ -472,4 +474,5 @@ export class BulkUpgradeModal {
     private static _isActionable(r: ApiBulkUpgradePreviewResult): boolean {
         return 'preview' in r;
     }
+
 }

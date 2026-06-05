@@ -101,9 +101,11 @@ export class TemplatesView {
             return;
         }
 
-        // Project columns come from the first row's cells — same order
-        // across every row (the backend iterates the projects map
-        // identically).
+        /*
+         * Project columns come from the first row's cells — same order
+         * across every row (the backend iterates the projects map
+         * identically).
+         */
         const projects = data.rows[0].cells.map((c) => ({unid: c.projectUnid, name: c.projectName}));
 
         const tableWrap = document.createElement('div');
@@ -201,13 +203,13 @@ export class TemplatesView {
         const meta = document.createElement('div');
         meta.className = 'tpv-tpl-meta';
         const parts: string[] = [];
-        if (row.template.runtimeCount > 0) parts.push(`runtime ${row.template.runtimeCount}`);
-        if (row.template.devCount > 0) parts.push(`dev ${row.template.devCount}`);
-        if (row.template.peerCount > 0) parts.push(`peer ${row.template.peerCount}`);
-        if (row.template.optionalCount > 0) parts.push(`opt ${row.template.optionalCount}`);
-        if (row.template.forbiddenCount > 0) parts.push(`forbidden ${row.template.forbiddenCount}`);
-        if (row.template.hasRoot) parts.push('root');
-        if (row.template.mode === 'strict') parts.push('strict');
+        if (row.template.runtimeCount > 0) {parts.push(`runtime ${row.template.runtimeCount}`);}
+        if (row.template.devCount > 0) {parts.push(`dev ${row.template.devCount}`);}
+        if (row.template.peerCount > 0) {parts.push(`peer ${row.template.peerCount}`);}
+        if (row.template.optionalCount > 0) {parts.push(`opt ${row.template.optionalCount}`);}
+        if (row.template.forbiddenCount > 0) {parts.push(`forbidden ${row.template.forbiddenCount}`);}
+        if (row.template.hasRoot) {parts.push('root');}
+        if (row.template.mode === 'strict') {parts.push('strict');}
         meta.textContent = parts.join(' · ');
         tplCell.appendChild(meta);
         tr.appendChild(tplCell);
@@ -294,7 +296,7 @@ export class TemplatesView {
         addBtn.type = 'button';
         addBtn.className = 'umd-btn umd-btn-primary';
         addBtn.textContent = I18n.t('Add');
-        addBtn.addEventListener('click', async () => {
+        addBtn.addEventListener('click', async() => {
             const url = input.value.trim();
             if (!url) {
                 status.textContent = I18n.t('URL is required');
@@ -332,4 +334,5 @@ export class TemplatesView {
         document.body.appendChild(backdrop);
         input.focus();
     }
+
 }

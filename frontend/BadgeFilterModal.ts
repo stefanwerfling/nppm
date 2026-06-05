@@ -144,14 +144,18 @@ export class BadgeFilterModal {
         });
         row.appendChild(check);
 
-        // Wrapper around the sample so the badge keeps its inline
-        // styling — class list comes verbatim from the catalogue so
-        // colours match the matrix exactly.
+        /*
+         * Wrapper around the sample so the badge keeps its inline
+         * styling — class list comes verbatim from the catalogue so
+         * colours match the matrix exactly.
+         */
         const sample = document.createElement('span');
         sample.className = meta.sampleClasses;
         sample.textContent = meta.sampleText;
-        // The sample is purely visual inside the modal — strip the
-        // cursor: pointer the matrix uses on its real badges.
+        /*
+         * The sample is purely visual inside the modal — strip the
+         * cursor: pointer the matrix uses on its real badges.
+         */
         sample.style.cursor = 'default';
         sample.style.marginLeft = '0';
         row.appendChild(sample);
@@ -209,4 +213,5 @@ export class BadgeFilterModal {
             }
         });
     }
+
 }

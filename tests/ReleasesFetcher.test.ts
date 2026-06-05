@@ -36,12 +36,14 @@ describe('parseGithubRepo', () => {
 });
 
 class FakeRegistry extends Registry {
+
     constructor(private readonly _data: Record<string, RegistryPackage|null>, dir: string) {
         super('unused', new JsonCache(dir, 60));
     }
     public async fetchOne(name: string) {
         return this._data[name] ?? null;
     }
+
 }
 
 describe('ReleasesFetcher', () => {
@@ -55,13 +57,13 @@ describe('ReleasesFetcher', () => {
         fs.rmSync(dir, {recursive: true, force: true});
     });
 
-    it('returns null when the registry has no record', async () => {
+    it('returns null when the registry has no record', async() => {
         const reg = new FakeRegistry({}, dir);
         const fetcher = new ReleasesFetcher(reg, null);
         expect(await fetcher.fetch('missing')).toBeNull();
     });
 
-    it('builds a registry-only release list when there is no github repo', async () => {
+    it('builds a registry-only release list when there is no github repo', async() => {
         const reg = new FakeRegistry({
             foo: {
                 name: 'foo',
@@ -81,7 +83,7 @@ describe('ReleasesFetcher', () => {
         expect(out.releases[0].body).toBeUndefined();
     });
 
-    it('merges GitHub release notes onto matching versions', async () => {
+    it('merges GitHub release notes onto matching versions', async() => {
         const reg = new FakeRegistry({
             foo: {
                 name: 'foo',
@@ -95,7 +97,7 @@ describe('ReleasesFetcher', () => {
             }
         }, dir);
 
-        const ghFetcher = async (_owner: string, _repo: string): Promise<GithubRelease[]> => [
+        const ghFetcher = async(_owner: string, _repo: string): Promise<GithubRelease[]> => [
             {
                 tag_name: 'v1.0.0',
                 name: '1.0.0 - GA',
@@ -105,7 +107,7 @@ describe('ReleasesFetcher', () => {
             }
         ];
 
-        const fetcher = new ReleasesFetcher(reg, null, {ghFetcher});
+        const fetcher = new ReleasesFetcher(reg, null, {ghFetcher: ghFetcher});
         const out = (await fetcher.fetch('foo'))!;
 
         const v100 = out.releases.find((r) => r.version === '1.0.0')!;
@@ -118,7 +120,7 @@ describe('ReleasesFetcher', () => {
         expect(v090.body).toBeUndefined();
     });
 
-    it('falls back to registry-only data when GitHub is unreachable', async () => {
+    it('falls back to registry-only data when GitHub is unreachable', async() => {
         const reg = new FakeRegistry({
             foo: {
                 name: 'foo',
@@ -128,16 +130,16 @@ describe('ReleasesFetcher', () => {
                 repository: 'git+https://github.com/foo/foo.git'
             }
         }, dir);
-        const ghFetcher = async () => {
+        const ghFetcher = async() => {
             throw new Error('rate limited');
         };
-        const fetcher = new ReleasesFetcher(reg, null, {ghFetcher});
+        const fetcher = new ReleasesFetcher(reg, null, {ghFetcher: ghFetcher});
         const out = (await fetcher.fetch('foo'))!;
         expect(out.releases[0].body).toBeUndefined();
         expect(out.releases[0].publishedAt).toBe('2024-01-01T00:00:00Z');
     });
 
-    it('caches successful responses so a second fetch makes no network calls', async () => {
+    it('caches successful responses so a second fetch makes no network calls', async() => {
         const reg = new FakeRegistry({
             foo: {name: 'foo', latest: '1.0.0', versions: ['1.0.0']}
         }, dir);
@@ -145,10 +147,12 @@ describe('ReleasesFetcher', () => {
         const cache = new JsonCache(dir, 60);
         const fetcher = new ReleasesFetcher(reg, cache);
 
-        // Wrap registry to count calls (cache should suppress the
-        // second registry.fetchOne too).
+        /*
+         * Wrap registry to count calls (cache should suppress the
+         * second registry.fetchOne too).
+         */
         const origFetchOne = reg.fetchOne.bind(reg);
-        reg.fetchOne = async (name: string) => {
+        reg.fetchOne = async(name: string) => {
             calls++;
             return origFetchOne(name);
         };

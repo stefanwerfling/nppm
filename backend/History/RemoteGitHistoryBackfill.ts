@@ -68,9 +68,11 @@ export class RemoteGitHistoryBackfill {
     ): Promise<GitBackfillResult> {
         const headSha = await this.headSha(project);
 
-        // Lockfile-first. When non-empty, ignore package.json
-        // entirely — same-commit transitions between the two would
-        // create false diffs.
+        /*
+         * Lockfile-first. When non-empty, ignore package.json
+         * entirely — same-commit transitions between the two would
+         * create false diffs.
+         */
         const lockSnapshots = await this._collectSnapshots(
             project,
             'package-lock.json',
@@ -79,13 +81,15 @@ export class RemoteGitHistoryBackfill {
         );
         if (lockSnapshots.length > 0) {
             const {entries, finalState} = BackfillCommon.snapshotsToEntries(lockSnapshots);
-            return {headSha, entries, finalState, source: 'committed'};
+            return {headSha: headSha, entries: entries, finalState: finalState, source: 'committed'};
         }
 
-        // No committed lockfile anywhere — fall back to tracking
-        // declared-deps drift via package.json. Versions are ranges,
-        // not concrete; downstream code (TimelineBuilder) filters
-        // them out of OSV stats.
+        /*
+         * No committed lockfile anywhere — fall back to tracking
+         * declared-deps drift via package.json. Versions are ranges,
+         * not concrete; downstream code (TimelineBuilder) filters
+         * them out of OSV stats.
+         */
         const pkgSnapshots = await this._collectSnapshots(
             project,
             'package.json',
@@ -93,11 +97,11 @@ export class RemoteGitHistoryBackfill {
             onProgress
         );
         if (pkgSnapshots.length === 0) {
-            return {headSha, entries: [], finalState: [], source: 'committed'};
+            return {headSha: headSha, entries: [], finalState: [], source: 'committed'};
         }
 
         const {entries, finalState} = BackfillCommon.snapshotsToEntries(pkgSnapshots);
-        return {headSha, entries, finalState, source: 'package-json'};
+        return {headSha: headSha, entries: entries, finalState: finalState, source: 'package-json'};
     }
 
     /**
@@ -146,8 +150,9 @@ export class RemoteGitHistoryBackfill {
                 continue;
             }
 
-            snapshots.push({sha: c.sha, timestamp: c.timestamp, packages, source});
+            snapshots.push({sha: c.sha, timestamp: c.timestamp, packages: packages, source: source});
         }
         return snapshots;
     }
+
 }

@@ -14,9 +14,10 @@ export class Version {
      */
     public static cleanRange(range: string): string {
         return range
-            .trim()
-            .replace(/^[\^~=v]+/, '')
-            .replace(/^>=\s*/, '')
-            .split(/\s/)[0];
+        .trim()
+        .replace(/^[\^~=v]+/, '')
+        .replace(/^>=\s*/, '')
+        .split(/\s/)[0];
     }
+
 }

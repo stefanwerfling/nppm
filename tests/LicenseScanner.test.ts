@@ -44,9 +44,11 @@ describe('LicenseScanner.classify — SPDX expressions', () => {
     it('picks the most permissive for OR expressions', () => {
         // user can pick MIT → permissive wins
         expect(s.classify('(MIT OR GPL-3.0-only)').severity).toBe(LicenseSeverity.permissive);
-        // unknown beats strong-copyleft in the rank ladder
-        // (unknown might be permissive on inspection — we can't tell,
-        // but it's not certainly worse than GPL); user picks unknown.
+        /*
+         * unknown beats strong-copyleft in the rank ladder
+         * (unknown might be permissive on inspection — we can't tell,
+         * but it's not certainly worse than GPL); user picks unknown.
+         */
         expect(s.classify('(GPL-3.0-only OR Acme-Custom)').severity).toBe(LicenseSeverity.unknown);
         // both copyleft: strong-copyleft is worse, so user picks weak.
         expect(s.classify('(GPL-3.0-only OR LGPL-3.0-only)').severity).toBe(LicenseSeverity.weakCopyleft);

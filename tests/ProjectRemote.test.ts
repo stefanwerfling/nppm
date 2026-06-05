@@ -43,16 +43,17 @@ class FakeRemote extends ProjectRemote {
     public async getHeadSha(): Promise<string|null> {
         return null;
     }
+
 }
 
 describe('ProjectRemote', () => {
 
-    it('throws when the root package.json is missing', async () => {
+    it('throws when the root package.json is missing', async() => {
         const r = new FakeRemote(new Map(), new Map());
         await expect(r.loadManifests()).rejects.toThrow(/package.json missing/);
     });
 
-    it('reads the root manifest and splits deps into buckets', async () => {
+    it('reads the root manifest and splits deps into buckets', async() => {
         const files = new Map<string, string>([
             ['package.json', JSON.stringify({
                 name: 'r',
@@ -66,10 +67,10 @@ describe('ProjectRemote', () => {
         const manifests = await r.loadManifests();
         expect(manifests).toHaveLength(1);
         expect(manifests[0].dependencies.map((d) => `${d.name}@${d.type}`).sort())
-            .toEqual(['a@dependency', 'b@dev']);
+        .toEqual(['a@dependency', 'b@dev']);
     });
 
-    it('expands packages/* workspaces via listDirectory', async () => {
+    it('expands packages/* workspaces via listDirectory', async() => {
         const files = new Map<string, string>([
             ['package.json', JSON.stringify({
                 name: 'root',
@@ -98,7 +99,7 @@ describe('ProjectRemote', () => {
         ]);
     });
 
-    it('silently drops workspaces whose package.json is missing', async () => {
+    it('silently drops workspaces whose package.json is missing', async() => {
         const files = new Map<string, string>([
             ['package.json', JSON.stringify({
                 name: 'root',

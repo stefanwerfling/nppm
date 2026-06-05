@@ -8,17 +8,17 @@ import {STICKY_MARKER} from '../cli/ActionFormat.js';
  * method so the test can answer different things for the
  * list-comments GET and the patch / post.
  */
-type Cap = {url: string; method: string; headers: Headers; body: string|null};
+type Cap = {url: string; method: string; headers: Headers; body: string|null;};
 
 function fetchDouble(
-    routes: {match: (url: string, init?: RequestInit) => boolean; body: unknown; status?: number}[]
-): {fetchFn: typeof fetch; calls: Cap[]} {
+    routes: {match: (url: string, init?: RequestInit) => boolean; body: unknown; status?: number;}[]
+): {fetchFn: typeof fetch; calls: Cap[];} {
     const calls: Cap[] = [];
-    const fetchFn = (async (input: RequestInfo|URL, init?: RequestInit) => {
+    const fetchFn = (async(input: RequestInfo|URL, init?: RequestInit) => {
         const url = typeof input === 'string' ? input : input.toString();
         const method = init?.method ?? 'GET';
         calls.push({
-            url, method,
+            url: url, method: method,
             headers: new Headers(init?.headers as HeadersInit ?? {}),
             body: typeof init?.body === 'string' ? init.body : null
         });
@@ -26,16 +26,16 @@ function fetchDouble(
         const status = route?.status ?? 200;
         return {
             ok: status >= 200 && status < 300,
-            status,
+            status: status,
             statusText: status >= 200 && status < 300 ? 'OK' : 'Error',
-            json: async () => route?.body ?? {}
+            json: async() => route?.body ?? {}
         } as unknown as Response;
     }) as typeof fetch;
-    return {fetchFn, calls};
+    return {fetchFn: fetchFn, calls: calls};
 }
 
 describe('GithubClient.upsertStickyComment', () => {
-    it('posts a fresh comment when no marker is found', async () => {
+    it('posts a fresh comment when no marker is found', async() => {
         const {fetchFn, calls} = fetchDouble([
             {match: (u, i) => u.includes('/comments') && (i?.method ?? 'GET') === 'GET',
                 body: [{id: 1, body: 'unrelated comment'}]},
@@ -51,7 +51,7 @@ describe('GithubClient.upsertStickyComment', () => {
         expect(calls[1].body).toContain(STICKY_MARKER);
     });
 
-    it('patches an existing sticky comment in place', async () => {
+    it('patches an existing sticky comment in place', async() => {
         const {fetchFn, calls} = fetchDouble([
             {match: (u, i) => u.includes('/comments') && (i?.method ?? 'GET') === 'GET',
                 body: [
@@ -70,7 +70,7 @@ describe('GithubClient.upsertStickyComment', () => {
         expect(patch?.body).toContain('new body');
     });
 
-    it('returns null when the list endpoint refuses', async () => {
+    it('returns null when the list endpoint refuses', async() => {
         const {fetchFn} = fetchDouble([
             {match: () => true, body: {}, status: 401}
         ]);
@@ -80,7 +80,7 @@ describe('GithubClient.upsertStickyComment', () => {
         expect(id).toBeNull();
     });
 
-    it('sends Bearer auth + correct API version headers', async () => {
+    it('sends Bearer auth + correct API version headers', async() => {
         const {fetchFn, calls} = fetchDouble([
             {match: () => true, body: []}
         ]);

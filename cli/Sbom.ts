@@ -33,10 +33,12 @@ export type SbomCliArgs = {
 };
 
 export class SbomCliArgsError extends Error {
+
     constructor(message: string) {
         super(message);
         this.name = 'SbomCliArgsError';
     }
+
 }
 
 /**
@@ -105,6 +107,7 @@ export class SbomCliArgsParser {
 
         return out;
     }
+
 }
 
 export const SBOM_HELP_TEXT = `nppm sbom — Software Bill of Materials (CycloneDX / SPDX)
@@ -182,7 +185,7 @@ export class SbomRunner {
             const payload = args.format === SbomFormat.cyclonedx
                 ? CycloneDxBuilder.build(data, '1')
                 : SpdxBuilder.build(data, '1');
-            const text = JSON.stringify(payload, null, 2) + '\n';
+            const text = `${JSON.stringify(payload, null, 2)  }\n`;
 
             if (args.output) {
                 fs.writeFileSync(path.resolve(io.cwd, args.output), text);
@@ -258,4 +261,5 @@ export class SbomRunner {
         }
         return loaded.projects[0];
     }
+
 }

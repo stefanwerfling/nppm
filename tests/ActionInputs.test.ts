@@ -2,11 +2,11 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {readInputs, readPrContext} from '../cli/Action.js';
+import {ActionRunner} from '../cli/Action.js';
 
 describe('readInputs', () => {
     it('returns defaults when no INPUT_ env vars are set', () => {
-        const i = readInputs({});
+        const i = ActionRunner.readInputs({});
         expect(i.failOn).toBe('risk');
         expect(i.sarifOutput).toBe('nppm.sarif');
         expect(i.prComment).toBe(true);
@@ -15,7 +15,7 @@ describe('readInputs', () => {
     });
 
     it('reads INPUT_* env vars with GitHub Actions kebab→snake mapping', () => {
-        const i = readInputs({
+        const i = ActionRunner.readInputs({
             INPUT_FAIL_ON: 'warn',
             INPUT_SARIF_OUTPUT: 'out/x.sarif',
             INPUT_PR_COMMENT: 'true',
@@ -29,12 +29,12 @@ describe('readInputs', () => {
     });
 
     it('treats INPUT_PR_COMMENT=false as opt-out', () => {
-        const i = readInputs({INPUT_PR_COMMENT: 'false'});
+        const i = ActionRunner.readInputs({INPUT_PR_COMMENT: 'false'});
         expect(i.prComment).toBe(false);
     });
 
     it('treats empty INPUT_ strings as absent (GitHub Actions sends empties for unfilled inputs)', () => {
-        const i = readInputs({INPUT_CONFIG_PATH: '', INPUT_GITHUB_TOKEN: ''});
+        const i = ActionRunner.readInputs({INPUT_CONFIG_PATH: '', INPUT_GITHUB_TOKEN: ''});
         expect(i.configPath).toBeUndefined();
         expect(i.githubToken).toBeUndefined();
     });
@@ -54,7 +54,7 @@ describe('readPrContext', () => {
     });
 
     it('returns null when the event is not a pull request', () => {
-        expect(readPrContext({GITHUB_EVENT_NAME: 'push'})).toBeNull();
+        expect(ActionRunner.readPrContext({GITHUB_EVENT_NAME: 'push'})).toBeNull();
     });
 
     it('parses a pull_request event payload', () => {
@@ -66,7 +66,7 @@ describe('readPrContext', () => {
             },
             repository: {full_name: 'octocat/hello'}
         }));
-        const ctx = readPrContext({
+        const ctx = ActionRunner.readPrContext({
             GITHUB_EVENT_NAME: 'pull_request',
             GITHUB_EVENT_PATH: evtPath
         });
@@ -82,7 +82,7 @@ describe('readPrContext', () => {
             pull_request: {number: 7, base: {ref: 'dev'}, head: {sha: 's'}},
             repository: {full_name: 'a/b'}
         }));
-        const ctx = readPrContext({
+        const ctx = ActionRunner.readPrContext({
             GITHUB_EVENT_NAME: 'pull_request_target',
             GITHUB_EVENT_PATH: evtPath
         });
@@ -91,7 +91,7 @@ describe('readPrContext', () => {
 
     it('returns null on malformed JSON', () => {
         fs.writeFileSync(evtPath, '{not json');
-        expect(readPrContext({
+        expect(ActionRunner.readPrContext({
             GITHUB_EVENT_NAME: 'pull_request',
             GITHUB_EVENT_PATH: evtPath
         })).toBeNull();
@@ -101,7 +101,7 @@ describe('readPrContext', () => {
         fs.writeFileSync(evtPath, JSON.stringify({
             pull_request: {number: 1, base: {ref: 'main'}, head: {sha: 'x'}}
         }));
-        const ctx = readPrContext({
+        const ctx = ActionRunner.readPrContext({
             GITHUB_EVENT_NAME: 'pull_request',
             GITHUB_EVENT_PATH: evtPath,
             GITHUB_REPOSITORY: 'fallback/repo'

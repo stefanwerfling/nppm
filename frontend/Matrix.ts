@@ -298,17 +298,23 @@ export class Matrix {
     private _onSecurityClick: ((pkg: string, version: string) => void)|null = null;
     private _onBadgeFilterClick: (() => void)|null = null;
     private _onBulkUpgradeClick: ((picks: ApiBulkUpgradePick[]) => void)|null = null;
-    // Multi-select state for the cross-project Bulk-Upgrade Wizard.
-    // Keyed by `${unid}|${pkg}` — workspace is always root in the global
-    // matrix (cells aggregate workspaces), so the key collapses to that
-    // pair. Cleared on `setData`.
+    /*
+     * Multi-select state for the cross-project Bulk-Upgrade Wizard.
+     * Keyed by `${unid}|${pkg}` — workspace is always root in the global
+     * matrix (cells aggregate workspaces), so the key collapses to that
+     * pair. Cleared on `setData`.
+     */
     private _selected: Map<string, ApiBulkUpgradePick> = new Map();
-    // Cached batched vuln lookups, keyed by package name (we always
-    // batch against `latest`, so the version is implicit). `null` means
-    // OSV failed for that package; `[]` means "asked, no vulns".
+    /*
+     * Cached batched vuln lookups, keyed by package name (we always
+     * batch against `latest`, so the version is implicit). `null` means
+     * OSV failed for that package; `[]` means "asked, no vulns".
+     */
     private _vulnsByName: Map<string, string[]|null> = new Map();
-    // Cached script summaries, same keying as `_vulnsByName`. Populated
-    // by the (slow on cold start) /api/matrix/heuristics endpoint.
+    /*
+     * Cached script summaries, same keying as `_vulnsByName`. Populated
+     * by the (slow on cold start) /api/matrix/heuristics endpoint.
+     */
     private _scriptsByName: Map<string, ScriptSummary> = new Map();
     private _patternsByName: Map<string, PatternSummary> = new Map();
     private _binariesByName: Map<string, BinarySummary> = new Map();
@@ -323,16 +329,22 @@ export class Matrix {
     private _obfuscationByName: Map<string, ObfuscationSummary> = new Map();
     private _manifestRedFlagsByName: Map<string, ManifestRedFlagsSummary> = new Map();
     private _capabilityByName: Map<string, CapabilitySummary> = new Map();
-    // Bundlephobia size keyed by package name (we always query against
-    // `latest`, so the version is implicit). `null` means asked-and-
-    // unbuildable; missing key means not yet asked.
+    /*
+     * Bundlephobia size keyed by package name (we always query against
+     * `latest`, so the version is implicit). `null` means asked-and-
+     * unbuildable; missing key means not yet asked.
+     */
     private _bundlesByName: Map<string, ApiBundleEntry> = new Map();
-    // Per-name aggregated integrity status, loaded once after `setData`.
-    // Missing key means "not yet asked" or "no finding"; present key
-    // carries the worst severity any project's lockfile reported.
+    /*
+     * Per-name aggregated integrity status, loaded once after `setData`.
+     * Missing key means "not yet asked" or "no finding"; present key
+     * carries the worst severity any project's lockfile reported.
+     */
     private _integrityByName: Map<string, ApiMatrixIntegrityEntry> = new Map();
-    // Generation counter so a late security response from a previous
-    // `setData` call cannot overwrite a newer matrix.
+    /*
+     * Generation counter so a late security response from a previous
+     * `setData` call cannot overwrite a newer matrix.
+     */
     private _securityGen: number = 0;
 
     constructor(root: HTMLElement) {
@@ -349,9 +361,11 @@ export class Matrix {
             this._search = state.search;
         }
         if (Array.isArray(state.hiddenBadges)) {
-            // Trust nothing from localStorage — a badge id that no
-            // longer exists in the catalogue is silently dropped so
-            // a deleted scanner doesn't leak hidden state forever.
+            /*
+             * Trust nothing from localStorage — a badge id that no
+             * longer exists in the catalogue is silently dropped so
+             * a deleted scanner doesn't leak hidden state forever.
+             */
             const known = new Set<MatrixBadgeId>(MATRIX_BADGES.map((b) => b.id));
             for (const id of state.hiddenBadges) {
                 if (known.has(id)) {
@@ -443,10 +457,12 @@ export class Matrix {
             score += SCRIPT_WEIGHT[scripts.maxSeverity];
         }
         if (patterns && patterns.maxSeverity !== null) {
-            // count multiplied by per-finding weight, capped at one
-            // full "risk hit" — otherwise a noisy library (50
-            // child_process refs) dominates the sort and drowns out
-            // the true outliers.
+            /*
+             * count multiplied by per-finding weight, capped at one
+             * full "risk hit" — otherwise a noisy library (50
+             * child_process refs) dominates the sort and drowns out
+             * the true outliers.
+             */
             const perWeight = PATTERN_WEIGHT[patterns.maxSeverity];
             score += Math.min(patterns.count, 5) * perWeight;
         }
@@ -530,11 +546,13 @@ export class Matrix {
         if (!this._data) {
             return out;
         }
-        // Until at least one batched signal (CVE / heuristics / …)
-        // has landed, every row's contribution to `_scoreFor` is zero,
-        // which would round-trip to a misleading 100% health for every
-        // project. Emit an empty map instead so the treeview keeps the
-        // "…" loading state until the first real data arrives.
+        /*
+         * Until at least one batched signal (CVE / heuristics / …)
+         * has landed, every row's contribution to `_scoreFor` is zero,
+         * which would round-trip to a misleading 100% health for every
+         * project. Emit an empty map instead so the treeview keeps the
+         * "…" loading state until the first real data arrives.
+         */
         const hasSignal = this._vulnsByName.size > 0
             || this._scriptsByName.size > 0
             || this._patternsByName.size > 0
@@ -553,7 +571,7 @@ export class Matrix {
         if (!hasSignal) {
             return out;
         }
-        const totals = new Map<string, {score: number; count: number}>();
+        const totals = new Map<string, {score: number; count: number;}>();
         for (const project of this._data.projects) {
             totals.set(project.unid, {score: 0, count: 0});
         }
@@ -634,18 +652,20 @@ export class Matrix {
         this._emitScores();
 
         const gen = ++this._securityGen;
-        const packages: {name: string; version: string}[] = [];
+        const packages: {name: string; version: string;}[] = [];
         for (const row of data.rows) {
             if (!row.latest) {
                 continue;
             }
-            // Skip git-only rows. `row.latest` here is the registry's
-            // latest for `row.name`, which is meaningless when every
-            // declared cell is a git URL — the registry entry is an
-            // unrelated package with the same name (the figtree /
-            // fundon case). Querying CVE / cadence / freshness /
-            // maintainer for that registry entry would mis-attribute
-            // its data to the user's git dep.
+            /*
+             * Skip git-only rows. `row.latest` here is the registry's
+             * latest for `row.name`, which is meaningless when every
+             * declared cell is a git URL — the registry entry is an
+             * unrelated package with the same name (the figtree /
+             * fundon case). Querying CVE / cadence / freshness /
+             * maintainer for that registry entry would mis-attribute
+             * its data to the user's git dep.
+             */
             const allGit = Object.values(row.cells).every(
                 (c) => GitResolver.isGitVersion(c.version)
             );
@@ -655,17 +675,19 @@ export class Matrix {
             packages.push({name: row.name, version: Version.cleanRange(row.latest)});
         }
 
-        // CVE lookup is fast (OSV batch); the fingerprint-derived
-        // heuristics (scripts + patterns) are slow on cold start
-        // (tarball downloads). Fire all in parallel — whichever
-        // returns first repaints, the others follow.
+        /*
+         * CVE lookup is fast (OSV batch); the fingerprint-derived
+         * heuristics (scripts + patterns) are slow on cold start
+         * (tarball downloads). Fire all in parallel — whichever
+         * returns first repaints, the others follow.
+         */
         void this._loadVulnBadges(gen, packages);
         void this._loadHeuristicBadges(gen, packages);
         void this._loadIntegrityBadges(gen);
         void this._loadBundleSizes(gen, packages);
     }
 
-    private async _loadBundleSizes(gen: number, packages: {name: string; version: string}[]): Promise<void> {
+    private async _loadBundleSizes(gen: number, packages: {name: string; version: string;}[]): Promise<void> {
         if (packages.length === 0) {
             return;
         }
@@ -685,12 +707,14 @@ export class Matrix {
                 this._rerenderTable();
             }
         } catch {
-            // Best-effort — bundlephobia outages must not break the
-            // matrix itself.
+            /*
+             * Best-effort — bundlephobia outages must not break the
+             * matrix itself.
+             */
         }
     }
 
-    private async _loadVulnBadges(gen: number, packages: {name: string; version: string}[]): Promise<void> {
+    private async _loadVulnBadges(gen: number, packages: {name: string; version: string;}[]): Promise<void> {
         if (packages.length === 0) {
             return;
         }
@@ -739,7 +763,7 @@ export class Matrix {
         }
     }
 
-    private async _loadHeuristicBadges(gen: number, packages: {name: string; version: string}[]): Promise<void> {
+    private async _loadHeuristicBadges(gen: number, packages: {name: string; version: string;}[]): Promise<void> {
         if (packages.length === 0) {
             return;
         }
@@ -827,7 +851,7 @@ export class Matrix {
         const bar = document.createElement('div');
         bar.className = 'matrix-filters';
 
-        const opts: {value: MatrixFilter; label: string}[] = [
+        const opts: {value: MatrixFilter; label: string;}[] = [
             {value: MatrixFilter.all, label: I18n.t('All')},
             {value: MatrixFilter.issues, label: I18n.t('Issues')},
             {value: MatrixFilter.drift, label: I18n.t('Drift')},
@@ -856,9 +880,11 @@ export class Matrix {
         search.className = 'matrix-search';
         search.placeholder = I18n.t('Search package …');
         search.value = this._search;
-        // Re-render on each keystroke. The dataset is small (≤ a few
-        // hundred rows) and re-rendering also re-applies the filter +
-        // sort, so this stays consistent without extra plumbing.
+        /*
+         * Re-render on each keystroke. The dataset is small (≤ a few
+         * hundred rows) and re-rendering also re-applies the filter +
+         * sort, so this stays consistent without extra plumbing.
+         */
         search.addEventListener('input', () => {
             this._search = search.value;
             this._persist();
@@ -871,7 +897,7 @@ export class Matrix {
         sortLabel.textContent = I18n.t('Sort:');
         bar.appendChild(sortLabel);
 
-        const sorts: {value: MatrixSort; label: string}[] = [
+        const sorts: {value: MatrixSort; label: string;}[] = [
             {value: MatrixSort.name, label: I18n.t('Name')},
             {value: MatrixSort.status, label: I18n.t('Status')},
             {value: MatrixSort.severity, label: I18n.t('Severity')}
@@ -892,9 +918,11 @@ export class Matrix {
             bar.appendChild(btn);
         }
 
-        // Badges button — opens the BadgeFilterModal. Renders an
-        // active-state hint when at least one badge is hidden so the
-        // user has a quick visual cue that the matrix is filtered.
+        /*
+         * Badges button — opens the BadgeFilterModal. Renders an
+         * active-state hint when at least one badge is hidden so the
+         * user has a quick visual cue that the matrix is filtered.
+         */
         const badgesBtn = document.createElement('button');
         badgesBtn.className = 'matrix-sort-btn matrix-badges-btn';
         if (this._hiddenBadges.size > 0) {
@@ -1018,10 +1046,12 @@ export class Matrix {
         nameText.textContent = row.name;
         nameCell.appendChild(nameText);
 
-        // Bundle-size pill — informational rather than a warning.
-        // Coloured by gzip-size threshold (muted < 50kB, warn 50–200kB,
-        // risk > 200kB) so a glance at the matrix surfaces the
-        // outliers without crowding every row.
+        /*
+         * Bundle-size pill — informational rather than a warning.
+         * Coloured by gzip-size threshold (muted < 50kB, warn 50–200kB,
+         * risk > 200kB) so a glance at the matrix surfaces the
+         * outliers without crowding every row.
+         */
         const bundle = this._bundlesByName.get(row.name);
         if (bundle && bundle.gzip !== null) {
             const pill = document.createElement('span');
@@ -1042,9 +1072,11 @@ export class Matrix {
             badge.className = 'matrix-badge matrix-badge-cve';
             badge.textContent = `CVE ${vulnIds.length}`;
             badge.title = vulnIds.join('\n');
-            // Clicking the badge opens the detail panel on the latest
-            // version so the user lands on the security tab they care
-            // about. We piggy-back on the existing cell-click contract.
+            /*
+             * Clicking the badge opens the detail panel on the latest
+             * version so the user lands on the security tab they care
+             * about. We piggy-back on the existing cell-click contract.
+             */
             badge.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (row.latest) {
@@ -1069,9 +1101,11 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
-        // Pattern badge only for the loudest signal (`risk` = eval/
-        // Function call) — `warn` patterns like `child_process` are
-        // legitimate in dozens of libraries and would clutter every row.
+        /*
+         * Pattern badge only for the loudest signal (`risk` = eval/
+         * Function call) — `warn` patterns like `child_process` are
+         * legitimate in dozens of libraries and would clutter every row.
+         */
         const patterns = this._patternsByName.get(row.name);
         if (patterns && patterns.maxSeverity === PatternSeverity.risk && this._isBadgeVisible('pattern')) {
             const badge = document.createElement('span');
@@ -1087,9 +1121,11 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
-        // Binary badge only for risk-tier — `.node`/`.wasm` (warn/info)
-        // are routine in many native-binding packages and would
-        // clutter every row otherwise.
+        /*
+         * Binary badge only for risk-tier — `.node`/`.wasm` (warn/info)
+         * are routine in many native-binding packages and would
+         * clutter every row otherwise.
+         */
         const binaries = this._binariesByName.get(row.name);
         if (binaries && binaries.maxSeverity === BinarySeverity.risk && this._isBadgeVisible('binary')) {
             const badge = document.createElement('span');
@@ -1105,9 +1141,11 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
-        // Maintainer badge only for risk-tier — first-time publishers
-        // alone (`warn`) are common when a project moves to CI; we'd
-        // train the user to ignore the badge.
+        /*
+         * Maintainer badge only for risk-tier — first-time publishers
+         * alone (`warn`) are common when a project moves to CI; we'd
+         * train the user to ignore the badge.
+         */
         const maintainer = this._maintainersByName.get(row.name);
         if (maintainer && maintainer.severity === MaintainerSeverity.risk && this._isBadgeVisible('maintainer')) {
             const badge = document.createElement('span');
@@ -1123,10 +1161,12 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
-        // License badge only for strong-copyleft and proprietary —
-        // weak-copyleft is too noisy (legal teams pre-approve LGPL /
-        // MPL in most shops). `unknown` packages get a smaller grey
-        // badge so they're noticeable without screaming.
+        /*
+         * License badge only for strong-copyleft and proprietary —
+         * weak-copyleft is too noisy (legal teams pre-approve LGPL /
+         * MPL in most shops). `unknown` packages get a smaller grey
+         * badge so they're noticeable without screaming.
+         */
         const license = this._licensesByName.get(row.name);
         if (license && this._isBadgeVisible('license')) {
             const badge = Matrix._licenseBadge(license);
@@ -1141,12 +1181,14 @@ export class Matrix {
             }
         }
 
-        // Integrity badge only for risk-tier — `warn` covers benign
-        // custom mirrors and `info` covers private/unpublished
-        // packages, both of which are noise on a cross-project view.
-        // A `risk` finding means at least one project's lockfile pins
-        // a tarball whose integrity differs from what the registry
-        // now serves — real supply-chain signal.
+        /*
+         * Integrity badge only for risk-tier — `warn` covers benign
+         * custom mirrors and `info` covers private/unpublished
+         * packages, both of which are noise on a cross-project view.
+         * A `risk` finding means at least one project's lockfile pins
+         * a tarball whose integrity differs from what the registry
+         * now serves — real supply-chain signal.
+         */
         const integrity = this._integrityByName.get(row.name);
         if (integrity && integrity.severity === IntegritySeverity.risk && this._isBadgeVisible('integrity')) {
             const badge = document.createElement('span');
@@ -1162,12 +1204,14 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
-        // Provenance badge — *positive* signal, only rendered for
-        // `provenance`-level (Sigstore-anchored). `signed` is the
-        // npm baseline and rendering it would clutter every row;
-        // `unsigned` is too quiet to be actionable. The badge is
-        // green by convention since it answers "this build is
-        // verifiable" rather than warning of a risk.
+        /*
+         * Provenance badge — *positive* signal, only rendered for
+         * `provenance`-level (Sigstore-anchored). `signed` is the
+         * npm baseline and rendering it would clutter every row;
+         * `unsigned` is too quiet to be actionable. The badge is
+         * green by convention since it answers "this build is
+         * verifiable" rather than warning of a risk.
+         */
         const provenance = this._provenanceByName.get(row.name);
         if (provenance && provenance.level === ProvenanceLevel.provenance && this._isBadgeVisible('provenance')) {
             const badge = document.createElement('span');
@@ -1183,10 +1227,12 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
-        // Freshness badge — "brand new" signal. Renders for warn and
-        // risk; both colours via CSS modifier. Warn = young but past
-        // the risk threshold (typically <30d); risk = very young
-        // (typically <7d), the classic typosquat profile.
+        /*
+         * Freshness badge — "brand new" signal. Renders for warn and
+         * risk; both colours via CSS modifier. Warn = young but past
+         * the risk threshold (typically <30d); risk = very young
+         * (typically <7d), the classic typosquat profile.
+         */
         const freshness = this._freshnessByName.get(row.name);
         if (freshness && (freshness.level === FreshnessLevel.risk
                           || freshness.level === FreshnessLevel.warn)
@@ -1204,10 +1250,12 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
-        // Cadence badge — "is this package still alive?". Render
-        // warn (slowing, yellow) and risk (likely abandoned, red);
-        // info is silent to keep noise down. Threshold defaults:
-        // 180d warn, 730d risk.
+        /*
+         * Cadence badge — "is this package still alive?". Render
+         * warn (slowing, yellow) and risk (likely abandoned, red);
+         * info is silent to keep noise down. Threshold defaults:
+         * 180d warn, 730d risk.
+         */
         const cadence = this._cadenceByName.get(row.name);
         if (cadence && (cadence.level === CadenceLevel.risk
                         || cadence.level === CadenceLevel.warn)
@@ -1225,10 +1273,12 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
-        // Typosquat badge — render warn (distance 2) + risk
-        // (distance 1 OR Unicode confusables). Exact + unrelated
-        // are silent; almost every package name lands there so a
-        // badge would be useless noise.
+        /*
+         * Typosquat badge — render warn (distance 2) + risk
+         * (distance 1 OR Unicode confusables). Exact + unrelated
+         * are silent; almost every package name lands there so a
+         * badge would be useless noise.
+         */
         const typosquat = this._typosquatByName.get(row.name);
         if (typosquat && (typosquat.level === TyposquatLevel.risk
                           || typosquat.level === TyposquatLevel.warn)
@@ -1246,10 +1296,12 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
-        // External-sources badge — aggregated worst-of-three across
-        // socket.dev / OpenSSF Scorecard / deps.dev. Renders only at
-        // warn/risk; info-only contributions (typical deps.dev) stay
-        // silent so the badge actually means "look at this".
+        /*
+         * External-sources badge — aggregated worst-of-three across
+         * socket.dev / OpenSSF Scorecard / deps.dev. Renders only at
+         * warn/risk; info-only contributions (typical deps.dev) stay
+         * silent so the badge actually means "look at this".
+         */
         const external = this._externalByName.get(row.name);
         if (external && (external.level === ExternalSeverity.risk
                          || external.level === ExternalSeverity.warn)
@@ -1267,10 +1319,12 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
-        // Obfuscation badge — risk = code-obfuscation fingerprints in
-        // a non-build path; warn = same in a build path or weaker
-        // signal in source. Info (legit minification in dist/) stays
-        // silent.
+        /*
+         * Obfuscation badge — risk = code-obfuscation fingerprints in
+         * a non-build path; warn = same in a build path or weaker
+         * signal in source. Info (legit minification in dist/) stays
+         * silent.
+         */
         const obfuscation = this._obfuscationByName.get(row.name);
         if (obfuscation && (obfuscation.maxSeverity === ObfuscationSeverity.risk
                             || obfuscation.maxSeverity === ObfuscationSeverity.warn)
@@ -1288,11 +1342,13 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
-        // Manifest red-flags badge — `MAN!` for the native+postinstall
-        // combo or ≥3 stacked flags, `MAN?` for two stacked flags.
-        // Single flags stay info-grade and don't render a badge
-        // (every other manifest in the registry has at least one
-        // small quirk so the threshold has to be meaningful).
+        /*
+         * Manifest red-flags badge — `MAN!` for the native+postinstall
+         * combo or ≥3 stacked flags, `MAN?` for two stacked flags.
+         * Single flags stay info-grade and don't render a badge
+         * (every other manifest in the registry has at least one
+         * small quirk so the threshold has to be meaningful).
+         */
         const manifestRedFlags = this._manifestRedFlagsByName.get(row.name);
         if (manifestRedFlags && (manifestRedFlags.severity === ManifestRedFlagSeverity.risk
                                  || manifestRedFlags.severity === ManifestRedFlagSeverity.warn)
@@ -1310,11 +1366,13 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
-        // Capability badge — `CAP!` for the dangerous combinations
-        // (spawn+network, env+network, native+network), `CAP?` for
-        // two heavy-hitter capabilities or dynamic-import alone.
-        // Info-grade single capabilities stay silent (most packages
-        // touch one platform API).
+        /*
+         * Capability badge — `CAP!` for the dangerous combinations
+         * (spawn+network, env+network, native+network), `CAP?` for
+         * two heavy-hitter capabilities or dynamic-import alone.
+         * Info-grade single capabilities stay silent (most packages
+         * touch one platform API).
+         */
         const capability = this._capabilityByName.get(row.name);
         if (capability && (capability.severity === CapabilitySeverity.risk
                            || capability.severity === CapabilitySeverity.warn)
@@ -1332,11 +1390,13 @@ export class Matrix {
             nameCell.appendChild(badge);
         }
 
-        // Deprecation badge — risk = installed version itself is
-        // deprecated; warn = registry latest is deprecated.
-        // info-only ("some older versions were deprecated") stays
-        // silent because every long-lived package eventually has
-        // some deprecated history.
+        /*
+         * Deprecation badge — risk = installed version itself is
+         * deprecated; warn = registry latest is deprecated.
+         * info-only ("some older versions were deprecated") stays
+         * silent because every long-lived package eventually has
+         * some deprecated history.
+         */
         const deprecation = this._deprecationByName.get(row.name);
         if (deprecation && (deprecation.level === DeprecationLevel.risk
                             || deprecation.level === DeprecationLevel.warn)
@@ -1373,14 +1433,16 @@ export class Matrix {
                     this._onCellClick?.(row.name, cellData.version, row.latest);
                 });
 
-                // Bulk-Upgrade checkbox: outdated OR drift rows on
-                // local projects with a known registry `latest` and a
-                // non-git installation. Drift rows are included so
-                // the wizard can unify projects pinned to different
-                // versions; `internalDrift` cells stay blocked because
-                // a single pick can only target one workspace and the
-                // partial-update would be misleading. Click is
-                // stopped so it doesn't also open the detail panel.
+                /*
+                 * Bulk-Upgrade checkbox: outdated OR drift rows on
+                 * local projects with a known registry `latest` and a
+                 * non-git installation. Drift rows are included so
+                 * the wizard can unify projects pinned to different
+                 * versions; `internalDrift` cells stay blocked because
+                 * a single pick can only target one workspace and the
+                 * partial-update would be misleading. Click is
+                 * stopped so it doesn't also open the detail panel.
+                 */
                 const eligibleStatus =
                     row.status === MatrixRowStatus.outdated
                     || row.status === MatrixRowStatus.drift;
@@ -1419,10 +1481,12 @@ export class Matrix {
                 const v = document.createElement('span');
                 v.className = 'matrix-cell-version';
                 if (cellData.installedVersion) {
-                    // Git-pinned cell: show the *installed* version
-                    // primary, raw URL as tooltip. The clicked
-                    // `version` is still the git URL so the detail
-                    // panel can resolve the tarball.
+                    /*
+                     * Git-pinned cell: show the *installed* version
+                     * primary, raw URL as tooltip. The clicked
+                     * `version` is still the git URL so the detail
+                     * panel can resolve the tarball.
+                     */
                     v.textContent = cellData.installedVersion;
                     v.title = cellData.version;
                     const gitTag = document.createElement('span');
@@ -1449,9 +1513,9 @@ export class Matrix {
                 }
 
                 const types = cellData.types
-                    .filter((t) => t !== DependencyType.dependency)
-                    .map(Matrix._depLabel)
-                    .join('/');
+                .filter((t) => t !== DependencyType.dependency)
+                .map(Matrix._depLabel)
+                .join('/');
 
                 if (types) {
                     const tag = document.createElement('span');
@@ -1473,22 +1537,26 @@ export class Matrix {
                 (c) => GitResolver.isGitVersion(c.version)
             );
             if (allCellsGit) {
-                // Collect the distinct git refs so the user can see which
-                // branches/tags are in play across projects without
-                // hovering each cell separately.
+                /*
+                 * Collect the distinct git refs so the user can see which
+                 * branches/tags are in play across projects without
+                 * hovering each cell separately.
+                 */
                 const refs = new Set<string>();
                 for (const c of Object.values(row.cells)) {
                     const m = c.version.match(/#(.+)$/);
                     refs.add(m ? m[1] : 'HEAD');
                 }
                 latestTd.classList.add('matrix-cell-latest-git');
-                // Prefer the HEAD info the backend resolved (version +
-                // short SHA from the upstream repo). Fall back to the
-                // plain "git" pill when the resolver was disabled or
-                // the host couldn't be reached — in the latter case
-                // an info icon carries the reason as a tooltip so the
-                // user can tell "no data because host is down" from
-                // "no data because the row is fine".
+                /*
+                 * Prefer the HEAD info the backend resolved (version +
+                 * short SHA from the upstream repo). Fall back to the
+                 * plain "git" pill when the resolver was disabled or
+                 * the host couldn't be reached — in the latter case
+                 * an info icon carries the reason as a tooltip so the
+                 * user can tell "no data because host is down" from
+                 * "no data because the row is fine".
+                 */
                 if (row.gitLatest && (row.gitLatest.version || row.gitLatest.shortSha)) {
                     const parts: string[] = [];
                     if (row.gitLatest.version) {
@@ -1650,7 +1718,7 @@ export class Matrix {
         const apply = bar.querySelector<HTMLButtonElement>('.matrix-footer-apply');
         const clear = bar.querySelector<HTMLButtonElement>('.matrix-footer-clear');
         if (count) {
-            count.textContent = I18n.t('{n} selected', {n});
+            count.textContent = I18n.t('{n} selected', {n: n});
         }
         if (apply) {
             apply.disabled = n === 0;
@@ -1814,4 +1882,5 @@ export class Matrix {
                 return 'opt';
         }
     }
+
 }

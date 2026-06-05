@@ -18,16 +18,16 @@ import {JsonCache} from '../../Cache/JsonCache.js';
  *    even though OsvClient is the primary source.
  */
 export type DepsDevVersion = {
-    versionKey: {system: string; name: string; version: string};
+    versionKey: {system: string; name: string; version: string;};
     defaultVersion: string|null;
     isDefault: boolean;
     licenses: string[];
-    projects: {type: string; name: string}[];
+    projects: {type: string; name: string;}[];
     advisoryKeys: string[];
     publishedAt: string|null;
 };
 
-type Wrap = {data: DepsDevVersion|null};
+type Wrap = {data: DepsDevVersion|null;};
 
 /**
  * Fetches package-version metadata from deps.dev (Google's open-source
@@ -100,7 +100,7 @@ export class DepsDevFetcher {
                 : pp.name;
             const type = typeof pp.relationType === 'string' ? pp.relationType : 'related';
             if (typeof name === 'string') {
-                projects.push({type, name});
+                projects.push({type: type, name: name});
             }
         }
         const licenses: string[] = Array.isArray(obj.licenses)
@@ -130,16 +130,17 @@ export class DepsDevFetcher {
                 name: vk.name as string,
                 version: vk.version as string
             },
-            defaultVersion,
-            isDefault,
-            licenses,
-            projects,
-            advisoryKeys,
-            publishedAt
+            defaultVersion: defaultVersion,
+            isDefault: isDefault,
+            licenses: licenses,
+            projects: projects,
+            advisoryKeys: advisoryKeys,
+            publishedAt: publishedAt
         };
     }
 
     private static _cacheKey(name: string, version: string): string {
         return `depsdev_${name}@${version}`;
     }
+
 }

@@ -71,7 +71,7 @@ const DEFAULT_RISK_DAYS = 7;
 export class FreshnessScanner {
 
     public static classify(
-        input: {firstPublishedAt: string|null; maintainerCreatedAt: string|null},
+        input: {firstPublishedAt: string|null; maintainerCreatedAt: string|null;},
         opts: FreshnessScannerOptions = {}
     ): FreshnessFinding|null {
         const warnDays = opts.warnDays ?? DEFAULT_WARN_DAYS;
@@ -90,11 +90,11 @@ export class FreshnessScanner {
         const level = FreshnessScanner._maxLevel(pkgLevel, mntLevel);
 
         return {
-            level,
+            level: level,
             firstPublishedAt: input.firstPublishedAt,
-            packageAgeDays,
+            packageAgeDays: packageAgeDays,
             maintainerCreatedAt: input.maintainerCreatedAt,
-            maintainerAgeDays,
+            maintainerAgeDays: maintainerAgeDays,
             reason: FreshnessScanner._reason(level, packageAgeDays, maintainerAgeDays, warnDays, riskDays)
         };
     }
@@ -170,4 +170,5 @@ export class FreshnessScanner {
         }
         return `${head} — both signals are normal`;
     }
+
 }

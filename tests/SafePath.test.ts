@@ -23,10 +23,12 @@ describe('SafePath.join', () => {
     });
 
     it('rejects a deep `..` chain that escapes via a workspace prefix', () => {
-        // Models the upgrade-apply attack: workspace=`../../etc/cron.d/evil`,
-        // segment=`package.json` — the resolved path lands outside `root`.
+        /*
+         * Models the upgrade-apply attack: workspace=`../../etc/cron.d/evil`,
+         * segment=`package.json` — the resolved path lands outside `root`.
+         */
         expect(() => SafePath.join(root, '../../etc/cron.d/evil', 'package.json'))
-            .toThrow(/escapes project root/);
+        .toThrow(/escapes project root/);
     });
 
     it('rejects an absolute segment that bypasses the root', () => {
@@ -34,11 +36,13 @@ describe('SafePath.join', () => {
     });
 
     it('rejects a sibling whose path string accidentally starts with the root', () => {
-        // `/srv/project-evil` is NOT inside `/srv/project` even though its
-        // string starts with the same prefix. Naive `startsWith(root)`
-        // would let it through; the `+ path.sep` boundary check stops it.
+        /*
+         * `/srv/project-evil` is NOT inside `/srv/project` even though its
+         * string starts with the same prefix. Naive `startsWith(root)`
+         * would let it through; the `+ path.sep` boundary check stops it.
+         */
         expect(() => SafePath.join('/srv/project', '../project-evil', 'package.json'))
-            .toThrow(/escapes project root/);
+        .toThrow(/escapes project root/);
     });
 
     it('treats a relative root the same way as an absolute one', () => {

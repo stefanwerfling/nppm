@@ -19,7 +19,7 @@ export type NpmUserDoc = {
  * `null` when the registry refused (so a re-fetch within the TTL
  * window doesn't keep hammering the endpoint).
  */
-type Wrap = {data: NpmUserDoc|null};
+type Wrap = {data: NpmUserDoc|null;};
 
 /**
  * Fetches the CouchDB-style user document at
@@ -70,11 +70,11 @@ export class NpmUserFetcher {
             if (this._auth) {
                 headers.Authorization = `Bearer ${this._auth}`;
             }
-            const res = await fetch(url, {headers});
+            const res = await fetch(url, {headers: headers});
             if (!res.ok) {
                 return null;
             }
-            const raw = await res.json() as {tfa?: unknown; created?: unknown};
+            const raw = await res.json() as {tfa?: unknown; created?: unknown;};
             return {
                 tfa: NpmUserFetcher.parseTfa(raw.tfa),
                 created: NpmUserFetcher.parseCreated(raw.created)
@@ -101,7 +101,7 @@ export class NpmUserFetcher {
             return false;
         }
         if (typeof value === 'object') {
-            const mode = (value as {mode?: unknown}).mode;
+            const mode = (value as {mode?: unknown;}).mode;
             if (typeof mode === 'string' && mode.length > 0) {
                 return true;
             }
@@ -121,7 +121,7 @@ export class NpmUserFetcher {
             return value;
         }
         if (value && typeof value === 'object') {
-            const iso = (value as {iso?: unknown}).iso;
+            const iso = (value as {iso?: unknown;}).iso;
             if (typeof iso === 'string' && iso.length > 0) {
                 return iso;
             }
@@ -132,4 +132,5 @@ export class NpmUserFetcher {
     private static _cacheKey(username: string): string {
         return `npmuser_${username}`;
     }
+
 }

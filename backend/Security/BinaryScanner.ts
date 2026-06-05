@@ -168,7 +168,7 @@ export class BinaryScanner {
                 riskCount++;
             }
         }
-        return {maxSeverity: best, riskCount, totalCount: findings.length};
+        return {maxSeverity: best, riskCount: riskCount, totalCount: findings.length};
     }
 
     /**
@@ -203,4 +203,5 @@ export class BinaryScanner {
         const segments = path.split('/');
         return segments.includes('bin');
     }
+
 }

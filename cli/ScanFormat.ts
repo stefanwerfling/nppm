@@ -83,7 +83,7 @@ export class ScanFormatter {
             lines.push('Result: PASS');
         }
 
-        return lines.join('\n') + '\n';
+        return `${lines.join('\n')  }\n`;
     }
 
     /**
@@ -92,7 +92,7 @@ export class ScanFormatter {
      * `text()`.
      */
     public static json(report: ScanReport): string {
-        return JSON.stringify(report, null, 2) + '\n';
+        return `${JSON.stringify(report, null, 2)  }\n`;
     }
 
     /**
@@ -101,8 +101,9 @@ export class ScanFormatter {
      * formatter.
      */
     public static sarif(report: ScanReport): string {
-        return JSON.stringify(SarifBuilder.build(report, ScanFormatter._TOOL_VERSION), null, 2) + '\n';
+        return `${JSON.stringify(SarifBuilder.build(report, ScanFormatter._TOOL_VERSION), null, 2)  }\n`;
     }
+
 }
 
 /** Re-exported for symmetry — the tests import threshold helpers from here. */

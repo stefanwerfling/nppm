@@ -20,7 +20,6 @@ export type GithubRelease = {
     published_at?: string|null;
 };
 
-
 /**
  * Glue between the npm registry (version list + publish times) and
  * the GitHub Releases API (changelog body + release titles). Caching
@@ -44,7 +43,7 @@ export class ReleasesFetcher {
     constructor(
         registry: Registry,
         cache: JsonCache|null,
-        opts: {token?: string; ghFetcher?: GithubReleasesFetcher} = {}
+        opts: {token?: string; ghFetcher?: GithubReleasesFetcher;} = {}
     ) {
         this._registry = registry;
         this._cache = cache;
@@ -54,7 +53,7 @@ export class ReleasesFetcher {
 
     public async fetch(name: string): Promise<ReleasesResponse|null> {
         const key = `releases_${name}`;
-        type Wrap = {data: ReleasesResponse|null};
+        type Wrap = {data: ReleasesResponse|null;};
 
         if (this._cache) {
             const hit = this._cache.get<Wrap>(key);
@@ -92,23 +91,29 @@ export class ReleasesFetcher {
                     rel.name = match.name ?? undefined;
                     rel.body = match.body ?? undefined;
                     rel.url = match.html_url ?? undefined;
-                    // Prefer the GitHub publish timestamp when present —
-                    // it's more accurate than `npm publish` time for
-                    // pre-release tag dances.
+                    /*
+                     * Prefer the GitHub publish timestamp when present —
+                     * it's more accurate than `npm publish` time for
+                     * pre-release tag dances.
+                     */
                     if (!rel.publishedAt && match.published_at) {
                         rel.publishedAt = match.published_at;
                     }
                 }
             } catch {
-                // GitHub failed (rate limit / network / private repo) —
-                // fall through and serve the registry-only data. Not
-                // an error from the user's perspective.
+                /*
+                 * GitHub failed (rate limit / network / private repo) —
+                 * fall through and serve the registry-only data. Not
+                 * an error from the user's perspective.
+                 */
             }
         }
 
-        // Newest publish first; entries without a timestamp slot in at
-        // the bottom (their version string still gives a sort order
-        // visually).
+        /*
+         * Newest publish first; entries without a timestamp slot in at
+         * the bottom (their version string still gives a sort order
+         * visually).
+         */
         releases.sort((a, b) => {
             if (a.publishedAt && b.publishedAt) {
                 return b.publishedAt.localeCompare(a.publishedAt);
@@ -127,7 +132,7 @@ export class ReleasesFetcher {
             description: reg.description,
             homepage: reg.homepage,
             repository: reg.repository,
-            releases
+            releases: releases
         };
 
         this._cache?.set<Wrap>(key, {data: response});
@@ -140,17 +145,17 @@ export class ReleasesFetcher {
      * rate-limit budget tight.
      */
     private static _defaultGithubFetcher(): GithubReleasesFetcher {
-        return async (owner, repo, token) => {
+        return async(owner, repo, token) => {
             const headers: Record<string, string> = {
                 'User-Agent': 'nppm',
-                Accept: 'application/vnd.github.v3+json'
+                'Accept': 'application/vnd.github.v3+json'
             };
             if (token) {
                 headers.Authorization = `Bearer ${token}`;
             }
             const res = await fetch(
                 `https://api.github.com/repos/${owner}/${repo}/releases?per_page=100`,
-                {headers}
+                {headers: headers}
             );
             if (!res.ok) {
                 throw new Error(`GitHub releases ${owner}/${repo} → ${res.status} ${res.statusText}`);
@@ -167,7 +172,7 @@ export class ReleasesFetcher {
      * github.com. Public so tests can exercise it without going
      * through the full fetcher.
      */
-    public static parseGithubRepo(value: string|undefined): {owner: string; repo: string}|null {
+    public static parseGithubRepo(value: string|undefined): {owner: string; repo: string;}|null {
         if (!value) {
             return null;
         }
@@ -205,4 +210,5 @@ export class ReleasesFetcher {
     private static _normaliseTag(tag: string): string {
         return tag.trim().replace(/^v/, '');
     }
+
 }

@@ -20,7 +20,7 @@ export class DirectoryPickerModal {
     private _panel: HTMLElement|null = null;
     private _currentPath: string|null = null;
     private _parent: string|null = null;
-    private _entries: {name: string; type: 'dir'|'file'}[] = [];
+    private _entries: {name: string; type: 'dir'|'file';}[] = [];
     private _showHidden = false;
     private _initial: string|undefined;
     private _onPicked: ((absPath: string) => void)|null = null;
@@ -277,4 +277,5 @@ export class DirectoryPickerModal {
         actions.appendChild(cancel);
         this._panel.appendChild(actions);
     }
+
 }

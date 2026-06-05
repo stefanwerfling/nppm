@@ -62,8 +62,10 @@ export type MatrixGitLatest = {
     version: string|null;
     sha: string|null;
     shortSha: string|null;
-    /** The git URL the HEAD info was resolved from. Used by the
-     * frontend to construct the diff-against-HEAD coordinate. */
+    /**
+     * The git URL the HEAD info was resolved from. Used by the
+     * frontend to construct the diff-against-HEAD coordinate. 
+     */
     sourceUrl: string;
     /**
      * Reason the HEAD lookup couldn't complete (e.g. "GitHub
@@ -112,10 +114,10 @@ export class MatrixBuilder {
      */
     public static cleanRange(range: string): string {
         return range
-            .trim()
-            .replace(/^[\^~=v]+/, '')
-            .replace(/^>=\s*/, '')
-            .split(/\s/)[0];
+        .trim()
+        .replace(/^[\^~=v]+/, '')
+        .replace(/^>=\s*/, '')
+        .split(/\s/)[0];
     }
 
     /**
@@ -167,16 +169,18 @@ export class MatrixBuilder {
         const allPackageNames = new Set<string>();
 
         for (const [unid, project] of registeredProjects.entries()) {
-            // Hidden projects skip the cross-project matrix entirely
-            // — they're still in the treeview and have working per-
-            // project routes, but they don't pollute the matrix
-            // columns or pull registry metadata that nobody asked
-            // about.
+            /*
+             * Hidden projects skip the cross-project matrix entirely
+             * — they're still in the treeview and have working per-
+             * project routes, but they don't pollute the matrix
+             * columns or pull registry metadata that nobody asked
+             * about.
+             */
             if (project.isHidden()) {
                 continue;
             }
             const meta: MatrixProject = {
-                unid,
+                unid: unid,
                 name: project.getName(),
                 type: project.getType()
             };
@@ -185,11 +189,13 @@ export class MatrixBuilder {
                 const manifests = await project.loadManifests();
                 const cells = MatrixBuilder._buildProjectCells(manifests);
 
-                // Pull a `name → installed version` map from the
-                // project's lockfile so cells that pin a git URL can
-                // surface the concrete version next to it.
-                // Best-effort — lockfile failures don't block the
-                // matrix.
+                /*
+                 * Pull a `name → installed version` map from the
+                 * project's lockfile so cells that pin a git URL can
+                 * surface the concrete version next to it.
+                 * Best-effort — lockfile failures don't block the
+                 * matrix.
+                 */
                 try {
                     const lockfile = await project.loadLockfile();
                     if (lockfile) {
@@ -220,8 +226,10 @@ export class MatrixBuilder {
             projects.push(meta);
         }
 
-        // single batched registry call for the union — Registry
-        // handles concurrency + cache so this is fast on a warm cache.
+        /*
+         * single batched registry call for the union — Registry
+         * handles concurrency + cache so this is fast on a warm cache.
+         */
         const registryHits = await registry.fetchMany(Array.from(allPackageNames));
 
         const rows: MatrixRow[] = [];
@@ -237,26 +245,28 @@ export class MatrixBuilder {
                 }
             }
 
-            // Git-only rows: every declaration points at a git URL, so
-            // the registry entry of the same name is either missing
-            // or — worse — an unrelated package that happens to
-            // share the name (the figtree / fundon collision). Force
-            // `latest = null` so the UI shows "git" instead of the
-            // foreign latest, and so the row status comes out as
-            // drift / unknown rather than a fake "outdated" against
-            // a version that doesn't belong to this package.
+            /*
+             * Git-only rows: every declaration points at a git URL, so
+             * the registry entry of the same name is either missing
+             * or — worse — an unrelated package that happens to
+             * share the name (the figtree / fundon collision). Force
+             * `latest = null` so the UI shows "git" instead of the
+             * foreign latest, and so the row status comes out as
+             * drift / unknown rather than a fake "outdated" against
+             * a version that doesn't belong to this package.
+             */
             const allCellsGit = Object.values(rowCells).every(
                 (c) => GitResolver.isGitVersion(c.version)
             );
-            const reg = allCellsGit ? null : (registryHits.get(pkgName) ?? null);
+            const reg = allCellsGit ? null : registryHits.get(pkgName) ?? null;
             const latest = reg?.latest ?? null;
             const latestPublishedAt = (latest && reg?.time?.[latest]) ?? null;
 
             const row: MatrixRow = {
                 name: pkgName,
                 cells: rowCells,
-                latest,
-                latestPublishedAt,
+                latest: latest,
+                latestPublishedAt: latestPublishedAt,
                 status: MatrixBuilder._computeStatus(rowCells, latest)
             };
             if (allCellsGit) {
@@ -265,11 +275,13 @@ export class MatrixBuilder {
             rows.push(row);
         }
 
-        // Resolve HEAD info for every git-only row. Done after the
-        // initial rows are built so each unique origin is fetched
-        // exactly once even when the same package appears in N
-        // projects. Failures stay as `{version:null, sha:null}` so
-        // the UI can fall back to the "git" pill cleanly.
+        /*
+         * Resolve HEAD info for every git-only row. Done after the
+         * initial rows are built so each unique origin is fetched
+         * exactly once even when the same package appears in N
+         * projects. Failures stay as `{version:null, sha:null}` so
+         * the UI can fall back to the "git" pill cleanly.
+         */
         if (headFetcher) {
             const distinctUrls = new Set<string>();
             for (const r of rows) {
@@ -278,7 +290,7 @@ export class MatrixBuilder {
                 }
             }
             const resolved = new Map<string, GitHeadInfo|null>();
-            await Promise.all(Array.from(distinctUrls).map(async (url) => {
+            await Promise.all(Array.from(distinctUrls).map(async(url) => {
                 try {
                     resolved.set(url, await headFetcher.fetch(url));
                 } catch {
@@ -301,7 +313,7 @@ export class MatrixBuilder {
             }
         }
 
-        return {projects, rows};
+        return {projects: projects, rows: rows};
     }
 
     /**
@@ -311,9 +323,11 @@ export class MatrixBuilder {
      */
     private static _pickRowGitOrigin(cells: Record<string, MatrixCell>): MatrixGitLatest {
         const values = Object.values(cells);
-        // First cell wins — the matrix is most useful when projects
-        // agree on the origin, and an upstream that disagrees would
-        // surface as drift anyway.
+        /*
+         * First cell wins — the matrix is most useful when projects
+         * agree on the origin, and an upstream that disagrees would
+         * surface as drift anyway.
+         */
         const first = values[0]?.version ?? '';
         const stripped = first.replace(/#.*$/, '');
         return {
@@ -366,21 +380,25 @@ export class MatrixBuilder {
         }
 
         for (const [name, entry] of collected.entries()) {
-            // prefer the root version for the displayed cell so the
-            // user sees what the "project as a whole" is pinning; if
-            // there's no root manifest declaration, pick any.
+            /*
+             * prefer the root version for the displayed cell so the
+             * user sees what the "project as a whole" is pinning; if
+             * there's no root manifest declaration, pick any.
+             */
             const display = entry.rootVersion ?? Array.from(entry.versions)[0];
-            // Bulk-Upgrade targeting: root if root declared the dep,
-            // otherwise the first workspace that did. Without this,
-            // workspace-only deps would route the pick to the root
-            // `package.json` and silently no-op.
+            /*
+             * Bulk-Upgrade targeting: root if root declared the dep,
+             * otherwise the first workspace that did. Without this,
+             * workspace-only deps would route the pick to the root
+             * `package.json` and silently no-op.
+             */
             const workspace = entry.rootVersion !== null ? undefined : entry.firstWorkspace;
 
             out.set(name, {
                 version: display,
                 types: Array.from(entry.types),
                 internalDrift: entry.versions.size > 1,
-                workspace
+                workspace: workspace
             });
         }
 
@@ -419,4 +437,5 @@ export class MatrixBuilder {
             ? MatrixRowStatus.aligned
             : MatrixRowStatus.outdated;
     }
+
 }

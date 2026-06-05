@@ -84,14 +84,13 @@ export class IgnoreScriptsScanner {
             return {
                 level: IgnoreScriptsLevel.avoidScripts,
                 hookCount: scripts.length,
-                riskCount,
+                riskCount: riskCount,
                 reason: `${riskCount} risky hook(s) — definitely run with --ignore-scripts, even if something breaks`
             };
         }
 
         const native = scripts.find((s) =>
-            NATIVE_BUILD_PATTERNS.some((p) => p.test(s.script))
-        );
+            NATIVE_BUILD_PATTERNS.some((p) => p.test(s.script)));
         if (native) {
             return {
                 level: IgnoreScriptsLevel.needsScripts,
@@ -108,4 +107,5 @@ export class IgnoreScriptsScanner {
             reason: `${scripts.length} install-time hook(s), no native-build or risky bodies — safe to skip with --ignore-scripts`
         };
     }
+
 }

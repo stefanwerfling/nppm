@@ -37,8 +37,8 @@ export class TemplateApplyModal {
         this._findings = findings;
         this._selected = new Set(
             findings
-                .filter((f) => f.severity === 'risk' || f.severity === 'warn')
-                .map((f) => f.target)
+            .filter((f) => f.severity === 'risk' || f.severity === 'warn')
+            .map((f) => f.target)
         );
         this._step = 'review';
         this._mount();
@@ -323,7 +323,7 @@ export class TemplateApplyModal {
                         this._appendLine(body, `[${p.current}/${p.total}] ${p.status.toUpperCase()} ${p.target}${p.msg ? ` — ${p.msg}` : ''}`);
                         counter.textContent = I18n.t('Applied {a}, skipped {s}, error {e}', {a: applied, s: skipped, e: errored});
                     } else if (eventName === 'backup') {
-                        const b = data as {backupDir: string|null};
+                        const b = data as {backupDir: string|null;};
                         if (b.backupDir) {
                             this._appendLine(body, `📦 ${I18n.t('Backup written to {dir}', {dir: b.backupDir})}`);
                         }
@@ -332,7 +332,7 @@ export class TemplateApplyModal {
                         this._appendLine(body, '');
                         this._appendLine(body, I18n.t('Done. {a} applied, {s} skipped, {e} errored.', {a: e.applied, s: e.skipped, e: e.errored}));
                     } else if (eventName === 'error') {
-                        this._appendLine(body, `✗ ${(data as {msg: string}).msg}`);
+                        this._appendLine(body, `✗ ${(data as {msg: string;}).msg}`);
                     }
                 }
             }
@@ -372,4 +372,5 @@ export class TemplateApplyModal {
             case 'workspace-missing': return I18n.t('Workspace missing');
         }
     }
+
 }

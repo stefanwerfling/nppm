@@ -54,11 +54,11 @@ export class Api {
         const res = await fetch('/api/templates/sources', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({url})
+            body: JSON.stringify({url: url})
         });
         if (!res.ok) {
             const j = await res.json().catch(() => ({}));
-            throw new Error((j as {msg?: string}).msg ?? `${res.status} ${res.statusText}`);
+            throw new Error((j as {msg?: string;}).msg ?? `${res.status} ${res.statusText}`);
         }
         return (await res.json()) as ApiAddTemplateSourceResponse;
     }
@@ -108,7 +108,7 @@ export class Api {
         const res = await fetch(`/api/projects/${unid}/visibility`, {
             method: 'PATCH',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({hidden})
+            body: JSON.stringify({hidden: hidden})
         });
         if (!res.ok) {
             throw new Error(`/api/projects/${unid}/visibility → ${res.status} ${res.statusText}`);
@@ -207,7 +207,7 @@ export class Api {
     public static async matrixUpgradePreview(
         picks: ApiBulkUpgradePick[]
     ): Promise<ApiBulkUpgradePreviewResponse> {
-        const body: ApiBulkUpgradePreviewRequest = {picks};
+        const body: ApiBulkUpgradePreviewRequest = {picks: picks};
         const res = await fetch('/api/matrix/upgrade/preview', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -224,7 +224,7 @@ export class Api {
     }
 
     public static async releases(name: string, version?: string): Promise<ApiReleasesResponse> {
-        const qs = new URLSearchParams({name});
+        const qs = new URLSearchParams({name: name});
         if (version) {
             qs.set('version', version);
         }
@@ -236,7 +236,7 @@ export class Api {
     }
 
     public static async impact(name: string, version?: string): Promise<ApiImpactResponse> {
-        const qs = new URLSearchParams({name});
+        const qs = new URLSearchParams({name: name});
         if (version) {
             qs.set('version', version);
         }
@@ -244,7 +244,7 @@ export class Api {
     }
 
     public static async fingerprint(name: string, version: string): Promise<ApiFingerprintResponse> {
-        const qs = new URLSearchParams({name, version});
+        const qs = new URLSearchParams({name: name, version: version});
         return Api._json<ApiFingerprintResponse>(`/api/fingerprint?${qs.toString()}`);
     }
 
@@ -253,7 +253,7 @@ export class Api {
         before: string,
         after: string
     ): Promise<ApiFingerprintDiffResponse> {
-        const qs = new URLSearchParams({name, before, after});
+        const qs = new URLSearchParams({name: name, before: before, after: after});
         return Api._json<ApiFingerprintDiffResponse>(`/api/fingerprint/diff?${qs.toString()}`);
     }
 
@@ -262,14 +262,14 @@ export class Api {
     }
 
     public static async security(name: string, version: string): Promise<ApiSecurityResponse> {
-        const qs = new URLSearchParams({name, version});
+        const qs = new URLSearchParams({name: name, version: version});
         return Api._json<ApiSecurityResponse>(`/api/security?${qs.toString()}`);
     }
 
     public static async matrixSecurity(
-        packages: {name: string; version: string}[]
+        packages: {name: string; version: string;}[]
     ): Promise<ApiMatrixSecurityResponse> {
-        const body: ApiMatrixSecurityRequest = {packages};
+        const body: ApiMatrixSecurityRequest = {packages: packages};
         const res = await fetch('/api/matrix/security', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -288,9 +288,9 @@ export class Api {
     }
 
     public static async matrixBundles(
-        packages: {name: string; version: string}[]
+        packages: {name: string; version: string;}[]
     ): Promise<ApiBundlesResponse> {
-        const body: ApiBundlesRequest = {packages};
+        const body: ApiBundlesRequest = {packages: packages};
         const res = await fetch('/api/matrix/bundles', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -303,9 +303,9 @@ export class Api {
     }
 
     public static async matrixHeuristics(
-        packages: {name: string; version: string}[]
+        packages: {name: string; version: string;}[]
     ): Promise<ApiMatrixHeuristicsResponse> {
-        const body: ApiMatrixHeuristicsRequest = {packages};
+        const body: ApiMatrixHeuristicsRequest = {packages: packages};
         const res = await fetch('/api/matrix/heuristics', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -323,13 +323,15 @@ export class Api {
         const res = await fetch(url);
 
         if (!res.ok) {
-            // Most write/error responses ship `{success:false, msg:'…'}`
-            // — prefer that human-readable text over the generic
-            // "404 Not Found" the status line gives us. Falling back
-            // to the status pair keeps non-JSON bodies sensible.
+            /*
+             * Most write/error responses ship `{success:false, msg:'…'}`
+             * — prefer that human-readable text over the generic
+             * "404 Not Found" the status line gives us. Falling back
+             * to the status pair keeps non-JSON bodies sensible.
+             */
             let detail = `${res.status} ${res.statusText}`;
             try {
-                const body = await res.clone().json() as {msg?: string; error?: string};
+                const body = await res.clone().json() as {msg?: string; error?: string;};
                 const msg = body.msg ?? body.error;
                 if (typeof msg === 'string' && msg.length > 0) {
                     detail = msg;
@@ -342,4 +344,5 @@ export class Api {
 
         return (await res.json()) as T;
     }
+
 }

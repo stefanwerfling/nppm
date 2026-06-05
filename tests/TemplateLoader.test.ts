@@ -23,7 +23,7 @@ describe('TemplateLoader', () => {
     function writeTemplate(dir: string, id: string, body: object): void {
         const tplDir = path.join(dir, id);
         fs.mkdirSync(tplDir, {recursive: true});
-        fs.writeFileSync(path.join(tplDir, 'template.json'), JSON.stringify({id, ...body}, null, 2));
+        fs.writeFileSync(path.join(tplDir, 'template.json'), JSON.stringify({id: id, ...body}, null, 2));
     }
 
     it('returns empty map when no folders exist', () => {
@@ -38,13 +38,13 @@ describe('TemplateLoader', () => {
         expect(loader.getSource('foo')).toEqual({kind: 'local'});
     });
 
-    it('refreshRemote writes fetched bodies to remoteDir with .source.json sidecar', async () => {
+    it('refreshRemote writes fetched bodies to remoteDir with .source.json sidecar', async() => {
         const loader = new TemplateLoader(localDir, remoteDir);
         await loader.refreshRemote(['https://example.com/base.json'], {
-            fetcher: async () => ({
+            fetcher: async() => ({
                 ok: true,
                 status: 200,
-                text: async () => JSON.stringify({id: 'base', name: 'Base'})
+                text: async() => JSON.stringify({id: 'base', name: 'Base'})
             })
         });
         const written = JSON.parse(fs.readFileSync(path.join(remoteDir, 'base', 'template.json'), 'utf-8'));
@@ -53,13 +53,13 @@ describe('TemplateLoader', () => {
         expect(sidecar.url).toBe('https://example.com/base.json');
     });
 
-    it('loadAll surfaces remote-cached templates with the source url', async () => {
+    it('loadAll surfaces remote-cached templates with the source url', async() => {
         const loader = new TemplateLoader(localDir, remoteDir);
         await loader.refreshRemote(['https://example.com/base.json'], {
-            fetcher: async () => ({
+            fetcher: async() => ({
                 ok: true,
                 status: 200,
-                text: async () => JSON.stringify({id: 'base', name: 'Base'})
+                text: async() => JSON.stringify({id: 'base', name: 'Base'})
             })
         });
         const out = loader.loadAll();
@@ -67,14 +67,14 @@ describe('TemplateLoader', () => {
         expect(loader.getSource('base')).toEqual({kind: 'remote', url: 'https://example.com/base.json'});
     });
 
-    it('local override wins when same id exists in both', async () => {
+    it('local override wins when same id exists in both', async() => {
         writeTemplate(localDir, 'base', {name: 'Local Base'});
         const loader = new TemplateLoader(localDir, remoteDir);
         await loader.refreshRemote(['https://example.com/base.json'], {
-            fetcher: async () => ({
+            fetcher: async() => ({
                 ok: true,
                 status: 200,
-                text: async () => JSON.stringify({id: 'base', name: 'Remote Base'})
+                text: async() => JSON.stringify({id: 'base', name: 'Remote Base'})
             })
         });
         const out = loader.loadAll();
@@ -82,16 +82,16 @@ describe('TemplateLoader', () => {
         expect(loader.getSource('base')?.kind).toBe('local');
     });
 
-    it('skips failed URLs without killing the refresh', async () => {
+    it('skips failed URLs without killing the refresh', async() => {
         const loader = new TemplateLoader(localDir, remoteDir);
         await loader.refreshRemote(
             ['https://bad.example/x', 'https://good.example/y'],
             {
-                fetcher: async (url) => {
+                fetcher: async(url) => {
                     if (url.includes('bad')) {
-                        return {ok: false, status: 500, text: async () => 'oops'};
+                        return {ok: false, status: 500, text: async() => 'oops'};
                     }
-                    return {ok: true, status: 200, text: async () => JSON.stringify({id: 'good'})};
+                    return {ok: true, status: 200, text: async() => JSON.stringify({id: 'good'})};
                 }
             }
         );
@@ -101,22 +101,22 @@ describe('TemplateLoader', () => {
         expect(entries.sort()).toEqual(['good']);
     });
 
-    it('rejects remote bodies that fail schema validation', async () => {
+    it('rejects remote bodies that fail schema validation', async() => {
         const loader = new TemplateLoader(localDir, remoteDir);
         await loader.refreshRemote(['https://bad.example/x'], {
             // Missing `id` field — schema rejects.
-            fetcher: async () => ({ok: true, status: 200, text: async () => JSON.stringify({name: 'no-id'})})
+            fetcher: async() => ({ok: true, status: 200, text: async() => JSON.stringify({name: 'no-id'})})
         });
         expect(fs.existsSync(remoteDir) ? fs.readdirSync(remoteDir) : []).toEqual([]);
     });
 
-    it('getFilesDir routes to remoteDir for remote templates', async () => {
+    it('getFilesDir routes to remoteDir for remote templates', async() => {
         const loader = new TemplateLoader(localDir, remoteDir);
         await loader.refreshRemote(['https://example.com/base.json'], {
-            fetcher: async () => ({
+            fetcher: async() => ({
                 ok: true,
                 status: 200,
-                text: async () => JSON.stringify({id: 'base'})
+                text: async() => JSON.stringify({id: 'base'})
             })
         });
         loader.loadAll();

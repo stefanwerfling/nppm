@@ -25,12 +25,12 @@ describe('ProjectLocal', () => {
         fs.rmSync(root, {recursive: true, force: true});
     });
 
-    it('throws if the root has no package.json', async () => {
+    it('throws if the root has no package.json', async() => {
         const project = new ProjectLocal(root, 'empty');
         await expect(project.loadManifests()).rejects.toThrow(/package.json not found/);
     });
 
-    it('loads the root manifest and splits deps into typed buckets', async () => {
+    it('loads the root manifest and splits deps into typed buckets', async() => {
         writePkg('.', {
             name: 'root',
             version: '1.0.0',
@@ -59,7 +59,7 @@ describe('ProjectLocal', () => {
         });
     });
 
-    it('expands packages/* workspaces and tags each manifest', async () => {
+    it('expands packages/* workspaces and tags each manifest', async() => {
         writePkg('.', {
             name: 'root',
             version: '1.0.0',
@@ -88,7 +88,7 @@ describe('ProjectLocal', () => {
         expect(api.dependencies[0].workspace).toBe('packages/api');
     });
 
-    it('accepts the npm `{packages: [...]}` workspaces shape', async () => {
+    it('accepts the npm `{packages: [...]}` workspaces shape', async() => {
         writePkg('.', {
             name: 'root',
             version: '1.0.0',
@@ -101,7 +101,7 @@ describe('ProjectLocal', () => {
         expect(manifests.map((m) => m.workspace ?? 'root').sort()).toEqual(['root', 'sub']);
     });
 
-    it('skips a workspace pattern whose parent does not exist', async () => {
+    it('skips a workspace pattern whose parent does not exist', async() => {
         writePkg('.', {
             name: 'root',
             version: '1.0.0',
@@ -113,7 +113,7 @@ describe('ProjectLocal', () => {
         expect(manifests).toHaveLength(1);
     });
 
-    it('skips a workspace whose package.json is missing', async () => {
+    it('skips a workspace whose package.json is missing', async() => {
         writePkg('.', {
             name: 'root',
             version: '1.0.0',
@@ -126,7 +126,7 @@ describe('ProjectLocal', () => {
         expect(manifests).toHaveLength(1);
     });
 
-    it('reports invalid root JSON', async () => {
+    it('reports invalid root JSON', async() => {
         fs.writeFileSync(path.join(root, 'package.json'), 'not json');
         const project = new ProjectLocal(root, 'r');
         await expect(project.loadManifests()).rejects.toThrow(/invalid JSON/);

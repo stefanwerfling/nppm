@@ -8,7 +8,7 @@ import {LockfileReader} from '../backend/Project/Lockfile.js';
  */
 function fakeFs(files: Record<string, string>) {
     return {
-        existsSync: (p: string) => Object.prototype.hasOwnProperty.call(files, p),
+        existsSync: (p: string) => Object.hasOwn(files, p),
         readdirSync: (p: string) => {
             const prefix = `${p}/`;
             const out = new Set<string>();
@@ -95,10 +95,12 @@ describe('LockfileReader.parse', () => {
         expect(by('d').dev).toBe(true);
         expect(by('o').optional).toBe(true);
         expect(by('p').peer).toBe(true);
-        // devOptional collapses into both flags being true — npm sets
-        // this when a package is *both* in devDependencies and is
-        // marked optional. The UI shouldn't need to know about the
-        // combined flag separately.
+        /*
+         * devOptional collapses into both flags being true — npm sets
+         * this when a package is *both* in devDependencies and is
+         * marked optional. The UI shouldn't need to know about the
+         * combined flag separately.
+         */
         expect(by('do').dev).toBe(true);
         expect(by('do').optional).toBe(true);
     });

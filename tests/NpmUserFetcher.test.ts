@@ -11,16 +11,16 @@ import {NpmUserFetcher} from '../backend/Security/NpmUserFetcher.js';
  * fetch — every test calls it in a `finally` block so the next test
  * doesn't inherit the stub.
  */
-function stubFetch(impl: (url: string) => {ok: boolean; status?: number; body?: unknown}): () => void {
+function stubFetch(impl: (url: string) => {ok: boolean; status?: number; body?: unknown;}): () => void {
     const original = globalThis.fetch;
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    globalThis.fetch = (async(input: RequestInfo | URL) => {
         const url = typeof input === 'string' ? input : input.toString();
         const res = impl(url);
         return {
             ok: res.ok,
             status: res.status ?? (res.ok ? 200 : 500),
             statusText: res.ok ? 'OK' : 'Error',
-            json: async () => res.body ?? {}
+            json: async() => res.body ?? {}
         } as unknown as Response;
     }) as typeof fetch;
     return () => {
@@ -83,7 +83,7 @@ describe('NpmUserFetcher.fetch', () => {
         fs.rmSync(dir, {recursive: true, force: true});
     });
 
-    it('returns the parsed envelope when the registry answers', async () => {
+    it('returns the parsed envelope when the registry answers', async() => {
         const restore = stubFetch(() => ({
             ok: true,
             body: {tfa: {mode: 'auth-and-writes'}, created: '2018-03-15T10:00:00Z'}
@@ -99,7 +99,7 @@ describe('NpmUserFetcher.fetch', () => {
         }
     });
 
-    it('returns null when the registry refuses (401 etc.)', async () => {
+    it('returns null when the registry refuses (401 etc.)', async() => {
         const restore = stubFetch(() => ({ok: false, status: 401}));
         try {
             const fetcher = new NpmUserFetcher('http://r', cache);
@@ -109,7 +109,7 @@ describe('NpmUserFetcher.fetch', () => {
         }
     });
 
-    it('caches the parsed envelope so a second fetch never hits the network', async () => {
+    it('caches the parsed envelope so a second fetch never hits the network', async() => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;
@@ -125,7 +125,7 @@ describe('NpmUserFetcher.fetch', () => {
         }
     });
 
-    it('caches the null envelope too — refusal is not a miss', async () => {
+    it('caches the null envelope too — refusal is not a miss', async() => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;
@@ -141,7 +141,7 @@ describe('NpmUserFetcher.fetch', () => {
         }
     });
 
-    it('returns null for an empty username without hitting the network', async () => {
+    it('returns null for an empty username without hitting the network', async() => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;

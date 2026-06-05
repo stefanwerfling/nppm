@@ -150,8 +150,7 @@ describe('SpdxBuilder.build', () => {
         const edge = doc.relationships.find((r) =>
             r.relationshipType === 'DEPENDS_ON'
             && r.spdxElementId === apiId
-            && r.relatedSpdxElement === lodashId
-        );
+            && r.relatedSpdxElement === lodashId);
         expect(edge).toBeDefined();
     });
 

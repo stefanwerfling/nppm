@@ -97,7 +97,7 @@ export type CellFinding = {
  */
 export type DashboardCell = {
     score: number|null;
-    counts: {info: number; warn: number; risk: number};
+    counts: {info: number; warn: number; risk: number;};
     /**
      * Packages considered for the score denominator. Equals
      * `lockfile.packages.length` for per-package scanners; for
@@ -132,7 +132,7 @@ export const CELL_FINDINGS_CAP = 50;
  * is then empty.
  */
 export type DashboardColumn = {
-    project: {unid: string; name: string; type: ConfigProjectType};
+    project: {unid: string; name: string; type: ConfigProjectType;};
     cells: Partial<Record<ScannerId, DashboardCell>>;
     error?: string;
     /**
@@ -156,7 +156,7 @@ export type DashboardColumn = {
      * UI surfaces this as a "best-effort floor" tooltip so the user
      * knows the number is conservative.
      */
-    sizeCoverage?: {covered: number; total: number};
+    sizeCoverage?: {covered: number; total: number;};
     /**
      * Sum of last-week npm download counts for every *distinct*
      * package name in this project (within-project dedupe — a name
@@ -215,7 +215,7 @@ export class DashboardBuilder {
 
         const safeDenom = Math.max(1, denom);
         const score = Math.max(0, Math.round(100 * (1 - weightSum / (safeDenom * 30))));
-        return {score, counts, total: denom, findings: DashboardBuilder.capFindings(findings)};
+        return {score: score, counts: counts, total: denom, findings: DashboardBuilder.capFindings(findings)};
     }
 
     /**
@@ -240,12 +240,12 @@ export class DashboardBuilder {
 
         const safeDenom = Math.max(1, packageDenom);
         const score = Math.max(0, Math.round(100 * (1 - weightSum / (safeDenom * 30))));
-        return {score, counts, total: packageDenom, findings: DashboardBuilder.capFindings(findings)};
+        return {score: score, counts: counts, total: packageDenom, findings: DashboardBuilder.capFindings(findings)};
     }
 
     /** N/A cell — scanner doesn't apply to this project. */
     public static naCell(note: string): DashboardCell {
-        return {score: null, counts: {info: 0, warn: 0, risk: 0}, total: 0, findings: [], note};
+        return {score: null, counts: {info: 0, warn: 0, risk: 0}, total: 0, findings: [], note: note};
     }
 
     /**
@@ -263,13 +263,15 @@ export class DashboardBuilder {
         return copy;
     }
 
-    // -------------------------------------------------------------
-    // Severity normalisers — every scanner's native level/severity
-    // collapses to the unified info/warn/risk ladder via the maps
-    // below.  Anything not in the ladder (`permissive`, `unaffected`,
-    // `signed`, `exact`, …) returns null so the score formula skips
-    // it cleanly.
-    // -------------------------------------------------------------
+    /*
+     * -------------------------------------------------------------
+     * Severity normalisers — every scanner's native level/severity
+     * collapses to the unified info/warn/risk ladder via the maps
+     * below.  Anything not in the ladder (`permissive`, `unaffected`,
+     * `signed`, `exact`, …) returns null so the score formula skips
+     * it cleanly.
+     * -------------------------------------------------------------
+     */
 
     public static cveSeverity(vulnIds: string[]|null): UnifiedSeverity|null {
         if (!vulnIds || vulnIds.length === 0) {
@@ -418,9 +420,11 @@ export class DashboardBuilder {
     }
 
     public static complianceSeverity(f: ComplianceFinding): UnifiedSeverity {
-        // ComplianceFinding.severity is already typed as the literal
-        // union 'info'|'warn'|'risk', so it lands in the unified
-        // ladder verbatim.
+        /*
+         * ComplianceFinding.severity is already typed as the literal
+         * union 'info'|'warn'|'risk', so it lands in the unified
+         * ladder verbatim.
+         */
         return f.severity;
     }
 
@@ -508,4 +512,5 @@ export class DashboardBuilder {
         }
         return null;
     }
+
 }

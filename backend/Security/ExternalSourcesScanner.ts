@@ -173,19 +173,19 @@ export class ExternalSourcesScanner {
      */
     public async scan(name: string, version: string): Promise<ExternalFinding> {
         if (!this.isEnabled() || GitResolver.isGitVersion(version)) {
-            return {name, version, level: null, findings: []};
+            return {name: name, version: version, level: null, findings: []};
         }
 
         const wantSocket = this._opts.socket?.enabled !== false && this._socket.hasKey();
         const wantOpenssf = this._opts.openssf?.enabled !== false;
         const wantDepsDev = this._opts.depsDev?.enabled !== false;
 
-        const reg = (wantOpenssf || wantDepsDev) ? await this._registry.fetchOne(name) : null;
+        const reg = wantOpenssf || wantDepsDev ? await this._registry.fetchOne(name) : null;
         const repo = wantOpenssf ? OpenSsfFetcher.parseRepoUrl(reg?.repository ?? null) : null;
 
         const [socket, openssf, depsDev] = await Promise.all([
             wantSocket ? this._socket.fetch(name, version) : Promise.resolve(null),
-            (wantOpenssf && repo) ? this._openssf.fetch(repo) : Promise.resolve(null),
+            wantOpenssf && repo ? this._openssf.fetch(repo) : Promise.resolve(null),
             wantDepsDev ? this._depsDev.fetch(name, version) : Promise.resolve(null)
         ]);
 
@@ -204,7 +204,7 @@ export class ExternalSourcesScanner {
         }
 
         const level = ExternalSourcesScanner._worstSeverity(findings);
-        return {name, version, level, findings};
+        return {name: name, version: version, level: level, findings: findings};
     }
 
     private _classifySocket(
@@ -228,7 +228,7 @@ export class ExternalSourcesScanner {
         }
         return {
             source: 'socket',
-            severity,
+            severity: severity,
             score: pct,
             detail: `socket overall score ${pct}/100`,
             url: `https://socket.dev/npm/package/${encodeURIComponent(name)}/overview/${encodeURIComponent(version)}`,
@@ -238,7 +238,7 @@ export class ExternalSourcesScanner {
 
     private _classifyOpenssf(
         result: ScorecardResult|null,
-        repo: {host: string; owner: string; repo: string}|null
+        repo: {host: string; owner: string; repo: string;}|null
     ): ExternalSourceFinding|null {
         if (!result || result.score === null || !repo) {
             return null;
@@ -256,7 +256,7 @@ export class ExternalSourcesScanner {
         const pct = Math.round(result.score * 10);
         return {
             source: 'openssf',
-            severity,
+            severity: severity,
             score: pct,
             detail: `OpenSSF Scorecard ${result.score.toFixed(1)}/10`,
             url: `https://scorecard.dev/viewer/?uri=${encodeURIComponent(`${repo.host}/${repo.owner}/${repo.repo}`)}`,
@@ -268,9 +268,11 @@ export class ExternalSourcesScanner {
         if (!result) {
             return null;
         }
-        // deps.dev contributes informational context only — no severity
-        // escalation. Stays info regardless of `isDefault` so the panel
-        // can still render the "default version is X" hint.
+        /*
+         * deps.dev contributes informational context only — no severity
+         * escalation. Stays info regardless of `isDefault` so the panel
+         * can still render the "default version is X" hint.
+         */
         const detail = result.defaultVersion && !result.isDefault
             ? `deps.dev default version: ${result.defaultVersion}`
             : 'deps.dev metadata available';
@@ -278,7 +280,7 @@ export class ExternalSourcesScanner {
             source: 'depsDev',
             severity: ExternalSeverity.info,
             score: null,
-            detail,
+            detail: detail,
             url: `https://deps.dev/npm/${encodeURIComponent(result.versionKey.name)}/${encodeURIComponent(result.versionKey.version)}`,
             raw: result
         };
@@ -291,13 +293,13 @@ export class ExternalSourcesScanner {
      * fetches. Returns one entry per input coordinate, in input order.
      */
     public async scanBatch(
-        packages: {name: string; version: string}[],
+        packages: {name: string; version: string;}[],
         concurrency = 10
     ): Promise<ExternalFinding[]> {
         const result: ExternalFinding[] = new Array(packages.length);
         let cursor = 0;
 
-        const runOne = async (): Promise<void> => {
+        const runOne = async(): Promise<void> => {
             while (true) {
                 const i = cursor++;
                 if (i >= packages.length) {
@@ -352,4 +354,5 @@ export class ExternalSourcesScanner {
         }
         return best;
     }
+
 }

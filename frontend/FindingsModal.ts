@@ -186,13 +186,15 @@ export class FindingsModal {
             wrap.appendChild(cap);
         }
 
-        // Scanners whose findings are keyed by `name@version` (every
-        // per-package one) get clickable rows that jump straight into
-        // the PackageDetailPanel — the modal lists the *which*, the
-        // detail panel shows the *what*. External is the explicit
-        // motivator: each row's detail is just "N source(s)", so the
-        // user needs to drill in to see what socket/OpenSSF/deps.dev
-        // actually returned.
+        /*
+         * Scanners whose findings are keyed by `name@version` (every
+         * per-package one) get clickable rows that jump straight into
+         * the PackageDetailPanel — the modal lists the *which*, the
+         * detail panel shows the *what*. External is the explicit
+         * motivator: each row's detail is just "N source(s)", so the
+         * user needs to drill in to see what socket/OpenSSF/deps.dev
+         * actually returned.
+         */
         const rowsClickable = FindingsModal._rowsAreClickable(scanner) && this._onRowClick !== null;
 
         const list = document.createElement('div');
@@ -275,7 +277,7 @@ export class FindingsModal {
      * leading `@scope/`. Returns `null` for labels that don't carry
      * a version at all.
      */
-    private static _parseLabel(label: string): {name: string; version: string}|null {
+    private static _parseLabel(label: string): {name: string; version: string;}|null {
         const at = label.lastIndexOf('@');
         if (at <= 0) {
             return null;
@@ -285,7 +287,7 @@ export class FindingsModal {
         if (!name || !version) {
             return null;
         }
-        return {name, version};
+        return {name: name, version: version};
     }
 
     private _renderDrillFooter(scanner: ScannerId, projectUnid: string, viewLabel: string): HTMLElement {
@@ -317,4 +319,5 @@ export class FindingsModal {
             default: return null;
         }
     }
+
 }

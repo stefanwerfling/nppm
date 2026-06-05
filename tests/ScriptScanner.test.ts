@@ -8,7 +8,7 @@ function mf(scripts: Record<string, string>): PackageFingerprintManifest {
         devDependencies: {},
         peerDependencies: {},
         optionalDependencies: {},
-        scripts
+        scripts: scripts
     };
 }
 

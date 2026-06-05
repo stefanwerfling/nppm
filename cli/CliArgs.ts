@@ -50,10 +50,12 @@ export type CliArgs = {
  * these and prints the message + usage to stderr.
  */
 export class CliArgsError extends Error {
+
     constructor(message: string) {
         super(message);
         this.name = 'CliArgsError';
     }
+
 }
 
 /**
@@ -163,6 +165,7 @@ export class CliArgsParser {
 
         return out;
     }
+
 }
 
 /**

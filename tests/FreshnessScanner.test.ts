@@ -62,9 +62,11 @@ describe('FreshnessScanner.classify', () => {
     });
 
     it('respects custom thresholds', () => {
-        // With default 30/7, a 5-day-old package is risk. With a
-        // strict 60/14, the same age is still risk; with a relaxed
-        // 7/3 it becomes warn.
+        /*
+         * With default 30/7, a 5-day-old package is risk. With a
+         * strict 60/14, the same age is still risk; with a relaxed
+         * 7/3 it becomes warn.
+         */
         const strict = FreshnessScanner.classify(
             {firstPublishedAt: daysAgo(5), maintainerCreatedAt: null},
             {now: NOW, warnDays: 60, riskDays: 14}

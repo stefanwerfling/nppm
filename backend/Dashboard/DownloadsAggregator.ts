@@ -61,6 +61,7 @@ export class DownloadsAggregator {
             perProject.set(unid, projectSum);
         }
 
-        return {perProject, ecosystemDeduped: ecosystem};
+        return {perProject: perProject, ecosystemDeduped: ecosystem};
     }
+
 }

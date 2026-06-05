@@ -25,9 +25,11 @@ export type GitRunner = {
     headSha: (cwd: string) => string;
 };
 
-// Re-export the shared types so existing imports keep working. The
-// types live in `BackfillCommon` because the remote backfill shares
-// them; this module's public surface stays unchanged.
+/*
+ * Re-export the shared types so existing imports keep working. The
+ * types live in `BackfillCommon` because the remote backfill shares
+ * them; this module's public surface stays unchanged.
+ */
 export type {GitBackfillResult, GitHistorySnapshot};
 
 /**
@@ -103,24 +105,28 @@ export class GitHistoryBackfill {
 
         const headSha = this.headSha(cwd);
 
-        // Lockfile-first. When non-empty, ignore package.json
-        // entirely — same-commit transitions between the two would
-        // create false diffs.
+        /*
+         * Lockfile-first. When non-empty, ignore package.json
+         * entirely — same-commit transitions between the two would
+         * create false diffs.
+         */
         const lockSnapshots = this._listSnapshots(cwd, 'package-lock.json', 'committed', onProgress);
         if (lockSnapshots.length > 0) {
             const {entries, finalState} = BackfillCommon.snapshotsToEntries(lockSnapshots);
-            return {headSha, entries, finalState, source: 'committed'};
+            return {headSha: headSha, entries: entries, finalState: finalState, source: 'committed'};
         }
 
-        // No committed lockfile anywhere in history — fall back to
-        // tracking declared-deps drift via package.json.
+        /*
+         * No committed lockfile anywhere in history — fall back to
+         * tracking declared-deps drift via package.json.
+         */
         const pkgSnapshots = this._listSnapshots(cwd, 'package.json', 'package-json', onProgress);
         if (pkgSnapshots.length === 0) {
-            return {headSha, entries: [], finalState: [], source: 'committed'};
+            return {headSha: headSha, entries: [], finalState: [], source: 'committed'};
         }
 
         const {entries, finalState} = BackfillCommon.snapshotsToEntries(pkgSnapshots);
-        return {headSha, entries, finalState, source: 'package-json'};
+        return {headSha: headSha, entries: entries, finalState: finalState, source: 'package-json'};
     }
 
     private _listSnapshots(
@@ -170,7 +176,7 @@ export class GitHistoryBackfill {
                 continue;
             }
 
-            out.push({sha, timestamp: secs * 1000, packages, source});
+            out.push({sha: sha, timestamp: secs * 1000, packages: packages, source: source});
         }
         return out;
     }
@@ -178,11 +184,15 @@ export class GitHistoryBackfill {
     private static _defaultRunner(): GitRunner {
         const opts = {
             encoding: 'utf-8' as const,
-            // Big lockfiles balloon up. 128 MB is the upper bound for
-            // realistic monorepo lockfiles.
+            /*
+             * Big lockfiles balloon up. 128 MB is the upper bound for
+             * realistic monorepo lockfiles.
+             */
             maxBuffer: 128 * 1024 * 1024,
-            // Inherit the shell environment but swallow stderr — git
-            // chatter on missing refs would otherwise spam the dev log.
+            /*
+             * Inherit the shell environment but swallow stderr — git
+             * chatter on missing refs would otherwise spam the dev log.
+             */
             stdio: ['ignore', 'pipe', 'ignore'] as ('ignore'|'pipe')[]
         };
         return {
@@ -190,18 +200,19 @@ export class GitHistoryBackfill {
             log: (cwd, file) => execFileSync(
                 'git',
                 ['log', '--reverse', '--format=%H,%ct', '--', file],
-                {...opts, cwd}
+                {...opts, cwd: cwd}
             ),
             show: (cwd, ref, file) => execFileSync(
                 'git',
                 ['show', `${ref}:${file}`],
-                {...opts, cwd}
+                {...opts, cwd: cwd}
             ),
             headSha: (cwd) => execFileSync(
                 'git',
                 ['rev-parse', 'HEAD'],
-                {...opts, cwd}
+                {...opts, cwd: cwd}
             )
         };
     }
+
 }

@@ -6,7 +6,7 @@ import {SbomComponent, SbomData} from './SbomCollector.js';
  * inspects: packages with name/version/SPDXID/downloadLocation/
  * licenseConcluded/checksums, plus DEPENDS_ON relationships.
  */
-type SpdxChecksum = {algorithm: 'SHA512'; checksumValue: string};
+type SpdxChecksum = {algorithm: 'SHA512'; checksumValue: string;};
 
 type SpdxExternalRef = {
     referenceCategory: 'PACKAGE-MANAGER';
@@ -98,8 +98,10 @@ export class SpdxBuilder {
             return pkg;
         });
 
-        // Root project package — minimal, used as the `DESCRIBES`
-        // target so consumers know which element is the BOM subject.
+        /*
+         * Root project package — minimal, used as the `DESCRIBES`
+         * target so consumers know which element is the BOM subject.
+         */
         packages.unshift({
             SPDXID: rootId,
             name: data.project.name,
@@ -119,8 +121,10 @@ export class SpdxBuilder {
             relatedSpdxElement: rootId
         });
 
-        // Build per-name index so dependency-edge resolution mirrors
-        // CycloneDX semantics: declared name → first matching version.
+        /*
+         * Build per-name index so dependency-edge resolution mirrors
+         * CycloneDX semantics: declared name → first matching version.
+         */
         const byName = new Map<string, SbomComponent>();
         for (const c of data.components) {
             if (!byName.has(c.name)) {
@@ -155,8 +159,8 @@ export class SpdxBuilder {
                 created: data.project.generatedAt,
                 creators: [`Tool: nppm-${toolVersion}`]
             },
-            packages,
-            relationships
+            packages: packages,
+            relationships: relationships
         };
     }
 
@@ -167,8 +171,8 @@ export class SpdxBuilder {
      */
     private static _spdxId(name: string, version: string): string {
         const sanitised = `${name}-${version}`
-            .replace(/[^A-Za-z0-9.+-]/g, '-')
-            .replace(/^-+|-+$/g, '');
+        .replace(/[^A-Za-z0-9.+-]/g, '-')
+        .replace(/^-+|-+$/g, '');
         const safe = sanitised.length > 0 ? sanitised : 'pkg';
         return `SPDXRef-${safe}`;
     }
@@ -191,12 +195,15 @@ export class SpdxBuilder {
         if (SpdxBuilder._SPDX_ID_RE.test(trimmed)) {
             return trimmed;
         }
-        // Compound expression — let through if it's parens + uppercase
-        // operators + valid SPDX-ish tokens. We don't fully validate;
-        // a downstream tool will catch the malformed cases.
+        /*
+         * Compound expression — let through if it's parens + uppercase
+         * operators + valid SPDX-ish tokens. We don't fully validate;
+         * a downstream tool will catch the malformed cases.
+         */
         if (/^[A-Za-z0-9.+\-() ]+$/.test(trimmed) && /\b(AND|OR|WITH)\b/.test(trimmed)) {
             return trimmed;
         }
         return 'NOASSERTION';
     }
+
 }

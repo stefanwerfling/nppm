@@ -21,7 +21,7 @@ export type UnusedFs = {
     existsSync: (p: string) => boolean;
     readdirSync: (p: string) => string[];
     readFileSync: (p: string, enc: 'utf-8') => string;
-    statSync: (p: string) => {isDirectory: () => boolean; isFile: () => boolean};
+    statSync: (p: string) => {isDirectory: () => boolean; isFile: () => boolean;};
 };
 
 export type UnusedDetectorOptions = {
@@ -126,25 +126,31 @@ export class UnusedDetector {
     private readonly _fs: UnusedFs;
 
     constructor(opts: UnusedDetectorOptions = {}, fs?: UnusedFs) {
-        // Allowlist: built-in defaults + user additions. Union, not
-        // override — losing the bin-tool defaults would re-introduce
-        // a wall of false positives.
+        /*
+         * Allowlist: built-in defaults + user additions. Union, not
+         * override — losing the bin-tool defaults would re-introduce
+         * a wall of false positives.
+         */
         this._allowlist = new Set([
             ...DEFAULT_ALLOWLIST,
-            ...(opts.allowlist ?? [])
+            ...opts.allowlist ?? []
         ]);
 
-        // Dev-path globs: user list *replaces* the default if non-
-        // empty (otherwise an opinionated user couldn't shrink the
-        // dev-path set), but is empty means "use defaults".
-        const globs = (opts.devPathGlobs && opts.devPathGlobs.length > 0)
+        /*
+         * Dev-path globs: user list *replaces* the default if non-
+         * empty (otherwise an opinionated user couldn't shrink the
+         * dev-path set), but is empty means "use defaults".
+         */
+        const globs = opts.devPathGlobs && opts.devPathGlobs.length > 0
             ? opts.devPathGlobs
             : DEFAULT_DEV_PATH_GLOBS;
         this._devGlobs = globs.map((g) => UnusedDetector._globToRegex(g));
 
-        // Optional FS injection so the test suite stays offline /
-        // off-disk. The production wiring leaves `fs` undefined and
-        // we fall back to Node's built-in.
+        /*
+         * Optional FS injection so the test suite stays offline /
+         * off-disk. The production wiring leaves `fs` undefined and
+         * we fall back to Node's built-in.
+         */
         this._fs = fs ?? {
             existsSync: nodeFs.existsSync,
             readdirSync: (p: string) => nodeFs.readdirSync(p),
@@ -160,9 +166,11 @@ export class UnusedDetector {
             type: project.getType()
         };
 
-        // Remote projects need a contents-API per-file fetch; that's
-        // too expensive for v1. Return a sentinel report so the UI
-        // can render "not supported here" instead of failing.
+        /*
+         * Remote projects need a contents-API per-file fetch; that's
+         * too expensive for v1. Return a sentinel report so the UI
+         * can render "not supported here" instead of failing.
+         */
         if (!(project instanceof ProjectLocal)) {
             return {
                 project: projectMeta,
@@ -179,14 +187,18 @@ export class UnusedDetector {
         const root = project.getRoot();
         const manifests = await project.loadManifests();
 
-        // Per-package collection across the whole project:
-        //   importsByName.get(pkg) → array of source files that mention it
+        /*
+         * Per-package collection across the whole project:
+         *   importsByName.get(pkg) → array of source files that mention it
+         */
         const importsByName = new Map<string, string[]>();
         const scanLimits: ScanLimit[] = [];
         let filesScanned = 0;
 
-        // One pass over the file tree — same scan covers all
-        // workspaces because workspaces all live under `root`.
+        /*
+         * One pass over the file tree — same scan covers all
+         * workspaces because workspaces all live under `root`.
+         */
         const walk = (dir: string): void => {
             let entries: string[];
             try {
@@ -251,14 +263,18 @@ export class UnusedDetector {
         };
         walk(root);
 
-        // Union of declared deps across all workspaces. The detector
-        // works against the *project as a whole*; a workspace-only
-        // dep imported only in that workspace is still "used".
+        /*
+         * Union of declared deps across all workspaces. The detector
+         * works against the *project as a whole*; a workspace-only
+         * dep imported only in that workspace is still "used".
+         */
         const declared = UnusedDetector._collectDeclared(manifests);
 
-        // Workspace package names — these resolve to local source, not
-        // to a node_modules install, so imports of them are not
-        // "missing" even though they don't show up in deps.
+        /*
+         * Workspace package names — these resolve to local source, not
+         * to a node_modules install, so imports of them are not
+         * "missing" even though they don't show up in deps.
+         */
         const workspaceNames = new Set<string>();
         for (const m of manifests) {
             if (m.workspace !== undefined) {
@@ -266,8 +282,10 @@ export class UnusedDetector {
             }
         }
 
-        // Names that appear inside `scripts: {...}` command bodies
-        // (e.g. `"build": "tsc -p ."` → `tsc` counts as used).
+        /*
+         * Names that appear inside `scripts: {...}` command bodies
+         * (e.g. `"build": "tsc -p ."` → `tsc` counts as used).
+         */
         const scriptHits = UnusedDetector._collectScriptHits(manifests, declared);
 
         const unused: UnusedFinding[] = [];
@@ -283,7 +301,7 @@ export class UnusedDetector {
             if (imports.length === 0) {
                 if (isAllowlisted) {
                     unused.push({
-                        name,
+                        name: name,
                         declaredIn: info.bucket,
                         severity: UnusedSeverity.info,
                         reason: 'On the allowlist (bin tool / build step) — not safe to remove'
@@ -292,7 +310,7 @@ export class UnusedDetector {
                 }
                 if (isInScripts) {
                     unused.push({
-                        name,
+                        name: name,
                         declaredIn: info.bucket,
                         severity: UnusedSeverity.info,
                         reason: 'Referenced in `scripts: {...}` — invoked via CLI'
@@ -301,7 +319,7 @@ export class UnusedDetector {
                 }
                 if (isUsedByTypesConsumer) {
                     unused.push({
-                        name,
+                        name: name,
                         declaredIn: info.bucket,
                         severity: UnusedSeverity.info,
                         reason: '`@types/X` package — implicitly used by consumer X'
@@ -309,7 +327,7 @@ export class UnusedDetector {
                     continue;
                 }
                 unused.push({
-                    name,
+                    name: name,
                     declaredIn: info.bucket,
                     severity: UnusedSeverity.risk,
                     reason: 'Not imported anywhere, not in `scripts:`, not on the allowlist'
@@ -317,21 +335,25 @@ export class UnusedDetector {
                 continue;
             }
 
-            // Bucket 2: imported, but only from dev-paths AND
-            // declared as a regular dep.
+            /*
+             * Bucket 2: imported, but only from dev-paths AND
+             * declared as a regular dep.
+             */
             if (info.bucket === 'dependency') {
                 const allDev = imports.every((path) => this._isDevPath(path));
                 if (allDev) {
                     misplaced.push({
-                        name,
+                        name: name,
                         firstImport: imports[0]
                     });
                 }
             }
         }
 
-        // Missing deps: every name in importsByName that isn't
-        // declared, isn't a workspace, and isn't a Node-builtin.
+        /*
+         * Missing deps: every name in importsByName that isn't
+         * declared, isn't a workspace, and isn't a Node-builtin.
+         */
         const missing: MissingFinding[] = [];
         for (const [name, paths] of importsByName.entries()) {
             if (declared.has(name)) {
@@ -343,7 +365,7 @@ export class UnusedDetector {
             if (UnusedDetector._isNodeBuiltin(name)) {
                 continue;
             }
-            missing.push({name, firstImport: paths[0]});
+            missing.push({name: name, firstImport: paths[0]});
         }
 
         unused.sort((a, b) => a.name.localeCompare(b.name));
@@ -353,11 +375,11 @@ export class UnusedDetector {
         return {
             project: projectMeta,
             supported: true,
-            unused,
-            misplaced,
-            missing,
-            scanLimits,
-            filesScanned
+            unused: unused,
+            misplaced: misplaced,
+            missing: missing,
+            scanLimits: scanLimits,
+            filesScanned: filesScanned
         };
     }
 
@@ -367,17 +389,19 @@ export class UnusedDetector {
      * plus a count of dynamic-spec patterns we couldn't resolve
      * (`import(name)` where `name` is a variable).
      */
-    private static _scanImports(content: string): {specs: string[]; dynamicHits: number} {
+    private static _scanImports(content: string): {specs: string[]; dynamicHits: number;} {
         const specs: string[] = [];
 
-        // Strip line-comments and block-comments. Naive but adequate
-        // — strings with `//` inside are rare enough that the
-        // false-positive risk is lower than the false-negative risk
-        // of e.g. an `// import 'foo'` line being counted as a real
-        // import.
+        /*
+         * Strip line-comments and block-comments. Naive but adequate
+         * — strings with `//` inside are rare enough that the
+         * false-positive risk is lower than the false-negative risk
+         * of e.g. an `// import 'foo'` line being counted as a real
+         * import.
+         */
         const stripped = content
-            .replace(/\/\*[\s\S]*?\*\//g, '')
-            .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
         // ES module `import ... from 'name'` / bare `import 'name'`.
         const reImport = /(?:^|[\s;])import(?:\s+(?:type\s+)?[^'"]*?from)?\s*['"]([^'"]+)['"]/g;
@@ -404,16 +428,18 @@ export class UnusedDetector {
             specs.push(m[1]);
         }
 
-        // Count dynamic specs we can't resolve. Best-effort
-        // approximation; we don't need to extract anything, just
-        // flag the file as partially scanned.
+        /*
+         * Count dynamic specs we can't resolve. Best-effort
+         * approximation; we don't need to extract anything, just
+         * flag the file as partially scanned.
+         */
         const reDynVar = /(?:^|[\s({,=])(?:import|require)\s*\(\s*[A-Za-z_$]/g;
         let dynamicHits = 0;
         while (reDynVar.exec(stripped) !== null) {
             dynamicHits++;
         }
 
-        return {specs, dynamicHits};
+        return {specs: specs, dynamicHits: dynamicHits};
     }
 
     /**
@@ -451,8 +477,8 @@ export class UnusedDetector {
      */
     private static _collectDeclared(
         manifests: PackageManifest[]
-    ): Map<string, {bucket: UnusedDepBucket}> {
-        const out = new Map<string, {bucket: UnusedDepBucket}>();
+    ): Map<string, {bucket: UnusedDepBucket;}> {
+        const out = new Map<string, {bucket: UnusedDepBucket;}>();
         const rank: Record<UnusedDepBucket, number> = {
             dependency: 3,
             peerDependency: 2,
@@ -464,7 +490,7 @@ export class UnusedDetector {
                 const bucket = UnusedDetector._bucketOf(dep.type);
                 const existing = out.get(dep.name);
                 if (!existing || rank[bucket] > rank[existing.bucket]) {
-                    out.set(dep.name, {bucket});
+                    out.set(dep.name, {bucket: bucket});
                 }
             }
         }
@@ -492,7 +518,7 @@ export class UnusedDetector {
      */
     private static _collectScriptHits(
         manifests: PackageManifest[],
-        declared: Map<string, {bucket: UnusedDepBucket}>
+        declared: Map<string, {bucket: UnusedDepBucket;}>
     ): Set<string> {
         const hits = new Set<string>();
 
@@ -547,10 +573,12 @@ export class UnusedDetector {
     }
 
     private static _isNodeBuiltin(name: string): boolean {
-        // Common Node built-ins. `node:` prefix is already filtered
-        // upstream; this catches bare names. Not exhaustive — false
-        // negatives here surface as `missing` findings, which is the
-        // safe direction.
+        /*
+         * Common Node built-ins. `node:` prefix is already filtered
+         * upstream; this catches bare names. Not exhaustive — false
+         * negatives here surface as `missing` findings, which is the
+         * safe direction.
+         */
         const builtins = new Set([
             'fs', 'path', 'os', 'crypto', 'http', 'https', 'url', 'util',
             'stream', 'buffer', 'child_process', 'events', 'querystring',
@@ -603,7 +631,7 @@ export class UnusedDetector {
                 continue;
             }
             if ('.+^${}()|[]\\'.includes(ch)) {
-                out += '\\' + ch;
+                out += `\\${  ch}`;
             } else {
                 out += ch;
             }
@@ -617,4 +645,5 @@ export class UnusedDetector {
         const dot = path.lastIndexOf('.');
         return dot >= 0 ? path.slice(dot).toLowerCase() : '';
     }
+
 }

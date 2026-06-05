@@ -5,16 +5,16 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {JsonCache} from '../backend/Cache/JsonCache.js';
 import {SocketDevFetcher} from '../backend/Security/External/SocketDevFetcher.js';
 
-function stubFetch(impl: (url: string, init?: RequestInit) => {ok: boolean; status?: number; body?: unknown}): () => void {
+function stubFetch(impl: (url: string, init?: RequestInit) => {ok: boolean; status?: number; body?: unknown;}): () => void {
     const original = globalThis.fetch;
-    globalThis.fetch = (async (input: RequestInfo|URL, init?: RequestInit) => {
+    globalThis.fetch = (async(input: RequestInfo|URL, init?: RequestInit) => {
         const url = typeof input === 'string' ? input : input.toString();
         const res = impl(url, init);
         return {
             ok: res.ok,
             status: res.status ?? (res.ok ? 200 : 500),
             statusText: res.ok ? 'OK' : 'Error',
-            json: async () => res.body ?? {}
+            json: async() => res.body ?? {}
         } as unknown as Response;
     }) as typeof fetch;
     return () => {
@@ -66,7 +66,7 @@ describe('SocketDevFetcher.fetch', () => {
         fs.rmSync(dir, {recursive: true, force: true});
     });
 
-    it('returns null and skips the network without an API key', async () => {
+    it('returns null and skips the network without an API key', async() => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;
@@ -82,7 +82,7 @@ describe('SocketDevFetcher.fetch', () => {
         }
     });
 
-    it('sends the API key as Bearer and parses the response', async () => {
+    it('sends the API key as Bearer and parses the response', async() => {
         let seenAuth: string|null = null;
         const restore = stubFetch((_url, init) => {
             const h = init?.headers as Record<string, string>|undefined;
@@ -99,7 +99,7 @@ describe('SocketDevFetcher.fetch', () => {
         }
     });
 
-    it('caches the null envelope on refusal so a second call never re-fetches', async () => {
+    it('caches the null envelope on refusal so a second call never re-fetches', async() => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;

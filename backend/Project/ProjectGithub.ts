@@ -25,8 +25,8 @@ type GithubContentEntry = {
 type GithubCommitEntry = {
     sha: string;
     commit?: {
-        committer?: {date?: string};
-        author?: {date?: string};
+        committer?: {date?: string;};
+        author?: {date?: string;};
     };
 };
 
@@ -52,13 +52,15 @@ export class ProjectGithub extends ProjectRemote {
         ref?: string,
         token?: string,
         cache?: JsonCache,
-        opts: {hidden?: boolean; configIndex?: number; templates?: string[]} = {}
+        opts: {hidden?: boolean; configIndex?: number; templates?: string[];} = {}
     ) {
         super(displayName, opts);
-        // Accept either `owner/repo` or a full github.com URL the user
-        // pasted from the address bar — the contents API only handles
-        // the short form. Normalising here keeps the rest of this
-        // class oblivious to which shape sat in nppm.json.
+        /*
+         * Accept either `owner/repo` or a full github.com URL the user
+         * pasted from the address bar — the contents API only handles
+         * the short form. Normalising here keeps the rest of this
+         * class oblivious to which shape sat in nppm.json.
+         */
         this._repo = ProjectGithub._normaliseRepo(repo);
         this._ref = ref;
         this._token = token;
@@ -96,8 +98,10 @@ export class ProjectGithub extends ProjectRemote {
         }
 
         if (data.encoding === 'base64' && typeof data.content === 'string') {
-            // GitHub wraps long base64 with newlines — atob+TextDecoder
-            // handle this fine but we strip them for clarity.
+            /*
+             * GitHub wraps long base64 with newlines — atob+TextDecoder
+             * handle this fine but we strip them for clarity.
+             */
             const cleaned = data.content.replace(/\n/g, '');
             return Buffer.from(cleaned, 'base64').toString('utf-8');
         }
@@ -113,8 +117,8 @@ export class ProjectGithub extends ProjectRemote {
         }
 
         return data
-            .filter((e) => e.type === 'dir')
-            .map((e) => e.name);
+        .filter((e) => e.type === 'dir')
+        .map((e) => e.name);
     }
 
     public async fetchFileAtRef(repoPath: string, ref: string): Promise<string|null> {
@@ -143,7 +147,7 @@ export class ProjectGithub extends ProjectRemote {
             }
 
             const cacheKey = `github_commits_${this._repo}_${this._ref ?? 'HEAD'}_${cleanPath}_p${page}`;
-            type Wrap = {data: GithubCommitEntry[]|null};
+            type Wrap = {data: GithubCommitEntry[]|null;};
             let chunk: GithubCommitEntry[]|null = null;
 
             if (this._cache) {
@@ -185,9 +189,11 @@ export class ProjectGithub extends ProjectRemote {
             }
         }
 
-        // GitHub returns commits newest-first across pages. Flip so
-        // the backfill processes oldest-first and matches the local
-        // walker's `git log --reverse` semantics.
+        /*
+         * GitHub returns commits newest-first across pages. Flip so
+         * the backfill processes oldest-first and matches the local
+         * walker's `git log --reverse` semantics.
+         */
         collected.reverse();
         return collected;
     }
@@ -196,7 +202,7 @@ export class ProjectGithub extends ProjectRemote {
         const ref = this._ref ?? 'HEAD';
         const url = `https://api.github.com/repos/${this._repo}/commits/${encodeURIComponent(ref)}`;
         const cacheKey = `github_head_${this._repo}_${ref}`;
-        type Wrap = {data: string|null};
+        type Wrap = {data: string|null;};
 
         if (this._cache) {
             const hit = this._cache.get<Wrap>(cacheKey);
@@ -211,7 +217,7 @@ export class ProjectGithub extends ProjectRemote {
                 this._cache?.set<Wrap>(cacheKey, {data: null});
                 return null;
             }
-            const body = (await res.json()) as {sha?: string};
+            const body = (await res.json()) as {sha?: string;};
             const sha = typeof body.sha === 'string' ? body.sha : null;
             this._cache?.set<Wrap>(cacheKey, {data: sha});
             return sha;
@@ -222,7 +228,7 @@ export class ProjectGithub extends ProjectRemote {
 
     private _headers(): Record<string, string> {
         const headers: Record<string, string> = {
-            Accept: 'application/vnd.github.v3+json',
+            'Accept': 'application/vnd.github.v3+json',
             'User-Agent': 'nppm'
         };
         if (this._token) {
@@ -245,11 +251,13 @@ export class ProjectGithub extends ProjectRemote {
             url.searchParams.set('ref', ref);
         }
 
-        // Wrap in `{data: ...}` so we can distinguish a cached-404
-        // (`{data: null}`) from a cache miss (JsonCache returning
-        // `null`).
+        /*
+         * Wrap in `{data: ...}` so we can distinguish a cached-404
+         * (`{data: null}`) from a cache miss (JsonCache returning
+         * `null`).
+         */
         const cacheKey = `github_${this._repo}_${ref ?? 'HEAD'}_${cleanPath}`;
-        type Wrap = {data: GithubContentEntry|GithubContentEntry[]|null};
+        type Wrap = {data: GithubContentEntry|GithubContentEntry[]|null;};
 
         if (this._cache) {
             const hit = this._cache.get<Wrap>(cacheKey);
@@ -270,7 +278,8 @@ export class ProjectGithub extends ProjectRemote {
         }
 
         const data = (await res.json()) as GithubContentEntry|GithubContentEntry[];
-        this._cache?.set<Wrap>(cacheKey, {data});
+        this._cache?.set<Wrap>(cacheKey, {data: data});
         return data;
     }
+
 }

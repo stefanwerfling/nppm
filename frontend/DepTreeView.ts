@@ -30,7 +30,7 @@ type TreeDatum = {
     cycle?: boolean;
     children?: TreeDatum[];
     _children?: TreeDatum[];
-    _pendingDeps?: {name: string; version: string}[];
+    _pendingDeps?: {name: string; version: string;}[];
 };
 
 const INITIAL_EAGER_DEPTH = 1;
@@ -175,7 +175,7 @@ export class DepTreeView {
      */
     private _buildNode(
         parentKey: string,
-        ref: {name: string; version: string},
+        ref: {name: string; version: string;},
         data: DepGraphResponse,
         eagerDepth: number
     ): TreeDatum {
@@ -184,7 +184,7 @@ export class DepTreeView {
 
         if (parentKey.split('/').includes(pkgKey)) {
             return {
-                key,
+                key: key,
                 label: `${pkgKey} ↻`,
                 pkg: null,
                 cycle: true
@@ -193,9 +193,9 @@ export class DepTreeView {
 
         const pkg = data.packages[pkgKey] ?? null;
         const node: TreeDatum = {
-            key,
+            key: key,
             label: ref.version ? pkgKey : `${ref.name} (?)`,
-            pkg
+            pkg: pkg
         };
 
         if (!pkg || pkg.deps.length === 0) {
@@ -208,8 +208,7 @@ export class DepTreeView {
         }
 
         node.children = pkg.deps.map((dep) =>
-            this._buildNode(key, dep, data, eagerDepth - 1)
-        );
+            this._buildNode(key, dep, data, eagerDepth - 1));
         return node;
     }
 
@@ -260,7 +259,7 @@ export class DepTreeView {
     private _renderLegend(): HTMLElement {
         const wrap = document.createElement('div');
         wrap.className = 'deptree-legend';
-        const items: {status: DepGraphStatus; label: string}[] = [
+        const items: {status: DepGraphStatus; label: string;}[] = [
             {status: 'aligned', label: I18n.t('aligned (= latest)')},
             {status: 'outdated', label: I18n.t('outdated')},
             {status: 'cve', label: I18n.t('CVEs known')},
@@ -305,9 +304,9 @@ export class DepTreeView {
         let maxX = -Infinity;
         let maxY = 0;
         for (const n of nodes) {
-            if (n.x < minX) minX = n.x;
-            if (n.x > maxX) maxX = n.x;
-            if (n.y > maxY) maxY = n.y;
+            if (n.x < minX) {minX = n.x;}
+            if (n.x > maxX) {maxX = n.x;}
+            if (n.y > maxY) {maxY = n.y;}
         }
         const height = maxX - minX + 60;
         const width = maxY + COLUMN_WIDTH;
@@ -429,8 +428,7 @@ export class DepTreeView {
         // (3) first-time expand
         if (datum._pendingDeps && datum._pendingDeps.length > 0 && this._data) {
             datum.children = datum._pendingDeps.map((dep) =>
-                this._buildNode(datum.key, dep, this._data!, 0)
-            );
+                this._buildNode(datum.key, dep, this._data!, 0));
             datum._pendingDeps = undefined;
             this._redraw();
         }
@@ -540,4 +538,5 @@ export class DepTreeView {
         header.appendChild(toggle);
         return header;
     }
+
 }

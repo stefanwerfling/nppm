@@ -212,7 +212,7 @@ export class WhyModal {
         const MAX_PATHS = 30;
         const MAX_DEPTH = 12;
 
-        const queue: {chain: string[]; seen: Set<string>}[] = [
+        const queue: {chain: string[]; seen: Set<string>;}[] = [
             {chain: [target], seen: new Set([target])}
         ];
         const out: string[][] = [];
@@ -244,4 +244,5 @@ export class WhyModal {
         }
         return out;
     }
+
 }

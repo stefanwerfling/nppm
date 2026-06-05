@@ -21,9 +21,9 @@ function fakeRunner(commits: {
                 ? 'lockfile'
                 : 'packageJson';
             return commits
-                .filter((c) => c[field] !== null && c[field] !== undefined)
-                .map((c) => `${c.sha},${c.ts}`)
-                .join('\n');
+            .filter((c) => c[field] !== null && c[field] !== undefined)
+            .map((c) => `${c.sha},${c.ts}`)
+            .join('\n');
         },
         show: (_cwd, ref, file) => {
             const c = commits.find((x) => x.sha === ref);
@@ -50,7 +50,7 @@ function pkgJson(deps: {
 function lockfile(packages: Record<string, string>): string {
     const out: Record<string, unknown> = {};
     for (const [name, version] of Object.entries(packages)) {
-        out[`node_modules/${name}`] = {version};
+        out[`node_modules/${name}`] = {version: version};
     }
     return JSON.stringify({
         lockfileVersion: 3,

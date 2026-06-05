@@ -159,9 +159,11 @@ export class DashboardView {
     }
 
     private async _loadSnapshot(): Promise<void> {
-        // Fetch history in parallel — drives the macro-donut delta and
-        // pre-warms the trend tab. A history failure is non-fatal; the
-        // donut just hides its delta line.
+        /*
+         * Fetch history in parallel — drives the macro-donut delta and
+         * pre-warms the trend tab. A history failure is non-fatal; the
+         * donut just hides its delta line.
+         */
         void this._loadHistory();
         try {
             const res = await fetch('/api/dashboard/snapshot');
@@ -195,9 +197,11 @@ export class DashboardView {
             const payload = (await res.json()) as ApiDashboardHistoryResponse;
             this._historyEntries = payload.entries;
             this._previousOverall = payload.previous?.overall ?? null;
-            // Re-render in case the user is already looking at the
-            // scanner-score tab — the macro-donut needs to re-paint
-            // its delta line now that the previous-overall is known.
+            /*
+             * Re-render in case the user is already looking at the
+             * scanner-score tab — the macro-donut needs to re-paint
+             * its delta line now that the previous-overall is known.
+             */
             this._renderTable();
         } catch {
             // ignore; donut just hides its delta line
@@ -300,9 +304,11 @@ export class DashboardView {
         this._renderTabBar();
         this._root.appendChild(tabBarHost);
 
-        // Widget strip sits between the tab bar and the table body.
-        // Painted only on the scanner-score tab — Overall has its own
-        // hero card, Trend has its own chart.
+        /*
+         * Widget strip sits between the tab bar and the table body.
+         * Painted only on the scanner-score tab — Overall has its own
+         * hero card, Trend has its own chart.
+         */
         const widgetStripHost = document.createElement('div');
         widgetStripHost.className = 'dash-widget-strip-host';
         this._widgetStripHost = widgetStripHost;
@@ -319,7 +325,7 @@ export class DashboardView {
             return;
         }
         this._tabBarHost.innerHTML = '';
-        const tabs: {value: 'scanner-score'|'overall'|'trend'; label: string}[] = [
+        const tabs: {value: 'scanner-score'|'overall'|'trend'; label: string;}[] = [
             {value: 'scanner-score', label: I18n.t('Scanner Score')},
             {value: 'overall', label: I18n.t('Overall Evaluation')},
             {value: 'trend', label: I18n.t('Trend')}
@@ -375,8 +381,10 @@ export class DashboardView {
                     project: {
                         unid: data.projectUnid,
                         name: data.projectName,
-                        // `type` is filled in by column-end; placeholder
-                        // is good enough for the partial table render.
+                        /*
+                         * `type` is filled in by column-end; placeholder
+                         * is good enough for the partial table render.
+                         */
                         type: 'local' as DashboardColumn['project']['type']
                     },
                     cells: {}
@@ -389,11 +397,13 @@ export class DashboardView {
         es.addEventListener('progress', (e) => {
             const data = JSON.parse((e as MessageEvent).data) as ApiDashboardScanProgressEvent;
             const scannerLabel = data.scanner ? DashboardView._scannerLabel(data.scanner) : '';
-            // `detail` (when set) is the substring the user actually
-            // wants to read — "Fingerprinting lodash@4.17.21 (32/84)
-            // — kavula". It already encodes project/scanner context,
-            // so the original `{project} — {scanner}` fallback only
-            // kicks in for cell-level progress events.
+            /*
+             * `detail` (when set) is the substring the user actually
+             * wants to read — "Fingerprinting lodash@4.17.21 (32/84)
+             * — kavula". It already encodes project/scanner context,
+             * so the original `{project} — {scanner}` fallback only
+             * kicks in for cell-level progress events.
+             */
             const phase = data.detail
                 ?? (scannerLabel
                     ? I18n.t('{project} — {scanner}', {project: data.projectName, scanner: scannerLabel})
@@ -414,9 +424,11 @@ export class DashboardView {
             const data = JSON.parse((e as MessageEvent).data) as ApiDashboardScanColumnEndEvent;
             this._columns.set(data.column.project.unid, data.column);
             this._renderTable();
-            // Per-project score is final once the column ends — emit
-            // so the treeview ring updates progressively instead of
-            // waiting for the whole scan.
+            /*
+             * Per-project score is final once the column ends — emit
+             * so the treeview ring updates progressively instead of
+             * waiting for the whole scan.
+             */
             this.emitScores();
         });
 
@@ -497,10 +509,12 @@ export class DashboardView {
         const table = document.createElement('table');
         table.className = 'dash-table';
 
-        // Header row — scanner column + one per project. Project
-        // headers are clickable: they route through `onProjectClick`
-        // so the user can jump from a worrying column straight into
-        // the project's drill-down view (Nppm.handles).
+        /*
+         * Header row — scanner column + one per project. Project
+         * headers are clickable: they route through `onProjectClick`
+         * so the user can jump from a worrying column straight into
+         * the project's drill-down view (Nppm.handles).
+         */
         const thead = document.createElement('thead');
         const headRow = document.createElement('tr');
         const cornerCell = document.createElement('th');
@@ -519,10 +533,12 @@ export class DashboardView {
                 th.title = `${errTitle} · ${col.error}`;
                 th.classList.add('dash-th-error');
             } else if (col?.note) {
-                // Soft annotation (e.g. "no lockfile — scanned against
-                // registry latest"). Adds a small info marker after the
-                // project name without flipping the column to the red
-                // error style.
+                /*
+                 * Soft annotation (e.g. "no lockfile — scanned against
+                 * registry latest"). Adds a small info marker after the
+                 * project name without flipping the column to the red
+                 * error style.
+                 */
                 const errTitle = th.title;
                 th.title = `${errTitle} · ${col.note}`;
                 th.classList.add('dash-th-note');
@@ -536,9 +552,11 @@ export class DashboardView {
         thead.appendChild(headRow);
         table.appendChild(thead);
 
-        // One row per scanner — `dash-row` lets CSS highlight the full
-        // row on hover so the user can track project ↔ scanner
-        // intersections at a glance.
+        /*
+         * One row per scanner — `dash-row` lets CSS highlight the full
+         * row on hover so the user can track project ↔ scanner
+         * intersections at a glance.
+         */
         const tbody = document.createElement('tbody');
         for (const scanner of this._scanners) {
             const row = document.createElement('tr');
@@ -597,11 +615,13 @@ export class DashboardView {
         wrap.className = 'dash-overall';
 
         wrap.appendChild(this._renderEcosystemCard());
-        // Project-health list and top-problem-packages roll-ups are
-        // intentionally suppressed for now — the hero card carries
-        // the same information in summary form and the modals offer
-        // the drill-down. The `_renderOverall*` helpers stay around
-        // so it's one-line to bring either back.
+        /*
+         * Project-health list and top-problem-packages roll-ups are
+         * intentionally suppressed for now — the hero card carries
+         * the same information in summary form and the modals offer
+         * the drill-down. The `_renderOverall*` helpers stay around
+         * so it's one-line to bring either back.
+         */
 
         this._tableHost.appendChild(wrap);
     }
@@ -622,8 +642,10 @@ export class DashboardView {
         const card = document.createElement('div');
         card.className = 'dash-eco-card';
 
-        // SVG overlay must sit above the background image but below
-        // the boxes — the boxes' z-index bumps them over it.
+        /*
+         * SVG overlay must sit above the background image but below
+         * the boxes — the boxes' z-index bumps them over it.
+         */
         const svgNs = 'http://www.w3.org/2000/svg';
         const svg = document.createElementNS(svgNs, 'svg');
         svg.setAttribute('class', 'dash-eco-svg');
@@ -682,9 +704,11 @@ export class DashboardView {
         const ecosystemHealth = scoredProjects > 0 ? Math.round(scoreSum / scoredProjects) : null;
         const projectCount = this._columns.size;
 
-        // Box layout — coordinates in % of the card, anchor points
-        // (where the connector tip lands) likewise in %. Box origin
-        // is its top-left corner.
+        /*
+         * Box layout — coordinates in % of the card, anchor points
+         * (where the connector tip lands) likewise in %. Box origin
+         * is its top-left corner.
+         */
         type BoxSpec = {
             id: EcoBoxId;
             side: 'green'|'red';
@@ -707,9 +731,11 @@ export class DashboardView {
                 id: 'ecosystem-health',
                 side: 'green',
                 top: 22, left: 3, w: 19,
-                // Aim across the canopy toward the upper-centre tree
-                // foliage — longer, clearly visible diagonal instead
-                // of a stub that sits next to the box.
+                /*
+                 * Aim across the canopy toward the upper-centre tree
+                 * foliage — longer, clearly visible diagonal instead
+                 * of a stub that sits next to the box.
+                 */
                 anchorX: 40, anchorY: 26,
                 label: I18n.t('Ecosystem health'),
                 value: ecosystemHealth !== null ? `${ecosystemHealth}/100` : '—',
@@ -728,10 +754,12 @@ export class DashboardView {
                 id: 'info-findings',
                 side: 'green',
                 top: 75, left: 14, w: 22,
-                // Box bottom-left, anchor previously sat *inside* the
-                // box's X range so the line was a stub. Send it up
-                // and right toward the mushroom cluster at the
-                // tree's base — clear diagonal away from the box.
+                /*
+                 * Box bottom-left, anchor previously sat *inside* the
+                 * box's X range so the line was a stub. Send it up
+                 * and right toward the mushroom cluster at the
+                 * tree's base — clear diagonal away from the box.
+                 */
                 anchorX: 42, anchorY: 58,
                 label: I18n.t('Info-level findings'),
                 value: String(totalInfo),
@@ -768,10 +796,12 @@ export class DashboardView {
                 id: 'at-risk-projects',
                 side: 'red',
                 top: 75, left: 64, w: 22,
-                // Mirror of the info-findings box: the previous
-                // anchor sat inside the box's X range. Aim up and
-                // left toward the shield + dark-roots cluster so the
-                // diagonal is visible.
+                /*
+                 * Mirror of the info-findings box: the previous
+                 * anchor sat inside the box's X range. Aim up and
+                 * left toward the shield + dark-roots cluster so the
+                 * diagonal is visible.
+                 */
                 anchorX: 58, anchorY: 58,
                 label: I18n.t('At-risk projects'),
                 value: String(riskyProjects),
@@ -797,13 +827,15 @@ export class DashboardView {
             }
         ];
 
-        // Draw connectors first so the boxes (added next) paint on
-        // top. Start each line a few percent inside the box so the
-        // origin is guaranteed to sit behind the solid box fill —
-        // the visible portion of the line then emerges cleanly at
-        // the box edge that faces the anchor. Boxes render at ~9-12%
-        // tall on the 960×640 card; `+4` keeps the start well above
-        // the bottom edge even on the shortest box.
+        /*
+         * Draw connectors first so the boxes (added next) paint on
+         * top. Start each line a few percent inside the box so the
+         * origin is guaranteed to sit behind the solid box fill —
+         * the visible portion of the line then emerges cleanly at
+         * the box edge that faces the anchor. Boxes render at ~9-12%
+         * tall on the 960×640 card; `+4` keeps the start well above
+         * the bottom edge even on the shortest box.
+         */
         for (const b of boxes) {
             const boxCenterX = b.left + b.w / 2;
             const boxCenterY = b.top + 4;
@@ -881,10 +913,10 @@ export class DashboardView {
                 info += cell.counts.info;
             }
             aggs.push({
-                unid,
+                unid: unid,
                 name: col.project.name,
                 avg: scanned > 0 ? Math.round(sum / scanned) : null,
-                risk, warn, info,
+                risk: risk, warn: warn, info: info,
                 scannedCells: scanned,
                 totalCells: Object.keys(col.cells).length
             });
@@ -944,7 +976,7 @@ export class DashboardView {
     }
 
     private _renderOverallPackages(): HTMLElement|null {
-        type Agg = {label: string; risk: number; warn: number; info: number; projects: Set<string>};
+        type Agg = {label: string; risk: number; warn: number; info: number; projects: Set<string>;};
         const byLabel = new Map<string, Agg>();
         for (const unid of this._columnOrder) {
             const col = this._columns.get(unid);
@@ -973,16 +1005,16 @@ export class DashboardView {
             return null;
         }
         const topN = Array.from(byLabel.values())
-            .sort((a, b) => {
-                if (a.risk !== b.risk) {
-                    return b.risk - a.risk;
-                }
-                if (a.warn !== b.warn) {
-                    return b.warn - a.warn;
-                }
-                return b.info - a.info;
-            })
-            .slice(0, 20);
+        .sort((a, b) => {
+            if (a.risk !== b.risk) {
+                return b.risk - a.risk;
+            }
+            if (a.warn !== b.warn) {
+                return b.warn - a.warn;
+            }
+            return b.info - a.info;
+        })
+        .slice(0, 20);
 
         const section = document.createElement('div');
         section.className = 'dash-overall-section';
@@ -1089,8 +1121,10 @@ export class DashboardView {
         svg.setAttribute('width', '160');
         svg.setAttribute('height', '160');
 
-        // Donut background ring (light grey) — sits behind so an
-        // unscored ecosystem still shows the shape.
+        /*
+         * Donut background ring (light grey) — sits behind so an
+         * unscored ecosystem still shows the shape.
+         */
         const bg = document.createElementNS(svgNs, 'circle');
         bg.setAttribute('cx', '50');
         bg.setAttribute('cy', '50');
@@ -1099,9 +1133,11 @@ export class DashboardView {
         bg.setAttribute('class', 'dash-donut-bg');
         svg.appendChild(bg);
 
-        // Segments — stroke-dasharray / -dashoffset rotated counter-
-        // clockwise so the slice order starts at 12 o'clock and walks
-        // clockwise. Circumference of r=40 is 2π·40 ≈ 251.33.
+        /*
+         * Segments — stroke-dasharray / -dashoffset rotated counter-
+         * clockwise so the slice order starts at 12 o'clock and walks
+         * clockwise. Circumference of r=40 is 2π·40 ≈ 251.33.
+         */
         const circ = 2 * Math.PI * 40;
         const seg = (n: number, cls: string, offset: number): void => {
             if (n === 0) {
@@ -1172,7 +1208,7 @@ export class DashboardView {
             const line = document.createElement('div');
             line.className = `dash-donut-delta dash-donut-delta-${delta > 0 ? 'up' : 'down'}`;
             line.textContent = I18n.t('{sign}{n} pts vs last scan', {
-                sign,
+                sign: sign,
                 n: Math.abs(delta)
             });
             legend.appendChild(line);
@@ -1250,8 +1286,8 @@ export class DashboardView {
         }
 
         const ranked = Array.from(byLabel.values())
-            .sort((a, b) => b.weight - a.weight)
-            .slice(0, 10);
+        .sort((a, b) => b.weight - a.weight)
+        .slice(0, 10);
 
         const list = document.createElement('div');
         list.className = 'dash-topworst-list';
@@ -1277,7 +1313,7 @@ export class DashboardView {
             row.appendChild(projects);
 
             const topScanner = Array.from(a.scanners.entries())
-                .sort((x, y) => y[1] - x[1])[0];
+            .sort((x, y) => y[1] - x[1])[0];
             const scannerEl = document.createElement('div');
             scannerEl.className = 'dash-topworst-scanner';
             scannerEl.textContent = topScanner
@@ -1309,18 +1345,20 @@ export class DashboardView {
         const wrap = document.createElement('div');
         wrap.className = 'dash-trend';
 
-        // Metric selector — flipping between "Score" (uses the
-        // dashboard-history payload) and "Packages" (uses the
-        // growth payload reconstructed from per-project HistoryStore
-        // files). The two metrics live on different Y axes so we
-        // re-render the chart wholesale on switch.
+        /*
+         * Metric selector — flipping between "Score" (uses the
+         * dashboard-history payload) and "Packages" (uses the
+         * growth payload reconstructed from per-project HistoryStore
+         * files). The two metrics live on different Y axes so we
+         * re-render the chart wholesale on switch.
+         */
         const metrics = document.createElement('div');
         metrics.className = 'dash-trend-controls';
         const metricLabel = document.createElement('span');
         metricLabel.className = 'dash-trend-controls-label';
         metricLabel.textContent = I18n.t('Metric:');
         metrics.appendChild(metricLabel);
-        const metricOpts: {value: 'score'|'packages'|'size'|'downloads'; label: string}[] = [
+        const metricOpts: {value: 'score'|'packages'|'size'|'downloads'; label: string;}[] = [
             {value: 'score', label: I18n.t('Score')},
             {value: 'packages', label: I18n.t('Packages')},
             {value: 'size', label: I18n.t('Size')},
@@ -1349,8 +1387,10 @@ export class DashboardView {
         }
         wrap.appendChild(metrics);
 
-        // Range selector — clicking a chip re-fetches with the new
-        // window and re-renders. Cheap, the endpoint is sub-100ms.
+        /*
+         * Range selector — clicking a chip re-fetches with the new
+         * window and re-renders. Cheap, the endpoint is sub-100ms.
+         */
         const controls = document.createElement('div');
         controls.className = 'dash-trend-controls';
         const label = document.createElement('span');
@@ -1370,8 +1410,10 @@ export class DashboardView {
                     return;
                 }
                 this._trendRangeDays = days;
-                // Range change invalidates the cached growth payload
-                // (the endpoint clips server-side), so refetch both.
+                /*
+                 * Range change invalidates the cached growth payload
+                 * (the endpoint clips server-side), so refetch both.
+                 */
                 this._growth = null;
                 void this._loadHistory();
                 if (this._trendMetric === 'packages') {
@@ -1406,10 +1448,12 @@ export class DashboardView {
             }
             wrap.appendChild(this._renderGrowthChart(this._growth));
         } else if (this._trendMetric === 'size') {
-            // size — derived from the same DashboardHistoryEntry payload
-            // the score chart reads. `typeof === 'number'` so older
-            // entries persisted before the size field was added (where
-            // the JSON lacks the key entirely) drop out cleanly.
+            /*
+             * size — derived from the same DashboardHistoryEntry payload
+             * the score chart reads. `typeof === 'number'` so older
+             * entries persisted before the size field was added (where
+             * the JSON lacks the key entirely) drop out cleanly.
+             */
             const sized = this._historyEntries.filter((e) => typeof e.totalSizeBytes === 'number');
             if (sized.length === 0) {
                 wrap.appendChild(DashboardView._renderTrendEmpty(
@@ -1451,8 +1495,8 @@ export class DashboardView {
      * into the {series, overall} shape it expects.
      */
     private _renderScoreChart(entries: DashboardHistoryEntry[]): SVGElement {
-        type Pt = {timestamp: string; value: number};
-        const seriesByUnid = new Map<string, {unid: string; name: string; points: Pt[]}>();
+        type Pt = {timestamp: string; value: number;};
+        const seriesByUnid = new Map<string, {unid: string; name: string; points: Pt[];}>();
         for (const e of entries) {
             for (const p of e.perProject) {
                 if (p.avg === null) {
@@ -1467,11 +1511,11 @@ export class DashboardView {
             }
         }
         const overall: Pt[] = entries
-            .filter((e) => e.overall !== null)
-            .map((e) => ({timestamp: e.timestamp, value: e.overall!}));
+        .filter((e) => e.overall !== null)
+        .map((e) => ({timestamp: e.timestamp, value: e.overall!}));
         return this._renderChartSvg({
             series: Array.from(seriesByUnid.values()),
-            overall,
+            overall: overall,
             yMin: 0,
             yMax: 100,
             yTicks: [0, 25, 50, 75, 100],
@@ -1488,7 +1532,7 @@ export class DashboardView {
      * sum from the growth builder.
      */
     private _renderGrowthChart(g: ApiDashboardGrowthResponse): SVGElement {
-        type Pt = {timestamp: string; value: number};
+        type Pt = {timestamp: string; value: number;};
         const series = g.series.map((s) => ({
             unid: s.unid,
             name: s.name,
@@ -1511,11 +1555,11 @@ export class DashboardView {
         const yMax = DashboardView._niceCeil(Math.max(max, 1));
         const yTicks = [0, Math.round(yMax * 0.25), Math.round(yMax * 0.5), Math.round(yMax * 0.75), yMax];
         return this._renderChartSvg({
-            series,
-            overall,
+            series: series,
+            overall: overall,
             yMin: 0,
-            yMax,
-            yTicks,
+            yMax: yMax,
+            yTicks: yTicks,
             overallLabel: I18n.t('Ecosystem total'),
             valueFormatter: (v) => String(v)
         });
@@ -1528,8 +1572,8 @@ export class DashboardView {
      * byte-formatter so the gridlines read "120 MB" not "125829120".
      */
     private _renderSizeChart(entries: DashboardHistoryEntry[]): SVGElement {
-        type Pt = {timestamp: string; value: number};
-        const seriesByUnid = new Map<string, {unid: string; name: string; points: Pt[]}>();
+        type Pt = {timestamp: string; value: number;};
+        const seriesByUnid = new Map<string, {unid: string; name: string; points: Pt[];}>();
         for (const e of entries) {
             for (const p of e.perProject) {
                 if (typeof p.sizeBytes !== 'number') {
@@ -1544,8 +1588,8 @@ export class DashboardView {
             }
         }
         const overall: Pt[] = entries
-            .filter((e) => typeof e.totalSizeBytes === 'number')
-            .map((e) => ({timestamp: e.timestamp, value: e.totalSizeBytes as number}));
+        .filter((e) => typeof e.totalSizeBytes === 'number')
+        .map((e) => ({timestamp: e.timestamp, value: e.totalSizeBytes as number}));
         let max = 0;
         for (const s of seriesByUnid.values()) {
             for (const p of s.points) {
@@ -1563,10 +1607,10 @@ export class DashboardView {
         const yTicks = [0, Math.round(yMax * 0.25), Math.round(yMax * 0.5), Math.round(yMax * 0.75), yMax];
         return this._renderChartSvg({
             series: Array.from(seriesByUnid.values()),
-            overall,
+            overall: overall,
             yMin: 0,
-            yMax,
-            yTicks,
+            yMax: yMax,
+            yTicks: yTicks,
             overallLabel: I18n.t('Ecosystem total'),
             valueFormatter: (v) => DashboardView._formatBytes(v)
         });
@@ -1578,8 +1622,8 @@ export class DashboardView {
      * auto-scaled; value formatter shows abbreviated counts (k / M).
      */
     private _renderDownloadsChart(entries: DashboardHistoryEntry[]): SVGElement {
-        type Pt = {timestamp: string; value: number};
-        const seriesByUnid = new Map<string, {unid: string; name: string; points: Pt[]}>();
+        type Pt = {timestamp: string; value: number;};
+        const seriesByUnid = new Map<string, {unid: string; name: string; points: Pt[];}>();
         for (const e of entries) {
             for (const p of e.perProject) {
                 if (typeof p.downloadsLastWeek !== 'number') {
@@ -1594,8 +1638,8 @@ export class DashboardView {
             }
         }
         const overall: Pt[] = entries
-            .filter((e) => typeof e.totalDownloadsLastWeek === 'number')
-            .map((e) => ({timestamp: e.timestamp, value: e.totalDownloadsLastWeek as number}));
+        .filter((e) => typeof e.totalDownloadsLastWeek === 'number')
+        .map((e) => ({timestamp: e.timestamp, value: e.totalDownloadsLastWeek as number}));
         let max = 0;
         for (const s of seriesByUnid.values()) {
             for (const p of s.points) {
@@ -1613,10 +1657,10 @@ export class DashboardView {
         const yTicks = [0, Math.round(yMax * 0.25), Math.round(yMax * 0.5), Math.round(yMax * 0.75), yMax];
         return this._renderChartSvg({
             series: Array.from(seriesByUnid.values()),
-            overall,
+            overall: overall,
             yMin: 0,
-            yMax,
-            yTicks,
+            yMax: yMax,
+            yTicks: yTicks,
             overallLabel: I18n.t('Ecosystem total (deduplicated)'),
             valueFormatter: (v) => DashboardView._formatCount(v)
         });
@@ -1672,7 +1716,7 @@ export class DashboardView {
         if (n <= 1) {
             return 1;
         }
-        const mag = Math.pow(10, Math.floor(Math.log10(n)));
+        const mag = 10**Math.floor(Math.log10(n));
         const lead = n / mag;
         let snap: number;
         if (lead <= 1) {
@@ -1698,8 +1742,8 @@ export class DashboardView {
      * cheap and accessible.
      */
     private _renderChartSvg(input: {
-        series: {unid: string; name: string; points: {timestamp: string; value: number}[]}[];
-        overall: {timestamp: string; value: number}[];
+        series: {unid: string; name: string; points: {timestamp: string; value: number;}[];}[];
+        overall: {timestamp: string; value: number;}[];
         yMin: number;
         yMax: number;
         yTicks: number[];
@@ -1721,10 +1765,12 @@ export class DashboardView {
         svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
         svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
-        // Collect every timestamp across series + overall so the X
-        // scale spans the full union — a project that only logged
-        // points before another project started shouldn't get
-        // squished into the right edge.
+        /*
+         * Collect every timestamp across series + overall so the X
+         * scale spans the full union — a project that only logged
+         * points before another project started shouldn't get
+         * squished into the right edge.
+         */
         const allTimes: number[] = [];
         for (const s of input.series) {
             for (const p of s.points) {
@@ -1735,9 +1781,11 @@ export class DashboardView {
             allTimes.push(new Date(p.timestamp).getTime());
         }
         if (allTimes.length === 0) {
-            // Defensive — callers should have returned early when no
-            // data is available, but render a friendly empty SVG
-            // rather than crash on the maths below.
+            /*
+             * Defensive — callers should have returned early when no
+             * data is available, but render a friendly empty SVG
+             * rather than crash on the maths below.
+             */
             return svg;
         }
         const tStart = Math.min(...allTimes);
@@ -1785,19 +1833,23 @@ export class DashboardView {
             svg.appendChild(lbl);
         }
 
-        // Sort projects by latest value asc so the lowest series is
-        // first in the legend (matches "worst-first" semantics for
-        // the score metric; for packages it shows the smallest
-        // project first, which is also a reasonable default).
+        /*
+         * Sort projects by latest value asc so the lowest series is
+         * first in the legend (matches "worst-first" semantics for
+         * the score metric; for packages it shows the smallest
+         * project first, which is also a reasonable default).
+         */
         const seriesList = input.series.slice()
-            .sort((a, b) => {
-                const la = a.points[a.points.length - 1]?.value ?? Infinity;
-                const lb = b.points[b.points.length - 1]?.value ?? Infinity;
-                return la - lb;
-            });
+        .sort((a, b) => {
+            const la = a.points[a.points.length - 1]?.value ?? Infinity;
+            const lb = b.points[b.points.length - 1]?.value ?? Infinity;
+            return la - lb;
+        });
 
-        // Colour palette — cycles for projects beyond the 12th. Picked
-        // so adjacent hues stay distinguishable on a dark background.
+        /*
+         * Colour palette — cycles for projects beyond the 12th. Picked
+         * so adjacent hues stay distinguishable on a dark background.
+         */
         const palette = [
             '#ff6b6b', '#feca57', '#48dbfb', '#1dd1a1', '#5f27cd', '#ff9ff3',
             '#54a0ff', '#00d2d3', '#c8d6e5', '#ee5253', '#10ac84', '#ff9f43'
@@ -1826,8 +1878,10 @@ export class DashboardView {
             }
         }
 
-        // Ecosystem-overall line — heavier stroke, painted last so it
-        // sits on top.
+        /*
+         * Ecosystem-overall line — heavier stroke, painted last so it
+         * sits on top.
+         */
         if (input.overall.length > 1) {
             const poly = document.createElementNS(svgNs, 'polyline');
             poly.setAttribute('class', 'dash-trend-line dash-trend-line-overall');
@@ -1847,8 +1901,10 @@ export class DashboardView {
             svg.appendChild(dot);
         }
 
-        // Legend column on the right. Overall sits on top, then
-        // per-project sorted.
+        /*
+         * Legend column on the right. Overall sits on top, then
+         * per-project sorted.
+         */
         const legendX = PAD_L + PLOT_W + 16;
         let legendY = PAD_T + 4;
         const legendEntry = (colour: string, text: string, isOverall: boolean): void => {
@@ -1894,9 +1950,11 @@ export class DashboardView {
      * `name@version` depending on the finding. ImpactModal handles
      * both — name-only seeds skip the version filter.
      */
-    private static _parseFindingLabel(label: string): {name?: string; version?: string} {
-        // Scoped packages start with `@scope/name@version`; only the
-        // *last* `@` separates name from version.
+    private static _parseFindingLabel(label: string): {name?: string; version?: string;} {
+        /*
+         * Scoped packages start with `@scope/name@version`; only the
+         * *last* `@` separates name from version.
+         */
         const at = label.lastIndexOf('@');
         if (at <= 0) {
             return {name: label};
@@ -1981,9 +2039,11 @@ export class DashboardView {
      * covers all 15 rows).
      */
     private static _renderScannerCell(id: ScannerId): HTMLElement {
-        // `<td>` keeps its native `display: table-cell` so the column
-        // sizes correctly with the rest of the table; the flex layout
-        // lives one level down on a wrapper div.
+        /*
+         * `<td>` keeps its native `display: table-cell` so the column
+         * sizes correctly with the rest of the table; the flex layout
+         * lives one level down on a wrapper div.
+         */
         const td = document.createElement('td');
         td.className = 'dash-td-scanner';
 
@@ -2050,9 +2110,11 @@ export class DashboardView {
             const margin = 12;
             const gap = 8;
 
-            // Switch to fixed first; sizes were already computed by the
-            // initial absolute-positioned render, so offsetWidth/Height
-            // remain accurate.
+            /*
+             * Switch to fixed first; sizes were already computed by the
+             * initial absolute-positioned render, so offsetWidth/Height
+             * remain accurate.
+             */
             tip.style.position = 'fixed';
             tip.style.left = '0px';
             tip.style.top = '0px';
@@ -2095,7 +2157,7 @@ export class DashboardView {
     private static _scannerIcon(id: ScannerId): string {
         const s = (path: string): string =>
             '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" '
-            + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + path + '</svg>';
+            + `stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${  path  }</svg>`;
 
         switch (id) {
             case 'cve':
@@ -2164,8 +2226,10 @@ export class DashboardView {
                     + '<line x1="3" y1="12" x2="21" y2="12"/>'
                     + '<path d="M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18"/>');
             case 'deprecation':
-                // Crossed-out package — old release the maintainer
-                // wants users to move off
+                /*
+                 * Crossed-out package — old release the maintainer
+                 * wants users to move off
+                 */
                 return s('<path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/>'
                     + '<line x1="5" y1="5" x2="19" y2="19"/>');
             case 'integrity':
@@ -2381,14 +2445,15 @@ export class DashboardView {
         }
         let text = summary.join(' · ');
 
-        // Top-3 findings as separate lines — the native `title`
-        // attribute renders newlines reliably in modern browsers.
-        // Full list is available in the FindingsModal on click.
+        /*
+         * Top-3 findings as separate lines — the native `title`
+         * attribute renders newlines reliably in modern browsers.
+         * Full list is available in the FindingsModal on click.
+         */
         const topFindings = cell.findings.slice(0, 3);
         if (topFindings.length > 0) {
             const lines = topFindings.map((f) =>
-                `${f.severity.toUpperCase()} ${f.label}${f.detail ? ` · ${f.detail}` : ''}`
-            );
+                `${f.severity.toUpperCase()} ${f.label}${f.detail ? ` · ${f.detail}` : ''}`);
             text = `${text}\n\n${lines.join('\n')}`;
             const flagged = cell.counts.risk + cell.counts.warn + cell.counts.info;
             if (flagged > topFindings.length) {
@@ -2416,4 +2481,5 @@ export class DashboardView {
         }
         return d.toLocaleString();
     }
+
 }

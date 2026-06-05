@@ -24,7 +24,7 @@ export type ImpactHit = {
  * separate "scanned but clean" from "couldn't scan".
  */
 export type ImpactProjectReport = {
-    project: {unid: string; name: string; type: string};
+    project: {unid: string; name: string; type: string;};
     hits: ImpactHit[];
     error?: string;
 };
@@ -37,11 +37,11 @@ export type ImpactProjectReport = {
  *  - `skippedProjects` — name asc (no lockfile or build error)
  */
 export type ImpactReport = {
-    query: {name: string; versionPattern: string|null};
+    query: {name: string; versionPattern: string|null;};
     totalHits: number;
     projects: ImpactProjectReport[];
-    cleanProjects: {unid: string; name: string; type: string}[];
-    skippedProjects: {unid: string; name: string; type: string; reason: string}[];
+    cleanProjects: {unid: string; name: string; type: string;}[];
+    skippedProjects: {unid: string; name: string; type: string; reason: string;}[];
 };
 
 /**
@@ -101,15 +101,15 @@ export class ImpactAnalyzer {
             hits.push({
                 name: node.name,
                 version: node.version,
-                kind,
-                path,
+                kind: kind,
+                path: path,
                 status: node.status,
                 vulnCount: node.vulnCount
             });
         }
 
         hits.sort(ImpactAnalyzer._compareHits);
-        return {project: graph.project, hits};
+        return {project: graph.project, hits: hits};
     }
 
     /**
@@ -118,12 +118,12 @@ export class ImpactAnalyzer {
      * counts as "skipped" vs "error"); this just sorts + counts.
      */
     public static buildReport(
-        query: {name: string; versionPattern: string|null},
+        query: {name: string; versionPattern: string|null;},
         perProject: ImpactProjectReport[],
-        skipped: {unid: string; name: string; type: string; reason: string}[]
+        skipped: {unid: string; name: string; type: string; reason: string;}[]
     ): ImpactReport {
         const withHits: ImpactProjectReport[] = [];
-        const clean: {unid: string; name: string; type: string}[] = [];
+        const clean: {unid: string; name: string; type: string;}[] = [];
 
         for (const pp of perProject) {
             if (pp.hits.length > 0) {
@@ -148,7 +148,7 @@ export class ImpactAnalyzer {
         }
 
         return {
-            query,
+            query: query,
             totalHits: total,
             projects: withHits,
             cleanProjects: clean,
@@ -217,9 +217,11 @@ export class ImpactAnalyzer {
         }
 
         if (!found) {
-            // Target lives in the graph but isn't reachable from any
-            // declared root — usually means a bundled / nohoist quirk.
-            // Surface as a singleton path so the UI still renders it.
+            /*
+             * Target lives in the graph but isn't reachable from any
+             * declared root — usually means a bundled / nohoist quirk.
+             * Surface as a singleton path so the UI still renders it.
+             */
             return [target];
         }
 
@@ -233,9 +235,11 @@ export class ImpactAnalyzer {
     }
 
     private static _compareHits(a: ImpactHit, b: ImpactHit): number {
-        // Direct hits first (more actionable for the user), then by
-        // version desc so the newest pinned copy floats up, then by
-        // path length asc so the shortest chain wins on ties.
+        /*
+         * Direct hits first (more actionable for the user), then by
+         * version desc so the newest pinned copy floats up, then by
+         * path length asc so the shortest chain wins on ties.
+         */
         if (a.kind !== b.kind) {
             return a.kind === 'direct' ? -1 : 1;
         }
@@ -244,4 +248,5 @@ export class ImpactAnalyzer {
         }
         return a.path.length - b.path.length;
     }
+
 }

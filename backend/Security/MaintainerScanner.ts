@@ -193,20 +193,22 @@ export class MaintainerScanner {
                 currentPublisher: current,
                 trustedPublishers: [],
                 priorVersionsWithPublisher: 0,
-                gapDays,
+                gapDays: gapDays,
                 severity: MaintainerSeverity.info,
                 reason: 'No predecessors with publisher info — cannot build a trust set'
             };
         }
 
-        // Current version has no publisher recorded — typical for
-        // pre-2014 releases; cannot meaningfully compare.
+        /*
+         * Current version has no publisher recorded — typical for
+         * pre-2014 releases; cannot meaningfully compare.
+         */
         if (!current) {
             return {
                 currentPublisher: null,
-                trustedPublishers,
+                trustedPublishers: trustedPublishers,
                 priorVersionsWithPublisher: priorWithPub,
-                gapDays,
+                gapDays: gapDays,
                 severity: MaintainerSeverity.info,
                 reason: 'This version has no `_npmUser` field in the registry'
             };
@@ -215,71 +217,77 @@ export class MaintainerScanner {
         if (trustSet.has(current.name)) {
             return {
                 currentPublisher: current,
-                trustedPublishers,
+                trustedPublishers: trustedPublishers,
                 priorVersionsWithPublisher: priorWithPub,
-                gapDays,
+                gapDays: gapDays,
                 severity: MaintainerSeverity.info,
                 reason: `Known publisher (${current.name})`
             };
         }
 
-        // First-time publisher. Severity is driven by *how quickly* the
-        // handover happened on a mature package — the empirical attack
-        // pattern is "active project, sudden owner change", not "dormant
-        // project, new maintainer adopts it" (the latter is usually
-        // benign community takeover).
+        /*
+         * First-time publisher. Severity is driven by *how quickly* the
+         * handover happened on a mature package — the empirical attack
+         * pattern is "active project, sudden owner change", not "dormant
+         * project, new maintainer adopts it" (the latter is usually
+         * benign community takeover).
+         */
         const mature = priorWithPub >= this._matureVersions;
         const gapKnown = gapDays !== null;
 
         if (mature && gapKnown && gapDays <= this._quickHandoverDays) {
             return {
                 currentPublisher: current,
-                trustedPublishers,
+                trustedPublishers: trustedPublishers,
                 priorVersionsWithPublisher: priorWithPub,
-                gapDays,
+                gapDays: gapDays,
                 severity: MaintainerSeverity.risk,
                 reason: `New publisher (${current.name}) after only ${gapDays} days — `
                     + `active package (${priorWithPub} predecessors) switched owner abruptly, `
-                    + `classic account-takeover pattern (event-stream / ua-parser-js profile)`
+                    + 'classic account-takeover pattern (event-stream / ua-parser-js profile)'
             };
         }
 
         if (mature && gapKnown && gapDays <= this._suspiciousGapDays) {
             return {
                 currentPublisher: current,
-                trustedPublishers,
+                trustedPublishers: trustedPublishers,
                 priorVersionsWithPublisher: priorWithPub,
-                gapDays,
+                gapDays: gapDays,
                 severity: MaintainerSeverity.warn,
                 reason: `New publisher (${current.name}) after ${gapDays} days — `
-                    + `mid-length gap on an established package, worth a look`
+                    + 'mid-length gap on an established package, worth a look'
             };
         }
 
         if (mature && gapKnown) {
-            // Long silence + new publisher — usually a legitimate
-            // community takeover of an abandoned package. Demote to
-            // info but make the context explicit.
+            /*
+             * Long silence + new publisher — usually a legitimate
+             * community takeover of an abandoned package. Demote to
+             * info but make the context explicit.
+             */
             return {
                 currentPublisher: current,
-                trustedPublishers,
+                trustedPublishers: trustedPublishers,
                 priorVersionsWithPublisher: priorWithPub,
-                gapDays,
+                gapDays: gapDays,
                 severity: MaintainerSeverity.info,
                 reason: `New publisher (${current.name}) after ${gapDays} days of silence — `
-                    + `long pause usually points to a legitimate community takeover `
-                    + `of an abandoned package rather than an attack`
+                    + 'long pause usually points to a legitimate community takeover '
+                    + 'of an abandoned package rather than an attack'
             };
         }
 
-        // Unknown gap (missing `time` info) — fall back to warn for
-        // mature packages, info for young ones.
+        /*
+         * Unknown gap (missing `time` info) — fall back to warn for
+         * mature packages, info for young ones.
+         */
         if (mature) {
             return {
                 currentPublisher: current,
-                trustedPublishers,
+                trustedPublishers: trustedPublishers,
                 priorVersionsWithPublisher: priorWithPub,
-                gapDays,
+                gapDays: gapDays,
                 severity: MaintainerSeverity.warn,
                 reason: `New publisher (${current.name}) on an established package `
                     + `(${priorWithPub} predecessors), publish gap unknown`
@@ -288,9 +296,9 @@ export class MaintainerScanner {
 
         return {
             currentPublisher: current,
-            trustedPublishers,
+            trustedPublishers: trustedPublishers,
             priorVersionsWithPublisher: priorWithPub,
-            gapDays,
+            gapDays: gapDays,
             severity: MaintainerSeverity.warn,
             reason: `New publisher (${current.name}), but package is still young `
                 + `(${priorWithPub} predecessors) — could be a legitimate new maintainer`
@@ -310,7 +318,7 @@ export class MaintainerScanner {
             return [];
         }
 
-        const triples: {v: string; t: SemverTriple}[] = [];
+        const triples: {v: string; t: SemverTriple;}[] = [];
         for (const raw of versions) {
             const t = MaintainerScanner._parseSemver(raw);
             if (!t) {
@@ -319,7 +327,7 @@ export class MaintainerScanner {
             if (MaintainerScanner._compare(t, tgt) >= 0) {
                 continue;
             }
-            triples.push({v: raw, t});
+            triples.push({v: raw, t: t});
         }
 
         triples.sort((a, b) => MaintainerScanner._compare(b.t, a.t));
@@ -328,7 +336,7 @@ export class MaintainerScanner {
 
     private static _parseSemver(v: string): SemverTriple|null {
         const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v.trim());
-        return m ? [+m[1], +m[2], +m[3]] : null;
+        return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
     }
 
     private static _compare(a: SemverTriple, b: SemverTriple): number {
@@ -352,6 +360,7 @@ export class MaintainerScanner {
         }
         return Math.round(Math.abs(ta - tb) / (24 * 60 * 60 * 1000));
     }
+
 }
 
 /**

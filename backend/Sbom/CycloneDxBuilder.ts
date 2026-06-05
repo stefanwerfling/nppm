@@ -6,7 +6,7 @@ import {SbomComponent, SbomData} from './SbomCollector.js';
  * Scanner) actually inspect. The schema URL in `$schema` lets
  * validators pin the spec version even if we stay short of it.
  */
-type CdxLicenseChoice = {license: {id: string}}|{license: {name: string}}|{expression: string};
+type CdxLicenseChoice = {license: {id: string;};}|{license: {name: string;};}|{expression: string;};
 
 type CdxComponent = {
     'bom-ref': string;
@@ -14,9 +14,9 @@ type CdxComponent = {
     name: string;
     version: string;
     purl: string;
-    hashes?: {alg: 'SHA-512'; content: string}[];
+    hashes?: {alg: 'SHA-512'; content: string;}[];
     licenses?: CdxLicenseChoice[];
-    externalReferences?: {type: 'distribution'|'vcs'; url: string}[];
+    externalReferences?: {type: 'distribution'|'vcs'; url: string;}[];
 };
 
 type CdxDependency = {
@@ -32,7 +32,7 @@ type CycloneDxBom = {
     version: 1;
     metadata: {
         timestamp: string;
-        tools: {components: {type: 'application'; name: 'nppm'; version: string}[]};
+        tools: {components: {type: 'application'; name: 'nppm'; version: string;}[];};
         component: {
             'bom-ref': string;
             type: 'application';
@@ -61,10 +61,10 @@ export class CycloneDxBuilder {
         const components: CdxComponent[] = data.components.map((c) => {
             const cdx: CdxComponent = {
                 'bom-ref': c.purl,
-                type: 'library',
-                name: c.name,
-                version: c.version,
-                purl: c.purl
+                'type': 'library',
+                'name': c.name,
+                'version': c.version,
+                'purl': c.purl
             };
             if (c.hashSha512Hex) {
                 cdx.hashes = [{alg: 'SHA-512', content: c.hashSha512Hex}];
@@ -93,12 +93,12 @@ export class CycloneDxBuilder {
                 tools: {components: [{type: 'application', name: 'nppm', version: toolVersion}]},
                 component: {
                     'bom-ref': `nppm-project:${data.project.name}`,
-                    type: 'application',
-                    name: data.project.name
+                    'type': 'application',
+                    'name': data.project.name
                 }
             },
-            components,
-            dependencies
+            components: components,
+            dependencies: dependencies
         };
     }
 
@@ -169,4 +169,5 @@ export class CycloneDxBuilder {
         }
         return edge;
     }
+
 }

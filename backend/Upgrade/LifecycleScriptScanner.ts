@@ -62,7 +62,7 @@ export class LifecycleScriptScanner {
         if (!fs.existsSync(manifestPath)) {
             return;
         }
-        let parsed: {version?: unknown; scripts?: Record<string, unknown>};
+        let parsed: {version?: unknown; scripts?: Record<string, unknown>;};
         try {
             parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
         } catch {
@@ -76,7 +76,7 @@ export class LifecycleScriptScanner {
         for (const hook of HOOKS) {
             const body = scripts[hook];
             if (typeof body === 'string' && body.length > 0) {
-                out.push({name, version, hook, script: body});
+                out.push({name: name, version: version, hook: hook, script: body});
             }
         }
     }
@@ -88,4 +88,5 @@ export class LifecycleScriptScanner {
             return [];
         }
     }
+
 }

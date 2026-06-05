@@ -132,10 +132,12 @@ export class ProjectMatrixView {
         }
 
         if (this._data.project.type !== ConfigProjectType.local) {
-            // Remote projects (github / gitea) can be inspected but not
-            // written back to — nppm doesn't claim push access. Hide
-            // every write affordance and tell the user once at the
-            // top so the missing buttons aren't a mystery.
+            /*
+             * Remote projects (github / gitea) can be inspected but not
+             * written back to — nppm doesn't claim push access. Hide
+             * every write affordance and tell the user once at the
+             * top so the missing buttons aren't a mystery.
+             */
             const note = document.createElement('div');
             note.className = 'installed-meta installed-meta-readonly';
             note.textContent = I18n.t('Read-only: remote project — upgrades and template apply are disabled.');
@@ -224,9 +226,9 @@ export class ProjectMatrixView {
                 }
 
                 const types = cellData.types
-                    .filter((t) => t !== DependencyType.dependency)
-                    .map(ProjectMatrixView._depLabel)
-                    .join('/');
+                .filter((t) => t !== DependencyType.dependency)
+                .map(ProjectMatrixView._depLabel)
+                .join('/');
                 if (types) {
                     const tag = document.createElement('span');
                     tag.className = 'matrix-cell-type';
@@ -234,12 +236,14 @@ export class ProjectMatrixView {
                     td.appendChild(tag);
                 }
 
-                // Outdated cells get an Upgrade affordance. Skip git
-                // installs — the upgrader operates on registry ranges
-                // and a git URL has no `latest` to bump to. Skip
-                // remote (github/gitea) projects too because we can
-                // only read their working tree, not commit back to
-                // it.
+                /*
+                 * Outdated cells get an Upgrade affordance. Skip git
+                 * installs — the upgrader operates on registry ranges
+                 * and a git URL has no `latest` to bump to. Skip
+                 * remote (github/gitea) projects too because we can
+                 * only read their working tree, not commit back to
+                 * it.
+                 */
                 if (
                     row.status === MatrixRowStatus.outdated
                     && row.latest
@@ -273,12 +277,14 @@ export class ProjectMatrixView {
         if (row.latest) {
             latestTd.textContent = row.latest;
         } else if (row.gitLatest) {
-            // Symmetric with the cross-project matrix's git-pill: show
-            // upstream version + short SHA when the HEAD fetcher
-            // resolved them, fall back to a plain "git" pill when not.
-            // An info icon appears whenever the lookup failed
-            // (unreachable host / 404) so the user can tell that case
-            // apart from a fine-but-unfetched row.
+            /*
+             * Symmetric with the cross-project matrix's git-pill: show
+             * upstream version + short SHA when the HEAD fetcher
+             * resolved them, fall back to a plain "git" pill when not.
+             * An info icon appears whenever the lookup failed
+             * (unreachable host / 404) so the user can tell that case
+             * apart from a fine-but-unfetched row.
+             */
             latestTd.classList.add('matrix-cell-latest-git');
             if (row.gitLatest.version || row.gitLatest.shortSha) {
                 const parts: string[] = [];
@@ -441,4 +447,5 @@ export class ProjectMatrixView {
     private static _toApiDepType(t: DependencyType): 'dependency'|'dev'|'peer'|'optional' {
         return t as unknown as 'dependency'|'dev'|'peer'|'optional';
     }
+
 }

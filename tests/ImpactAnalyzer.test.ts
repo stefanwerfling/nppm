@@ -5,27 +5,27 @@ import {ImpactAnalyzer} from '../backend/Security/ImpactAnalyzer.js';
 function node(
     name: string,
     version: string,
-    deps: {name: string; version: string}[] = []
+    deps: {name: string; version: string;}[] = []
 ): DepGraphNode {
     return {
-        name,
-        version,
+        name: name,
+        version: version,
         status: 'aligned',
         vulnCount: 0,
         latestVersion: version,
-        deps
+        deps: deps
     };
 }
 
 function graph(
     unid: string,
-    rootDeps: {name: string; version: string}[],
+    rootDeps: {name: string; version: string;}[],
     packages: Record<string, DepGraphNode>
 ): DepGraphResponse {
     return {
-        project: {unid, name: `proj-${unid}`, type: 'local'},
-        rootDeps,
-        packages
+        project: {unid: unid, name: `proj-${unid}`, type: 'local'},
+        rootDeps: rootDeps,
+        packages: packages
     };
 }
 
@@ -60,8 +60,7 @@ describe('ImpactAnalyzer.analyzeGraph', () => {
     it('labels a root-declared hit as direct and returns a single-step path', () => {
         const g = graph('p1',
             [{name: 'lodash', version: '4.17.21'}],
-            {'lodash@4.17.21': node('lodash', '4.17.21')}
-        );
+            {'lodash@4.17.21': node('lodash', '4.17.21')});
         const report = ImpactAnalyzer.analyzeGraph(g, 'lodash', null);
         expect(report.hits).toHaveLength(1);
         expect(report.hits[0].kind).toBe('direct');
@@ -75,8 +74,7 @@ describe('ImpactAnalyzer.analyzeGraph', () => {
                 'react@18.0.0': node('react', '18.0.0', [{name: 'some-lib', version: '2.0.0'}]),
                 'some-lib@2.0.0': node('some-lib', '2.0.0', [{name: 'lodash', version: '4.17.21'}]),
                 'lodash@4.17.21': node('lodash', '4.17.21')
-            }
-        );
+            });
         const report = ImpactAnalyzer.analyzeGraph(g, 'lodash', null);
         expect(report.hits).toHaveLength(1);
         expect(report.hits[0].kind).toBe('transitive');
@@ -98,16 +96,17 @@ describe('ImpactAnalyzer.analyzeGraph', () => {
                 'b@1.0.0': node('b', '1.0.0', [{name: 'lodash', version: '4.18.0'}]),
                 'lodash@4.17.21': node('lodash', '4.17.21'),
                 'lodash@4.18.0': node('lodash', '4.18.0')
-            }
-        );
+            });
         const report = ImpactAnalyzer.analyzeGraph(g, 'lodash', '4.17.x');
         expect(report.hits).toHaveLength(1);
         expect(report.hits[0].version).toBe('4.17.21');
     });
 
     it('returns the shortest path when multiple chains reach the same key', () => {
-        // root → short-chain → lodash       (length 3)
-        // root → long-chain → mid → lodash  (length 4)
+        /*
+         * root → short-chain → lodash       (length 3)
+         * root → long-chain → mid → lodash  (length 4)
+         */
         const g = graph('p4',
             [
                 {name: 'short-chain', version: '1.0.0'},
@@ -118,8 +117,7 @@ describe('ImpactAnalyzer.analyzeGraph', () => {
                 'long-chain@1.0.0': node('long-chain', '1.0.0', [{name: 'mid', version: '1.0.0'}]),
                 'mid@1.0.0': node('mid', '1.0.0', [{name: 'lodash', version: '4.17.21'}]),
                 'lodash@4.17.21': node('lodash', '4.17.21')
-            }
-        );
+            });
         const report = ImpactAnalyzer.analyzeGraph(g, 'lodash', null);
         expect(report.hits).toHaveLength(1);
         expect(report.hits[0].path).toEqual(['short-chain@1.0.0', 'lodash@4.17.21']);
@@ -136,8 +134,7 @@ describe('ImpactAnalyzer.analyzeGraph', () => {
                 'b@1.0.0': node('b', '1.0.0', [{name: 'lodash', version: '4.17.15'}]),
                 'lodash@4.17.21': node('lodash', '4.17.21'),
                 'lodash@4.17.15': node('lodash', '4.17.15')
-            }
-        );
+            });
         const report = ImpactAnalyzer.analyzeGraph(g, 'lodash', '4.17.x');
         expect(report.hits.map((h) => h.version).sort()).toEqual(['4.17.15', '4.17.21']);
     });
@@ -145,8 +142,7 @@ describe('ImpactAnalyzer.analyzeGraph', () => {
     it('returns no hits when the package is absent', () => {
         const g = graph('p6',
             [{name: 'react', version: '18.0.0'}],
-            {'react@18.0.0': node('react', '18.0.0')}
-        );
+            {'react@18.0.0': node('react', '18.0.0')});
         const report = ImpactAnalyzer.analyzeGraph(g, 'lodash', null);
         expect(report.hits).toEqual([]);
     });
@@ -161,8 +157,7 @@ describe('ImpactAnalyzer.analyzeGraph', () => {
                 'lodash@4.17.21': node('lodash', '4.17.21'),
                 'react@18.0.0': node('react', '18.0.0', [{name: 'lodash', version: '4.17.15'}]),
                 'lodash@4.17.15': node('lodash', '4.17.15')
-            }
-        );
+            });
         const report = ImpactAnalyzer.analyzeGraph(g, 'lodash', null);
         expect(report.hits[0].kind).toBe('direct');
         expect(report.hits[1].kind).toBe('transitive');

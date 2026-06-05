@@ -49,7 +49,7 @@ export type DashboardHistoryEntry = {
          */
         downloadsLastWeek: number|null;
     }[];
-    perScanner: {scanner: ScannerId; avg: number|null}[];
+    perScanner: {scanner: ScannerId; avg: number|null;}[];
 };
 
 /**
@@ -174,8 +174,8 @@ export class DashboardHistoryStore {
         timestampIso: string,
         ecosystemDownloadsDeduped: number|null = null
     ): DashboardHistoryEntry {
-        const perProject: {unid: string; name: string; avg: number|null; sizeBytes: number|null; downloadsLastWeek: number|null}[] = [];
-        const scannerSum = new Map<ScannerId, {sum: number; n: number}>();
+        const perProject: {unid: string; name: string; avg: number|null; sizeBytes: number|null; downloadsLastWeek: number|null;}[] = [];
+        const scannerSum = new Map<ScannerId, {sum: number; n: number;}>();
         let overallSum = 0;
         let overallN = 0;
         let totalSize = 0;
@@ -185,7 +185,7 @@ export class DashboardHistoryStore {
         for (const col of dashboard.columns) {
             let projSum = 0;
             let projN = 0;
-            for (const [scanner, cell] of Object.entries(col.cells) as [ScannerId, {score: number|null}][]) {
+            for (const [scanner, cell] of Object.entries(col.cells) as [ScannerId, {score: number|null;}][]) {
                 if (cell.score === null) {
                     continue;
                 }
@@ -218,23 +218,25 @@ export class DashboardHistoryStore {
             perProject.push({
                 unid: col.project.unid,
                 name: col.project.name,
-                avg,
-                sizeBytes,
-                downloadsLastWeek
+                avg: avg,
+                sizeBytes: sizeBytes,
+                downloadsLastWeek: downloadsLastWeek
             });
         }
 
-        const perScanner: {scanner: ScannerId; avg: number|null}[] = [];
+        const perScanner: {scanner: ScannerId; avg: number|null;}[] = [];
         for (const [scanner, bucket] of scannerSum) {
-            perScanner.push({scanner, avg: Math.round(bucket.sum / bucket.n)});
+            perScanner.push({scanner: scanner, avg: Math.round(bucket.sum / bucket.n)});
         }
         perScanner.sort((a, b) => a.scanner.localeCompare(b.scanner));
 
-        // Total downloads prefers the caller's deduped value (only
-        // it knows the per-name dedupe across the whole fleet).
-        // Falls back to the per-project sum only when the caller has
-        // no downloads info at all — gives the metric *some* shape
-        // for tests / future paths that don't compute downloads.
+        /*
+         * Total downloads prefers the caller's deduped value (only
+         * it knows the per-name dedupe across the whole fleet).
+         * Falls back to the per-project sum only when the caller has
+         * no downloads info at all — gives the metric *some* shape
+         * for tests / future paths that don't compute downloads.
+         */
         let totalDl: number|null = null;
         if (ecosystemDownloadsDeduped !== null) {
             totalDl = ecosystemDownloadsDeduped;
@@ -249,8 +251,8 @@ export class DashboardHistoryStore {
             overall: overallN > 0 ? Math.round(overallSum / overallN) : null,
             totalSizeBytes: anySize ? totalSize : null,
             totalDownloadsLastWeek: totalDl,
-            perProject,
-            perScanner
+            perProject: perProject,
+            perScanner: perScanner
         };
     }
 
@@ -270,4 +272,5 @@ export class DashboardHistoryStore {
         const day = String(d.getUTCDate()).padStart(2, '0');
         return `${y}-${m}-${day}`;
     }
+
 }

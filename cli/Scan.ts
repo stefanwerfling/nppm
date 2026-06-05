@@ -16,11 +16,11 @@ import {ProjectScanReport, ScanReportBuilder} from './ScanReport.js';
 /**
  * Inputs the runner expects from the surrounding shell. Kept as a
  * parameter (not pulled from `process` directly) so the unit tests can
- * call `runScan()` deterministically without leaking env state.
+ * call `ScanRunner.run()` deterministically without leaking env state.
  *
  * `configOverride` is the test seam: when present, the runner uses it
  * verbatim instead of reading from disk — lets tests run the entire
- * `runScan()` pipeline without writing fixture files.
+ * pipeline without writing fixture files.
  */
 export type RunScanIO = {
     argv: readonly string[];
@@ -34,8 +34,8 @@ export type RunScanIO = {
 };
 
 /**
- * Headless scan entry point. Returns the intended process exit code so
- * the JS shim can `process.exit(code)` without sprinkling exits
+ * Headless scan entry point. `run()` returns the intended process exit
+ * code so the JS shim can `process.exit(code)` without sprinkling exits
  * through the runner itself (makes tests bearable).
  *
  * Exit codes:
@@ -43,188 +43,198 @@ export type RunScanIO = {
  *  - 1: findings at or above `--fail-on`
  *  - 2: usage / config error
  */
-export async function runScan(io: RunScanIO): Promise<number> {
-    let args: CliArgs;
-    try {
-        args = CliArgsParser.parse(io.argv);
-    } catch (e) {
-        if (e instanceof CliArgsError) {
-            io.stderr(`nppm scan: ${e.message}\n\n`);
-            io.stderr(HELP_TEXT);
-            return 2;
-        }
-        throw e;
-    }
+export class ScanRunner {
 
-    if (args.help) {
-        io.stdout(HELP_TEXT);
-        return 0;
-    }
-
-    let loaded: LoadedConfig;
-    if (io.environmentOverride) {
-        loaded = io.environmentOverride;
-    } else {
-        const configPath = path.resolve(io.cwd, args.configPath);
-        let rawConfig: unknown;
-        if (io.configOverride !== undefined) {
-            rawConfig = io.configOverride;
-        } else {
-            if (!fs.existsSync(configPath)) {
-                io.stderr(`nppm scan: config file not found at ${configPath}\n`);
+    public static async run(io: RunScanIO): Promise<number> {
+        let args: CliArgs;
+        try {
+            args = CliArgsParser.parse(io.argv);
+        } catch (e) {
+            if (e instanceof CliArgsError) {
+                io.stderr(`nppm scan: ${e.message}\n\n`);
+                io.stderr(HELP_TEXT);
                 return 2;
             }
-            rawConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+            throw e;
         }
 
-        const errors: SchemaErrors = [];
-        if (!SchemaConfig.validate(rawConfig, errors)) {
-            io.stderr(`nppm scan: ${configPath} has an invalid structure\n`);
-            for (const err of errors) {
-                io.stderr(`  ${JSON.stringify(err)}\n`);
+        if (args.help) {
+            io.stdout(HELP_TEXT);
+            return 0;
+        }
+
+        let loaded: LoadedConfig;
+        if (io.environmentOverride) {
+            loaded = io.environmentOverride;
+        } else {
+            const configPath = path.resolve(io.cwd, args.configPath);
+            let rawConfig: unknown;
+            if (io.configOverride !== undefined) {
+                rawConfig = io.configOverride;
+            } else {
+                if (!fs.existsSync(configPath)) {
+                    io.stderr(`nppm scan: config file not found at ${configPath}\n`);
+                    return 2;
+                }
+                rawConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
             }
-            return 2;
+
+            const errors: SchemaErrors = [];
+            if (!SchemaConfig.validate(rawConfig, errors)) {
+                io.stderr(`nppm scan: ${configPath} has an invalid structure\n`);
+                for (const err of errors) {
+                    io.stderr(`  ${JSON.stringify(err)}\n`);
+                }
+                return 2;
+            }
+
+            /*
+             * Pick up a sibling .env so token references in `nppm.json`
+             * resolve the same way the dev server resolves them. Only fire
+             * this on the disk-backed path — the test seam stays env-clean.
+             */
+            const projectRoot = path.dirname(configPath);
+            const envPath = path.resolve(projectRoot, '.env');
+            if (fs.existsSync(envPath)) {
+                dotenv.config({quiet: true, path: envPath});
+            }
+
+            loaded = ConfigLoader.build(rawConfig, projectRoot, {
+                onSkip: (msg): void => io.stderr(`nppm scan: ${msg}\n`)
+            });
         }
 
-        // Pick up a sibling .env so token references in `nppm.json`
-        // resolve the same way the dev server resolves them. Only fire
-        // this on the disk-backed path — the test seam stays env-clean.
-        const projectRoot = path.dirname(configPath);
-        const envPath = path.resolve(projectRoot, '.env');
-        if (fs.existsSync(envPath)) {
-            dotenv.config({quiet: true, path: envPath});
+        /*
+         * CLI override for the external-sources master switch. The
+         * scanner's own per-source flags stay in the loaded config; only
+         * the master gate flips so `--no-external` is a one-line opt-out
+         * without rebuilding the scanner tree.
+         */
+        if (!args.runExternal) {
+            loaded.externalScanner.setEnabled(false);
         }
 
-        loaded = ConfigLoader.build(rawConfig, projectRoot, {
-            onSkip: (msg) => io.stderr(`nppm scan: ${msg}\n`)
+        let projects = loaded.projects;
+        if (args.projects.length > 0) {
+            const want = new Set(args.projects);
+            projects = projects.filter((p): boolean => want.has(p.getName()));
+            if (projects.length === 0) {
+                io.stderr(
+                    `nppm scan: no projects matched --project filter (${args.projects.join(', ')})\n`
+                    + `  configured: ${loaded.projects.map((p): string => p.getName()).join(', ')}\n`
+                );
+                return 2;
+            }
+        }
+
+        /*
+         * `--sarif` and `--json` are machine outputs — keep stderr clean
+         * so the consuming tool (GitHub Code Scanning ingest, jq pipeline)
+         * gets a single deterministic stdout payload.
+         */
+        const machine = args.json || args.sarif;
+        if (!machine) {
+            io.stderr(`nppm scan: ${projects.length} project(s)\n`);
+        }
+
+        const projectReports: ProjectScanReport[] = [];
+        for (const project of projects) {
+            if (!machine) {
+                io.stderr(`  → ${project.getName()}\n`);
+            }
+            // eslint-disable-next-line no-await-in-loop
+            const report = await ScanRunner._scanProject(
+                project,
+                args,
+                loaded.osvClient,
+                loaded.securityScanner,
+                loaded.unusedDetector
+            );
+            projectReports.push(report);
+        }
+
+        const report = ScanReportBuilder.summarise(projectReports);
+
+        if (args.sarif) {
+            io.stdout(ScanFormatter.sarif(report));
+        } else if (args.json) {
+            io.stdout(ScanFormatter.json(report));
+        } else {
+            io.stdout(ScanFormatter.text(report, args.failOn));
+        }
+
+        return ScanFormatter.shouldFail(report, args.failOn) ? 1 : 0;
+    }
+
+    /**
+     * Inner per-project pipeline. Pulled out of `run()` so each project
+     * sits in its own try/catch — one broken project shouldn't abort the
+     * whole CI run.
+     */
+    private static async _scanProject(
+        project: Project,
+        args: CliArgs,
+        osvClient: OsvClient,
+        securityScanner: SecurityScanner,
+        unusedDetector: UnusedDetector
+    ): Promise<ProjectScanReport> {
+        const baseInput = {
+            name: project.getName(),
+            type: project.getType()
+        };
+
+        let lockfile: Lockfile|null = null;
+        let lockfileError: string|null = null;
+        try {
+            lockfile = await project.loadLockfile();
+        } catch (e) {
+            lockfileError = `lockfile: ${(e as Error).message}`;
+        }
+
+        const lockPackages = lockfile?.packages ?? [];
+        const dedup = new Map<string, OsvBatchPackage>();
+        for (const p of lockPackages) {
+            const key = `${p.name}@${p.version}`;
+            if (!dedup.has(key)) {
+                dedup.set(key, {name: p.name, version: p.version});
+            }
+        }
+        const uniquePackages = Array.from(dedup.values());
+
+        let vulnsByKey;
+        if (args.runOsv && uniquePackages.length > 0) {
+            try {
+                vulnsByKey = await osvClient.queryBatch(uniquePackages);
+            } catch (e) {
+                lockfileError = `${lockfileError ? `${lockfileError}; ` : ''}osv: ${(e as Error).message}`;
+            }
+        }
+
+        let heuristics;
+        if (args.runHeuristics && uniquePackages.length > 0) {
+            try {
+                heuristics = await securityScanner.scanHeuristicsBatch(uniquePackages, args.concurrency);
+            } catch (e) {
+                lockfileError = `${lockfileError ? `${lockfileError}; ` : ''}heuristics: ${(e as Error).message}`;
+            }
+        }
+
+        let unused;
+        if (args.runUnused) {
+            try {
+                unused = await unusedDetector.scan(project);
+            } catch (e) {
+                lockfileError = `${lockfileError ? `${lockfileError}; ` : ''}unused: ${(e as Error).message}`;
+            }
+        }
+
+        return ScanReportBuilder.buildProject({
+            ...baseInput,
+            packagesScanned: uniquePackages.length,
+            vulnsByKey: vulnsByKey,
+            heuristics: heuristics,
+            unused: unused,
+            error: lockfileError
         });
     }
-
-    // CLI override for the external-sources master switch. The
-    // scanner's own per-source flags stay in the loaded config; only
-    // the master gate flips so `--no-external` is a one-line opt-out
-    // without rebuilding the scanner tree.
-    if (!args.runExternal) {
-        loaded.externalScanner.setEnabled(false);
-    }
-
-    let projects = loaded.projects;
-    if (args.projects.length > 0) {
-        const want = new Set(args.projects);
-        projects = projects.filter((p) => want.has(p.getName()));
-        if (projects.length === 0) {
-            io.stderr(
-                `nppm scan: no projects matched --project filter (${args.projects.join(', ')})\n`
-                + `  configured: ${loaded.projects.map((p) => p.getName()).join(', ')}\n`
-            );
-            return 2;
-        }
-    }
-
-    // `--sarif` and `--json` are machine outputs — keep stderr clean
-    // so the consuming tool (GitHub Code Scanning ingest, jq pipeline)
-    // gets a single deterministic stdout payload.
-    const machine = args.json || args.sarif;
-    if (!machine) {
-        io.stderr(`nppm scan: ${projects.length} project(s)\n`);
-    }
-
-    const projectReports: ProjectScanReport[] = [];
-    for (const project of projects) {
-        if (!machine) {
-            io.stderr(`  → ${project.getName()}\n`);
-        }
-        const report = await scanProject(
-            project,
-            args,
-            loaded.osvClient,
-            loaded.securityScanner,
-            loaded.unusedDetector
-        );
-        projectReports.push(report);
-    }
-
-    const report = ScanReportBuilder.summarise(projectReports);
-
-    if (args.sarif) {
-        io.stdout(ScanFormatter.sarif(report));
-    } else if (args.json) {
-        io.stdout(ScanFormatter.json(report));
-    } else {
-        io.stdout(ScanFormatter.text(report, args.failOn));
-    }
-
-    return ScanFormatter.shouldFail(report, args.failOn) ? 1 : 0;
-}
-
-/**
- * Inner per-project pipeline. Pulled out of `runScan` so each project
- * sits in its own try/catch — one broken project shouldn't abort the
- * whole CI run.
- */
-async function scanProject(
-    project: Project,
-    args: CliArgs,
-    osvClient: OsvClient,
-    securityScanner: SecurityScanner,
-    unusedDetector: UnusedDetector
-): Promise<ProjectScanReport> {
-    const baseInput = {
-        name: project.getName(),
-        type: project.getType()
-    };
-
-    let lockfile: Lockfile|null = null;
-    let lockfileError: string|null = null;
-    try {
-        lockfile = await project.loadLockfile();
-    } catch (e) {
-        lockfileError = `lockfile: ${(e as Error).message}`;
-    }
-
-    const lockPackages = lockfile?.packages ?? [];
-    const dedup = new Map<string, OsvBatchPackage>();
-    for (const p of lockPackages) {
-        const key = `${p.name}@${p.version}`;
-        if (!dedup.has(key)) {
-            dedup.set(key, {name: p.name, version: p.version});
-        }
-    }
-    const uniquePackages = Array.from(dedup.values());
-
-    let vulnsByKey;
-    if (args.runOsv && uniquePackages.length > 0) {
-        try {
-            vulnsByKey = await osvClient.queryBatch(uniquePackages);
-        } catch (e) {
-            lockfileError = (lockfileError ? lockfileError + '; ' : '') + `osv: ${(e as Error).message}`;
-        }
-    }
-
-    let heuristics;
-    if (args.runHeuristics && uniquePackages.length > 0) {
-        try {
-            heuristics = await securityScanner.scanHeuristicsBatch(uniquePackages, args.concurrency);
-        } catch (e) {
-            lockfileError = (lockfileError ? lockfileError + '; ' : '') + `heuristics: ${(e as Error).message}`;
-        }
-    }
-
-    let unused;
-    if (args.runUnused) {
-        try {
-            unused = await unusedDetector.scan(project);
-        } catch (e) {
-            lockfileError = (lockfileError ? lockfileError + '; ' : '') + `unused: ${(e as Error).message}`;
-        }
-    }
-
-    return ScanReportBuilder.buildProject({
-        ...baseInput,
-        packagesScanned: uniquePackages.length,
-        vulnsByKey,
-        heuristics,
-        unused,
-        error: lockfileError
-    });
 }

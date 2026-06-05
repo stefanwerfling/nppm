@@ -18,7 +18,7 @@ export type BundleSize = {
  * bundlephobia returned 404 because the package can't be bundled)
  * is distinguishable from a cold-cache miss.
  */
-type Wrap = {data: BundleSize|null};
+type Wrap = {data: BundleSize|null;};
 
 const DEFAULT_BASE_URL = 'https://bundlephobia.com';
 const DEFAULT_CONCURRENCY = 5;
@@ -42,7 +42,7 @@ export class BundlephobiaFetcher {
 
     constructor(
         cache: JsonCache,
-        opts: {baseUrl?: string; concurrency?: number} = {}
+        opts: {baseUrl?: string; concurrency?: number;} = {}
     ) {
         this._baseUrl = (opts.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, '');
         this._cache = cache;
@@ -73,11 +73,11 @@ export class BundlephobiaFetcher {
      * concurrency cap. The returned map is keyed by `${name}@${version}`
      * for direct lookup by callers that already have those strings.
      */
-    public async fetchMany(packages: {name: string; version: string}[]): Promise<Map<string, BundleSize|null>> {
+    public async fetchMany(packages: {name: string; version: string;}[]): Promise<Map<string, BundleSize|null>> {
         const result = new Map<string, BundleSize|null>();
         const queue = [...packages];
 
-        const runOne = async (): Promise<void> => {
+        const runOne = async(): Promise<void> => {
             while (queue.length > 0) {
                 const next = queue.shift();
                 if (!next) {
@@ -134,4 +134,5 @@ export class BundlephobiaFetcher {
         const safeVer = version.replace(/[^a-zA-Z0-9._@+-]/g, '__');
         return `bundle_${safeName}__${safeVer}`;
     }
+
 }

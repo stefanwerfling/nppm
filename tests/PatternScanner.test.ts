@@ -3,7 +3,7 @@ import {FileFingerprint} from '../backend/Fingerprint/Fingerprint.js';
 import {PatternScanner, PatternSeverity} from '../backend/Security/PatternScanner.js';
 
 function file(path: string, content: string|undefined): FileFingerprint {
-    const f: FileFingerprint = {path, sha256: 'x', size: content?.length ?? 0};
+    const f: FileFingerprint = {path: path, sha256: 'x', size: content?.length ?? 0};
     if (content !== undefined) {
         f.content = content;
     }
@@ -25,11 +25,13 @@ describe('PatternScanner.scan', () => {
 
     it('flags child_process require and member access', () => {
         const findings = PatternScanner.scan([
-            // Two separate styles in two files. The combined-on-one-line
-            // form `require("child_process").exec()` only matches the
-            // require regex (the string literal breaks the `.exec`
-            // adjacency); we cover the member-access form via a bound
-            // variable.
+            /*
+             * Two separate styles in two files. The combined-on-one-line
+             * form `require("child_process").exec()` only matches the
+             * require regex (the string literal breaks the `.exec`
+             * adjacency); we cover the member-access form via a bound
+             * variable.
+             */
             file('lib/exec.js', 'const cp = require("child_process"); child_process.execSync("ls")'),
             file('lib/dec.js', 'Buffer.from(input, "base64").toString()')
         ]);
@@ -113,9 +115,11 @@ describe('PatternScanner.scan', () => {
         ]);
         const aws = findings.filter((f) => f.pattern === 'AWS credentials env read');
         expect(aws.length).toBe(3);
-        // The AWS_SECRET_ACCESS_KEY read also legitimately matches the
-        // generic Secret/token pattern — overlap is intentional, both
-        // signals are useful to a reviewer.
+        /*
+         * The AWS_SECRET_ACCESS_KEY read also legitimately matches the
+         * generic Secret/token pattern — overlap is intentional, both
+         * signals are useful to a reviewer.
+         */
         const generic = findings.filter((f) => f.pattern === 'Secret/token env read');
         expect(generic.length).toBe(1);
     });
@@ -127,9 +131,11 @@ describe('PatternScanner.scan', () => {
             file('lib/c.js', 'const x = process.env.PRIVATE_KEY')
         ]);
 
-        // Three matches expected; the regex deliberately does not catch
-        // `_TOKEN` on its own to keep CI-token reads from drowning the
-        // signal, so a token-only read is intentionally not flagged.
+        /*
+         * Three matches expected; the regex deliberately does not catch
+         * `_TOKEN` on its own to keep CI-token reads from drowning the
+         * signal, so a token-only read is intentionally not flagged.
+         */
         expect(findings.length).toBe(3);
         expect(findings.every((f) => f.pattern === 'Secret/token env read')).toBe(true);
     });
@@ -145,9 +151,11 @@ describe('PatternScanner.scan', () => {
         const findings = PatternScanner.scan([
             file('lib/obf.js', 'var _0xab12 = ["console", "log"]; _0xab12[1](_0xab12[0]);')
         ]);
-        // Three textual references — declaration + two usages — each a
-        // match. The badge tooltip shows the count, so over-counting
-        // here is actually the desired behaviour.
+        /*
+         * Three textual references — declaration + two usages — each a
+         * match. The badge tooltip shows the count, so over-counting
+         * here is actually the desired behaviour.
+         */
         expect(findings.length).toBe(3);
         expect(findings.every((f) => f.pattern === 'Obfuscated _0x variable')).toBe(true);
     });

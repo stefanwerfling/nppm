@@ -50,12 +50,13 @@ class FakeRemoteProject extends ProjectRemote {
     public async getHeadSha(): Promise<string|null> {
         return this._head;
     }
+
 }
 
 function lockfile(packages: Record<string, string>): string {
     const out: Record<string, unknown> = {};
     for (const [name, version] of Object.entries(packages)) {
-        out[`node_modules/${name}`] = {version};
+        out[`node_modules/${name}`] = {version: version};
     }
     return JSON.stringify({
         lockfileVersion: 3,
@@ -75,7 +76,7 @@ function pkgJson(deps: {
 
 describe('RemoteGitHistoryBackfill', () => {
 
-    it('returns empty when neither lockfile nor package.json has commits', async () => {
+    it('returns empty when neither lockfile nor package.json has commits', async() => {
         const project = new FakeRemoteProject(new Map(), new Map(), 'abc');
         const backfill = new RemoteGitHistoryBackfill();
         const result = await backfill.build(project);
@@ -84,7 +85,7 @@ describe('RemoteGitHistoryBackfill', () => {
         expect(result.source).toBe('committed');
     });
 
-    it('builds chronological entries from consecutive remote lockfile commits', async () => {
+    it('builds chronological entries from consecutive remote lockfile commits', async() => {
         const project = new FakeRemoteProject(
             new Map([
                 ['package-lock.json', [
@@ -116,7 +117,7 @@ describe('RemoteGitHistoryBackfill', () => {
         expect(result.entries[1].removed).toEqual([{name: 'bar', version: '2.0.0'}]);
     });
 
-    it('skips commits whose lockfile is unparseable', async () => {
+    it('skips commits whose lockfile is unparseable', async() => {
         const project = new FakeRemoteProject(
             new Map([
                 ['package-lock.json', [
@@ -146,7 +147,7 @@ describe('RemoteGitHistoryBackfill', () => {
         });
     });
 
-    it('skips commits whose file fetch returns null (deleted at that ref)', async () => {
+    it('skips commits whose file fetch returns null (deleted at that ref)', async() => {
         const project = new FakeRemoteProject(
             new Map([
                 ['package-lock.json', [
@@ -168,7 +169,7 @@ describe('RemoteGitHistoryBackfill', () => {
         expect(result.entries[0].commitSha).toBe('aaa');
     });
 
-    it('reports finalState matching the last successful snapshot', async () => {
+    it('reports finalState matching the last successful snapshot', async() => {
         const project = new FakeRemoteProject(
             new Map([
                 ['package-lock.json', [
@@ -192,7 +193,7 @@ describe('RemoteGitHistoryBackfill', () => {
         ]);
     });
 
-    it('fires onProgress per commit including ones that were skipped', async () => {
+    it('fires onProgress per commit including ones that were skipped', async() => {
         const project = new FakeRemoteProject(
             new Map([
                 ['package-lock.json', [
@@ -216,11 +217,13 @@ describe('RemoteGitHistoryBackfill', () => {
         expect(calls).toEqual([[1, 3], [2, 3], [3, 3]]);
     });
 
-    it('returns empty result when the commit list call throws', async () => {
+    it('returns empty result when the commit list call throws', async() => {
         class ThrowingProject extends FakeRemoteProject {
+
             public async listCommitsForFile(): Promise<RemoteCommit[]|null> {
                 throw new Error('rate limit');
             }
+        
         }
         const project = new ThrowingProject(new Map(), new Map(), 'abc');
         const backfill = new RemoteGitHistoryBackfill();
@@ -229,11 +232,13 @@ describe('RemoteGitHistoryBackfill', () => {
         expect(result.headSha).toBe('abc');
     });
 
-    it('handles a null commit list (API said "no such file") gracefully', async () => {
+    it('handles a null commit list (API said "no such file") gracefully', async() => {
         class NullProject extends FakeRemoteProject {
+
             public async listCommitsForFile(): Promise<RemoteCommit[]|null> {
                 return null;
             }
+        
         }
         const project = new NullProject(new Map(), new Map(), null);
         const backfill = new RemoteGitHistoryBackfill();
@@ -242,7 +247,7 @@ describe('RemoteGitHistoryBackfill', () => {
         expect(result.headSha).toBeNull();
     });
 
-    it('falls back to package.json when no lockfile commits exist', async () => {
+    it('falls back to package.json when no lockfile commits exist', async() => {
         const project = new FakeRemoteProject(
             new Map([
                 // No lockfile commits — empty list for that file
@@ -273,7 +278,7 @@ describe('RemoteGitHistoryBackfill', () => {
         });
     });
 
-    it('prefers lockfile path even when package.json commits also exist', async () => {
+    it('prefers lockfile path even when package.json commits also exist', async() => {
         const project = new FakeRemoteProject(
             new Map([
                 ['package-lock.json', [{sha: 'aaa', timestamp: 1000_000}]],
@@ -294,14 +299,16 @@ describe('RemoteGitHistoryBackfill', () => {
         expect(result.entries[0].added).toEqual([{name: 'foo', version: '1.0.0'}]);
     });
 
-    it('falls back when the lockfile commits-list call throws but package.json is reachable', async () => {
+    it('falls back when the lockfile commits-list call throws but package.json is reachable', async() => {
         class PartiallyThrowingProject extends FakeRemoteProject {
+
             public async listCommitsForFile(file: string): Promise<RemoteCommit[]|null> {
                 if (file === 'package-lock.json') {
                     throw new Error('lockfile API blip');
                 }
                 return super.listCommitsForFile(file);
             }
+        
         }
         const project = new PartiallyThrowingProject(
             new Map([

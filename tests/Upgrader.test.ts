@@ -22,9 +22,9 @@ function makeFakeProcess(scripted: {
     const proc = new EventEmitter() as ChildProcess & EventEmitter;
     const stdout = new PassThrough();
     const stderr = new PassThrough();
-    (proc as unknown as {stdout: Readable}).stdout = stdout;
-    (proc as unknown as {stderr: Readable}).stderr = stderr;
-    (proc as unknown as {kill: () => boolean}).kill = () => true;
+    (proc as unknown as {stdout: Readable;}).stdout = stdout;
+    (proc as unknown as {stderr: Readable;}).stderr = stderr;
+    (proc as unknown as {kill: () => boolean;}).kill = () => true;
 
     setImmediate(() => {
         for (const c of scripted.stdout ?? []) {
@@ -43,14 +43,14 @@ function makeFakeProcess(scripted: {
 
 function collectSink(): {
     sink: StreamSink;
-    started: {command: string; cwd: string}|null;
+    started: {command: string; cwd: string;}|null;
     stdout: string;
     stderr: string;
     ended: number|null|undefined;
     error: string|null;
-} {
+    } {
     const state = {
-        started: null as null|{command: string; cwd: string},
+        started: null as null|{command: string; cwd: string;},
         stdout: '',
         stderr: '',
         ended: undefined as number|null|undefined,
@@ -58,7 +58,7 @@ function collectSink(): {
     };
     const sink: StreamSink = {
         onStart: (command, cwd) => {
-            state.started = {command, cwd};
+            state.started = {command: command, cwd: cwd};
         },
         onStdout: (c) => {
             state.stdout += c;
@@ -73,7 +73,7 @@ function collectSink(): {
             state.error = msg;
         }
     };
-    return {sink, ...state, get stdout() { return state.stdout; }, get stderr() { return state.stderr; }, get ended() { return state.ended; }, get error() { return state.error; }, get started() { return state.started; }};
+    return {sink: sink, ...state, get stdout() { return state.stdout; }, get stderr() { return state.stderr; }, get ended() { return state.ended; }, get error() { return state.error; }, get started() { return state.started; }};
 }
 
 describe('Upgrader', () => {
@@ -87,7 +87,7 @@ describe('Upgrader', () => {
         fs.rmSync(tmp, {recursive: true, force: true});
     });
 
-    it('preview() returns a planned diff without touching disk', async () => {
+    it('preview() returns a planned diff without touching disk', async() => {
         const pkgPath = path.join(tmp, 'package.json');
         const before = '{\n  "dependencies": {\n    "lodash": "^4.17.20"\n  }\n}\n';
         fs.writeFileSync(pkgPath, before);
@@ -152,7 +152,7 @@ describe('Upgrader', () => {
         expect(fs.readFileSync(pkgPath, 'utf-8')).toContain('"vitest": "^4.0.0"');
     });
 
-    it('runInstall() streams stdout/stderr and emits exit code via the sink', async () => {
+    it('runInstall() streams stdout/stderr and emits exit code via the sink', async() => {
         const pkgPath = path.join(tmp, 'package.json');
         fs.writeFileSync(pkgPath, '{}');
         const spawnStub: SpawnFn = (cmd, args) => {
@@ -169,7 +169,7 @@ describe('Upgrader', () => {
         expect(c.ended).toBe(0);
     });
 
-    it('runRebuild() invokes `npm rebuild <pkg>`', async () => {
+    it('runRebuild() invokes `npm rebuild <pkg>`', async() => {
         const spawnStub: SpawnFn = (cmd, args) => {
             expect(cmd).toBe('npm');
             expect(args).toEqual(['rebuild', 'sharp']);

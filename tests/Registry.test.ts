@@ -11,7 +11,7 @@ import {Registry} from '../backend/Registry/Registry.js';
  * surfaces as a test failure.
  */
 function makeFetch(routes: Record<string, unknown>): typeof fetch {
-    return vi.fn(async (input: unknown) => {
+    return vi.fn(async(input: unknown) => {
         const url = typeof input === 'string' ? input : (input as URL).toString();
         if (!(url in routes)) {
             throw new Error(`unexpected fetch ${url}`);
@@ -21,7 +21,7 @@ function makeFetch(routes: Record<string, unknown>): typeof fetch {
             ok: true,
             status: 200,
             statusText: 'OK',
-            json: async () => routes[url]
+            json: async() => routes[url]
         } as Response;
     }) as unknown as typeof fetch;
 }
@@ -38,13 +38,13 @@ describe('Registry', () => {
         vi.unstubAllGlobals();
     });
 
-    it('returns latest + versions for a successful hit', async () => {
+    it('returns latest + versions for a successful hit', async() => {
         vi.stubGlobal('fetch', makeFetch({
             'https://registry.example/lodash': {
-                name: 'lodash',
+                'name': 'lodash',
                 'dist-tags': {latest: '4.17.21'},
-                versions: {'4.17.21': {}, '4.17.20': {}},
-                time: {'4.17.21': '2021-02-20T00:00:00Z'}
+                'versions': {'4.17.21': {}, '4.17.20': {}},
+                'time': {'4.17.21': '2021-02-20T00:00:00Z'}
             }
         }));
 
@@ -57,12 +57,12 @@ describe('Registry', () => {
         expect(pkg!.versions.sort()).toEqual(['4.17.20', '4.17.21']);
     });
 
-    it('cache prevents a second HTTP call', async () => {
+    it('cache prevents a second HTTP call', async() => {
         const fetchMock = makeFetch({
             'https://registry.example/foo': {
-                name: 'foo',
+                'name': 'foo',
                 'dist-tags': {latest: '1.0.0'},
-                versions: {'1.0.0': {}}
+                'versions': {'1.0.0': {}}
             }
         });
         vi.stubGlobal('fetch', fetchMock);
@@ -76,8 +76,8 @@ describe('Registry', () => {
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
-    it('returns null on non-2xx', async () => {
-        vi.stubGlobal('fetch', vi.fn(async () => ({
+    it('returns null on non-2xx', async() => {
+        vi.stubGlobal('fetch', vi.fn(async() => ({
             ok: false,
             status: 404,
             statusText: 'Not Found'
@@ -88,17 +88,17 @@ describe('Registry', () => {
         expect(await r.fetchOne('ghost')).toBeNull();
     });
 
-    it('fetchMany deduplicates names and returns a map', async () => {
+    it('fetchMany deduplicates names and returns a map', async() => {
         vi.stubGlobal('fetch', makeFetch({
             'https://registry.example/a': {
-                name: 'a',
+                'name': 'a',
                 'dist-tags': {latest: '1.0.0'},
-                versions: {'1.0.0': {}}
+                'versions': {'1.0.0': {}}
             },
             'https://registry.example/b': {
-                name: 'b',
+                'name': 'b',
                 'dist-tags': {latest: '2.0.0'},
-                versions: {'2.0.0': {}}
+                'versions': {'2.0.0': {}}
             }
         }));
 
@@ -111,12 +111,12 @@ describe('Registry', () => {
         expect(result.get('b')!.latest).toBe('2.0.0');
     });
 
-    it('extracts per-version `_npmUser` into the publishers map', async () => {
+    it('extracts per-version `_npmUser` into the publishers map', async() => {
         vi.stubGlobal('fetch', makeFetch({
             'https://registry.example/foo': {
-                name: 'foo',
+                'name': 'foo',
                 'dist-tags': {latest: '1.0.1'},
-                versions: {
+                'versions': {
                     '1.0.0': {_npmUser: {name: 'alice', email: 'a@x'}},
                     '1.0.1': {_npmUser: {name: 'bob'}},
                     // No `_npmUser` — should be omitted from the map.
@@ -135,13 +135,13 @@ describe('Registry', () => {
         expect(pkg!.publishers!['0.9.0']).toBeUndefined();
     });
 
-    it('extracts modern bare-string license field', async () => {
+    it('extracts modern bare-string license field', async() => {
         vi.stubGlobal('fetch', makeFetch({
             'https://registry.example/p': {
-                name: 'p',
+                'name': 'p',
                 'dist-tags': {latest: '1.0.0'},
-                versions: {'1.0.0': {}},
-                license: 'MIT'
+                'versions': {'1.0.0': {}},
+                'license': 'MIT'
             }
         }));
         const r = new Registry('https://registry.example', new JsonCache(dir, 60));
@@ -149,13 +149,13 @@ describe('Registry', () => {
         expect(pkg!.license).toBe('MIT');
     });
 
-    it('extracts deprecated {type,url} license object', async () => {
+    it('extracts deprecated {type,url} license object', async() => {
         vi.stubGlobal('fetch', makeFetch({
             'https://registry.example/p': {
-                name: 'p',
+                'name': 'p',
                 'dist-tags': {latest: '1.0.0'},
-                versions: {'1.0.0': {}},
-                license: {type: 'Apache-2.0', url: 'https://…'}
+                'versions': {'1.0.0': {}},
+                'license': {type: 'Apache-2.0', url: 'https://…'}
             }
         }));
         const r = new Registry('https://registry.example', new JsonCache(dir, 60));
@@ -163,13 +163,13 @@ describe('Registry', () => {
         expect(pkg!.license).toBe('Apache-2.0');
     });
 
-    it('joins legacy licenses[] array as an OR-expression', async () => {
+    it('joins legacy licenses[] array as an OR-expression', async() => {
         vi.stubGlobal('fetch', makeFetch({
             'https://registry.example/p': {
-                name: 'p',
+                'name': 'p',
                 'dist-tags': {latest: '1.0.0'},
-                versions: {'1.0.0': {}},
-                licenses: [{type: 'MIT'}, {type: 'Apache-2.0'}]
+                'versions': {'1.0.0': {}},
+                'licenses': [{type: 'MIT'}, {type: 'Apache-2.0'}]
             }
         }));
         const r = new Registry('https://registry.example', new JsonCache(dir, 60));
@@ -177,12 +177,12 @@ describe('Registry', () => {
         expect(pkg!.license).toBe('(MIT OR Apache-2.0)');
     });
 
-    it('extracts per-version deprecated reasons into the deprecations map', async () => {
+    it('extracts per-version deprecated reasons into the deprecations map', async() => {
         vi.stubGlobal('fetch', makeFetch({
             'https://registry.example/foo': {
-                name: 'foo',
+                'name': 'foo',
                 'dist-tags': {latest: '2.0.0'},
-                versions: {
+                'versions': {
                     '1.0.0': {deprecated: 'use 2.x'},
                     '2.0.0': {},
                     '0.9.0': {deprecated: ''}
@@ -198,12 +198,12 @@ describe('Registry', () => {
         expect(pkg!.deprecations!['2.0.0']).toBeUndefined();
     });
 
-    it('omits the deprecations field when no version carries one', async () => {
+    it('omits the deprecations field when no version carries one', async() => {
         vi.stubGlobal('fetch', makeFetch({
             'https://registry.example/clean': {
-                name: 'clean',
+                'name': 'clean',
                 'dist-tags': {latest: '1.0.0'},
-                versions: {'1.0.0': {}}
+                'versions': {'1.0.0': {}}
             }
         }));
         const r = new Registry('https://registry.example', new JsonCache(dir, 60));
@@ -211,12 +211,12 @@ describe('Registry', () => {
         expect(pkg!.deprecations).toBeUndefined();
     });
 
-    it('omits the publishers field when no version has `_npmUser`', async () => {
+    it('omits the publishers field when no version has `_npmUser`', async() => {
         vi.stubGlobal('fetch', makeFetch({
             'https://registry.example/old': {
-                name: 'old',
+                'name': 'old',
                 'dist-tags': {latest: '1.0.0'},
-                versions: {'1.0.0': {}}
+                'versions': {'1.0.0': {}}
             }
         }));
 
@@ -227,12 +227,12 @@ describe('Registry', () => {
         expect(pkg!.publishers).toBeUndefined();
     });
 
-    it('extracts dist.signatures + dist.attestations from a provenance-published version', async () => {
+    it('extracts dist.signatures + dist.attestations from a provenance-published version', async() => {
         vi.stubGlobal('fetch', makeFetch({
             'https://registry.example/proven': {
-                name: 'proven',
+                'name': 'proven',
                 'dist-tags': {latest: '1.0.0'},
-                versions: {
+                'versions': {
                     '1.0.0': {
                         dist: {
                             tarball: 'https://registry.example/proven/-/proven-1.0.0.tgz',
@@ -260,12 +260,12 @@ describe('Registry', () => {
         expect(dist!.attestations?.provenance?.predicateType).toBe('https://slsa.dev/provenance/v0.2');
     });
 
-    it('omits signatures/attestations when the registry serves neither', async () => {
+    it('omits signatures/attestations when the registry serves neither', async() => {
         vi.stubGlobal('fetch', makeFetch({
             'https://registry.example/bare': {
-                name: 'bare',
+                'name': 'bare',
                 'dist-tags': {latest: '1.0.0'},
-                versions: {
+                'versions': {
                     '1.0.0': {
                         dist: {
                             tarball: 'https://registry.example/bare/-/bare-1.0.0.tgz'
@@ -285,15 +285,15 @@ describe('Registry', () => {
         expect(dist!.attestations).toBeUndefined();
     });
 
-    it('sends Authorization header when configured', async () => {
-        const fetchMock = vi.fn(async () => ({
+    it('sends Authorization header when configured', async() => {
+        const fetchMock = vi.fn(async() => ({
             ok: true,
             status: 200,
             statusText: 'OK',
-            json: async () => ({
-                name: 'priv',
+            json: async() => ({
+                'name': 'priv',
                 'dist-tags': {latest: '1'},
-                versions: {'1': {}}
+                'versions': {1: {}}
             })
         } as Response));
         vi.stubGlobal('fetch', fetchMock);
@@ -302,7 +302,7 @@ describe('Registry', () => {
         const r = new Registry('https://registry.example', cache, 'secret');
         await r.fetchOne('priv');
 
-        const call = fetchMock.mock.calls[0] as unknown as [string, {headers: Record<string, string>}];
+        const call = fetchMock.mock.calls[0] as unknown as [string, {headers: Record<string, string>;}];
         expect(call[1].headers.Authorization).toBe('Bearer secret');
     });
 });

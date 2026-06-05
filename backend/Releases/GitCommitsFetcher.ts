@@ -12,8 +12,10 @@ export type GitCommit = {
     shortSha: string;
     /** First line of the commit message ("subject"). */
     subject: string;
-    /** ISO timestamp. `null` when the host returned an unparseable
-     * date — keeps the entry visible instead of dropping it. */
+    /**
+     * ISO timestamp. `null` when the host returned an unparseable
+     * date — keeps the entry visible instead of dropping it. 
+     */
     date: string|null;
     /** Author login / display name; falls back to email-local-part. */
     author: string|null;
@@ -26,7 +28,7 @@ export type GitCommit = {
  * stub keyed by request URL so we never hit the real APIs.
  */
 export interface CommitsHttpFetcher {
-    fetch(url: string, headers: Record<string, string>): Promise<{ok: boolean; status: number; statusText: string; body: unknown}>;
+    fetch(url: string, headers: Record<string, string>): Promise<{ok: boolean; status: number; statusText: string; body: unknown;}>;
 }
 
 export type GitCommitsResponse = {
@@ -66,8 +68,10 @@ export class GitCommitsFetcher {
         opts: {
             giteaHosts?: string[];
             githubToken?: string;
-            /** Per-instance token map (hostname → token). Gitea
-             * deployments are private-by-default so tokens are common. */
+            /**
+             * Per-instance token map (hostname → token). Gitea
+             * deployments are private-by-default so tokens are common. 
+             */
             giteaTokens?: Map<string, string>;
             http?: CommitsHttpFetcher;
         } = {}
@@ -82,7 +86,7 @@ export class GitCommitsFetcher {
     public async fetch(gitUrl: string, limit: number = DEFAULT_LIMIT): Promise<GitCommitsResponse|null> {
         const v = gitUrl.trim();
         const key = `gitcommits_${v}`;
-        type Wrap = {data: GitCommitsResponse|null};
+        type Wrap = {data: GitCommitsResponse|null;};
 
         if (this._cache) {
             const hit = this._cache.get<Wrap>(key);
@@ -109,8 +113,10 @@ export class GitCommitsFetcher {
             this._cache?.set<Wrap>(key, {data: resp});
             return resp;
         } catch {
-            // Don't cache transient errors — same shape as the GH
-            // release-notes path.
+            /*
+             * Don't cache transient errors — same shape as the GH
+             * release-notes path.
+             */
             return null;
         }
     }
@@ -119,7 +125,7 @@ export class GitCommitsFetcher {
         const url = `https://api.github.com/repos/${info.owner}/${info.repo}/commits?per_page=${limit}`;
         const headers: Record<string, string> = {
             'User-Agent': 'nppm',
-            Accept: 'application/vnd.github.v3+json'
+            'Accept': 'application/vnd.github.v3+json'
         };
         if (this._githubToken) {
             headers.Authorization = `Bearer ${this._githubToken}`;
@@ -137,7 +143,7 @@ export class GitCommitsFetcher {
             host: info.host,
             owner: info.owner,
             repo: info.repo,
-            commits,
+            commits: commits,
             repoUrl: `https://github.com/${info.owner}/${info.repo}`
         };
     }
@@ -146,7 +152,7 @@ export class GitCommitsFetcher {
         const url = `https://${info.hostname}/api/v1/repos/${info.owner}/${info.repo}/commits?limit=${limit}`;
         const headers: Record<string, string> = {
             'User-Agent': 'nppm',
-            Accept: 'application/json'
+            'Accept': 'application/json'
         };
         const token = this._giteaTokens.get(info.hostname);
         if (token) {
@@ -165,7 +171,7 @@ export class GitCommitsFetcher {
             host: info.host,
             owner: info.owner,
             repo: info.repo,
-            commits,
+            commits: commits,
             repoUrl: `https://${info.hostname}/${info.owner}/${info.repo}`
         };
     }
@@ -174,7 +180,7 @@ export class GitCommitsFetcher {
         const sha = c.sha ?? '';
         const message = c.commit?.message ?? '';
         return {
-            sha,
+            sha: sha,
             shortSha: sha.slice(0, 7),
             subject: GitCommitsFetcher._subject(message),
             date: c.commit?.author?.date ?? c.commit?.committer?.date ?? null,
@@ -187,7 +193,7 @@ export class GitCommitsFetcher {
         const sha = c.sha ?? '';
         const message = c.commit?.message ?? '';
         return {
-            sha,
+            sha: sha,
             shortSha: sha.slice(0, 7),
             subject: GitCommitsFetcher._subject(message),
             date: c.commit?.author?.date ?? c.created ?? null,
@@ -211,18 +217,19 @@ export class GitCommitsFetcher {
 
     private static _defaultHttp(): CommitsHttpFetcher {
         return {
-            async fetch(url, headers) {
-                const res = await fetch(url, {headers});
+            fetch: async function(url, headers) {
+                const res = await fetch(url, {headers: headers});
                 let body: unknown = null;
                 try {
                     body = await res.json();
                 } catch {
                     body = null;
                 }
-                return {ok: res.ok, status: res.status, statusText: res.statusText, body};
+                return {ok: res.ok, status: res.status, statusText: res.statusText, body: body};
             }
         };
     }
+
 }
 
 type GithubCommit = {
@@ -230,10 +237,10 @@ type GithubCommit = {
     html_url?: string;
     commit?: {
         message?: string;
-        author?: {name?: string; email?: string; date?: string};
-        committer?: {date?: string};
+        author?: {name?: string; email?: string; date?: string;};
+        committer?: {date?: string;};
     };
-    author?: {login?: string} | null;
+    author?: {login?: string;} | null;
 };
 
 type GiteaCommit = {
@@ -242,7 +249,7 @@ type GiteaCommit = {
     created?: string;
     commit?: {
         message?: string;
-        author?: {name?: string; email?: string; date?: string};
+        author?: {name?: string; email?: string; date?: string;};
     };
-    author?: {login?: string} | null;
+    author?: {login?: string;} | null;
 };

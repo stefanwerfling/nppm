@@ -45,4 +45,5 @@ export class Resizer {
             window.addEventListener('mouseup', onUp);
         });
     }
+
 }

@@ -80,7 +80,7 @@ export type HistoryFile = {
     projectName: string;
     lastSnapshot: {
         timestamp: number;
-        packages: {name: string; version: string}[];
+        packages: {name: string; version: string;}[];
     }|null;
     entries: HistoryEntry[];
     gitBackfilledHead?: string|null;

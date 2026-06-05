@@ -5,16 +5,16 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {JsonCache} from '../backend/Cache/JsonCache.js';
 import {OpenSsfFetcher} from '../backend/Security/External/OpenSsfFetcher.js';
 
-function stubFetch(impl: (url: string) => {ok: boolean; status?: number; body?: unknown}): () => void {
+function stubFetch(impl: (url: string) => {ok: boolean; status?: number; body?: unknown;}): () => void {
     const original = globalThis.fetch;
-    globalThis.fetch = (async (input: RequestInfo|URL) => {
+    globalThis.fetch = (async(input: RequestInfo|URL) => {
         const url = typeof input === 'string' ? input : input.toString();
         const res = impl(url);
         return {
             ok: res.ok,
             status: res.status ?? (res.ok ? 200 : 500),
             statusText: res.ok ? 'OK' : 'Error',
-            json: async () => res.body ?? {}
+            json: async() => res.body ?? {}
         } as unknown as Response;
     }) as typeof fetch;
     return () => {
@@ -25,31 +25,31 @@ function stubFetch(impl: (url: string) => {ok: boolean; status?: number; body?: 
 describe('OpenSsfFetcher.parseRepoUrl', () => {
     it('parses git+https URLs across hosts', () => {
         expect(OpenSsfFetcher.parseRepoUrl('git+https://github.com/lodash/lodash.git'))
-            .toEqual({host: 'github.com', owner: 'lodash', repo: 'lodash'});
+        .toEqual({host: 'github.com', owner: 'lodash', repo: 'lodash'});
         expect(OpenSsfFetcher.parseRepoUrl('git+https://gitlab.com/g/r.git'))
-            .toEqual({host: 'gitlab.com', owner: 'g', repo: 'r'});
+        .toEqual({host: 'gitlab.com', owner: 'g', repo: 'r'});
         expect(OpenSsfFetcher.parseRepoUrl('git+https://bitbucket.org/b/r.git'))
-            .toEqual({host: 'bitbucket.org', owner: 'b', repo: 'r'});
+        .toEqual({host: 'bitbucket.org', owner: 'b', repo: 'r'});
     });
 
     it('parses plain https URLs without .git suffix', () => {
         expect(OpenSsfFetcher.parseRepoUrl('https://github.com/axios/axios'))
-            .toEqual({host: 'github.com', owner: 'axios', repo: 'axios'});
+        .toEqual({host: 'github.com', owner: 'axios', repo: 'axios'});
     });
 
     it('parses ssh URLs', () => {
         expect(OpenSsfFetcher.parseRepoUrl('git@github.com:owner/repo.git'))
-            .toEqual({host: 'github.com', owner: 'owner', repo: 'repo'});
+        .toEqual({host: 'github.com', owner: 'owner', repo: 'repo'});
     });
 
     it('parses npm shorthand (owner/repo) as GitHub', () => {
         expect(OpenSsfFetcher.parseRepoUrl('owner/repo'))
-            .toEqual({host: 'github.com', owner: 'owner', repo: 'repo'});
+        .toEqual({host: 'github.com', owner: 'owner', repo: 'repo'});
     });
 
     it('parses github:owner/repo shorthand', () => {
         expect(OpenSsfFetcher.parseRepoUrl('github:foo/bar'))
-            .toEqual({host: 'github.com', owner: 'foo', repo: 'bar'});
+        .toEqual({host: 'github.com', owner: 'foo', repo: 'bar'});
     });
 
     it('returns null for unsupported hosts', () => {
@@ -103,7 +103,7 @@ describe('OpenSsfFetcher.fetch', () => {
         fs.rmSync(dir, {recursive: true, force: true});
     });
 
-    it('caches the parsed result so a second call never re-fetches', async () => {
+    it('caches the parsed result so a second call never re-fetches', async() => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;
@@ -119,7 +119,7 @@ describe('OpenSsfFetcher.fetch', () => {
         }
     });
 
-    it('caches the null envelope on 404 — Scorecard hasn\'t scored this repo', async () => {
+    it('caches the null envelope on 404 — Scorecard hasn\'t scored this repo', async() => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;

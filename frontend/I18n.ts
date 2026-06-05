@@ -119,4 +119,5 @@ export class I18n {
         }
         return DEFAULT_LANG;
     }
+
 }

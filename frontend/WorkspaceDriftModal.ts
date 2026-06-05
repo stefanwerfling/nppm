@@ -226,4 +226,5 @@ export class WorkspaceDriftModal {
         actions.appendChild(cancel);
         return actions;
     }
+
 }

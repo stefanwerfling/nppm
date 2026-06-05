@@ -49,7 +49,7 @@ export class TemplateComplianceChecker {
     public check(
         manifests: PackageManifest[],
         template: ResolvedTemplate,
-        opts: {projectRoot?: string} = {}
+        opts: {projectRoot?: string;} = {}
     ): ComplianceReport {
         const findings: ComplianceFinding[] = [];
         if (template.sourceIds.length === 0) {
@@ -58,7 +58,7 @@ export class TemplateComplianceChecker {
         const root = manifests.find((m) => m.workspace === undefined) ?? manifests[0];
 
         // Index project deps by name → list of {bucket, range, workspace?}
-        type Seen = {bucket: DependencyType; range: string; workspace?: string};
+        type Seen = {bucket: DependencyType; range: string; workspace?: string;};
         const projectDeps = new Map<string, Seen[]>();
         for (const m of manifests) {
             for (const d of m.dependencies) {
@@ -76,8 +76,10 @@ export class TemplateComplianceChecker {
             optional: DependencyType.optional
         };
 
-        // Walk every templated bucket → check missing / divergent /
-        // bucket-wrong.
+        /*
+         * Walk every templated bucket → check missing / divergent /
+         * bucket-wrong.
+         */
         for (const bucket of bucketKeys) {
             const expectedType = bucketToType[bucket];
             const reqs = template.packages[bucket];
@@ -90,7 +92,7 @@ export class TemplateComplianceChecker {
                         severity: req.required ? 'risk' : 'warn',
                         target: `${bucket}:${name}`,
                         expected: req.version,
-                        sourceId
+                        sourceId: sourceId
                     });
                     continue;
                 }
@@ -106,7 +108,7 @@ export class TemplateComplianceChecker {
                             target: `${bucket}:${name}`,
                             expected: req.version,
                             actual: matchedBucket.range,
-                            sourceId
+                            sourceId: sourceId
                         });
                     }
                 } else {
@@ -120,7 +122,7 @@ export class TemplateComplianceChecker {
                             ? `${bucket} (${req.version})`
                             : bucket,
                         actual: `${TemplateComplianceChecker._typeToBucket(wrong.bucket)} (${wrong.range})`,
-                        sourceId
+                        sourceId: sourceId
                     });
                 }
             }
@@ -139,12 +141,14 @@ export class TemplateComplianceChecker {
                 severity: 'risk',
                 target: `forbidden:${name}`,
                 actual: `${TemplateComplianceChecker._typeToBucket(where.bucket)} (${where.range})`,
-                sourceId
+                sourceId: sourceId
             });
         }
 
-        // Strict mode — flag any project dep not declared in the template
-        // and not on the forbidden list.
+        /*
+         * Strict mode — flag any project dep not declared in the template
+         * and not on the forbidden list.
+         */
         if (template.mode === 'strict') {
             const pinned = new Set<string>();
             for (const bucket of bucketKeys) {
@@ -168,9 +172,11 @@ export class TemplateComplianceChecker {
             }
         }
 
-        // Root-package.json metadata. Each key in the template's
-        // `root` section is checked independently. Engines + scripts
-        // are deep-key maps; private/type/packageManager are scalars.
+        /*
+         * Root-package.json metadata. Each key in the template's
+         * `root` section is checked independently. Engines + scripts
+         * are deep-key maps; private/type/packageManager are scalars.
+         */
         const r = template.root;
         if (r.engines) {
             for (const [k, expected] of Object.entries(r.engines)) {
@@ -180,7 +186,7 @@ export class TemplateComplianceChecker {
                         kind: 'root-missing',
                         severity: 'warn',
                         target: `engines.${k}`,
-                        expected,
+                        expected: expected,
                         sourceId: template.id
                     });
                 } else if (actual !== expected) {
@@ -188,8 +194,8 @@ export class TemplateComplianceChecker {
                         kind: 'root-divergent',
                         severity: 'warn',
                         target: `engines.${k}`,
-                        expected,
-                        actual,
+                        expected: expected,
+                        actual: actual,
                         sourceId: template.id
                     });
                 }
@@ -203,7 +209,7 @@ export class TemplateComplianceChecker {
                         kind: 'root-missing',
                         severity: 'warn',
                         target: `scripts.${k}`,
-                        expected,
+                        expected: expected,
                         sourceId: template.id
                     });
                 } else if (actual !== expected) {
@@ -211,8 +217,8 @@ export class TemplateComplianceChecker {
                         kind: 'root-divergent',
                         severity: 'warn',
                         target: `scripts.${k}`,
-                        expected,
-                        actual,
+                        expected: expected,
+                        actual: actual,
                         sourceId: template.id
                     });
                 }
@@ -279,9 +285,11 @@ export class TemplateComplianceChecker {
             }
         }
 
-        // File-compliance against the template's top-level `files[]`.
-        // Skipped when no projectRoot is provided (tests / remote
-        // projects).
+        /*
+         * File-compliance against the template's top-level `files[]`.
+         * Skipped when no projectRoot is provided (tests / remote
+         * projects).
+         */
         if (opts.projectRoot) {
             for (const f of template.files) {
                 const finding = TemplateComplianceChecker._checkFile(f, opts.projectRoot, '');
@@ -291,11 +299,13 @@ export class TemplateComplianceChecker {
             }
         }
 
-        // Per-workspace checks. The template declares the workspace
-        // contract; we match by `workspace` path on the project's
-        // manifests. Missing workspaces surface as one finding; the
-        // recursive packages / root / files check then runs against
-        // the workspace's own manifest.
+        /*
+         * Per-workspace checks. The template declares the workspace
+         * contract; we match by `workspace` path on the project's
+         * manifests. Missing workspaces surface as one finding; the
+         * recursive packages / root / files check then runs against
+         * the workspace's own manifest.
+         */
         for (const ws of template.workspaces) {
             const wsManifest = manifests.find((m) => m.workspace === ws.path);
             if (!wsManifest) {
@@ -317,7 +327,7 @@ export class TemplateComplianceChecker {
 
         return {
             templateIds: template.sourceIds,
-            findings,
+            findings: findings,
             worst: TemplateComplianceChecker._worst(findings)
         };
     }
@@ -333,17 +343,21 @@ export class TemplateComplianceChecker {
         workspacePath: string
     ): ComplianceFinding|null {
         const projectAbs = path.join(projectRoot, workspacePath, f.path);
-        // For workspace files the resolver records sourcePath under
-        // <files>/<workspace>/<path> — read it as-is.
+        /*
+         * For workspace files the resolver records sourcePath under
+         * <files>/<workspace>/<path> — read it as-is.
+         */
         const wsTarget = workspacePath.length > 0
             ? `workspace:${workspacePath}:file:${f.path}`
             : `file:${f.path}`;
         const projectExists = fs.existsSync(projectAbs);
         const templateExists = fs.existsSync(f.sourcePath);
         if (!templateExists) {
-            // Template promises a file that's not actually on disk —
-            // misconfigured template; surface as warn so the user
-            // notices.
+            /*
+             * Template promises a file that's not actually on disk —
+             * misconfigured template; surface as warn so the user
+             * notices.
+             */
             return {
                 kind: 'file-missing',
                 severity: 'warn',
@@ -370,12 +384,14 @@ export class TemplateComplianceChecker {
         if (projectBytes.equals(templateBytes)) {
             return null;
         }
-        // merge-json mode: drift only when applying the merge would
-        // actually change something. The byte-difference between a
-        // valid merged project file and the template source isn't
-        // drift — the user opted into "project may have its own
-        // additional keys", and the template only enforces presence
-        // of its own keys + values.
+        /*
+         * merge-json mode: drift only when applying the merge would
+         * actually change something. The byte-difference between a
+         * valid merged project file and the template source isn't
+         * drift — the user opted into "project may have its own
+         * additional keys", and the template only enforces presence
+         * of its own keys + values.
+         */
         if (f.mode === 'merge-json') {
             const drift = TemplateComplianceChecker._mergeJsonDrift(projectBytes, templateBytes);
             if (!drift) {
@@ -445,7 +461,7 @@ export class TemplateComplianceChecker {
         const p = project as Record<string, unknown>;
         for (const [key, val] of Object.entries(t)) {
             const subPrefix = prefix ? `${prefix}.${key}` : key;
-            if (!Object.prototype.hasOwnProperty.call(p, key)) {
+            if (!Object.hasOwn(p, key)) {
                 return `${subPrefix} missing`;
             }
             const sub = TemplateComplianceChecker._deepDrift(p[key], val, subPrefix);
@@ -478,7 +494,7 @@ export class TemplateComplianceChecker {
         const targetPrefix = `workspace:${ws.path}:`;
 
         // Workspace-deps index — only this workspace's deps count.
-        type Seen = {bucket: DependencyType; range: string};
+        type Seen = {bucket: DependencyType; range: string;};
         const wsDeps = new Map<string, Seen[]>();
         for (const d of manifest.dependencies) {
             const list = wsDeps.get(d.name) ?? [];
@@ -542,8 +558,10 @@ export class TemplateComplianceChecker {
             });
         }
 
-        // Workspace root metadata — checks against this workspace's
-        // package.json (e.g. its own scripts.test).
+        /*
+         * Workspace root metadata — checks against this workspace's
+         * package.json (e.g. its own scripts.test).
+         */
         TemplateComplianceChecker._checkRootInto(ws.root, manifest, ws.sourceId, targetPrefix, findings);
 
         // Workspace files (paths are relative to the workspace dir).
@@ -577,17 +595,17 @@ export class TemplateComplianceChecker {
                         kind: 'root-missing',
                         severity: 'warn',
                         target: `${targetPrefix}engines.${k}`,
-                        expected,
-                        sourceId
+                        expected: expected,
+                        sourceId: sourceId
                     });
                 } else if (actual !== expected) {
                     findings.push({
                         kind: 'root-divergent',
                         severity: 'warn',
                         target: `${targetPrefix}engines.${k}`,
-                        expected,
-                        actual,
-                        sourceId
+                        expected: expected,
+                        actual: actual,
+                        sourceId: sourceId
                     });
                 }
             }
@@ -600,17 +618,17 @@ export class TemplateComplianceChecker {
                         kind: 'root-missing',
                         severity: 'warn',
                         target: `${targetPrefix}scripts.${k}`,
-                        expected,
-                        sourceId
+                        expected: expected,
+                        sourceId: sourceId
                     });
                 } else if (actual !== expected) {
                     findings.push({
                         kind: 'root-divergent',
                         severity: 'warn',
                         target: `${targetPrefix}scripts.${k}`,
-                        expected,
-                        actual,
-                        sourceId
+                        expected: expected,
+                        actual: actual,
+                        sourceId: sourceId
                     });
                 }
             }
@@ -622,7 +640,7 @@ export class TemplateComplianceChecker {
                     severity: 'warn',
                     target: `${targetPrefix}private`,
                     expected: String(root.private),
-                    sourceId
+                    sourceId: sourceId
                 });
             } else if (manifest.isPrivate !== root.private) {
                 findings.push({
@@ -631,7 +649,7 @@ export class TemplateComplianceChecker {
                     target: `${targetPrefix}private`,
                     expected: String(root.private),
                     actual: String(manifest.isPrivate),
-                    sourceId
+                    sourceId: sourceId
                 });
             }
         }
@@ -642,7 +660,7 @@ export class TemplateComplianceChecker {
                     severity: 'warn',
                     target: `${targetPrefix}type`,
                     expected: root.type,
-                    sourceId
+                    sourceId: sourceId
                 });
             } else if (manifest.moduleType !== root.type) {
                 findings.push({
@@ -651,7 +669,7 @@ export class TemplateComplianceChecker {
                     target: `${targetPrefix}type`,
                     expected: root.type,
                     actual: manifest.moduleType,
-                    sourceId
+                    sourceId: sourceId
                 });
             }
         }
@@ -662,7 +680,7 @@ export class TemplateComplianceChecker {
                     severity: 'warn',
                     target: `${targetPrefix}packageManager`,
                     expected: root.packageManager,
-                    sourceId
+                    sourceId: sourceId
                 });
             } else if (manifest.packageManager !== root.packageManager) {
                 findings.push({
@@ -671,7 +689,7 @@ export class TemplateComplianceChecker {
                     target: `${targetPrefix}packageManager`,
                     expected: root.packageManager,
                     actual: manifest.packageManager,
-                    sourceId
+                    sourceId: sourceId
                 });
             }
         }
@@ -682,9 +700,11 @@ export class TemplateComplianceChecker {
         bucket: keyof ResolvedTemplate['packages'],
         name: string
     ): string {
-        // The merger doesn't track per-key ownership, so attribute to
-        // the final template in the chain — sufficient for the UI
-        // tooltip until phase 2 introduces an ownership map.
+        /*
+         * The merger doesn't track per-key ownership, so attribute to
+         * the final template in the chain — sufficient for the UI
+         * tooltip until phase 2 introduces an ownership map.
+         */
         return template.sourceIds[template.sourceIds.length - 1] ?? template.id;
     }
 
@@ -725,4 +745,5 @@ export class TemplateComplianceChecker {
         }
         return r;
     }
+
 }

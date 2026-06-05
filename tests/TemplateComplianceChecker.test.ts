@@ -325,8 +325,10 @@ describe('TemplateComplianceChecker — workspaces', () => {
             root: {},
             files: []
         }];
-        // root has express but the workspace doesn't — workspace
-        // contract independently requires it
+        /*
+         * root has express but the workspace doesn't — workspace
+         * contract independently requires it
+         */
         const root = mkManifest({
             dependencies: [{name: 'express', version: '^5', type: DependencyType.dependency}]
         });

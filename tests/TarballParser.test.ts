@@ -16,7 +16,7 @@ function tarHeader(name: string, size: number, prefix = ''): Buffer {
     header.write('0000644 ', 100, 8, 'ascii');
     header.write('0000000 ', 108, 8, 'ascii');
     header.write('0000000 ', 116, 8, 'ascii');
-    header.write(size.toString(8).padStart(11, '0') + ' ', 124, 12, 'ascii');
+    header.write(`${size.toString(8).padStart(11, '0')  } `, 124, 12, 'ascii');
     header.write('00000000000 ', 136, 12, 'ascii');
     header.write('        ', 148, 8, 'ascii'); // checksum placeholder (8 spaces)
     header.write('0', 156, 1, 'ascii');
@@ -31,7 +31,7 @@ function tarHeader(name: string, size: number, prefix = ''): Buffer {
     for (let i = 0; i < BLOCK; i++) {
         sum += header[i];
     }
-    header.write(sum.toString(8).padStart(6, '0') + '\0 ', 148, 8, 'ascii');
+    header.write(`${sum.toString(8).padStart(6, '0')  }\0 `, 148, 8, 'ascii');
 
     return header;
 }
@@ -42,7 +42,7 @@ function tarBody(content: Buffer): Buffer {
     return padded;
 }
 
-function buildTarball(files: {name: string; content: string}[]): Buffer {
+function buildTarball(files: {name: string; content: string;}[]): Buffer {
     const parts: Buffer[] = [];
 
     for (const f of files) {
@@ -81,8 +81,10 @@ describe('TarballParser', () => {
     });
 
     it('keeps paths without the package/ prefix intact', () => {
-        // Some legacy npm-incompatible tarballs put files at the root.
-        // The fingerprint should still see *something* — don't drop them.
+        /*
+         * Some legacy npm-incompatible tarballs put files at the root.
+         * The fingerprint should still see *something* — don't drop them.
+         */
         const header = tarHeader('README.md', 5);
         const body = tarBody(Buffer.from('hello', 'utf8'));
         const end = Buffer.alloc(BLOCK);
@@ -94,10 +96,12 @@ describe('TarballParser', () => {
     });
 
     it('strips a non-package/ common prefix (e.g. @types/* tarballs)', () => {
-        // @types/cookie-parser publishes its tarball under
-        // `cookie-parser/` rather than `package/`. The parser should
-        // notice that every entry shares the same top-level dir and
-        // strip it.
+        /*
+         * @types/cookie-parser publishes its tarball under
+         * `cookie-parser/` rather than `package/`. The parser should
+         * notice that every entry shares the same top-level dir and
+         * strip it.
+         */
         const tgz = buildTarball([
             {name: 'cookie-parser/package.json', content: '{"name":"@types/cookie-parser"}'},
             {name: 'cookie-parser/index.d.ts', content: 'declare module "cookie-parser";'}
@@ -114,8 +118,10 @@ describe('TarballParser', () => {
         ]);
 
         const entries = TarballParser.parse(tgz);
-        // Without a single common dir we keep the raw paths so caller can
-        // still find `package/index.js` etc.
+        /*
+         * Without a single common dir we keep the raw paths so caller can
+         * still find `package/index.js` etc.
+         */
         expect(entries.map((e) => e.path)).toEqual(['package/index.js', 'docs/readme.md']);
     });
 });

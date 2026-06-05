@@ -30,7 +30,7 @@ class LanguagePicker {
             if (info.id === active) {
                 btn.classList.add('topbar-flag-active');
             }
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (): void => {
                 if (info.id === I18n.getLanguage()) {
                     return;
                 }
@@ -40,47 +40,46 @@ class LanguagePicker {
             host.appendChild(btn);
         }
     }
+
+}
+
+/**
+ * One-shot bootstrap glue: wires the two topbar buttons (gear,
+ * Impact) whose markup lives in `index.html` to their respective
+ * modals and applies the active-locale title strings. Kept as a
+ * class so the file has no module-level free functions.
+ */
+class Bootstrap {
+
+    public static mountSettingsButton(): void {
+        const btn = document.getElementById('topbar-settings');
+        if (!btn) {
+            return;
+        }
+        btn.title = I18n.t('Settings');
+        btn.setAttribute('aria-label', I18n.t('Settings'));
+        btn.addEventListener('click', (): void => {
+            new SettingsModal().open();
+        });
+    }
+
+    public static mountImpactButton(): void {
+        const btn = document.getElementById('topbar-impact');
+        if (!btn) {
+            return;
+        }
+        btn.title = I18n.t('Impact analysis');
+        btn.textContent = I18n.t('Impact');
+        btn.addEventListener('click', (): void => {
+            new ImpactModal().open();
+        });
+    }
+
 }
 
 LanguagePicker.mount();
-
-/**
- * Mount the gear button → SettingsModal handler. The button itself
- * lives in `index.html` (so the markup-side title attribute is
- * static); here we translate the title to the active locale and
- * wire the click. One-shot at boot — the button never moves.
- */
-function mountSettingsButton(): void {
-    const btn = document.getElementById('topbar-settings');
-    if (!btn) {
-        return;
-    }
-    btn.title = I18n.t('Settings');
-    btn.setAttribute('aria-label', I18n.t('Settings'));
-    btn.addEventListener('click', () => {
-        new SettingsModal().open();
-    });
-}
-
-mountSettingsButton();
-
-/**
- * Topbar Impact button → ImpactModal. Same pattern as the gear button:
- * markup lives in `index.html`, click handler + i18n title wired here.
- */
-function mountImpactButton(): void {
-    const btn = document.getElementById('topbar-impact');
-    if (!btn) {
-        return;
-    }
-    btn.title = I18n.t('Impact analysis');
-    btn.textContent = I18n.t('Impact');
-    btn.addEventListener('click', () => {
-        new ImpactModal().open();
-    });
-}
-
-mountImpactButton();
+Bootstrap.mountSettingsButton();
+Bootstrap.mountImpactButton();
 
 const app = new Nppm();
 void app.start();

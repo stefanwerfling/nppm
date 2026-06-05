@@ -105,9 +105,11 @@ export class PatternScanner {
             }
 
             for (const def of PATTERNS) {
-                // Reset regex state — these patterns are declared with
-                // the `g` flag, so `lastIndex` carries over across
-                // files otherwise.
+                /*
+                 * Reset regex state — these patterns are declared with
+                 * the `g` flag, so `lastIndex` carries over across
+                 * files otherwise.
+                 */
                 def.regex.lastIndex = 0;
 
                 let match: RegExpExecArray|null;
@@ -117,7 +119,7 @@ export class PatternScanner {
 
                     findings.push({
                         path: file.path,
-                        line,
+                        line: line,
                         pattern: def.name,
                         severity: def.severity,
                         snippet: PatternScanner._snippetAround(file.content, match.index, match[0].length)
@@ -138,6 +140,7 @@ export class PatternScanner {
         const lineStart = source.lastIndexOf('\n', start - 1) + 1;
         const lineEnd = source.indexOf('\n', start + length);
         const slice = source.slice(lineStart, lineEnd === -1 ? source.length : lineEnd);
-        return slice.length > 200 ? slice.slice(0, 200) + '…' : slice;
+        return slice.length > 200 ? `${slice.slice(0, 200)  }…` : slice;
     }
+
 }

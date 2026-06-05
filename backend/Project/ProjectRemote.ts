@@ -47,7 +47,7 @@ export abstract class ProjectRemote implements Project {
 
     constructor(
         displayName: string,
-        opts: {hidden?: boolean; configIndex?: number; templates?: string[]} = {}
+        opts: {hidden?: boolean; configIndex?: number; templates?: string[];} = {}
     ) {
         this._name = displayName;
         this._hidden = opts.hidden === true;
@@ -124,15 +124,17 @@ export abstract class ProjectRemote implements Project {
     public abstract getHeadSha(): Promise<string|null>;
 
     public async loadLockfile(): Promise<Lockfile|null> {
-        // Remote contents API can serve `package-lock.json` just fine,
-        // but the file is often huge (megabytes for any non-trivial
-        // tree). Pulling it on every matrix render via base64-decode
-        // would dwarf the rest of the page; the user can run lockfile
-        // analysis against a checked-out copy if they need it.
-        //
-        // Returning `null` is the contract for "no lockfile available"
-        // — callers treat it the same as a project without a committed
-        // lock.
+        /*
+         * Remote contents API can serve `package-lock.json` just fine,
+         * but the file is often huge (megabytes for any non-trivial
+         * tree). Pulling it on every matrix render via base64-decode
+         * would dwarf the rest of the page; the user can run lockfile
+         * analysis against a checked-out copy if they need it.
+         * 
+         * Returning `null` is the contract for "no lockfile available"
+         * — callers treat it the same as a project without a committed
+         * lock.
+         */
         const body = await this.fetchFile('package-lock.json');
 
         if (body === null) {
@@ -190,10 +192,10 @@ export abstract class ProjectRemote implements Project {
         ];
 
         return {
-            name,
-            version,
-            workspace,
-            dependencies,
+            name: name,
+            version: version,
+            workspace: workspace,
+            dependencies: dependencies,
             scripts: ProjectRemote._extractScripts(raw.scripts),
             engines: ProjectRemote._extractStringMap(raw.engines),
             isPrivate: typeof raw.private === 'boolean' ? raw.private : undefined,
@@ -241,7 +243,7 @@ export abstract class ProjectRemote implements Project {
 
         for (const [name, version] of Object.entries(block as Record<string, unknown>)) {
             if (typeof version === 'string') {
-                out.push({name, version, type, workspace});
+                out.push({name: name, version: version, type: type, workspace: workspace});
             }
         }
 
@@ -260,7 +262,7 @@ export abstract class ProjectRemote implements Project {
         if (Array.isArray(raw.workspaces)) {
             patterns = raw.workspaces.filter((v): v is string => typeof v === 'string');
         } else if (raw.workspaces && typeof raw.workspaces === 'object') {
-            const ws = raw.workspaces as {packages?: unknown};
+            const ws = raw.workspaces as {packages?: unknown;};
 
             if (Array.isArray(ws.packages)) {
                 patterns = ws.packages.filter((v): v is string => typeof v === 'string');
@@ -285,4 +287,5 @@ export abstract class ProjectRemote implements Project {
 
         return Array.from(out);
     }
+
 }

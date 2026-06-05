@@ -131,13 +131,13 @@ export class IntegrityScanner {
      */
     public static aggregateByName(
         findings: IntegrityFinding[]
-    ): Map<string, {severity: IntegritySeverity; riskCount: number}> {
+    ): Map<string, {severity: IntegritySeverity; riskCount: number;}> {
         const rank: Record<IntegritySeverity, number> = {
             [IntegritySeverity.info]: 1,
             [IntegritySeverity.warn]: 2,
             [IntegritySeverity.risk]: 3
         };
-        const out = new Map<string, {severity: IntegritySeverity; riskCount: number}>();
+        const out = new Map<string, {severity: IntegritySeverity; riskCount: number;}>();
         for (const f of findings) {
             const existing = out.get(f.name);
             const riskInc = f.severity === IntegritySeverity.risk ? 1 : 0;
@@ -178,7 +178,7 @@ export class IntegrityScanner {
                 : infoCount > 0
                     ? IntegritySeverity.info
                     : null;
-        return {maxSeverity, riskCount, warnCount, infoCount, totalScanned};
+        return {maxSeverity: maxSeverity, riskCount: riskCount, warnCount: warnCount, infoCount: infoCount, totalScanned: totalScanned};
     }
 
     /**
@@ -190,12 +190,14 @@ export class IntegrityScanner {
         const seen = new Set<string>();
         const out: LockedPackage[] = [];
         for (const p of packages) {
-            // Skip non-registry installs — git/file URLs aren't
-            // anchored in the registry; comparing integrity makes no
-            // sense. The check has to cover both `p.version`
-            // (`"figtree": "git+…"` in the manifest) and `p.resolved`
-            // (lockfile entry resolved to a git tarball but reporting
-            // the inner semver `1.0.21` as version).
+            /*
+             * Skip non-registry installs — git/file URLs aren't
+             * anchored in the registry; comparing integrity makes no
+             * sense. The check has to cover both `p.version`
+             * (`"figtree": "git+…"` in the manifest) and `p.resolved`
+             * (lockfile entry resolved to a git tarball but reporting
+             * the inner semver `1.0.21` as version).
+             */
             if (!p.name || !p.version) {
                 continue;
             }
@@ -222,12 +224,14 @@ export class IntegrityScanner {
      */
     private static _evaluate(
         pkg: LockedPackage,
-        registry: {dist?: Record<string, RegistryDist>}|null
+        registry: {dist?: Record<string, RegistryDist>;}|null
     ): IntegrityFinding|null {
         if (registry === null) {
-            // Registry returned null — package not on the registry,
-            // could be a private/internal dep. Info-level so the
-            // user can audit but not a hard signal.
+            /*
+             * Registry returned null — package not on the registry,
+             * could be a private/internal dep. Info-level so the
+             * user can audit but not a hard signal.
+             */
             return {
                 name: pkg.name,
                 version: pkg.version,
@@ -241,17 +245,21 @@ export class IntegrityScanner {
 
         const dist = registry.dist?.[pkg.version];
         if (!dist) {
-            // Registry knows the package but not this specific
-            // version. Could be an old cache entry without `dist`
-            // (pre-IntegrityScanner) — defer judgment by emitting
-            // no finding rather than a false positive.
+            /*
+             * Registry knows the package but not this specific
+             * version. Could be an old cache entry without `dist`
+             * (pre-IntegrityScanner) — defer judgment by emitting
+             * no finding rather than a false positive.
+             */
             return null;
         }
 
         if (!pkg.integrity) {
-            // Lockfile entry has no integrity at all. Old npm
-            // versions or hand-edited lockfiles. Info — not
-            // actionable on its own.
+            /*
+             * Lockfile entry has no integrity at all. Old npm
+             * versions or hand-edited lockfiles. Info — not
+             * actionable on its own.
+             */
             return {
                 name: pkg.name,
                 version: pkg.version,
@@ -265,10 +273,12 @@ export class IntegrityScanner {
         }
 
         if (dist.integrity && pkg.integrity !== dist.integrity) {
-            // Hash mismatch — the registry now serves a different
-            // tarball than the project pinned. Could be mirror-
-            // hijack, dependency-confusion via re-published name,
-            // lockfile-injection. Real attack signal.
+            /*
+             * Hash mismatch — the registry now serves a different
+             * tarball than the project pinned. Could be mirror-
+             * hijack, dependency-confusion via re-published name,
+             * lockfile-injection. Real attack signal.
+             */
             return {
                 name: pkg.name,
                 version: pkg.version,
@@ -282,10 +292,12 @@ export class IntegrityScanner {
             };
         }
 
-        // Integrity matches (or registry has none). Check whether
-        // the tarball URL also matches — divergence with matching
-        // hash is benign (custom mirror), but worth surfacing so
-        // the user knows.
+        /*
+         * Integrity matches (or registry has none). Check whether
+         * the tarball URL also matches — divergence with matching
+         * hash is benign (custom mirror), but worth surfacing so
+         * the user knows.
+         */
         if (pkg.resolved && dist.tarball && pkg.resolved !== dist.tarball) {
             return {
                 name: pkg.name,
@@ -302,4 +314,5 @@ export class IntegrityScanner {
 
         return null;
     }
+
 }

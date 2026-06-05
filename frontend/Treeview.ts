@@ -94,22 +94,26 @@ export class Treeview {
     public render(projects: ApiProject[]): void {
         this._root.innerHTML = '';
 
-        // "+ Add project" pinned to the very top so the action is
-        // discoverable even when the project list is empty.
+        /*
+         * "+ Add project" pinned to the very top so the action is
+         * discoverable even when the project list is empty.
+         */
         const addBar = document.createElement('div');
         addBar.className = 'tree-addbar';
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
         addBtn.className = 'tree-add-btn';
         addBtn.title = I18n.t('Add project');
-        addBtn.innerHTML = '<span class="tree-add-plus">+</span> ' + I18n.t('Add project');
+        addBtn.innerHTML = `<span class="tree-add-plus">+</span> ${  I18n.t('Add project')}`;
         addBtn.addEventListener('click', () => this._onAdd?.());
         addBar.appendChild(addBtn);
         this._root.appendChild(addBar);
 
-        // Always-present sentinel rows on top — Dashboard / Matrix /
-        // Templates. Their UUIDs are sentinels the parent component
-        // routes specially.
+        /*
+         * Always-present sentinel rows on top — Dashboard / Matrix /
+         * Templates. Their UUIDs are sentinels the parent component
+         * routes specially.
+         */
         const matrixGroup = document.createElement('div');
         matrixGroup.className = 'tree-group';
 
@@ -183,9 +187,11 @@ export class Treeview {
             item.classList.add('tree-item-hidden');
         }
 
-        // Sentinel entries (Matrix, Templates) get their own class so
-        // the user can spot them at a glance — they aren't projects
-        // and behave differently when clicked.
+        /*
+         * Sentinel entries (Matrix, Templates) get their own class so
+         * the user can spot them at a glance — they aren't projects
+         * and behave differently when clicked.
+         */
         const sentinel = Treeview._sentinelIcon(project.unid);
         if (sentinel) {
             item.classList.add('tree-item-sentinel');
@@ -231,8 +237,10 @@ export class Treeview {
             actions.appendChild(this._renderEyeToggle(project));
             item.appendChild(actions);
 
-            // Health score ring — filled in asynchronously by
-            // `setProjectScores()` once the matrix heuristics arrive.
+            /*
+             * Health score ring — filled in asynchronously by
+             * `setProjectScores()` once the matrix heuristics arrive.
+             */
             const scoreSlot = document.createElement('div');
             scoreSlot.className = 'tree-item-score';
             scoreSlot.appendChild(Treeview._renderScoreRing(this._scores.get(project.unid)));
@@ -365,9 +373,11 @@ export class Treeview {
             fg.setAttribute('cy', '18');
             fg.setAttribute('r', '15');
             fg.setAttribute('fill', 'none');
-            // 2πr ≈ 94.25 for r=15. Dasharray "<percent>, 100" uses
-            // pathLength=100 so we don't have to compute the
-            // circumference — modern browsers handle it.
+            /*
+             * 2πr ≈ 94.25 for r=15. Dasharray "<percent>, 100" uses
+             * pathLength=100 so we don't have to compute the
+             * circumference — modern browsers handle it.
+             */
             fg.setAttribute('pathLength', '100');
             fg.setAttribute('stroke-dasharray', `${health}, 100`);
             fg.setAttribute('stroke-linecap', 'round');
@@ -396,4 +406,5 @@ export class Treeview {
                 return 'Gitea';
         }
     }
+
 }

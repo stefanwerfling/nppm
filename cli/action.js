@@ -19,7 +19,7 @@ const vite = await createServer({
 
 try {
     const mod = await vite.ssrLoadModule('./cli/Action.ts');
-    const exit = await mod.runAction({
+    const exit = await mod.ActionRunner.run({
         env: process.env,
         cwd: process.cwd(),
         stdout: (s) => process.stdout.write(s),

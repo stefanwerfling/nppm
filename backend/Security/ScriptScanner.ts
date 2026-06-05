@@ -41,7 +41,7 @@ const BUILD_HOOKS = new Set(['prepare', 'prepublish']);
  * patterns yield false positives that train the user to ignore the
  * badge.
  */
-const RISK_PATTERNS: {pattern: RegExp; reason: string}[] = [
+const RISK_PATTERNS: {pattern: RegExp; reason: string;}[] = [
     {pattern: /\b(curl|wget)\b/i, reason: 'downloads remote payload via curl/wget'},
     {pattern: /\bnc\s+-/, reason: 'opens network connection via netcat'},
     {pattern: /\bnode\s+(-e|--eval)\b/, reason: 'runs code via `node -e`'},
@@ -88,9 +88,9 @@ export class ScriptScanner {
                     : ScriptSeverity.info;
 
             findings.push({
-                hook,
-                severity,
-                script,
+                hook: hook,
+                severity: severity,
+                script: script,
                 reason: risk
                     ? risk.reason
                     : isInstall
@@ -101,4 +101,5 @@ export class ScriptScanner {
 
         return findings;
     }
+
 }

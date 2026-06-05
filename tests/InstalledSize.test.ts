@@ -26,7 +26,7 @@ describe('InstalledSize.compute', () => {
     };
 
     const pkgWithSizes = (name: string, sizes: Record<string, number>): RegistryPackage => ({
-        name,
+        name: name,
         latest: Object.keys(sizes)[0] ?? null,
         versions: Object.keys(sizes),
         dist: Object.fromEntries(
@@ -34,10 +34,10 @@ describe('InstalledSize.compute', () => {
         )
     });
 
-    it('sums unpackedSize across the package list', async () => {
+    it('sums unpackedSize across the package list', async() => {
         const reg = mkRegistry({
-            'a': pkgWithSizes('a', {'1.0.0': 1000, '2.0.0': 2000}),
-            'b': pkgWithSizes('b', {'1.0.0': 500})
+            a: pkgWithSizes('a', {'1.0.0': 1000, '2.0.0': 2000}),
+            b: pkgWithSizes('b', {'1.0.0': 500})
         });
         const result = await InstalledSize.compute([
             {name: 'a', version: '1.0.0'},
@@ -48,10 +48,10 @@ describe('InstalledSize.compute', () => {
         expect(result.totalCount).toBe(2);
     });
 
-    it('skips packages without a size record but counts them in totalCount', async () => {
+    it('skips packages without a size record but counts them in totalCount', async() => {
         const reg = mkRegistry({
-            'a': pkgWithSizes('a', {'1.0.0': 1000}),
-            'b': {
+            a: pkgWithSizes('a', {'1.0.0': 1000}),
+            b: {
                 name: 'b', latest: '1.0.0', versions: ['1.0.0'],
                 dist: {'1.0.0': {tarball: 'http://t'}}  // no unpackedSize
             }
@@ -65,15 +65,15 @@ describe('InstalledSize.compute', () => {
         expect(result.totalCount).toBe(2);
     });
 
-    it('returns zero/zero/zero on empty input', async () => {
+    it('returns zero/zero/zero on empty input', async() => {
         const reg = mkRegistry({});
         const result = await InstalledSize.compute([], reg);
         expect(result).toEqual({totalBytes: 0, coveredCount: 0, totalCount: 0});
     });
 
-    it('skips packages whose version is not in the dist map', async () => {
+    it('skips packages whose version is not in the dist map', async() => {
         const reg = mkRegistry({
-            'a': pkgWithSizes('a', {'1.0.0': 1000})
+            a: pkgWithSizes('a', {'1.0.0': 1000})
         });
         const result = await InstalledSize.compute(
             [{name: 'a', version: '99.0.0'}],

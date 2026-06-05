@@ -17,20 +17,28 @@ export type SbomComponent = {
     purl: string;
     /** Resolved tarball URL from the lockfile, when present. */
     resolved: string|null;
-    /** Lowercase hex SHA-512 of the tarball — `null` if the lockfile
+    /**
+     * Lowercase hex SHA-512 of the tarball — `null` if the lockfile
      *  carried no integrity (or carried a non-sha512 algorithm we
-     *  don't transcode). */
+     *  don't transcode). 
+     */
     hashSha512Hex: string|null;
-    /** Raw SPDX-style license string from the registry packument. `null`
+    /**
+     * Raw SPDX-style license string from the registry packument. `null`
      *  when missing — SBOM formats render that as NOASSERTION /
-     *  unknown. */
+     *  unknown. 
+     */
     license: string|null;
-    /** Raw `repository` value from the packument (typically a git URL).
-     *  Echoed verbatim — both formats accept any URL string here. */
+    /**
+     * Raw `repository` value from the packument (typically a git URL).
+     *  Echoed verbatim — both formats accept any URL string here. 
+     */
     repository: string|null;
-    /** Direct `name → range` map this package declared in its own
+    /**
+     * Direct `name → range` map this package declared in its own
      *  `dependencies` (lockfile entry). Drives the SBOM dependency
-     *  graph. Empty for leaves. */
+     *  graph. Empty for leaves. 
+     */
     directDeps: Record<string, string>;
 };
 
@@ -70,11 +78,13 @@ export class SbomCollector {
         const lockfile: Lockfile|null = await project.loadLockfile();
         const unique = lockfile ? SbomCollector._dedupe(lockfile.packages) : [];
 
-        // One registry hit per *name* (versions share metadata) — the
-        // cache layer takes care of the rest.
+        /*
+         * One registry hit per *name* (versions share metadata) — the
+         * cache layer takes care of the rest.
+         */
         const distinctNames = Array.from(new Set(unique.map((p) => p.name)));
         const packuments = new Map<string, Awaited<ReturnType<Registry['fetchOne']>>>();
-        await Promise.all(distinctNames.map(async (n) => {
+        await Promise.all(distinctNames.map(async(n) => {
             try {
                 packuments.set(n, await this._registry.fetchOne(n));
             } catch {
@@ -108,7 +118,7 @@ export class SbomCollector {
                 urn: `urn:uuid:${SbomCollector._uuidLike(project.getName(), ts)}`,
                 generatedAt: ts
             },
-            components
+            components: components
         };
     }
 
@@ -165,4 +175,5 @@ export class SbomCollector {
         const h = createHash('sha256').update(`${name}|${ts}`).digest('hex');
         return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
     }
+
 }

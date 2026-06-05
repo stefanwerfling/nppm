@@ -109,10 +109,10 @@ const STRONG_COPYLEFT_IDS = new Set([
  * enough for 99 % of expressions seen on npm.
  */
 type Token =
-    | {kind: 'id'; value: string}
-    | {kind: 'op'; value: 'OR'|'AND'|'WITH'}
-    | {kind: 'lparen'}
-    | {kind: 'rparen'};
+    | {kind: 'id'; value: string;}
+    | {kind: 'op'; value: 'OR'|'AND'|'WITH';}
+    | {kind: 'lparen';}
+    | {kind: 'rparen';};
 
 /**
  * Classifies the `license` field of an npm package against a (small)
@@ -141,10 +141,12 @@ export class LicenseScanner {
     public classify(spdx: string|null|undefined): LicenseFinding {
         const raw = spdx ?? null;
 
-        // Empty / missing: respect `treatUnknownAs` from config, but
-        // policy lists still apply (a denylist match on '' is unusual
-        // but a hypothetical allowlist with a wildcard could legitimately
-        // catch it).
+        /*
+         * Empty / missing: respect `treatUnknownAs` from config, but
+         * policy lists still apply (a denylist match on '' is unusual
+         * but a hypothetical allowlist with a wildcard could legitimately
+         * catch it).
+         */
         if (raw === null || raw.trim().length === 0) {
             return {
                 spdx: null,
@@ -161,17 +163,21 @@ export class LicenseScanner {
         const tokens = LicenseScanner._tokenize(raw);
         const evaluated = tokens ? LicenseScanner._evalExpression(tokens) : null;
 
-        // Policy lookup matches against the raw string AND each
-        // recognised identifier. That way `BSD-*` in an allowlist
-        // matches both the bare `BSD-3-Clause` declaration and the
-        // dual-licensed `(MIT OR BSD-3-Clause)` expression.
+        /*
+         * Policy lookup matches against the raw string AND each
+         * recognised identifier. That way `BSD-*` in an allowlist
+         * matches both the bare `BSD-3-Clause` declaration and the
+         * dual-licensed `(MIT OR BSD-3-Clause)` expression.
+         */
         const candidates = evaluated && evaluated.identifiers.length > 0
             ? [raw, ...evaluated.identifiers]
             : [raw];
 
-        // Denylist always wins so a security-strict team can override
-        // even a normally-permissive license (e.g. some companies
-        // forbid CC-BY-4.0 for code).
+        /*
+         * Denylist always wins so a security-strict team can override
+         * even a normally-permissive license (e.g. some companies
+         * forbid CC-BY-4.0 for code).
+         */
         if (candidates.some((c) => LicenseScanner._matchesAny(c, this._denylist))) {
             return {
                 spdx: raw,
@@ -198,14 +204,16 @@ export class LicenseScanner {
                 severity: evaluated.severity,
                 identifiers: evaluated.identifiers,
                 reason: this._reasonFor(evaluated.severity, evaluated.identifiers, raw)
-            ,
+                ,
                 policyMatched: false
             };
         }
 
-        // Couldn't parse the expression — treat the whole string as a
-        // single atom. Catches free-text proprietary strings ("Acme
-        // Corp internal license").
+        /*
+         * Couldn't parse the expression — treat the whole string as a
+         * single atom. Catches free-text proprietary strings ("Acme
+         * Corp internal license").
+         */
         const atomSev = LicenseScanner._classifyAtom(raw);
         return {
             spdx: raw,
@@ -331,9 +339,11 @@ export class LicenseScanner {
                 continue;
             }
 
-            // Identifier / keyword. SPDX IDs use [A-Za-z0-9.+-], plus
-            // the keywords OR/AND/WITH. Read until we hit a space or
-            // paren.
+            /*
+             * Identifier / keyword. SPDX IDs use [A-Za-z0-9.+-], plus
+             * the keywords OR/AND/WITH. Read until we hit a space or
+             * paren.
+             */
             let j = i;
             while (j < s.length && !/[\s()]/.test(s[j])) {
                 j++;
@@ -369,7 +379,7 @@ export class LicenseScanner {
      */
     private static _evalExpression(
         tokens: Token[]
-    ): {severity: LicenseSeverity; identifiers: string[]}|null {
+    ): {severity: LicenseSeverity; identifiers: string[];}|null {
         let pos = 0;
         const ids = new Set<string>();
 
@@ -401,10 +411,12 @@ export class LicenseScanner {
             if (sev === null) {
                 return null;
             }
-            // `Apache-2.0 WITH Classpath-exception-2.0` — the WITH
-            // clause is an exception that loosens the parent license,
-            // never changes its bucket.
-            if (peek()?.kind === 'op' && (peek() as {value: string}).value === 'WITH') {
+            /*
+             * `Apache-2.0 WITH Classpath-exception-2.0` — the WITH
+             * clause is an exception that loosens the parent license,
+             * never changes its bucket.
+             */
+            if (peek()?.kind === 'op' && (peek() as {value: string;}).value === 'WITH') {
                 consume();
                 const next = consume();
                 if (!next || next.kind !== 'id') {
@@ -420,7 +432,7 @@ export class LicenseScanner {
             if (sev === null) {
                 return null;
             }
-            while (peek()?.kind === 'op' && (peek() as {value: string}).value === 'AND') {
+            while (peek()?.kind === 'op' && (peek() as {value: string;}).value === 'AND') {
                 consume();
                 const next = parseFactor();
                 if (next === null) {
@@ -439,7 +451,7 @@ export class LicenseScanner {
             if (sev === null) {
                 return null;
             }
-            while (peek()?.kind === 'op' && (peek() as {value: string}).value === 'OR') {
+            while (peek()?.kind === 'op' && (peek() as {value: string;}).value === 'OR') {
                 consume();
                 const next = parseTerm();
                 if (next === null) {
@@ -457,8 +469,9 @@ export class LicenseScanner {
         if (severity === null || pos !== tokens.length) {
             return null;
         }
-        return {severity, identifiers: Array.from(ids)};
+        return {severity: severity, identifiers: Array.from(ids)};
     }
+
 }
 
 /**

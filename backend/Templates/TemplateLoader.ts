@@ -11,15 +11,15 @@ import {SchemaTemplate, Template} from './Template.js';
  * `templateSources[]` and are read-only.
  */
 export type TemplateSource =
-    | {kind: 'local'}
-    | {kind: 'remote'; url: string};
+    | {kind: 'local';}
+    | {kind: 'remote'; url: string;};
 
 /**
  * Minimal `fetch`-compatible signature so tests can inject a fake
  * fetcher. Mirrors the global `fetch` enough for our needs:
  * `Response.ok` + `text()`.
  */
-export type TemplateFetcher = (url: string) => Promise<{ok: boolean; status: number; text(): Promise<string>}>;
+export type TemplateFetcher = (url: string) => Promise<{ok: boolean; status: number; text(): Promise<string>;}>;
 
 /**
  * Reads templates from a `<dir>/<id>/template.json` directory tree.
@@ -88,16 +88,18 @@ export class TemplateLoader {
                     const sourceFile = path.join(tplDir, '.source.json');
                     if (fs.existsSync(sourceFile)) {
                         try {
-                            const parsed = JSON.parse(fs.readFileSync(sourceFile, 'utf-8')) as {url?: string};
+                            const parsed = JSON.parse(fs.readFileSync(sourceFile, 'utf-8')) as {url?: string;};
                             url = parsed.url ?? '';
                         } catch {
-                            // ignore — empty url means "we fetched it
-                            // but the sidecar got corrupted", still a
-                            // valid remote
+                            /*
+                             * ignore — empty url means "we fetched it
+                             * but the sidecar got corrupted", still a
+                             * valid remote
+                             */
                         }
                     }
                     result.set(id, tpl);
-                    this._sources.set(id, {kind: 'remote', url});
+                    this._sources.set(id, {kind: 'remote', url: url});
                 }
             );
         }
@@ -110,12 +112,12 @@ export class TemplateLoader {
      * sidecar recording the URL. Network / parse / schema failures are
      * per-URL warnings — one bad source doesn't kill the whole refresh.
      */
-    public async refreshRemote(urls: string[], opts: {fetcher?: TemplateFetcher} = {}): Promise<void> {
+    public async refreshRemote(urls: string[], opts: {fetcher?: TemplateFetcher;} = {}): Promise<void> {
         if (urls.length === 0) {
             return;
         }
         const fetcher: TemplateFetcher = opts.fetcher ?? (
-            async (url: string) => {
+            async(url: string) => {
                 const res = await fetch(url);
                 return {ok: res.ok, status: res.status, text: () => res.text()};
             }
@@ -139,11 +141,11 @@ export class TemplateLoader {
                 fs.mkdirSync(tplDir, {recursive: true});
                 fs.writeFileSync(
                     path.join(tplDir, 'template.json'),
-                    JSON.stringify(tpl, null, 2) + '\n'
+                    `${JSON.stringify(tpl, null, 2)  }\n`
                 );
                 fs.writeFileSync(
                     path.join(tplDir, '.source.json'),
-                    JSON.stringify({url, fetchedAt: Date.now()}, null, 2) + '\n'
+                    `${JSON.stringify({url: url, fetchedAt: Date.now()}, null, 2)  }\n`
                 );
             } catch (e) {
                 console.warn(`nppm: remote template ${url} failed to load: ${(e as Error).message}`);
@@ -194,4 +196,5 @@ export class TemplateLoader {
         }
         return t;
     }
+
 }

@@ -45,20 +45,28 @@ export class InstalledView {
     private _onShowTemplate: ((unid: string) => void)|null = null;
     private _onWhy: ((unid: string, name: string, version: string) => void)|null = null;
     private _lockfile: Lockfile|null = null;
-    // Inflight SSE stream — kept so we can close it on view switch /
-    // re-analysis. `null` means no analysis is running.
+    /*
+     * Inflight SSE stream — kept so we can close it on view switch /
+     * re-analysis. `null` means no analysis is running.
+     */
     private _stream: EventSource|null = null;
-    // Per-`${name}@${version}` vuln list once the analyzer answered.
-    // `null` value means OSV failed for that specific entry; missing
-    // key means "not yet scanned".
+    /*
+     * Per-`${name}@${version}` vuln list once the analyzer answered.
+     * `null` value means OSV failed for that specific entry; missing
+     * key means "not yet scanned".
+     */
     private _vulnsByKey: Map<string, string[]|null> = new Map();
-    // Per-`${name}@${version}` integrity finding from the cross-check
-    // against the registry's current `dist` data. Missing key means
-    // "clean — no finding".
+    /*
+     * Per-`${name}@${version}` integrity finding from the cross-check
+     * against the registry's current `dist` data. Missing key means
+     * "clean — no finding".
+     */
     private _integrityByKey: Map<string, IntegrityFinding> = new Map();
     private _integrityResp: ApiIntegrityResponse|null = null;
-    // DOM references we update mid-stream without re-rendering the
-    // whole table.
+    /*
+     * DOM references we update mid-stream without re-rendering the
+     * whole table.
+     */
     private _progressBar: HTMLElement|null = null;
     private _progressText: HTMLElement|null = null;
     private _analyzeBtn: HTMLButtonElement|null = null;
@@ -126,17 +134,21 @@ export class InstalledView {
         this._renderLoading();
 
         try {
-            // Lockfile + integrity in parallel — both endpoints read
-            // the lockfile, so kicking them off together saves one
-            // round-trip. Integrity is cache-only against the
-            // already-warmed registry pocket; rarely the slow side.
+            /*
+             * Lockfile + integrity in parallel — both endpoints read
+             * the lockfile, so kicking them off together saves one
+             * round-trip. Integrity is cache-only against the
+             * already-warmed registry pocket; rarely the slow side.
+             */
             const [lockfileResp, integrityResp] = await Promise.all([
                 Api.lockfile(unid),
                 Api.integrity(unid).catch(() => null)
             ]);
 
-            // Guard against a stale response if the user switched
-            // projects while the fetch was in flight.
+            /*
+             * Guard against a stale response if the user switched
+             * projects while the fetch was in flight.
+             */
             if (this._projectUnid !== unid) {
                 return;
             }
@@ -192,11 +204,13 @@ export class InstalledView {
         const meta = document.createElement('div');
         meta.className = 'installed-meta';
         meta.textContent =
-            I18n.t('{n} resolved packages', {n: this._lockfile.packages.length})
-            + ` (${InstalledView._sourceLabel(this._lockfile)})`;
+            `${I18n.t('{n} resolved packages', {n: this._lockfile.packages.length})
+            } (${InstalledView._sourceLabel(this._lockfile)})`;
 
-        // Append integrity-summary pill when the scanner reported
-        // anything non-trivial. Clean projects stay quiet.
+        /*
+         * Append integrity-summary pill when the scanner reported
+         * anything non-trivial. Clean projects stay quiet.
+         */
         const sumPill = this._renderIntegritySummaryPill();
         if (sumPill) {
             meta.appendChild(document.createTextNode(' · '));
@@ -224,8 +238,10 @@ export class InstalledView {
 
         const tbody = document.createElement('tbody');
 
-        // Sort by name + version for predictable display. The user can
-        // search/sort interactively once we have CVE annotations.
+        /*
+         * Sort by name + version for predictable display. The user can
+         * search/sort interactively once we have CVE annotations.
+         */
         const sorted = [...this._lockfile.packages].sort((a, b) => {
             const n = a.name.localeCompare(b.name);
             return n !== 0 ? n : a.version.localeCompare(b.version);
@@ -318,9 +334,9 @@ export class InstalledView {
         const pill = document.createElement('span');
         pill.className = `installed-integrity-pill installed-integrity-pill-${finding.severity}`;
         pill.textContent = InstalledView._integrityShortLabel(finding.kind);
-        pill.title = `${finding.message}\n\n`
-            + (finding.lockfileIntegrity ? `lockfile: ${finding.lockfileIntegrity}\n` : '')
-            + (finding.registryIntegrity ? `registry: ${finding.registryIntegrity}` : '');
+        pill.title = `${finding.message}\n\n${
+            finding.lockfileIntegrity ? `lockfile: ${finding.lockfileIntegrity}\n` : ''
+        }${finding.registryIntegrity ? `registry: ${finding.registryIntegrity}` : ''}`;
         td.appendChild(pill);
         return td;
     }
@@ -367,7 +383,7 @@ export class InstalledView {
         if (s.infoCount > 0) {
             parts.push(I18n.t('{n} info', {n: String(s.infoCount)}));
         }
-        pill.textContent = I18n.t('Integrity') + ': ' + parts.join(' · ');
+        pill.textContent = `${I18n.t('Integrity')  }: ${  parts.join(' · ')}`;
         return pill;
     }
 
@@ -386,7 +402,7 @@ export class InstalledView {
         const rel = pkg.path.startsWith('/') ? pkg.path.slice(1) : pkg.path;
         const abs = this._projectRoot.endsWith('/')
             ? this._projectRoot + rel
-            : this._projectRoot + '/' + rel;
+            : `${this._projectRoot  }/${  rel}`;
         const url = EditorUrl.build(this._editor, abs);
         if (!url) {
             return null;
@@ -528,9 +544,11 @@ export class InstalledView {
         });
 
         es.addEventListener('error', (e) => {
-            // EventSource emits a bare `error` event on stream close
-            // *and* a server-sent `event: error` payload. Distinguish
-            // by whether there's data.
+            /*
+             * EventSource emits a bare `error` event on stream close
+             * *and* a server-sent `event: error` payload. Distinguish
+             * by whether there's data.
+             */
             const msg = (e as MessageEvent).data
                 ? (JSON.parse((e as MessageEvent).data) as ApiAnalyzeErrorEvent).msg
                 : I18n.t('Connection to analyser lost');
@@ -585,9 +603,11 @@ export class InstalledView {
                 continue;
             }
             const row = this._rowsByKey.get(`${pkg.name}@${pkg.version}`);
-            // _rowsByKey stores one entry per name@version (we collide
-            // on overwrite — fine, since all paths share the same cell
-            // contents). Re-rendering the cell is cheap.
+            /*
+             * _rowsByKey stores one entry per name@version (we collide
+             * on overwrite — fine, since all paths share the same cell
+             * contents). Re-rendering the cell is cheap.
+             */
             if (!row) {
                 continue;
             }
@@ -738,8 +758,9 @@ export class InstalledView {
 
     private static _esc(s: string): string {
         return s
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
     }
+
 }

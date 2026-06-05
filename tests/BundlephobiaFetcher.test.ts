@@ -9,16 +9,16 @@ import {JsonCache} from '../backend/Cache/JsonCache.js';
  * Replace the global fetch with a fixed-response stub for the
  * duration of one test. Returns a teardown closure.
  */
-function stubFetch(impl: (url: string) => {ok: boolean; status?: number; body?: unknown}): () => void {
+function stubFetch(impl: (url: string) => {ok: boolean; status?: number; body?: unknown;}): () => void {
     const original = globalThis.fetch;
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    globalThis.fetch = (async(input: RequestInfo | URL) => {
         const url = typeof input === 'string' ? input : input.toString();
         const res = impl(url);
         return {
             ok: res.ok,
             status: res.status ?? (res.ok ? 200 : 500),
             statusText: res.ok ? 'OK' : 'Error',
-            json: async () => res.body ?? {}
+            json: async() => res.body ?? {}
         } as unknown as Response;
     }) as typeof fetch;
     return () => {
@@ -39,7 +39,7 @@ describe('BundlephobiaFetcher.fetch', () => {
         fs.rmSync(dir, {recursive: true, force: true});
     });
 
-    it('returns the parsed payload on success', async () => {
+    it('returns the parsed payload on success', async() => {
         const restore = stubFetch(() => ({
             ok: true,
             body: {size: 12345, gzip: 4567, dependencyCount: 9}
@@ -53,7 +53,7 @@ describe('BundlephobiaFetcher.fetch', () => {
         }
     });
 
-    it('treats a 404 response as null', async () => {
+    it('treats a 404 response as null', async() => {
         const restore = stubFetch(() => ({ok: false, status: 404}));
         try {
             const f = new BundlephobiaFetcher(cache);
@@ -63,7 +63,7 @@ describe('BundlephobiaFetcher.fetch', () => {
         }
     });
 
-    it('treats a 200 response without numeric size as null', async () => {
+    it('treats a 200 response without numeric size as null', async() => {
         const restore = stubFetch(() => ({ok: true, body: {dependencyCount: 3}}));
         try {
             const f = new BundlephobiaFetcher(cache);
@@ -73,7 +73,7 @@ describe('BundlephobiaFetcher.fetch', () => {
         }
     });
 
-    it('caches successful results — second fetch never hits the network', async () => {
+    it('caches successful results — second fetch never hits the network', async() => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;
@@ -89,7 +89,7 @@ describe('BundlephobiaFetcher.fetch', () => {
         }
     });
 
-    it('caches null answers too — refusal is not a miss', async () => {
+    it('caches null answers too — refusal is not a miss', async() => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;
@@ -105,7 +105,7 @@ describe('BundlephobiaFetcher.fetch', () => {
         }
     });
 
-    it('returns null for missing name or version without hitting the network', async () => {
+    it('returns null for missing name or version without hitting the network', async() => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;
@@ -121,7 +121,7 @@ describe('BundlephobiaFetcher.fetch', () => {
         }
     });
 
-    it('fetchMany resolves a batch keyed by name@version', async () => {
+    it('fetchMany resolves a batch keyed by name@version', async() => {
         const restore = stubFetch((url) => {
             const m = /package=([^&]+)/.exec(url);
             const coord = m ? decodeURIComponent(m[1]) : '';

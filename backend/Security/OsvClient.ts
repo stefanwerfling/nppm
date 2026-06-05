@@ -11,8 +11,8 @@ export type OsvVulnerability = {
     id: string;
     summary: string;
     details: string;
-    severity: {type: string; score: string}[];
-    references: {type: string; url: string}[];
+    severity: {type: string; score: string;}[];
+    references: {type: string; url: string;}[];
     published: string|null;
     modified: string|null;
 };
@@ -25,8 +25,8 @@ type OsvRawVuln = {
     id: string;
     summary?: string;
     details?: string;
-    severity?: {type?: string; score?: string}[];
-    references?: {type?: string; url?: string}[];
+    severity?: {type?: string; score?: string;}[];
+    references?: {type?: string; url?: string;}[];
     published?: string;
     modified?: string;
 };
@@ -51,7 +51,7 @@ export type OsvBatchPackage = {
  * single-query endpoint.
  */
 type OsvBatchRawResult = {
-    vulns?: {id: string}[];
+    vulns?: {id: string;}[];
 };
 
 type OsvBatchRawResponse = {
@@ -65,7 +65,6 @@ type OsvBatchRawResponse = {
  */
 export type OsvFetcher = (body: object) => Promise<OsvRawResponse>;
 export type OsvBatchFetcher = (body: object) => Promise<OsvBatchRawResponse>;
-
 
 /**
  * Cap on the number of queries per outgoing batch request. OSV does not
@@ -105,7 +104,7 @@ export class OsvClient {
     }
 
     private static _defaultFetcher(baseUrl: string): OsvFetcher {
-        return async (body) => {
+        return async(body) => {
             const res = await fetch(`${baseUrl}/v1/query`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -121,7 +120,7 @@ export class OsvClient {
     }
 
     private static _defaultBatchFetcher(baseUrl: string): OsvBatchFetcher {
-        return async (body) => {
+        return async(body) => {
             const res = await fetch(`${baseUrl}/v1/querybatch`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -151,14 +150,16 @@ export class OsvClient {
         const out = new Map<string, string[]|null>();
         const toFetch: OsvBatchPackage[] = [];
 
-        type FullWrap = {data: OsvVulnerability[]|null};
-        type IdWrap = {data: string[]|null};
+        type FullWrap = {data: OsvVulnerability[]|null;};
+        type IdWrap = {data: string[]|null;};
 
         for (const pkg of packages) {
             const key = `${pkg.name}@${pkg.version}`;
 
-            // OSV doesn't index git-installed deps — skip them so the
-            // batch doesn't carry junk queries that always return [].
+            /*
+             * OSV doesn't index git-installed deps — skip them so the
+             * batch doesn't carry junk queries that always return [].
+             */
             if (GitResolver.isGitVersion(pkg.version)) {
                 out.set(key, []);
                 continue;
@@ -181,9 +182,11 @@ export class OsvClient {
             toFetch.push(pkg);
         }
 
-        // Chunk + fire in parallel. OSV doesn't formally limit batches but
-        // large bodies are slow and partial failures are easier to handle
-        // per-chunk.
+        /*
+         * Chunk + fire in parallel. OSV doesn't formally limit batches but
+         * large bodies are slow and partial failures are easier to handle
+         * per-chunk.
+         */
         for (let i = 0; i < toFetch.length; i += BATCH_CHUNK) {
             const chunk = toFetch.slice(i, i + BATCH_CHUNK);
             await this._runBatchChunk(chunk, out);
@@ -193,7 +196,7 @@ export class OsvClient {
     }
 
     private async _runBatchChunk(chunk: OsvBatchPackage[], out: Map<string, string[]|null>): Promise<void> {
-        type IdWrap = {data: string[]|null};
+        type IdWrap = {data: string[]|null;};
 
         try {
             const raw = await this._batchFetcher({
@@ -213,8 +216,10 @@ export class OsvClient {
                 out.set(key, ids);
             }
         } catch {
-            // Whole chunk failed — store nulls so we don't retry on
-            // every page reload. Next TTL window will refetch.
+            /*
+             * Whole chunk failed — store nulls so we don't retry on
+             * every page reload. Next TTL window will refetch.
+             */
             for (const pkg of chunk) {
                 const key = `${pkg.name}@${pkg.version}`;
                 this._cache?.set<IdWrap>(`osv_b_v1_${key}`, {data: null});
@@ -224,15 +229,17 @@ export class OsvClient {
     }
 
     public async query(name: string, version: string): Promise<OsvVulnerability[]|null> {
-        // OSV.dev only indexes published-to-registry versions. A
-        // `git+https://...` install has no ecosystem-version key OSV
-        // could match against, so don't waste a request.
+        /*
+         * OSV.dev only indexes published-to-registry versions. A
+         * `git+https://...` install has no ecosystem-version key OSV
+         * could match against, so don't waste a request.
+         */
         if (GitResolver.isGitVersion(version)) {
             return [];
         }
 
         const key = `osv_${name}@${version}`;
-        type Wrap = {data: OsvVulnerability[]|null};
+        type Wrap = {data: OsvVulnerability[]|null;};
 
         if (this._cache) {
             const hit = this._cache.get<Wrap>(key);
@@ -243,8 +250,8 @@ export class OsvClient {
 
         try {
             const raw = await this._fetcher({
-                package: {name, ecosystem: 'npm'},
-                version
+                package: {name: name, ecosystem: 'npm'},
+                version: version
             });
 
             const vulns = (raw.vulns ?? []).map(OsvClient._normalize);
@@ -273,4 +280,5 @@ export class OsvClient {
             modified: v.modified ?? null
         };
     }
+
 }

@@ -21,6 +21,7 @@ import {UnusedDetector} from '../backend/Unused/UnusedDetector.js';
 import {SbomCliArgsError, SbomCliArgsParser, SbomFormat, SbomIO, SbomRunner} from '../cli/Sbom.js';
 
 class FakeLocalProject extends ProjectLocal {
+
     private readonly _manifests: PackageManifest[];
     private readonly _lockfile: Lockfile|null;
 
@@ -37,6 +38,7 @@ class FakeLocalProject extends ProjectLocal {
     public async loadLockfile(): Promise<Lockfile|null> {
         return this._lockfile;
     }
+
 }
 
 function makeEnvironment(projects: Project[], cacheDir: string): LoadedConfig {
@@ -60,26 +62,26 @@ function makeEnvironment(projects: Project[], cacheDir: string): LoadedConfig {
     const bundlephobiaFetcher = new BundlephobiaFetcher(bundleCache);
     return {
         projectRoot: cacheDir,
-        cacheDir,
+        cacheDir: cacheDir,
         cacheTtlMinutes: 60,
-        registry,
-        registryCache,
-        remoteCache,
-        fingerprintCache,
-        fingerprintBuilder,
-        osvClient,
-        securityCache,
-        securityScanner,
-        unusedDetector,
-        bundlephobiaFetcher,
+        registry: registry,
+        registryCache: registryCache,
+        remoteCache: remoteCache,
+        fingerprintCache: fingerprintCache,
+        fingerprintBuilder: fingerprintBuilder,
+        osvClient: osvClient,
+        securityCache: securityCache,
+        securityScanner: securityScanner,
+        unusedDetector: unusedDetector,
+        bundlephobiaFetcher: bundlephobiaFetcher,
         allowInstall: false,
         editor: undefined,
-        projects,
-        externalScanner
+        projects: projects,
+        externalScanner: externalScanner
     };
 }
 
-function makeIO(over: Partial<SbomIO> & Pick<SbomIO, 'argv'>): SbomIO & {out: () => string; err: () => string} {
+function makeIO(over: Partial<SbomIO> & Pick<SbomIO, 'argv'>): SbomIO & {out: () => string; err: () => string;} {
     const outBuf: string[] = [];
     const errBuf: string[] = [];
     const io = {
@@ -98,7 +100,7 @@ function emptyLockfile(): Lockfile {
 }
 
 function emptyManifest(name: string): PackageManifest {
-    return {name, version: '1.0.0', scripts: {}, dependencies: []};
+    return {name: name, version: '1.0.0', scripts: {}, dependencies: []};
 }
 
 describe('SbomCliArgsParser', () => {
@@ -135,14 +137,14 @@ describe('SbomRunner.run', () => {
         fs.rmSync(tmp, {recursive: true, force: true});
     });
 
-    it('exits 0 and prints help on --help', async () => {
+    it('exits 0 and prints help on --help', async() => {
         const io = makeIO({argv: ['--help'], cwd: tmp});
         const code = await SbomRunner.run(io);
         expect(code).toBe(0);
         expect(io.out()).toMatch(/nppm sbom/);
     });
 
-    it('exits 2 when no projects are configured', async () => {
+    it('exits 2 when no projects are configured', async() => {
         const env = makeEnvironment([], tmp);
         const io = makeIO({argv: [], cwd: tmp, environmentOverride: env});
         const code = await SbomRunner.run(io);
@@ -150,7 +152,7 @@ describe('SbomRunner.run', () => {
         expect(io.err()).toMatch(/no projects configured/);
     });
 
-    it('exits 2 when more than one project is configured without --project', async () => {
+    it('exits 2 when more than one project is configured without --project', async() => {
         const env = makeEnvironment([
             new FakeLocalProject('/p/a', 'alpha', [emptyManifest('alpha')], emptyLockfile()),
             new FakeLocalProject('/p/b', 'beta', [emptyManifest('beta')], emptyLockfile())
@@ -161,7 +163,7 @@ describe('SbomRunner.run', () => {
         expect(io.err()).toMatch(/more than one project/);
     });
 
-    it('exits 2 when --project does not match', async () => {
+    it('exits 2 when --project does not match', async() => {
         const env = makeEnvironment([
             new FakeLocalProject('/p/a', 'alpha', [emptyManifest('alpha')], emptyLockfile())
         ], tmp);
@@ -171,7 +173,7 @@ describe('SbomRunner.run', () => {
         expect(io.err()).toMatch(/not found/);
     });
 
-    it('emits CycloneDX to stdout for a single-project setup', async () => {
+    it('emits CycloneDX to stdout for a single-project setup', async() => {
         const env = makeEnvironment([
             new FakeLocalProject('/p/a', 'alpha', [emptyManifest('alpha')], emptyLockfile())
         ], tmp);
@@ -183,7 +185,7 @@ describe('SbomRunner.run', () => {
         expect(parsed.specVersion).toBe('1.6');
     });
 
-    it('emits SPDX with --format=spdx', async () => {
+    it('emits SPDX with --format=spdx', async() => {
         const env = makeEnvironment([
             new FakeLocalProject('/p/a', 'alpha', [emptyManifest('alpha')], emptyLockfile())
         ], tmp);
@@ -194,7 +196,7 @@ describe('SbomRunner.run', () => {
         expect(parsed.spdxVersion).toBe('SPDX-2.3');
     });
 
-    it('writes to --output instead of stdout', async () => {
+    it('writes to --output instead of stdout', async() => {
         const env = makeEnvironment([
             new FakeLocalProject('/p/a', 'alpha', [emptyManifest('alpha')], emptyLockfile())
         ], tmp);
@@ -212,7 +214,7 @@ describe('SbomRunner.run', () => {
         expect(parsed.bomFormat).toBe('CycloneDX');
     });
 
-    it('loads from disk when no environmentOverride is given', async () => {
+    it('loads from disk when no environmentOverride is given', async() => {
         const configPath = path.join(tmp, 'nppm.json');
         fs.writeFileSync(configPath, JSON.stringify({projects: []}));
         const io = makeIO({argv: [], cwd: tmp});
@@ -221,7 +223,7 @@ describe('SbomRunner.run', () => {
         expect(io.err()).toMatch(/no projects configured/);
     });
 
-    it('exits 2 when the config is missing', async () => {
+    it('exits 2 when the config is missing', async() => {
         const io = makeIO({argv: [], cwd: tmp});
         const code = await SbomRunner.run(io);
         expect(code).toBe(2);

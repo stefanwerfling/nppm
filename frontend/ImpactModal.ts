@@ -24,7 +24,7 @@ export class ImpactModal {
     private _runBtn: HTMLButtonElement|null = null;
     private _inflight: boolean = false;
 
-    public open(seed?: {name?: string; version?: string}): void {
+    public open(seed?: {name?: string; version?: string;}): void {
         this._mount();
         if (seed?.name && this._nameInput) {
             this._nameInput.value = seed.name;
@@ -32,9 +32,11 @@ export class ImpactModal {
         if (seed?.version && this._versionInput) {
             this._versionInput.value = seed.version;
         }
-        // Auto-run when the caller pre-fills a name — the typical
-        // "PackageDetailPanel → Impact" flow already knows which package
-        // the user cares about, so making them click again is friction.
+        /*
+         * Auto-run when the caller pre-fills a name — the typical
+         * "PackageDetailPanel → Impact" flow already knows which package
+         * the user cares about, so making them click again is friction.
+         */
         if (seed?.name) {
             void this._run();
         }
@@ -352,4 +354,5 @@ export class ImpactModal {
 
         return card;
     }
+
 }

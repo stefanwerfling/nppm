@@ -6,9 +6,9 @@ const mkEntry = (
     timestamp: number,
     added: string[] = [],
     removed: string[] = [],
-    updated: {name: string; from: string; to: string}[] = []
+    updated: {name: string; from: string; to: string;}[] = []
 ): HistoryEntry => ({
-    timestamp,
+    timestamp: timestamp,
     lockfileSource: 'test',
     added: added.map((nv) => {
         const at = nv.lastIndexOf('@');
@@ -29,14 +29,14 @@ const mkEntry = (
 });
 
 const mkHistory = (
-    finalPackages: {name: string; version: string}[],
+    finalPackages: {name: string; version: string;}[],
     finalTs: number,
     entries: HistoryEntry[]
 ): HistoryFile => ({
     projectKey: 'k',
     projectName: 'n',
     lastSnapshot: {timestamp: finalTs, packages: finalPackages},
-    entries,
+    entries: entries,
     gitBackfilledHead: null
 });
 
@@ -60,11 +60,13 @@ describe('DashboardGrowthBuilder.replay', () => {
     });
 
     it('derives baseline from final count minus net delta', () => {
-        // Final: 5 packages. Two entries:
-        //   e0: +3 -1 (net +2)
-        //   e1: +1 -0 (net +1)
-        // Net delta = +3 → baseline = 5 - 3 = 2
-        // Trajectory: 2 → 4 → 5
+        /*
+         * Final: 5 packages. Two entries:
+         *   e0: +3 -1 (net +2)
+         *   e1: +1 -0 (net +1)
+         * Net delta = +3 → baseline = 5 - 3 = 2
+         * Trajectory: 2 → 4 → 5
+         */
         const h = mkHistory(
             [
                 {name: 'a', version: '1'}, {name: 'b', version: '1'},
@@ -78,9 +80,11 @@ describe('DashboardGrowthBuilder.replay', () => {
             ]
         );
         const pts = DashboardGrowthBuilder.replay(h);
-        // baseline anchor + 2 entries + (lastSnapshot is same ts as the last
-        // entry? final 1700_000_002_000 != entry 1700_000_001_000 so a
-        // 4th point appears).
+        /*
+         * baseline anchor + 2 entries + (lastSnapshot is same ts as the last
+         * entry? final 1700_000_002_000 != entry 1700_000_001_000 so a
+         * 4th point appears).
+         */
         const counts = pts.map((p) => p.count);
         expect(counts).toEqual([2, 4, 5, 5]);
     });
@@ -111,13 +115,15 @@ describe('DashboardGrowthBuilder.build', () => {
     });
 
     it('carries-forward ecosystem total across non-aligned timestamps', () => {
-        // Project A: 1 pkg at T=1000, 3 pkg at T=3000
-        // Project B: 5 pkg at T=2000, 6 pkg at T=4000
-        // Expected total events (carry-forward):
-        //   T=1000: A=1, B=0 → 1
-        //   T=2000: A=1, B=5 → 6
-        //   T=3000: A=3, B=5 → 8
-        //   T=4000: A=3, B=6 → 9
+        /*
+         * Project A: 1 pkg at T=1000, 3 pkg at T=3000
+         * Project B: 5 pkg at T=2000, 6 pkg at T=4000
+         * Expected total events (carry-forward):
+         *   T=1000: A=1, B=0 → 1
+         *   T=2000: A=1, B=5 → 6
+         *   T=3000: A=3, B=5 → 8
+         *   T=4000: A=3, B=6 → 9
+         */
         const projA = mkHistory(
             [{name: 'a1', version: '1'}, {name: 'a2', version: '1'}, {name: 'a3', version: '1'}],
             3_000,
@@ -148,9 +154,11 @@ describe('DashboardGrowthBuilder.build', () => {
     });
 
     it('clips to sinceMs but anchors carry-forward at the cutoff', () => {
-        // History with one delta well before sinceMs, one inside.
-        // Pre-cutoff anchor should be re-stamped to the cutoff with the
-        // pre-cutoff count.
+        /*
+         * History with one delta well before sinceMs, one inside.
+         * Pre-cutoff anchor should be re-stamped to the cutoff with the
+         * pre-cutoff count.
+         */
         const now = Date.now();
         const h = mkHistory(
             [{name: 'a', version: '1'}, {name: 'b', version: '1'}, {name: 'c', version: '1'}],
@@ -167,8 +175,10 @@ describe('DashboardGrowthBuilder.build', () => {
         );
         expect(out.series.length).toBe(1);
         const counts = out.series[0].points.map((p) => p.count);
-        // First point should be the carry-forward anchor at the cutoff
-        // with the pre-cutoff count (= 2, after the 30-days-ago entry).
+        /*
+         * First point should be the carry-forward anchor at the cutoff
+         * with the pre-cutoff count (= 2, after the 30-days-ago entry).
+         */
         expect(counts[0]).toBe(2);
         // Last point should be the count after the 1-day-ago entry = 3.
         expect(counts[counts.length - 1]).toBe(3);

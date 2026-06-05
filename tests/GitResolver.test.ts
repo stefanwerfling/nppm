@@ -65,9 +65,9 @@ describe('GitResolver.resolveTarball', () => {
 
     it('handles SCP-style ssh for gitlab/bitbucket', () => {
         expect(GitResolver.resolveTarball('git@gitlab.com:foo/bar.git')!.url)
-            .toBe('https://gitlab.com/foo/bar/-/archive/HEAD/bar-HEAD.tar.gz');
+        .toBe('https://gitlab.com/foo/bar/-/archive/HEAD/bar-HEAD.tar.gz');
         expect(GitResolver.resolveTarball('git@bitbucket.org:foo/bar.git')!.url)
-            .toBe('https://bitbucket.org/foo/bar/get/HEAD.tar.gz');
+        .toBe('https://bitbucket.org/foo/bar/get/HEAD.tar.gz');
     });
 
     it('returns null for hosts we still do not handle (e.g. self-hosted)', () => {

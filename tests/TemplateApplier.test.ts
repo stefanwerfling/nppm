@@ -52,16 +52,16 @@ describe('TemplateApplier', () => {
 
     it('adds a missing dep to root package.json', () => {
         fs.writeFileSync(path.join(projectRoot, 'package.json'),
-            JSON.stringify({name: 'p', dependencies: {}}, null, 2) + '\n');
+            `${JSON.stringify({name: 'p', dependencies: {}}, null, 2)  }\n`);
         const t = emptyResolved();
         t.packages.runtime = {express: {version: '^5.1.0'}};
 
         const r = new TemplateApplier().apply({
-            projectRoot,
+            projectRoot: projectRoot,
             manifests: [mkManifest()],
             template: t,
             selectedTargets: ['runtime:express'],
-            backupStore
+            backupStore: backupStore
         });
         const written = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'));
         expect(written.dependencies.express).toBe('^5.1.0');
@@ -70,16 +70,16 @@ describe('TemplateApplier', () => {
 
     it('updates a divergent version', () => {
         fs.writeFileSync(path.join(projectRoot, 'package.json'),
-            JSON.stringify({name: 'p', dependencies: {express: '^4.0.0'}}, null, 2) + '\n');
+            `${JSON.stringify({name: 'p', dependencies: {express: '^4.0.0'}}, null, 2)  }\n`);
         const t = emptyResolved();
         t.packages.runtime = {express: {version: '^5.1.0'}};
 
         new TemplateApplier().apply({
-            projectRoot,
+            projectRoot: projectRoot,
             manifests: [mkManifest({dependencies: [{name: 'express', version: '^4.0.0', type: DependencyType.dependency}]})],
             template: t,
             selectedTargets: ['runtime:express'],
-            backupStore
+            backupStore: backupStore
         });
         const written = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'));
         expect(written.dependencies.express).toBe('^5.1.0');
@@ -87,16 +87,16 @@ describe('TemplateApplier', () => {
 
     it('removes a forbidden dep from package.json', () => {
         fs.writeFileSync(path.join(projectRoot, 'package.json'),
-            JSON.stringify({name: 'p', dependencies: {moment: '^2.30.1'}}, null, 2) + '\n');
+            `${JSON.stringify({name: 'p', dependencies: {moment: '^2.30.1'}}, null, 2)  }\n`);
         const t = emptyResolved();
         t.forbidden = ['moment'];
 
         new TemplateApplier().apply({
-            projectRoot,
+            projectRoot: projectRoot,
             manifests: [mkManifest()],
             template: t,
             selectedTargets: ['forbidden:moment'],
-            backupStore
+            backupStore: backupStore
         });
         const written = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'));
         expect(written.dependencies).toBeUndefined();
@@ -104,16 +104,16 @@ describe('TemplateApplier', () => {
 
     it('moves a dep from the wrong bucket to the expected one', () => {
         fs.writeFileSync(path.join(projectRoot, 'package.json'),
-            JSON.stringify({name: 'p', devDependencies: {express: '^5'}}, null, 2) + '\n');
+            `${JSON.stringify({name: 'p', devDependencies: {express: '^5'}}, null, 2)  }\n`);
         const t = emptyResolved();
         t.packages.runtime = {express: {version: '^5.1.0'}};
 
         new TemplateApplier().apply({
-            projectRoot,
+            projectRoot: projectRoot,
             manifests: [mkManifest()],
             template: t,
             selectedTargets: ['runtime:express'],
-            backupStore
+            backupStore: backupStore
         });
         const written = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'));
         expect(written.dependencies.express).toBe('^5.1.0');
@@ -122,16 +122,16 @@ describe('TemplateApplier', () => {
 
     it('sets root metadata (engines.node + private)', () => {
         fs.writeFileSync(path.join(projectRoot, 'package.json'),
-            JSON.stringify({name: 'p'}, null, 2) + '\n');
+            `${JSON.stringify({name: 'p'}, null, 2)  }\n`);
         const t = emptyResolved();
         t.root = {engines: {node: '>=20'}, private: true};
 
         new TemplateApplier().apply({
-            projectRoot,
+            projectRoot: projectRoot,
             manifests: [mkManifest()],
             template: t,
             selectedTargets: ['engines.node', 'private'],
-            backupStore
+            backupStore: backupStore
         });
         const written = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'));
         expect(written.engines).toEqual({node: '>=20'});
@@ -145,11 +145,11 @@ describe('TemplateApplier', () => {
         t.files = [{path: 'eslint.config.js', mode: 'create', sourcePath: path.join(tplFiles, 'eslint.config.js')}];
 
         new TemplateApplier().apply({
-            projectRoot,
+            projectRoot: projectRoot,
             manifests: [mkManifest()],
             template: t,
             selectedTargets: ['file:eslint.config.js'],
-            backupStore
+            backupStore: backupStore
         });
         const written = fs.readFileSync(path.join(projectRoot, 'eslint.config.js'), 'utf-8');
         expect(written).toBe('// shared rules\n');
@@ -163,11 +163,11 @@ describe('TemplateApplier', () => {
         t.files = [{path: 'eslint.config.js', mode: 'create', sourcePath: path.join(tplFiles, 'eslint.config.js')}];
 
         const r = new TemplateApplier().apply({
-            projectRoot,
+            projectRoot: projectRoot,
             manifests: [mkManifest()],
             template: t,
             selectedTargets: ['file:eslint.config.js'],
-            backupStore
+            backupStore: backupStore
         });
         const written = fs.readFileSync(path.join(projectRoot, 'eslint.config.js'), 'utf-8');
         expect(written).toBe('// local\n');
@@ -177,19 +177,19 @@ describe('TemplateApplier', () => {
     it('deep-merges json files in mode=merge-json', () => {
         fs.writeFileSync(path.join(projectRoot, 'package.json'), '{"name":"p"}\n');
         fs.writeFileSync(path.join(projectRoot, 'tsconfig.json'),
-            JSON.stringify({compilerOptions: {strict: false, target: 'ES2020'}}, null, 2) + '\n');
+            `${JSON.stringify({compilerOptions: {strict: false, target: 'ES2020'}}, null, 2)  }\n`);
         fs.writeFileSync(path.join(tplFiles, 'tsconfig.json'),
-            JSON.stringify({compilerOptions: {strict: true, module: 'ESNext'}}, null, 2) + '\n');
+            `${JSON.stringify({compilerOptions: {strict: true, module: 'ESNext'}}, null, 2)  }\n`);
 
         const t = emptyResolved();
         t.files = [{path: 'tsconfig.json', mode: 'merge-json', sourcePath: path.join(tplFiles, 'tsconfig.json')}];
 
         new TemplateApplier().apply({
-            projectRoot,
+            projectRoot: projectRoot,
             manifests: [mkManifest()],
             template: t,
             selectedTargets: ['file:tsconfig.json'],
-            backupStore
+            backupStore: backupStore
         });
 
         const written = JSON.parse(fs.readFileSync(path.join(projectRoot, 'tsconfig.json'), 'utf-8'));
@@ -199,17 +199,17 @@ describe('TemplateApplier', () => {
 
     it('snapshots affected files into the backup store before mutating', () => {
         const pkgPath = path.join(projectRoot, 'package.json');
-        const before = JSON.stringify({name: 'p', dependencies: {express: '^4'}}, null, 2) + '\n';
+        const before = `${JSON.stringify({name: 'p', dependencies: {express: '^4'}}, null, 2)  }\n`;
         fs.writeFileSync(pkgPath, before);
         const t = emptyResolved();
         t.packages.runtime = {express: {version: '^5'}};
 
         const r = new TemplateApplier().apply({
-            projectRoot,
+            projectRoot: projectRoot,
             manifests: [mkManifest({dependencies: [{name: 'express', version: '^4', type: DependencyType.dependency}]})],
             template: t,
             selectedTargets: ['runtime:express'],
-            backupStore
+            backupStore: backupStore
         });
         expect(r.backup).not.toBeNull();
         const backupPkg = path.join(r.backup!.dir, 'package.json');
@@ -219,9 +219,9 @@ describe('TemplateApplier', () => {
     it('writes to workspace package.json for workspace-scoped targets', () => {
         const rootPkg = path.join(projectRoot, 'package.json');
         const wsPkg = path.join(projectRoot, 'packages', 'api', 'package.json');
-        fs.writeFileSync(rootPkg, JSON.stringify({name: 'p'}, null, 2) + '\n');
+        fs.writeFileSync(rootPkg, `${JSON.stringify({name: 'p'}, null, 2)  }\n`);
         fs.mkdirSync(path.dirname(wsPkg), {recursive: true});
-        fs.writeFileSync(wsPkg, JSON.stringify({name: 'api', dependencies: {}}, null, 2) + '\n');
+        fs.writeFileSync(wsPkg, `${JSON.stringify({name: 'api', dependencies: {}}, null, 2)  }\n`);
 
         const t = emptyResolved();
         t.workspaces = [{
@@ -237,14 +237,14 @@ describe('TemplateApplier', () => {
         }];
 
         new TemplateApplier().apply({
-            projectRoot,
+            projectRoot: projectRoot,
             manifests: [
                 mkManifest(),
                 mkManifest({workspace: 'packages/api'})
             ],
             template: t,
             selectedTargets: ['workspace:packages/api:runtime:express'],
-            backupStore
+            backupStore: backupStore
         });
 
         const written = JSON.parse(fs.readFileSync(wsPkg, 'utf-8'));

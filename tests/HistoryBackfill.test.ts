@@ -5,11 +5,11 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {HistoryEntry} from '../backend/History/History.js';
 import {HistoryStore} from '../backend/History/HistoryStore.js';
 
-function gitEntry(ts: number, sha: string, added: {name: string; version: string}[]): HistoryEntry {
+function gitEntry(ts: number, sha: string, added: {name: string; version: string;}[]): HistoryEntry {
     return {
         timestamp: ts,
         lockfileSource: 'committed',
-        added,
+        added: added,
         removed: [],
         updated: [],
         source: 'git',
@@ -66,16 +66,20 @@ describe('HistoryStore.backfillFromGit', () => {
 
     it('recovers from a stale watermark with zero stored entries', () => {
         const store = new HistoryStore(dir);
-        // Simulate a broken earlier run: watermark set, but no
-        // entries were ever written. A naive `head === existing.head`
-        // check would lock the project in this state forever.
+        /*
+         * Simulate a broken earlier run: watermark set, but no
+         * entries were ever written. A naive `head === existing.head`
+         * check would lock the project in this state forever.
+         */
         store.backfillFromGit('/p', 'p', [], 'aaa', [], false);
         const broken = store.read('/p', 'p');
         expect(broken.entries).toHaveLength(0);
         expect(broken.gitBackfilledHead).toBe('aaa');
 
-        // Same HEAD, but now the walk produces entries — the store
-        // must accept them instead of short-circuiting.
+        /*
+         * Same HEAD, but now the walk produces entries — the store
+         * must accept them instead of short-circuiting.
+         */
         const entries = [
             gitEntry(1000, 'c1', [{name: 'foo', version: '1.0.0'}]),
             gitEntry(2000, 'c2', [{name: 'bar', version: '2.0.0'}])
@@ -107,8 +111,10 @@ describe('HistoryStore.backfillFromGit', () => {
         );
 
         const after = store.read('/p', 'p');
-        // lastSnapshot stays as the live observation — git only added
-        // to the timeline.
+        /*
+         * lastSnapshot stays as the live observation — git only added
+         * to the timeline.
+         */
         expect(after.lastSnapshot?.packages).toEqual([{name: 'live', version: '9.9.9'}]);
         expect(after.entries).toHaveLength(1);
         expect(after.entries[0].source).toBe('git');
@@ -143,8 +149,10 @@ describe('HistoryStore.backfillFromGit', () => {
             false
         );
 
-        // Live snapshot with resolved version → should be initial
-        // baseline, NOT a "foo: ^1.0.0 → 1.0.5" update.
+        /*
+         * Live snapshot with resolved version → should be initial
+         * baseline, NOT a "foo: ^1.0.0 → 1.0.5" update.
+         */
         const entry = store.recordSnapshot('/p', 'p', 'hidden', [
             {name: 'foo', version: '1.0.5'}
         ]);

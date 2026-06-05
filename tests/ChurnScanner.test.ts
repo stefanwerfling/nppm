@@ -13,7 +13,7 @@ function tarHeader(name: string, size: number): Buffer {
     h.write('0000644 ', 100, 8, 'ascii');
     h.write('0000000 ', 108, 8, 'ascii');
     h.write('0000000 ', 116, 8, 'ascii');
-    h.write(size.toString(8).padStart(11, '0') + ' ', 124, 12, 'ascii');
+    h.write(`${size.toString(8).padStart(11, '0')  } `, 124, 12, 'ascii');
     h.write('00000000000 ', 136, 12, 'ascii');
     h.write('        ', 148, 8, 'ascii');
     h.write('0', 156, 1, 'ascii');
@@ -23,11 +23,11 @@ function tarHeader(name: string, size: number): Buffer {
     for (let i = 0; i < BLOCK; i++) {
         sum += h[i];
     }
-    h.write(sum.toString(8).padStart(6, '0') + '\0 ', 148, 8, 'ascii');
+    h.write(`${sum.toString(8).padStart(6, '0')  }\0 `, 148, 8, 'ascii');
     return h;
 }
 
-function tgzWithFiles(files: {name: string; content: string}[]): Buffer {
+function tgzWithFiles(files: {name: string; content: string;}[]): Buffer {
     const parts: Buffer[] = [];
     for (const f of files) {
         const body = Buffer.from(f.content, 'utf8');
@@ -69,27 +69,26 @@ describe('ChurnScanner.findPreviousVersion', () => {
 });
 
 describe('ChurnScanner.scan', () => {
-    const FRESH_DIR = (() => {
-        const path = '/tmp/nppm-churn-' + Math.random().toString(36).slice(2);
+    const FRESH_DIR = () => {
+        const path = `/tmp/nppm-churn-${  Math.random().toString(36).slice(2)}`;
         return path;
-    });
+    };
 
     function setup(versions: string[], tarballs: Record<string, Buffer>) {
         const regCacheDir = FRESH_DIR();
         const registry = makeRegistry('pkg', {
             name: 'pkg',
             latest: versions[versions.length - 1],
-            versions
+            versions: versions
         }, regCacheDir);
 
-        const builder = new FingerprintBuilder(null, async (n, v) =>
-            tarballs[`${n}@${v}`] ?? null
-        );
+        const builder = new FingerprintBuilder(null, async(n, v) =>
+            tarballs[`${n}@${v}`] ?? null);
 
         return new ChurnScanner(registry, builder);
     }
 
-    it('flags a patch bump with too many file changes as warn', async () => {
+    it('flags a patch bump with too many file changes as warn', async() => {
         // 1.0.0 → 1.0.1 with 15 modified files (>10 = warn).
         const v1Files = Array.from({length: 15}, (_, i) => ({
             name: `f${i}.js`,
@@ -113,7 +112,7 @@ describe('ChurnScanner.scan', () => {
         expect(finding!.severity).toBe(ChurnSeverity.warn);
     });
 
-    it('escalates a huge patch diff to risk', async () => {
+    it('escalates a huge patch diff to risk', async() => {
         const v1 = Array.from({length: 40}, (_, i) => ({name: `f${i}.js`, content: `a${i}`}));
         const v2 = Array.from({length: 40}, (_, i) => ({name: `f${i}.js`, content: `b${i}`}));
 
@@ -126,7 +125,7 @@ describe('ChurnScanner.scan', () => {
         expect(finding!.severity).toBe(ChurnSeverity.risk);
     });
 
-    it('treats a small patch bump as info', async () => {
+    it('treats a small patch bump as info', async() => {
         const scanner = setup(['1.0.0', '1.0.1'], {
             'pkg@1.0.0': tgzWithFiles([{name: 'a.js', content: 'x'}]),
             'pkg@1.0.1': tgzWithFiles([{name: 'a.js', content: 'y'}])
@@ -137,7 +136,7 @@ describe('ChurnScanner.scan', () => {
         expect(finding!.bumpType).toBe('patch');
     });
 
-    it('does not flag a major bump regardless of size', async () => {
+    it('does not flag a major bump regardless of size', async() => {
         const v1 = Array.from({length: 200}, (_, i) => ({name: `f${i}.js`, content: `a${i}`}));
         const v2 = Array.from({length: 200}, (_, i) => ({name: `f${i}.js`, content: `b${i}`}));
 
@@ -151,7 +150,7 @@ describe('ChurnScanner.scan', () => {
         expect(finding!.severity).toBe(ChurnSeverity.info);
     });
 
-    it('returns null when there is no previous stable version', async () => {
+    it('returns null when there is no previous stable version', async() => {
         const scanner = setup(['1.0.0'], {
             'pkg@1.0.0': tgzWithFiles([{name: 'a.js', content: 'x'}])
         });

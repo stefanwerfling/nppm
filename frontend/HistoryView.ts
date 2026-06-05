@@ -82,9 +82,11 @@ export class HistoryView {
     }
 
     public async show(unid: string, name: string): Promise<void> {
-        // Close any leftover SSE from a previous project — switching
-        // mid-backfill drops the stream so the UI doesn't apply a
-        // response that belongs elsewhere.
+        /*
+         * Close any leftover SSE from a previous project — switching
+         * mid-backfill drops the stream so the UI doesn't apply a
+         * response that belongs elsewhere.
+         */
         this._closeStream();
 
         this._projectUnid = unid;
@@ -94,8 +96,10 @@ export class HistoryView {
         try {
             const response = await Api.history(unid);
 
-            // Guard against a stale response if the user switched
-            // projects mid-fetch.
+            /*
+             * Guard against a stale response if the user switched
+             * projects mid-fetch.
+             */
             if (this._projectUnid !== unid) {
                 return;
             }
@@ -158,9 +162,11 @@ export class HistoryView {
         const timeline = document.createElement('div');
         timeline.className = 'history-timeline';
 
-        // Group consecutive entries by date — entries are already
-        // newest-first, so a simple lastDate tracker is enough; no
-        // separate Map needed.
+        /*
+         * Group consecutive entries by date — entries are already
+         * newest-first, so a simple lastDate tracker is enough; no
+         * separate Map needed.
+         */
         let lastDate = '';
         for (const entry of this._entries) {
             const date = HistoryView._formatDate(entry.timestamp);
@@ -207,7 +213,7 @@ export class HistoryView {
      * Classify an entry for icon styling. Pure-add / pure-update /
      * pure-remove get their own colour; anything else is "mixed".
      */
-    private static _dominantKind(entry: HistoryEntry): {kind: string; symbol: string} {
+    private static _dominantKind(entry: HistoryEntry): {kind: string; symbol: string;} {
         const a = entry.added.length;
         const u = entry.updated.length;
         const r = entry.removed.length;
@@ -382,9 +388,11 @@ export class HistoryView {
         source.textContent = I18n.t('Source: {source}', {source: entry.lockfileSource});
         head.appendChild(source);
 
-        // package.json-derived entries carry declared ranges, not
-        // resolved versions — surface that explicitly so the user
-        // doesn't expect the Vulns view to cover them.
+        /*
+         * package.json-derived entries carry declared ranges, not
+         * resolved versions — surface that explicitly so the user
+         * doesn't expect the Vulns view to cover them.
+         */
         if (entry.lockfileSource === 'package-json') {
             const pill = document.createElement('span');
             pill.className = 'history-pill history-pill-declared';
@@ -599,4 +607,5 @@ export class HistoryView {
         const pad = (n: number): string => n.toString().padStart(2, '0');
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     }
+
 }

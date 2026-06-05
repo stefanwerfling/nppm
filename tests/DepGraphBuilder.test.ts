@@ -11,6 +11,7 @@ import {Project} from '../backend/Project/Project.js';
 import {Registry, RegistryPackage} from '../backend/Registry/Registry.js';
 
 class FakeProject implements Project {
+
     constructor(
         private readonly _manifests: PackageManifest[],
         private readonly _lockfile: Lockfile|null
@@ -34,9 +35,11 @@ class FakeProject implements Project {
     public setHidden(_v: boolean) {}
     public getConfigIndex() { return -1; }
     public getTemplates() { return []; }
+
 }
 
 class FakeRegistry extends Registry {
+
     constructor(private readonly _data: Record<string, RegistryPackage|null>, dir: string) {
         super('unused', new JsonCache(dir, 60));
     }
@@ -50,12 +53,13 @@ class FakeRegistry extends Registry {
         }
         return out;
     }
+
 }
 
 function pkg(name: string, version: string, opts: Partial<LockedPackage> = {}): LockedPackage {
     return {
-        name,
-        version,
+        name: name,
+        version: version,
         path: opts.path ?? `node_modules/${name}`,
         dev: false,
         optional: false,
@@ -78,16 +82,18 @@ describe('DepGraphBuilder.build', () => {
         fs.rmSync(dir, {recursive: true, force: true});
     });
 
-    it('returns null when the project has no lockfile AND no manifests', async () => {
+    it('returns null when the project has no lockfile AND no manifests', async() => {
         const project = new FakeProject([], null);
         const graph = await DepGraphBuilder.build('UNID', project, new FakeRegistry({}, dir), new JsonCache(dir, 60));
         expect(graph).toBeNull();
     });
 
-    it('falls back to the manifest when no lockfile is present (remote projects without committed package-lock.json)', async () => {
-        // Models a github-hosted project that committed package.json
-        // but not the lockfile. The graph should still surface the
-        // declared top-level deps so the Tree view is not empty.
+    it('falls back to the manifest when no lockfile is present (remote projects without committed package-lock.json)', async() => {
+        /*
+         * Models a github-hosted project that committed package.json
+         * but not the lockfile. The graph should still surface the
+         * declared top-level deps so the Tree view is not empty.
+         */
         const project = new FakeProject(
             [{
                 name: 'root',
@@ -118,7 +124,7 @@ describe('DepGraphBuilder.build', () => {
         expect(graph!.packages['bar@^2.0.0'].deps).toEqual([]);
     });
 
-    it('resolves root deps to hoisted lockfile entries', async () => {
+    it('resolves root deps to hoisted lockfile entries', async() => {
         const project = new FakeProject(
             [{
                 name: 'root',
@@ -140,7 +146,7 @@ describe('DepGraphBuilder.build', () => {
         expect(graph!.packages['foo@1.2.3'].deps).toEqual([{name: 'bar', version: '2.0.0'}]);
     });
 
-    it('uses nested node_modules when both nested and hoisted exist', async () => {
+    it('uses nested node_modules when both nested and hoisted exist', async() => {
         const project = new FakeProject(
             [{name: 'root', version: '1.0.0', dependencies: [], scripts: {}}],
             {
@@ -159,7 +165,7 @@ describe('DepGraphBuilder.build', () => {
         expect(graph!.packages['a@1.0.0'].deps).toEqual([{name: 'b', version: '2.0.0'}]);
     });
 
-    it('emits empty-version placeholders for unresolved deps', async () => {
+    it('emits empty-version placeholders for unresolved deps', async() => {
         const project = new FakeProject(
             [{name: 'root', version: '1.0.0', dependencies: [], scripts: {}}],
             {
@@ -173,7 +179,7 @@ describe('DepGraphBuilder.build', () => {
         expect(graph!.packages['a@1.0.0'].deps).toEqual([{name: 'missing', version: ''}]);
     });
 
-    it('marks status from CVE cache and registry latest', async () => {
+    it('marks status from CVE cache and registry latest', async() => {
         const project = new FakeProject(
             [{name: 'root', version: '1.0.0', dependencies: [], scripts: {}}],
             {

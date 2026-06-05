@@ -122,8 +122,8 @@ export class ConfigLoader {
     ): LoadedConfig {
         const cfg = raw as {
             projects?: unknown[];
-            registry?: {url?: string; auth?: string};
-            cache?: {dir?: string; ttlMinutes?: number};
+            registry?: {url?: string; auth?: string;};
+            cache?: {dir?: string; ttlMinutes?: number;};
             security?: {
                 maintainer?: {
                     quickHandoverDays?: number;
@@ -142,9 +142,9 @@ export class ConfigLoader {
                 };
                 external?: {
                     enabled?: boolean;
-                    socket?: {enabled?: boolean; apiKey?: string};
-                    openssf?: {enabled?: boolean};
-                    depsDev?: {enabled?: boolean};
+                    socket?: {enabled?: boolean; apiKey?: string;};
+                    openssf?: {enabled?: boolean;};
+                    depsDev?: {enabled?: boolean;};
                 };
             };
             actions?: {
@@ -168,9 +168,11 @@ export class ConfigLoader {
         const registry = new Registry(registryUrl, registryCache, registryAuth);
         const remoteCache = new JsonCache(path.join(cacheDir, 'remote'), cacheTtlMinutes);
 
-        // Fingerprint cache is permanent — published `pkg@version` is
-        // immutable on npm. Bump the cache-key prefix in the builder
-        // (`fp_v4_*` → `fp_v5_*`) when the cached shape changes.
+        /*
+         * Fingerprint cache is permanent — published `pkg@version` is
+         * immutable on npm. Bump the cache-key prefix in the builder
+         * (`fp_v4_*` → `fp_v5_*`) when the cached shape changes.
+         */
         const fingerprintCache = new JsonCache(
             path.join(cacheDir, 'fingerprint'),
             cacheTtlMinutes,
@@ -181,29 +183,35 @@ export class ConfigLoader {
         const securityCache = new JsonCache(path.join(cacheDir, 'security'), cacheTtlMinutes);
         const osvClient = new OsvClient(securityCache);
 
-        // User-document cache pocket (account creation date + 2FA
-        // status). The registry frequently 401s anonymous reads of
-        // `/-/user/*`, so most lookups cache as the explicit-null
-        // envelope — that's still useful because it stops every
-        // reload from re-asking. Replaces the older `npm-2fa` pocket.
+        /*
+         * User-document cache pocket (account creation date + 2FA
+         * status). The registry frequently 401s anonymous reads of
+         * `/-/user/*`, so most lookups cache as the explicit-null
+         * envelope — that's still useful because it stops every
+         * reload from re-asking. Replaces the older `npm-2fa` pocket.
+         */
         const userCache = new JsonCache(path.join(cacheDir, 'npm-user'), cacheTtlMinutes);
         const userFetcher = new NpmUserFetcher(registryUrl, userCache, registryAuth);
 
-        // `treatUnknownAs` arrives as a free-form string from the
-        // config (VTS schema can't constrain it to enum values
-        // without a custom validator). Unknown values fall back to
-        // the scanner default by staying `undefined`.
+        /*
+         * `treatUnknownAs` arrives as a free-form string from the
+         * config (VTS schema can't constrain it to enum values
+         * without a custom validator). Unknown values fall back to
+         * the scanner default by staying `undefined`.
+         */
         const treatUnknownAsRaw = cfg.security?.license?.treatUnknownAs;
         const treatUnknownAs = Object.values(LicenseSeverity)
-            .includes(treatUnknownAsRaw as LicenseSeverity)
+        .includes(treatUnknownAsRaw as LicenseSeverity)
             ? treatUnknownAsRaw as LicenseSeverity
             : undefined;
 
-        // External-sources scanner — three TTL cache pockets, one per
-        // upstream API. Disabled-by-default for socket (needs API key);
-        // OpenSSF + deps.dev are free and on-by-default. The aggregator
-        // gates each source independently from the loaded config, and
-        // SecurityScanner reads the wrapper as a single dependency.
+        /*
+         * External-sources scanner — three TTL cache pockets, one per
+         * upstream API. Disabled-by-default for socket (needs API key);
+         * OpenSSF + deps.dev are free and on-by-default. The aggregator
+         * gates each source independently from the loaded config, and
+         * SecurityScanner reads the wrapper as a single dependency.
+         */
         const socketKey = ConfigLoader.expandEnv(cfg.security?.external?.socket?.apiKey);
         const socketCache = new JsonCache(path.join(cacheDir, 'external-socket'), cacheTtlMinutes);
         const openssfCache = new JsonCache(path.join(cacheDir, 'external-openssf'), cacheTtlMinutes);
@@ -233,9 +241,9 @@ export class ConfigLoader {
                 license: {
                     allowlist: cfg.security?.license?.allowlist,
                     denylist: cfg.security?.license?.denylist,
-                    treatUnknownAs
+                    treatUnknownAs: treatUnknownAs
                 },
-                userFetcher,
+                userFetcher: userFetcher,
                 external: externalScanner
             }
         );
@@ -245,10 +253,12 @@ export class ConfigLoader {
             devPathGlobs: cfg.security?.unused?.devPathGlobs
         });
 
-        // Bundle-size cache is permanent — bundlephobia computes
-        // against an immutable `name@version`, so a once-resolved
-        // result is correct forever. Network calls are bounded by
-        // the fetcher's concurrency cap.
+        /*
+         * Bundle-size cache is permanent — bundlephobia computes
+         * against an immutable `name@version`, so a once-resolved
+         * result is correct forever. Network calls are bounded by
+         * the fetcher's concurrency cap.
+         */
         const bundleCache = new JsonCache(
             path.join(cacheDir, 'bundlephobia'),
             cacheTtlMinutes,
@@ -257,15 +267,15 @@ export class ConfigLoader {
         const bundlephobiaFetcher = new BundlephobiaFetcher(bundleCache);
 
         const projects: Project[] = [];
-        const rawProjects = (cfg.projects ?? []) as Array<{type: ConfigProjectType; hidden?: boolean; templates?: string[]}>;
+        const rawProjects = (cfg.projects ?? []) as {type: ConfigProjectType; hidden?: boolean; templates?: string[];}[];
         for (let i = 0; i < rawProjects.length; i++) {
             const entry = rawProjects[i];
             const hidden = entry.hidden === true;
             const templates = Array.isArray(entry.templates) ? entry.templates : [];
             if (entry.type === ConfigProjectType.local) {
-                const local = entry as {type: ConfigProjectType.local; path: string; name?: string};
+                const local = entry as {type: ConfigProjectType.local; path: string; name?: string;};
                 const absRoot = path.resolve(projectRoot, local.path);
-                const project = new ProjectLocal(absRoot, local.name, {hidden, configIndex: i, templates});
+                const project = new ProjectLocal(absRoot, local.name, {hidden: hidden, configIndex: i, templates: templates});
                 projects.push(project);
                 hooks.onProjectLoaded?.(project);
             } else if (entry.type === ConfigProjectType.github) {
@@ -282,7 +292,7 @@ export class ConfigLoader {
                     gh.ref,
                     ConfigLoader.expandEnv(gh.token),
                     remoteCache,
-                    {hidden, configIndex: i, templates}
+                    {hidden: hidden, configIndex: i, templates: templates}
                 );
                 projects.push(project);
                 hooks.onProjectLoaded?.(project);
@@ -301,7 +311,7 @@ export class ConfigLoader {
                         ge.ref,
                         ConfigLoader.expandEnv(ge.token),
                         remoteCache,
-                        {hidden, configIndex: i, templates}
+                        {hidden: hidden, configIndex: i, templates: templates}
                     );
                     projects.push(project);
                     hooks.onProjectLoaded?.(project);
@@ -312,23 +322,24 @@ export class ConfigLoader {
         }
 
         return {
-            projectRoot,
-            cacheDir,
-            cacheTtlMinutes,
-            registry,
-            registryCache,
-            remoteCache,
-            fingerprintCache,
-            fingerprintBuilder,
-            osvClient,
-            securityCache,
-            securityScanner,
-            unusedDetector,
-            bundlephobiaFetcher,
-            allowInstall,
-            editor,
-            projects,
-            externalScanner
+            projectRoot: projectRoot,
+            cacheDir: cacheDir,
+            cacheTtlMinutes: cacheTtlMinutes,
+            registry: registry,
+            registryCache: registryCache,
+            remoteCache: remoteCache,
+            fingerprintCache: fingerprintCache,
+            fingerprintBuilder: fingerprintBuilder,
+            osvClient: osvClient,
+            securityCache: securityCache,
+            securityScanner: securityScanner,
+            unusedDetector: unusedDetector,
+            bundlephobiaFetcher: bundlephobiaFetcher,
+            allowInstall: allowInstall,
+            editor: editor,
+            projects: projects,
+            externalScanner: externalScanner
         };
     }
+
 }

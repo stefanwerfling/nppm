@@ -12,7 +12,7 @@ function pkg(over: Partial<LockedPackage>): LockedPackage {
 }
 
 function lock(packages: LockedPackage[], source: Lockfile['source'] = 'committed'): Lockfile {
-    return {lockfileVersion: 3, source, packages};
+    return {lockfileVersion: 3, source: source, packages: packages};
 }
 
 describe('MutableResolutionScanner.scan', () => {

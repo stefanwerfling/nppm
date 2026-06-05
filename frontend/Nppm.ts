@@ -135,8 +135,10 @@ export class Nppm {
         this._dashboardView = new DashboardView(this._dashboardHost!);
         this._findingsModal = new FindingsModal();
 
-        // Topbar wiring for the global scan. These elements live in
-        // index.html so non-pane components can drive them.
+        /*
+         * Topbar wiring for the global scan. These elements live in
+         * index.html so non-pane components can drive them.
+         */
         const globalBtn = document.getElementById('global-scan-btn') as HTMLButtonElement|null;
         const globalProgress = document.getElementById('global-scan-progress');
         const globalProgressFill = document.getElementById('global-scan-progress-fill');
@@ -163,22 +165,28 @@ export class Nppm {
         this._projectFormModal = new ProjectFormModal();
         this._badgeFilterModal = new BadgeFilterModal();
         this._badgeFilterModal.onApply((hidden) => {
-            // Single source of truth — the matrix owns the filter
-            // state and persists it. The modal just hands it back.
+            /*
+             * Single source of truth — the matrix owns the filter
+             * state and persists it. The modal just hands it back.
+             */
             this._matrix.setHiddenBadges(hidden);
         });
         this._projectFormModal.onSaved(() => {
-            // Re-fetch and re-render the project list so the new /
-            // edited entry shows up; if the matrix is currently the
-            // active view, also refresh it.
+            /*
+             * Re-fetch and re-render the project list so the new /
+             * edited entry shows up; if the matrix is currently the
+             * active view, also refresh it.
+             */
             void this._refreshProjects();
         });
 
         new Resizer(resizer, controls);
 
-        // Cross-toggle wiring: each project sub-view exposes callbacks
-        // for the three other sub-views in its header. They all route
-        // through Nppm so view-switching state stays centralised here.
+        /*
+         * Cross-toggle wiring: each project sub-view exposes callbacks
+         * for the three other sub-views in its header. They all route
+         * through Nppm so view-switching state stays centralised here.
+         */
         const findProject = (unid: string): ApiProject|undefined =>
             this._projects.find((p) => p.unid === unid);
 
@@ -350,10 +358,12 @@ export class Nppm {
             if (project.unid === '__dashboard__') {
                 this._loadDashboard();
             } else if (project.unid === '__matrix__') {
-                // Always re-fetch so the matrix is populated even
-                // when the session started on the Dashboard (no
-                // initial _loadMatrix from start()) and so a stale
-                // view picks up freshly added projects.
+                /*
+                 * Always re-fetch so the matrix is populated even
+                 * when the session started on the Dashboard (no
+                 * initial _loadMatrix from start()) and so a stale
+                 * view picks up freshly added projects.
+                 */
                 this._switchTo(View.matrix);
                 this._matrix.renderLoading();
                 void this._loadMatrix();
@@ -364,9 +374,11 @@ export class Nppm {
             }
         });
 
-        // Dashboard click routing — the cell modal opens for every
-        // scanner; its "Open in <view>" drill-down only fires for
-        // the four scanners with a dedicated view.
+        /*
+         * Dashboard click routing — the cell modal opens for every
+         * scanner; its "Open in <view>" drill-down only fires for
+         * the four scanners with a dedicated view.
+         */
         this._dashboardView.onProjectClick((unid) => {
             const p = findProject(unid);
             if (p) {
@@ -378,10 +390,12 @@ export class Nppm {
             this._findingsModal.open(scanner, scannerLabel, unid, projectName, cell);
         });
         this._findingsModal.onRowClick((pkg, version) => {
-            // Same hook the Matrix uses for its security badges — opens
-            // the PackageDetailPanel on the Security tab so the user
-            // lands directly on the External-sources card and the rest
-            // of the per-package signals.
+            /*
+             * Same hook the Matrix uses for its security badges — opens
+             * the PackageDetailPanel on the Security tab so the user
+             * lands directly on the External-sources card and the rest
+             * of the per-package signals.
+             */
             void this._detailPanel.openOnSecurity(pkg, version, version);
         });
         this._findingsModal.onDrill((unid, scanner) => {
@@ -393,9 +407,11 @@ export class Nppm {
             switch (scanner) {
                 case 'cve':
                 case 'integrity':
-                    // Both scanners reason over the lockfile; the
-                    // InstalledView already surfaces per-package
-                    // security findings.
+                    /*
+                     * Both scanners reason over the lockfile; the
+                     * InstalledView already surfaces per-package
+                     * security findings.
+                     */
                     void this._loadProjectInstalled(p);
                     break;
                 case 'unused':
@@ -421,27 +437,31 @@ export class Nppm {
             this._projectFormModal.open({kind: 'add'});
         });
 
-        this._treeview.onEditProject(async (project) => {
+        this._treeview.onEditProject(async(project) => {
             try {
                 const extras = await Api.getProjectConfig(project.unid);
-                this._projectFormModal.open({kind: 'edit', project, extras});
+                this._projectFormModal.open({kind: 'edit', project: project, extras: extras});
             } catch (e) {
                 console.error('Loading project config failed', e);
             }
         });
 
-        this._treeview.onVisibilityToggle(async (project, hidden) => {
+        this._treeview.onVisibilityToggle(async(project, hidden) => {
             try {
                 await Api.setProjectVisibility(project.unid, hidden);
-                // Re-fetch the project list so the eye icon flips
-                // everywhere; the matrix refresh below reads the
-                // new flag.
+                /*
+                 * Re-fetch the project list so the eye icon flips
+                 * everywhere; the matrix refresh below reads the
+                 * new flag.
+                 */
                 const response = await Api.listProjects();
                 this._projects = response.projects;
                 this._treeview.render(response.projects);
-                // If the matrix is currently displayed, refresh it
-                // so the just-hidden project disappears (or the
-                // just-shown one appears).
+                /*
+                 * If the matrix is currently displayed, refresh it
+                 * so the just-hidden project disappears (or the
+                 * just-shown one appears).
+                 */
                 if (this._view === View.matrix) {
                     void this._loadMatrix();
                 }
@@ -478,13 +498,15 @@ export class Nppm {
             void this._workspaceDriftModal.open(unid, projectName, pkg);
         });
 
-        // Two score sources race into the treeview rings: the
-        // cross-project Matrix (per-package severity rollup) and the
-        // Dashboard (per-scanner cell averages). Dashboard is the
-        // more comprehensive measurement, so its values win when both
-        // know a project. Matrix is the fallback for projects the
-        // Dashboard hasn't scored yet (e.g. before the first dashboard
-        // visit) so the ring isn't empty.
+        /*
+         * Two score sources race into the treeview rings: the
+         * cross-project Matrix (per-package severity rollup) and the
+         * Dashboard (per-scanner cell averages). Dashboard is the
+         * more comprehensive measurement, so its values win when both
+         * know a project. Matrix is the fallback for projects the
+         * Dashboard hasn't scored yet (e.g. before the first dashboard
+         * visit) so the ring isn't empty.
+         */
         this._matrix.onScoresChanged((scores) => {
             this._matrixScores = scores;
             this._pushScoresToTreeview();
@@ -513,10 +535,12 @@ export class Nppm {
         });
 
         this._upgradeModal.onAfterApply(() => {
-            // Single-project upgrade was triggered from the
-            // per-project matrix; reload it so the just-bumped range
-            // shows up without the user having to navigate away and
-            // back.
+            /*
+             * Single-project upgrade was triggered from the
+             * per-project matrix; reload it so the just-bumped range
+             * shows up without the user having to navigate away and
+             * back.
+             */
             const unid = this._currentProjectUnid;
             const proj = unid ? this._projects.find((p) => p.unid === unid) : undefined;
             if (proj) {
@@ -526,10 +550,12 @@ export class Nppm {
     }
 
     public async start(): Promise<void> {
-        // Read the user's start-view preference up-front so the very
-        // first paint already lands on the chosen surface. Failure to
-        // reach /api/config is non-fatal — we just fall back to the
-        // historical matrix landing.
+        /*
+         * Read the user's start-view preference up-front so the very
+         * first paint already lands on the chosen surface. Failure to
+         * reach /api/config is non-fatal — we just fall back to the
+         * historical matrix landing.
+         */
         const startView = await Nppm._fetchStartView();
         this._switchTo(startView === 'dashboard' ? View.dashboard : View.matrix);
         if (startView !== 'dashboard') {
@@ -542,19 +568,23 @@ export class Nppm {
             this._installedView.setEditor(response.editor);
             this._treeview.render(response.projects);
 
-            // Highlight the corresponding sentinel row so the first
-            // paint already reflects where the user is. Without this
-            // the treeview shows no selection until the user clicks
-            // something, which makes the initial landing look like a
-            // half-loaded state.
+            /*
+             * Highlight the corresponding sentinel row so the first
+             * paint already reflects where the user is. Without this
+             * the treeview shows no selection until the user clicks
+             * something, which makes the initial landing look like a
+             * half-loaded state.
+             */
             this._treeview.setSelected(startView === 'dashboard' ? '__dashboard__' : '__matrix__');
             if (startView === 'dashboard') {
                 this._dashboardView.show();
-                // Pull the matrix in the background even though we're
-                // not showing it — the treeview health-ring scores
-                // are only emitted by `Matrix.setData()`, so without
-                // this fetch a Dashboard-first landing would leave
-                // the sidebar rings at "…" forever.
+                /*
+                 * Pull the matrix in the background even though we're
+                 * not showing it — the treeview health-ring scores
+                 * are only emitted by `Matrix.setData()`, so without
+                 * this fetch a Dashboard-first landing would leave
+                 * the sidebar rings at "…" forever.
+                 */
                 void this._loadMatrix();
             } else {
                 await this._loadMatrix();
@@ -570,7 +600,7 @@ export class Nppm {
             if (!res.ok) {
                 return 'matrix';
             }
-            const cfg = await res.json() as {ui?: {startView?: string}};
+            const cfg = await res.json() as {ui?: {startView?: string;};};
             return cfg.ui?.startView === 'dashboard' ? 'dashboard' : 'matrix';
         } catch {
             return 'matrix';
@@ -774,11 +804,14 @@ export class Nppm {
         this._dashboardHost.style.display = view === View.dashboard ? '' : 'none';
         this._globalHost.style.display = view === View.global ? '' : 'none';
 
-        // Intentionally do NOT stop the dashboard SSE when leaving —
-        // a long-running scan should keep ticking so the user can
-        // jump to Templates / a project drill-down and find live
-        // progress (and detailed sub-phases) waiting when they come
-        // back. The stream closes itself on the `end` event; tab
-        // unload tears it down via the browser's EventSource cleanup.
+        /*
+         * Intentionally do NOT stop the dashboard SSE when leaving —
+         * a long-running scan should keep ticking so the user can
+         * jump to Templates / a project drill-down and find live
+         * progress (and detailed sub-phases) waiting when they come
+         * back. The stream closes itself on the `end` event; tab
+         * unload tears it down via the browser's EventSource cleanup.
+         */
     }
+
 }

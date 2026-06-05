@@ -158,7 +158,7 @@ export class EcosystemBoxModal {
         columns: Map<string, DashboardColumn>,
         predicate: (avg: number|null) => boolean
     ): HTMLElement {
-        type Row = {unid: string; name: string; avg: number|null};
+        type Row = {unid: string; name: string; avg: number|null;};
         const rows: Row[] = [];
         for (const [unid, col] of columns) {
             let sum = 0;
@@ -171,7 +171,7 @@ export class EcosystemBoxModal {
             }
             const avg = scanned > 0 ? Math.round(sum / scanned) : null;
             if (predicate(avg)) {
-                rows.push({unid, name: col.project.name, avg});
+                rows.push({unid: unid, name: col.project.name, avg: avg});
             }
         }
         rows.sort((a, b) => {
@@ -223,7 +223,7 @@ export class EcosystemBoxModal {
     }
 
     private _renderScannerAverages(columns: Map<string, DashboardColumn>): HTMLElement {
-        const byScanner = new Map<string, {sum: number; count: number}>();
+        const byScanner = new Map<string, {sum: number; count: number;}>();
         for (const col of columns.values()) {
             for (const [scanner, cell] of Object.entries(col.cells)) {
                 if (cell.score === null) {
@@ -239,8 +239,8 @@ export class EcosystemBoxModal {
             }
         }
         const rows = Array.from(byScanner.entries())
-            .map(([scanner, e]) => ({scanner, avg: Math.round(e.sum / e.count)}))
-            .sort((a, b) => a.avg - b.avg);
+        .map(([scanner, e]) => ({scanner: scanner, avg: Math.round(e.sum / e.count)}))
+        .sort((a, b) => a.avg - b.avg);
 
         const list = document.createElement('div');
         list.className = 'ebm-list';
@@ -284,7 +284,7 @@ export class EcosystemBoxModal {
             }
         }
         const rows = Array.from(byScanner.entries())
-            .sort((a, b) => b[1] - a[1]);
+        .sort((a, b) => b[1] - a[1]);
 
         const list = document.createElement('div');
         list.className = 'ebm-list';
@@ -315,7 +315,7 @@ export class EcosystemBoxModal {
         columns: Map<string, DashboardColumn>,
         scanner: ScannerId
     ): HTMLElement {
-        type Row = {label: string; projects: {unid: string; name: string}[]; risk: number; warn: number};
+        type Row = {label: string; projects: {unid: string; name: string;}[]; risk: number; warn: number;};
         const byLabel = new Map<string, Row>();
         for (const [unid, col] of columns) {
             const cell = col.cells[scanner];
@@ -329,7 +329,7 @@ export class EcosystemBoxModal {
                     byLabel.set(f.label, entry);
                 }
                 if (!entry.projects.some((p) => p.unid === unid)) {
-                    entry.projects.push({unid, name: col.project.name});
+                    entry.projects.push({unid: unid, name: col.project.name});
                 }
                 if (f.severity === 'risk') {
                     entry.risk++;
@@ -339,12 +339,12 @@ export class EcosystemBoxModal {
             }
         }
         const rows = Array.from(byLabel.values())
-            .sort((a, b) => {
-                if (a.risk !== b.risk) {
-                    return b.risk - a.risk;
-                }
-                return b.warn - a.warn;
-            });
+        .sort((a, b) => {
+            if (a.risk !== b.risk) {
+                return b.risk - a.risk;
+            }
+            return b.warn - a.warn;
+        });
 
         const list = document.createElement('div');
         list.className = 'ebm-list';
@@ -393,9 +393,11 @@ export class EcosystemBoxModal {
     }
 
     private _renderFooter(id: EcoBoxId): HTMLElement|null {
-        // Only the project-list boxes have a meaningful jump target —
-        // the cross-project Matrix is where the user can dig into
-        // the projects further (workspaces, deps, scanner badges).
+        /*
+         * Only the project-list boxes have a meaningful jump target —
+         * the cross-project Matrix is where the user can dig into
+         * the projects further (workspaces, deps, scanner badges).
+         */
         if (id !== 'projects' && id !== 'healthy-projects' && id !== 'at-risk-projects') {
             return null;
         }
@@ -441,4 +443,5 @@ export class EcosystemBoxModal {
                 return I18n.t('Package names a Levenshtein distance of 1-2 from a popular package, or carrying confusable (non-ASCII) characters. Most matches are intentional namesakes; the rows surface the suspicious ones.');
         }
     }
+
 }

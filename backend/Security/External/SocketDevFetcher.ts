@@ -23,7 +23,7 @@ export type SocketDevScore = {
     license: number|null;
 };
 
-type Wrap = {data: SocketDevScore|null};
+type Wrap = {data: SocketDevScore|null;};
 
 /**
  * Fetches socket.dev's per-package score. Bearer-token authed via the
@@ -95,7 +95,7 @@ export class SocketDevFetcher {
             return null;
         }
         const obj = raw as Record<string, unknown>;
-        const root = (obj.score && typeof obj.score === 'object')
+        const root = obj.score && typeof obj.score === 'object'
             ? obj.score as Record<string, unknown>
             : obj;
         const pick = (k: string): number|null => {
@@ -115,4 +115,5 @@ export class SocketDevFetcher {
     private static _cacheKey(name: string, version: string): string {
         return `socket_${name}@${version}`;
     }
+
 }

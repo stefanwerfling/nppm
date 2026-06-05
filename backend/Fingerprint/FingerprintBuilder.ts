@@ -55,9 +55,11 @@ export class NpmTarballFetcher implements TarballFetcher {
             if (!spec) {
                 return null;
             }
-            // GitLab (CloudFlare in front) rejects the default fetch
-            // User-Agent with HTTP 406. Sending a real UA fixes that
-            // and is also fine with GitHub codeload + Bitbucket.
+            /*
+             * GitLab (CloudFlare in front) rejects the default fetch
+             * User-Agent with HTTP 406. Sending a real UA fixes that
+             * and is also fine with GitHub codeload + Bitbucket.
+             */
             const res = await fetch(spec.url, {headers: {'User-Agent': 'nppm'}});
             if (res.status === 404) {
                 return null;
@@ -87,6 +89,7 @@ export class NpmTarballFetcher implements TarballFetcher {
         const buf = await res.arrayBuffer();
         return Buffer.from(buf);
     }
+
 }
 
 /**
@@ -123,9 +126,11 @@ export class FingerprintBuilder {
         const key = FingerprintBuilder._cacheKey(name, version);
 
         if (this._cache) {
-            // Use the {data: ...} envelope so a cached 404 (data:null) is
-            // distinguishable from a cache miss (cache.get → null).
-            type Wrap = {data: PackageFingerprint|null};
+            /*
+             * Use the {data: ...} envelope so a cached 404 (data:null) is
+             * distinguishable from a cache miss (cache.get → null).
+             */
+            type Wrap = {data: PackageFingerprint|null;};
             const hit = this._cache.get<Wrap>(key);
             if (hit !== null) {
                 return hit.data;
@@ -135,7 +140,7 @@ export class FingerprintBuilder {
         const tgz = await this._fetcher.fetch(name, version);
 
         if (tgz === null) {
-            this._cache?.set<{data: PackageFingerprint|null}>(key, {data: null});
+            this._cache?.set<{data: PackageFingerprint|null;}>(key, {data: null});
             return null;
         }
 
@@ -155,14 +160,14 @@ export class FingerprintBuilder {
         files.sort((a, b) => a.path.localeCompare(b.path));
 
         const fingerprint: PackageFingerprint = {
-            name,
-            version,
-            files,
+            name: name,
+            version: version,
+            files: files,
             manifest: FingerprintBuilder._extractManifest(entries),
             fetchedAt: Date.now()
         };
 
-        this._cache?.set<{data: PackageFingerprint|null}>(key, {data: fingerprint});
+        this._cache?.set<{data: PackageFingerprint|null;}>(key, {data: fingerprint});
         return fingerprint;
     }
 
@@ -230,32 +235,34 @@ export class FingerprintBuilder {
                 return out;
             };
 
-            // License is sometimes a bare string (modern), sometimes
-            // the deprecated `{type, url}` object, sometimes the
-            // legacy `licenses: [{type}]` array. Coerce to a single
-            // SPDX-style string here so `LicenseScanner` has only one
-            // shape to parse.
+            /*
+             * License is sometimes a bare string (modern), sometimes
+             * the deprecated `{type, url}` object, sometimes the
+             * legacy `licenses: [{type}]` array. Coerce to a single
+             * SPDX-style string here so `LicenseScanner` has only one
+             * shape to parse.
+             */
             let license: string|undefined;
             if (typeof parsed.license === 'string' && parsed.license.length > 0) {
                 license = parsed.license;
             } else if (parsed.license && typeof parsed.license === 'object') {
-                const type = (parsed.license as {type?: unknown}).type;
+                const type = (parsed.license as {type?: unknown;}).type;
                 if (typeof type === 'string' && type.length > 0) {
                     license = type;
                 }
             } else if (Array.isArray(parsed.licenses)) {
                 const ids = parsed.licenses
-                    .map((l) => {
-                        if (typeof l === 'string') {
-                            return l;
-                        }
-                        if (l && typeof l === 'object') {
-                            const t = (l as {type?: unknown}).type;
-                            return typeof t === 'string' ? t : null;
-                        }
-                        return null;
-                    })
-                    .filter((s): s is string => typeof s === 'string' && s.length > 0);
+                .map((l) => {
+                    if (typeof l === 'string') {
+                        return l;
+                    }
+                    if (l && typeof l === 'object') {
+                        const t = (l as {type?: unknown;}).type;
+                        return typeof t === 'string' ? t : null;
+                    }
+                    return null;
+                })
+                .filter((s): s is string => typeof s === 'string' && s.length > 0);
                 if (ids.length === 1) {
                     license = ids[0];
                 } else if (ids.length > 1) {
@@ -263,9 +270,11 @@ export class FingerprintBuilder {
                 }
             }
 
-            // `bin` is either a string ("path/to/cli", named after
-            // the package itself) or a `{name: path}` object. Coerce
-            // both into the map form so consumers have one shape.
+            /*
+             * `bin` is either a string ("path/to/cli", named after
+             * the package itself) or a `{name: path}` object. Coerce
+             * both into the map form so consumers have one shape.
+             */
             let bin: Record<string, string>|undefined;
             if (typeof parsed.bin === 'string' && parsed.bin.length > 0) {
                 const pkgName = typeof parsed.name === 'string' ? parsed.name : 'cli';
@@ -290,13 +299,14 @@ export class FingerprintBuilder {
                 ? asMap(parsed.engines)
                 : undefined;
 
-            // README presence: any sibling-of-package.json file whose
-            // basename starts with `README` (case-insensitive). Tarball
-            // entries are already top-level-stripped, so a plain
-            // `path === 'README'`/`'README.md'` etc. is what we look for.
+            /*
+             * README presence: any sibling-of-package.json file whose
+             * basename starts with `README` (case-insensitive). Tarball
+             * entries are already top-level-stripped, so a plain
+             * `path === 'README'`/`'README.md'` etc. is what we look for.
+             */
             const hasReadme = entries.some((e) =>
-                /^readme(\.[a-z0-9]+)?$/i.test(e.path)
-            );
+                /^readme(\.[a-z0-9]+)?$/i.test(e.path));
 
             return {
                 dependencies: asMap(parsed.dependencies),
@@ -304,12 +314,12 @@ export class FingerprintBuilder {
                 peerDependencies: asMap(parsed.peerDependencies),
                 optionalDependencies: asMap(parsed.optionalDependencies),
                 scripts: asMap(parsed.scripts),
-                license,
-                description,
+                license: license,
+                description: description,
                 files: filesField && filesField.length > 0 ? filesField : undefined,
                 bin: bin && Object.keys(bin).length > 0 ? bin : undefined,
                 engines: engines && Object.keys(engines).length > 0 ? engines : undefined,
-                hasReadme
+                hasReadme: hasReadme
             };
         } catch {
             return null;
@@ -339,4 +349,5 @@ export class FingerprintBuilder {
     private static _cacheKey(name: string, version: string): string {
         return `fp_v6_${name}@${version}`;
     }
+
 }

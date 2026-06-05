@@ -36,7 +36,7 @@ function pkgJson(deps: {
 function lockfile(packages: Record<string, string>): string {
     const out: Record<string, unknown> = {};
     for (const [name, version] of Object.entries(packages)) {
-        out[`node_modules/${name}`] = {version};
+        out[`node_modules/${name}`] = {version: version};
     }
     return JSON.stringify({
         lockfileVersion: 3,
@@ -54,18 +54,20 @@ describe('PrReviewBuilder', () => {
     beforeEach(() => {
         dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nppm-pr-'));
         cache = new JsonCache(dir, 60);
-        // OsvClient with a fetcher that always errors; the queryBatch
-        // path will fall back to the empty-record cache after one
-        // failed chunk. Tests that need OSV data seed the cache
-        // directly.
-        osv = new OsvClient(cache, async () => ({vulns: []}), 'http://test', async () => ({results: []}));
+        /*
+         * OsvClient with a fetcher that always errors; the queryBatch
+         * path will fall back to the empty-record cache after one
+         * failed chunk. Tests that need OSV data seed the cache
+         * directly.
+         */
+        osv = new OsvClient(cache, async() => ({vulns: []}), 'http://test', async() => ({results: []}));
     });
 
     afterEach(() => {
         fs.rmSync(dir, {recursive: true, force: true});
     });
 
-    it('returns an empty report when not a git repo', async () => {
+    it('returns an empty report when not a git repo', async() => {
         const reader: GitFileReader = {
             isRepo: () => false,
             refExists: () => false,
@@ -79,7 +81,7 @@ describe('PrReviewBuilder', () => {
         expect(r.notes[0]).toMatch(/Not a git repository/);
     });
 
-    it('marks ref as missing when it does not resolve', async () => {
+    it('marks ref as missing when it does not resolve', async() => {
         const reader = fakeReader(new Set(['HEAD']), new Map([
             ['HEAD:package.json', pkgJson({dependencies: {foo: '^1.0.0'}})]
         ]));
@@ -90,7 +92,7 @@ describe('PrReviewBuilder', () => {
         expect(r.notes.some((n) => /main/.test(n))).toBe(true);
     });
 
-    it('reports added deps when the head adds one', async () => {
+    it('reports added deps when the head adds one', async() => {
         const reader = fakeReader(new Set(['main', 'HEAD']), new Map([
             ['main:package.json', pkgJson({dependencies: {foo: '^1.0.0'}})],
             ['HEAD:package.json', pkgJson({dependencies: {foo: '^1.0.0', bar: '^2.0.0'}})]
@@ -106,7 +108,7 @@ describe('PrReviewBuilder', () => {
         expect(r.summary.added).toBe(1);
     });
 
-    it('reports removed deps when the head drops one', async () => {
+    it('reports removed deps when the head drops one', async() => {
         const reader = fakeReader(new Set(['main', 'HEAD']), new Map([
             ['main:package.json', pkgJson({dependencies: {foo: '^1.0.0', bar: '^2.0.0'}})],
             ['HEAD:package.json', pkgJson({dependencies: {foo: '^1.0.0'}})]
@@ -118,7 +120,7 @@ describe('PrReviewBuilder', () => {
         expect(r.summary.removed).toBe(1);
     });
 
-    it('reports updated deps with new and old ranges', async () => {
+    it('reports updated deps with new and old ranges', async() => {
         const reader = fakeReader(new Set(['main', 'HEAD']), new Map([
             ['main:package.json', pkgJson({dependencies: {foo: '^1.0.0'}})],
             ['HEAD:package.json', pkgJson({dependencies: {foo: '^2.0.0'}})]
@@ -134,7 +136,7 @@ describe('PrReviewBuilder', () => {
         });
     });
 
-    it('detects bucket-only moves (dependencies → devDependencies)', async () => {
+    it('detects bucket-only moves (dependencies → devDependencies)', async() => {
         const reader = fakeReader(new Set(['main', 'HEAD']), new Map([
             ['main:package.json', pkgJson({dependencies: {foo: '^1.0.0'}})],
             ['HEAD:package.json', pkgJson({devDependencies: {foo: '^1.0.0'}})]
@@ -150,7 +152,7 @@ describe('PrReviewBuilder', () => {
         });
     });
 
-    it('skips deps that look identical on both sides', async () => {
+    it('skips deps that look identical on both sides', async() => {
         const reader = fakeReader(new Set(['main', 'HEAD']), new Map([
             ['main:package.json', pkgJson({dependencies: {foo: '^1.0.0'}})],
             ['HEAD:package.json', pkgJson({dependencies: {foo: '^1.0.0'}})]
@@ -160,7 +162,7 @@ describe('PrReviewBuilder', () => {
         expect(r.changes).toEqual([]);
     });
 
-    it('annotates resolved-version delta from lockfile when present', async () => {
+    it('annotates resolved-version delta from lockfile when present', async() => {
         const reader = fakeReader(new Set(['main', 'HEAD']), new Map([
             ['main:package.json', pkgJson({dependencies: {lodash: '^4.0.0'}})],
             ['HEAD:package.json', pkgJson({dependencies: {lodash: '^4.0.0'}})],
@@ -178,9 +180,11 @@ describe('PrReviewBuilder', () => {
         });
     });
 
-    it('computes CVE delta when both sides have OSV cache entries', async () => {
-        // Seed OSV id-only batch cache: 4.17.20 has two CVEs, 4.17.21
-        // has only one (the other was fixed by the upgrade).
+    it('computes CVE delta when both sides have OSV cache entries', async() => {
+        /*
+         * Seed OSV id-only batch cache: 4.17.20 has two CVEs, 4.17.21
+         * has only one (the other was fixed by the upgrade).
+         */
         cache.set('osv_b_v1_lodash@4.17.20', {data: ['GHSA-a', 'GHSA-b']});
         cache.set('osv_b_v1_lodash@4.17.21', {data: ['GHSA-a']});
 
@@ -202,7 +206,7 @@ describe('PrReviewBuilder', () => {
         expect(r.summary.totalVulnsAdded).toBe(0);
     });
 
-    it('reports a new exposure when the head version pulls in a fresh CVE', async () => {
+    it('reports a new exposure when the head version pulls in a fresh CVE', async() => {
         cache.set('osv_b_v1_evil@1.0.0', {data: []});
         cache.set('osv_b_v1_evil@2.0.0', {data: ['GHSA-fresh']});
 
@@ -219,7 +223,7 @@ describe('PrReviewBuilder', () => {
         expect(r.summary.totalVulnsAdded).toBe(1);
     });
 
-    it('sorts changes by added-vuln count first, then name', async () => {
+    it('sorts changes by added-vuln count first, then name', async() => {
         cache.set('osv_b_v1_a@1.0.0', {data: []});
         cache.set('osv_b_v1_a@2.0.0', {data: ['x', 'y']});  // 2 added
         cache.set('osv_b_v1_b@1.0.0', {data: []});

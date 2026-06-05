@@ -214,5 +214,34 @@
       "error",
       "never"
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["frontend/**/*.ts", "main.ts"],
+      "env": {
+        "browser": true
+      }
+    },
+    {
+      "files": ["tests/**/*.ts"],
+      "env": {
+        "browser": true,
+        "node": true
+      },
+      "rules": {
+        "func-style": "off",
+        "func-names": "off",
+        "prefer-arrow/prefer-arrow-functions": "off",
+        "@typescript-eslint/explicit-function-return-type": "off",
+        "@typescript-eslint/explicit-member-accessibility": "off",
+        "max-classes-per-file": "off",
+        "no-await-in-loop": "off",
+        "no-inline-comments": "off",
+        "line-comment-position": "off",
+        "consistent-return": "off",
+        "no-negated-condition": "off",
+        "no-loop-func": "off"
+      }
+    }
+  ]
 }

@@ -17,8 +17,8 @@ describe('CadenceScanner.classify', () => {
 
     it('returns null when no version entry has a parseable timestamp', () => {
         const out = CadenceScanner.classify({
-            created: '2020-01-01T00:00:00Z',
-            modified: '2026-05-01T00:00:00Z',
+            'created': '2020-01-01T00:00:00Z',
+            'modified': '2026-05-01T00:00:00Z',
             '1.0.0': 'not-a-date'
         }, {now: NOW});
         expect(out).toBeNull();
@@ -58,12 +58,14 @@ describe('CadenceScanner.classify', () => {
     });
 
     it('ignores the `created` and `modified` sentinel keys in the time map', () => {
-        // If `created` were counted as a release, the median cadence
-        // and last-release would be wrong. Pin them far apart from
-        // the actual versions to make any leak loud.
+        /*
+         * If `created` were counted as a release, the median cadence
+         * and last-release would be wrong. Pin them far apart from
+         * the actual versions to make any leak loud.
+         */
         const out = CadenceScanner.classify({
-            created: daysAgo(5000),
-            modified: daysAgo(0),
+            'created': daysAgo(5000),
+            'modified': daysAgo(0),
             '1.0.0': daysAgo(120),
             '1.1.0': daysAgo(60),
             '1.2.0': daysAgo(30)

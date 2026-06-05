@@ -137,9 +137,11 @@ export class TyposquatScanner {
     public static classify(name: string): TyposquatFinding {
         const hasConfusables = TyposquatScanner._hasNonAscii(name);
 
-        // Exact match — but a Unicode-encoded "exact match" is still
-        // a homoglyph attack (the bytes differ even when the glyphs
-        // match), so confusables take precedence.
+        /*
+         * Exact match — but a Unicode-encoded "exact match" is still
+         * a homoglyph attack (the bytes differ even when the glyphs
+         * match), so confusables take precedence.
+         */
         if (POPULAR_SET.has(name) && !hasConfusables) {
             return {
                 level: TyposquatLevel.exact,
@@ -156,7 +158,7 @@ export class TyposquatScanner {
             return {
                 level: TyposquatLevel.risk,
                 closestMatch: closest,
-                distance,
+                distance: distance,
                 hasConfusables: true,
                 reason: closest
                     ? `Name contains non-ASCII characters and resembles popular "${closest}" — likely a homoglyph attack`
@@ -187,7 +189,7 @@ export class TyposquatScanner {
         return {
             level: TyposquatLevel.unrelated,
             closestMatch: closest,
-            distance,
+            distance: distance,
             hasConfusables: false,
             reason: 'No close match in the curated popular-packages list'
         };
@@ -199,7 +201,7 @@ export class TyposquatScanner {
      * trivial lower bound on the Levenshtein distance) so the inner
      * DP only runs on plausible neighbours.
      */
-    private static _closestPopular(name: string): {closest: string|null; distance: number|null} {
+    private static _closestPopular(name: string): {closest: string|null; distance: number|null;} {
         let bestDist = Infinity;
         let bestMatch: string|null = null;
         for (const pop of POPULAR_PACKAGES) {
@@ -283,6 +285,7 @@ export class TyposquatScanner {
         }
         return false;
     }
+
 }
 
 /**

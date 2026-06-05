@@ -109,7 +109,7 @@ export class MutableResolutionScanner {
         return {
             supported: true,
             maxSeverity: max,
-            findings,
+            findings: findings,
             packagesScanned: lockfile.packages.length
         };
     }
@@ -122,26 +122,30 @@ export class MutableResolutionScanner {
     public static _classifyEntry(pkg: LockedPackage): MutableResolutionFinding|null {
         const resolved = pkg.resolved;
 
-        // Workspace / self entry: the lockfile's `""` root key and
-        // `node_modules/<workspace>` entries pointing at the source
-        // tree. No `resolved`, no `integrity` — skip silently.
+        /*
+         * Workspace / self entry: the lockfile's `""` root key and
+         * `node_modules/<workspace>` entries pointing at the source
+         * tree. No `resolved`, no `integrity` — skip silently.
+         */
         if (!resolved && !pkg.integrity && pkg.path === '') {
             return null;
         }
 
         if (resolved) {
-            // `link:` and `file:` protocols cover workspace / local
-            // tarball / link-to-relative-path installs. Intentional
-            // when used; still inherently non-reproducible across
-            // machines (the linked tree changes whenever the user
-            // edits it). Info-grade signal.
+            /*
+             * `link:` and `file:` protocols cover workspace / local
+             * tarball / link-to-relative-path installs. Intentional
+             * when used; still inherently non-reproducible across
+             * machines (the linked tree changes whenever the user
+             * edits it). Info-grade signal.
+             */
             if (resolved.startsWith('link:')) {
                 return {
                     name: pkg.name, version: pkg.version,
                     severity: MutableResolutionSeverity.info,
                     kind: 'link-protocol',
                     detail: `link:${resolved.slice('link:'.length)}`,
-                    resolved
+                    resolved: resolved
                 };
             }
             if (resolved.startsWith('file:')) {
@@ -150,7 +154,7 @@ export class MutableResolutionScanner {
                     severity: MutableResolutionSeverity.info,
                     kind: 'file-protocol',
                     detail: `file:${resolved.slice('file:'.length)}`,
-                    resolved
+                    resolved: resolved
                 };
             }
             if (MutableResolutionScanner._isGitResolved(resolved)) {
@@ -161,24 +165,28 @@ export class MutableResolutionScanner {
                         severity: MutableResolutionSeverity.risk,
                         kind: 'git-branch-ref',
                         detail: 'git ref is a branch/tag, not a commit SHA',
-                        resolved
+                        resolved: resolved
                     };
                 }
-                // SHA-pinned git refs are fine — no integrity needed,
-                // npm verifies the SHA itself.
+                /*
+                 * SHA-pinned git refs are fine — no integrity needed,
+                 * npm verifies the SHA itself.
+                 */
                 return null;
             }
         }
 
-        // Registry tarball without integrity (npm v1 lockfiles or
-        // alt-registries that strip it). Warn-grade.
+        /*
+         * Registry tarball without integrity (npm v1 lockfiles or
+         * alt-registries that strip it). Warn-grade.
+         */
         if (resolved && resolved.startsWith('http') && !pkg.integrity) {
             return {
                 name: pkg.name, version: pkg.version,
                 severity: MutableResolutionSeverity.warn,
                 kind: 'missing-integrity',
                 detail: 'registry tarball without integrity hash',
-                resolved
+                resolved: resolved
             };
         }
 
@@ -202,11 +210,14 @@ export class MutableResolutionScanner {
     private static _gitRefLooksLikeSha(resolved: string): boolean {
         const hash = resolved.indexOf('#');
         if (hash < 0) {
-            // No fragment at all → npm pulls HEAD of the default
-            // branch. Mutable.
+            /*
+             * No fragment at all → npm pulls HEAD of the default
+             * branch. Mutable.
+             */
             return false;
         }
         const ref = resolved.slice(hash + 1);
         return /^[0-9a-f]{7,40}$/i.test(ref);
     }
+
 }

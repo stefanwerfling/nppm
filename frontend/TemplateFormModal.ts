@@ -1,15 +1,15 @@
 import {ApiTemplateBody, ApiTemplateMutationResponse, ApiTemplateSummary} from '../shared/Api/ApiTypes.js';
 import {I18n} from './I18n.js';
 
-type Mode = {kind: 'add'} | {kind: 'edit'; id: string};
+type Mode = {kind: 'add';} | {kind: 'edit'; id: string;};
 
 type Tab = 'general'|'packages'|'forbidden'|'root'|'files';
 
 type Bucket = 'runtime'|'dev'|'peer'|'optional';
 
-type PkgRow = {name: string; version: string; required: boolean};
+type PkgRow = {name: string; version: string; required: boolean;};
 
-type FileRow = {path: string; mode: 'create'|'merge-json'|'report-only'};
+type FileRow = {path: string; mode: 'create'|'merge-json'|'report-only';};
 
 /**
  * CRUD form for a single template. Tabbed layout — General /
@@ -138,7 +138,7 @@ export class TemplateFormModal {
     private _renderTabs(): HTMLElement {
         const bar = document.createElement('div');
         bar.className = 'sm-tabs';
-        const tabs: {id: Tab; label: string}[] = [
+        const tabs: {id: Tab; label: string;}[] = [
             {id: 'general', label: I18n.t('General')},
             {id: 'packages', label: I18n.t('Packages')},
             {id: 'forbidden', label: I18n.t('Forbidden')},
@@ -179,7 +179,7 @@ export class TemplateFormModal {
                 return;
             case 'files':
                 this._renderFiles(body);
-                return;
+                
         }
     }
 
@@ -390,7 +390,7 @@ export class TemplateFormModal {
         cls: string,
         label: string,
         value: string,
-        options: {value: string; label: string}[]
+        options: {value: string; label: string;}[]
     ): HTMLElement {
         const row = document.createElement('div');
         row.className = 'pfm-row';
@@ -457,7 +457,7 @@ export class TemplateFormModal {
                 return;
             case 'files':
                 this._collectFiles();
-                return;
+                
         }
     }
 
@@ -481,7 +481,7 @@ export class TemplateFormModal {
         }
         for (const bucket of ['runtime', 'dev', 'peer', 'optional'] as const) {
             const rows = Array.from(this._panel.querySelectorAll(`.tfm-pkgrow[data-bucket="${bucket}"]`)) as HTMLElement[];
-            const out: Record<string, {version?: string; required?: boolean}> = {};
+            const out: Record<string, {version?: string; required?: boolean;}> = {};
             for (const r of rows) {
                 const name = (r.querySelector('.tfm-pkgname') as HTMLInputElement|null)?.value.trim() ?? '';
                 const version = (r.querySelector('.tfm-pkgver') as HTMLInputElement|null)?.value.trim() ?? '';
@@ -489,7 +489,7 @@ export class TemplateFormModal {
                 if (name.length === 0) {
                     continue;
                 }
-                const entry: {version?: string; required?: boolean} = {};
+                const entry: {version?: string; required?: boolean;} = {};
                 if (version.length > 0) {
                     entry.version = version;
                 }
@@ -549,7 +549,7 @@ export class TemplateFormModal {
                 continue;
             }
             const mode = ((r.querySelector('.tfm-fmode') as HTMLSelectElement|null)?.value ?? 'create') as 'create'|'merge-json'|'report-only';
-            files.push({path: p, mode});
+            files.push({path: p, mode: mode});
         }
         this._body.files = files.length > 0 ? files : undefined;
     }
@@ -620,7 +620,7 @@ export class TemplateFormModal {
     private static _rowsFromBody(body: ApiTemplateBody, bucket: Bucket): PkgRow[] {
         const pkgs = body.packages?.[bucket] ?? {};
         return Object.entries(pkgs).map(([name, req]) => ({
-            name,
+            name: name,
             version: req.version ?? '',
             required: req.required === true
         }));
@@ -652,4 +652,5 @@ export class TemplateFormModal {
         }
         return out;
     }
+
 }

@@ -57,7 +57,7 @@ export class NppmDirs {
         }
         NppmDirs._migrated.add(resolved);
         const base = path.join(resolved, NppmDirs._BASE);
-        const moves: {from: string; to: string}[] = [
+        const moves: {from: string; to: string;}[] = [
             {from: path.join(resolved, '.nppm-cache'), to: path.join(base, 'cache')},
             {from: path.join(resolved, '.nppm-history'), to: path.join(base, 'history')},
             {from: path.join(resolved, '.nppm-backups'), to: path.join(base, 'backups')}
@@ -83,4 +83,5 @@ export class NppmDirs {
     public static resetForTests(): void {
         NppmDirs._migrated.clear();
     }
+
 }

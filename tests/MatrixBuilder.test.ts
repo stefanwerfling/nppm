@@ -46,6 +46,7 @@ class FakeProject implements Project {
     public setHidden(v: boolean) { this._hidden = v; }
     public getConfigIndex() { return -1; }
     public getTemplates() { return []; }
+
 }
 
 /**
@@ -53,6 +54,7 @@ class FakeProject implements Project {
  * touches the network.
  */
 class FakeRegistry extends Registry {
+
     constructor(private readonly _data: Record<string, RegistryPackage|null>) {
         super(
             'unused',
@@ -67,6 +69,7 @@ class FakeRegistry extends Registry {
         }
         return out;
     }
+
 }
 
 function manifest(
@@ -75,14 +78,14 @@ function manifest(
     workspace?: string
 ): PackageManifest {
     return {
-        name,
+        name: name,
         version: '0.0.0',
-        workspace,
+        workspace: workspace,
         dependencies: Object.entries(deps).map(([n, v]) => ({
             name: n,
             version: v,
             type: DependencyType.dependency,
-            workspace
+            workspace: workspace
         })),
         scripts: {}
     };
@@ -101,7 +104,7 @@ describe('MatrixBuilder.build', () => {
         }
     });
 
-    it('produces one row per unique package across projects', async () => {
+    it('produces one row per unique package across projects', async() => {
         const a = new FakeProject('a', [manifest('a', {foo: '^1', bar: '^2'})]);
         const b = new FakeProject('b', [manifest('b', {foo: '^1', baz: '^3'})]);
 
@@ -111,7 +114,7 @@ describe('MatrixBuilder.build', () => {
         expect(matrix.rows.map((r) => r.name).sort()).toEqual(['bar', 'baz', 'foo']);
     });
 
-    it('skips hidden projects from columns and from the row union', async () => {
+    it('skips hidden projects from columns and from the row union', async() => {
         const visible = new FakeProject('visible', [manifest('visible', {shared: '^1', only: '^2'})]);
         const hidden = new FakeProject('hidden', [manifest('hidden', {shared: '^1', secret: '^3'})]);
         hidden.setHidden(true);
@@ -126,7 +129,7 @@ describe('MatrixBuilder.build', () => {
         expect(matrix.rows.map((r) => r.name).sort()).toEqual(['only', 'shared']);
     });
 
-    it('marks the row as aligned when all cells equal latest', async () => {
+    it('marks the row as aligned when all cells equal latest', async() => {
         const a = new FakeProject('a', [manifest('a', {foo: '^1.0.0'})]);
         const b = new FakeProject('b', [manifest('b', {foo: '^1.0.0'})]);
 
@@ -138,7 +141,7 @@ describe('MatrixBuilder.build', () => {
         expect(matrix.rows[0].status).toBe(MatrixRowStatus.aligned);
     });
 
-    it('marks the row as outdated when all cells agree but latest differs', async () => {
+    it('marks the row as outdated when all cells agree but latest differs', async() => {
         const a = new FakeProject('a', [manifest('a', {foo: '^1.0.0'})]);
         const projects = new Map<string, Project>([['1', a]]);
 
@@ -150,7 +153,7 @@ describe('MatrixBuilder.build', () => {
         expect(matrix.rows[0].latest).toBe('2.0.0');
     });
 
-    it('marks the row as drift when projects disagree on the version', async () => {
+    it('marks the row as drift when projects disagree on the version', async() => {
         const a = new FakeProject('a', [manifest('a', {foo: '^1.0.0'})]);
         const b = new FakeProject('b', [manifest('b', {foo: '^2.0.0'})]);
 
@@ -162,12 +165,14 @@ describe('MatrixBuilder.build', () => {
         expect(matrix.rows[0].status).toBe(MatrixRowStatus.drift);
     });
 
-    it('forces latest=null for git-only rows even when the registry has an unrelated package with the same name', async () => {
-        // The figtree / fundon collision: the user's `figtree` is a
-        // git dep, but `figtree@0.0.0` exists on npm (by a different
-        // author). Without the git-only guard the matrix would
-        // mis-attribute fundon's 0.0.0 as "latest" and flag the row
-        // as outdated against a foreign package.
+    it('forces latest=null for git-only rows even when the registry has an unrelated package with the same name', async() => {
+        /*
+         * The figtree / fundon collision: the user's `figtree` is a
+         * git dep, but `figtree@0.0.0` exists on npm (by a different
+         * author). Without the git-only guard the matrix would
+         * mis-attribute fundon's 0.0.0 as "latest" and flag the row
+         * as outdated against a foreign package.
+         */
         const a = new FakeProject('a', [manifest('a', {
             figtree: 'git+https://github.com/me/figtree.git#main'
         })]);
@@ -186,10 +191,12 @@ describe('MatrixBuilder.build', () => {
         expect(matrix.rows[0].status).toBe(MatrixRowStatus.drift);
     });
 
-    it('asks the GitHeadFetcher once per distinct git origin and surfaces version + short SHA on the row', async () => {
-        // Two projects both pull `figtree` from the same repo at two
-        // different commits. The HEAD lookup should still fire only
-        // once because the `#ref` is stripped before dedup.
+    it('asks the GitHeadFetcher once per distinct git origin and surfaces version + short SHA on the row', async() => {
+        /*
+         * Two projects both pull `figtree` from the same repo at two
+         * different commits. The HEAD lookup should still fire only
+         * once because the `#ref` is stripped before dedup.
+         */
         const a = new FakeProject('a', [manifest('a', {
             figtree: 'git+https://github.com/me/figtree.git#v1.0.20'
         })]);
@@ -200,7 +207,7 @@ describe('MatrixBuilder.build', () => {
 
         let calls = 0;
         const stubHeadFetcher = {
-            fetch: async (url: string) => {
+            fetch: async(url: string) => {
                 calls++;
                 expect(url).toBe('git+https://github.com/me/figtree.git');
                 return {version: '1.0.28', sha: 'a'.repeat(40), shortSha: 'aaaaaaa'};
@@ -218,12 +225,12 @@ describe('MatrixBuilder.build', () => {
         expect(matrix.rows[0].gitLatest?.sourceUrl).toBe('git+https://github.com/me/figtree.git');
     });
 
-    it('leaves gitLatest fields null when the head fetcher returns null (host unreachable)', async () => {
+    it('leaves gitLatest fields null when the head fetcher returns null (host unreachable)', async() => {
         const a = new FakeProject('a', [manifest('a', {
             figtree: 'git+https://forge.example.com/me/figtree.git#main'
         })]);
         const projects = new Map<string, Project>([['1', a]]);
-        const headFetcher = {fetch: async () => null};
+        const headFetcher = {fetch: async() => null};
 
         const matrix = await MatrixBuilder.build(
             projects, new FakeRegistry({}), headFetcher as any
@@ -234,7 +241,7 @@ describe('MatrixBuilder.build', () => {
         expect(matrix.rows[0].gitLatest?.sourceUrl).toBe('git+https://forge.example.com/me/figtree.git');
     });
 
-    it('does not stamp gitLatest on rows that have any non-git cell', async () => {
+    it('does not stamp gitLatest on rows that have any non-git cell', async() => {
         const a = new FakeProject('a', [manifest('a', {
             figtree: 'git+https://github.com/me/figtree.git#main'
         })]);
@@ -243,7 +250,7 @@ describe('MatrixBuilder.build', () => {
 
         let called = false;
         const headFetcher = {
-            fetch: async () => {
+            fetch: async() => {
                 called = true;
                 return null;
             }
@@ -258,7 +265,7 @@ describe('MatrixBuilder.build', () => {
         expect(called).toBe(false);
     });
 
-    it('marks the row as unknown when registry has no data', async () => {
+    it('marks the row as unknown when registry has no data', async() => {
         const a = new FakeProject('a', [manifest('a', {foo: '^1'})]);
         const projects = new Map<string, Project>([['1', a]]);
 
@@ -266,7 +273,7 @@ describe('MatrixBuilder.build', () => {
         expect(matrix.rows[0].status).toBe(MatrixRowStatus.unknown);
     });
 
-    it('flags internalDrift when workspaces of one project disagree', async () => {
+    it('flags internalDrift when workspaces of one project disagree', async() => {
         const root = manifest('root', {foo: '^1.0.0'});
         const ws = manifest('child', {foo: '^2.0.0'}, 'packages/child');
         const a = new FakeProject('a', [root, ws]);
@@ -284,11 +291,13 @@ describe('MatrixBuilder.build', () => {
         expect(cell.workspace).toBeUndefined();
     });
 
-    it('records the workspace on the cell when a dep lives only in a workspace', async () => {
-        // The webpack / bulk-upgrade case: webpack is declared in
-        // <proj>/frontend/package.json but not in the root. Without
-        // the workspace marker the Bulk-Upgrade Wizard would aim its
-        // pick at root/package.json and silently skip.
+    it('records the workspace on the cell when a dep lives only in a workspace', async() => {
+        /*
+         * The webpack / bulk-upgrade case: webpack is declared in
+         * <proj>/frontend/package.json but not in the root. Without
+         * the workspace marker the Bulk-Upgrade Wizard would aim its
+         * pick at root/package.json and silently skip.
+         */
         const root = manifest('root', {});
         const front = manifest('front', {webpack: '^5.97.1'}, 'frontend');
         const a = new FakeProject('a', [root, front]);
@@ -304,15 +313,15 @@ describe('MatrixBuilder.build', () => {
         expect(cell.version).toBe('^5.97.1');
     });
 
-    it('surfaces a per-project error without breaking the rest', async () => {
+    it('surfaces a per-project error without breaking the rest', async() => {
         const broken: Project = {
             getName: () => 'broken',
             getKey: () => 'local:fake:broken',
             getType: () => ConfigProjectType.local,
-            loadManifests: async () => {
+            loadManifests: async() => {
                 throw new Error('boom');
             },
-            loadLockfile: async () => null,
+            loadLockfile: async() => null,
             isHidden: () => false,
             setHidden: () => {},
             getConfigIndex: () => -1,

@@ -63,14 +63,16 @@ export type CapabilitySummary = {
  * Per-capability regex catalogue. Each pattern is bounded (no nested
  * quantifiers) so a giant minified bundle stays linear-time.
  */
-const PATTERNS: {capability: Capability; regex: RegExp}[] = [
+const PATTERNS: {capability: Capability; regex: RegExp;}[] = [
     {capability: 'fs-read', regex: /\bfs\.(?:readFile|readFileSync|createReadStream|read)\b/},
     {capability: 'fs-write', regex: /\bfs\.(?:writeFile|writeFileSync|appendFile|createWriteStream|unlink|rm|rmdir|rename|chmod)\b/},
-    // Network: native node modules + the four most-popular HTTP
-    // libraries. The plain word `fetch` is too noisy by itself
-    // (`Array.prototype.fetch` lookalikes don't exist but `.fetch(`
-    // on user code does), so we require a context that pins it as a
-    // top-level call or method on a known global.
+    /*
+     * Network: native node modules + the four most-popular HTTP
+     * libraries. The plain word `fetch` is too noisy by itself
+     * (`Array.prototype.fetch` lookalikes don't exist but `.fetch(`
+     * on user code does), so we require a context that pins it as a
+     * top-level call or method on a known global.
+     */
     {capability: 'network', regex: /\brequire\s*\(\s*['"](?:node:)?https?['"]\s*\)/},
     {capability: 'network', regex: /\bfrom\s+['"](?:node:)?https?['"]/},
     {capability: 'network', regex: /\b(?:global\.)?fetch\s*\(\s*['"`]/},
@@ -127,8 +129,8 @@ export class CapabilityScanner {
         const capabilities = [...seen];
         const severity = CapabilityScanner._severity(seen);
         return {
-            severity,
-            capabilities,
+            severity: severity,
+            capabilities: capabilities,
             detail: CapabilityScanner._summarise(capabilities)
         };
     }
@@ -139,8 +141,8 @@ export class CapabilityScanner {
         finding: CapabilityFinding|null
     ): CapabilitySummary {
         return {
-            name,
-            version,
+            name: name,
+            version: version,
             severity: finding?.severity ?? null,
             count: finding?.capabilities.length ?? 0
         };
@@ -202,4 +204,5 @@ export class CapabilityScanner {
         };
         return capabilities.map((c) => labels[c]).join(' · ');
     }
+
 }

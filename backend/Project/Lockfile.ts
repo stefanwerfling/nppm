@@ -83,7 +83,7 @@ export type LockfileFs = {
     existsSync: (p: string) => boolean;
     readdirSync: (p: string) => string[];
     readFileSync: (p: string, enc: 'utf-8') => string;
-    statSync: (p: string) => {isDirectory: () => boolean};
+    statSync: (p: string) => {isDirectory: () => boolean;};
 };
 
 /**
@@ -137,7 +137,7 @@ export class LockfileReader {
             }
 
             out.push({
-                name,
+                name: name,
                 version: entry.version,
                 path: pkgPath,
                 resolved: entry.resolved,
@@ -151,7 +151,7 @@ export class LockfileReader {
             });
         }
 
-        return {lockfileVersion: version, source, packages: out};
+        return {lockfileVersion: version, source: source, packages: out};
     }
 
     /**
@@ -178,8 +178,10 @@ export class LockfileReader {
      * same contract as `loadLockfile`.
      */
     public static scanNodeModules(root: string, fs: LockfileFs): Lockfile|null {
-        // Posix join — we use forward slashes in `path` regardless of
-        // host OS because that's the lockfile convention.
+        /*
+         * Posix join — we use forward slashes in `path` regardless of
+         * host OS because that's the lockfile convention.
+         */
         const nmDir = `${root}/node_modules`.replace(/\\/g, '/');
 
         if (!fs.existsSync(nmDir) || !fs.statSync(nmDir).isDirectory()) {
@@ -189,8 +191,10 @@ export class LockfileReader {
         const packages: LockedPackage[] = [];
 
         for (const entry of fs.readdirSync(nmDir)) {
-            // Hidden entries are npm internals (`.bin`, `.cache`,
-            // `.package-lock.json`, …) — never real packages.
+            /*
+             * Hidden entries are npm internals (`.bin`, `.cache`,
+             * `.package-lock.json`, …) — never real packages.
+             */
             if (entry.startsWith('.')) {
                 continue;
             }
@@ -229,9 +233,11 @@ export class LockfileReader {
             }
         }
 
-        // lockfileVersion 0 + source 'synthesized' = walked from
-        // node_modules manifests; the real format always emits ≥ 2.
-        return {lockfileVersion: 0, source: 'synthesized', packages};
+        /*
+         * lockfileVersion 0 + source 'synthesized' = walked from
+         * node_modules manifests; the real format always emits ≥ 2.
+         */
+        return {lockfileVersion: 0, source: 'synthesized', packages: packages};
     }
 
     /**
@@ -278,9 +284,11 @@ export class LockfileReader {
      */
     public static packageNameFromPath(path: string): string|null {
         const segments = path.split('/');
-        // Find the *last* `node_modules` occurrence — everything
-        // after it (one or two segments depending on scope) is the
-        // package name.
+        /*
+         * Find the *last* `node_modules` occurrence — everything
+         * after it (one or two segments depending on scope) is the
+         * package name.
+         */
         let lastNm = -1;
         for (let i = 0; i < segments.length; i++) {
             if (segments[i] === 'node_modules') {
@@ -341,7 +349,7 @@ export class LockfileReader {
                 return;
             }
             packages.push({
-                name,
+                name: name,
                 version: parsed.version,
                 path: relPath,
                 dev: false,
@@ -352,8 +360,11 @@ export class LockfileReader {
                 optionalDeps: LockfileReader._stringMap(parsed.optionalDependencies)
             });
         } catch {
-            // Skip individual broken manifests — one bad package
-            // shouldn't kill the whole scan.
+            /*
+             * Skip individual broken manifests — one bad package
+             * shouldn't kill the whole scan.
+             */
         }
     }
+
 }

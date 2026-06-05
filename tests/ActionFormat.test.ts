@@ -5,7 +5,7 @@ import {ActionFormatter, STICKY_MARKER} from '../cli/ActionFormat.js';
 
 function emptyReport(name: string): PrReviewReport {
     return {
-        project: {unid: name, name, type: ConfigProjectType.local},
+        project: {unid: name, name: name, type: ConfigProjectType.local},
         base: 'main',
         head: 'HEAD',
         baseExists: true,

@@ -86,10 +86,12 @@ function isDatedEnginesRange(range: string|undefined): boolean {
     if (!range) {
         return false;
     }
-    // Ranges like `<=10`, `<10`, `<= 8`, `<8.0`, `<6` etc. exclude
-    // anything modern outright. We don't try to parse the full
-    // semver-range grammar — npm packages that genuinely require old
-    // Node use simple expressions.
+    /*
+     * Ranges like `<=10`, `<10`, `<= 8`, `<8.0`, `<6` etc. exclude
+     * anything modern outright. We don't try to parse the full
+     * semver-range grammar — npm packages that genuinely require old
+     * Node use simple expressions.
+     */
     return /<(?:=\s*)?(?:[0-9]|10|11|12)\b/.test(range);
 }
 
@@ -141,9 +143,11 @@ export class ManifestRedFlagsScanner {
             return null;
         }
 
-        // Severity rollup. The native+postinstall combo always
-        // escalates to risk on its own — it's the malicious-pattern
-        // signal the scanner exists for.
+        /*
+         * Severity rollup. The native+postinstall combo always
+         * escalates to risk on its own — it's the malicious-pattern
+         * signal the scanner exists for.
+         */
         let severity: ManifestRedFlagSeverity;
         if (flags.includes('native-plus-postinstall') || flags.length >= 3) {
             severity = ManifestRedFlagSeverity.risk;
@@ -154,8 +158,8 @@ export class ManifestRedFlagsScanner {
         }
 
         return {
-            severity,
-            flags,
+            severity: severity,
+            flags: flags,
             detail: ManifestRedFlagsScanner._summarise(flags)
         };
     }
@@ -166,8 +170,8 @@ export class ManifestRedFlagsScanner {
         finding: ManifestRedFlagsFinding|null
     ): ManifestRedFlagsSummary {
         return {
-            name,
-            version,
+            name: name,
+            version: version,
             severity: finding?.severity ?? null,
             count: finding?.flags.length ?? 0
         };
@@ -188,4 +192,5 @@ export class ManifestRedFlagsScanner {
         };
         return flags.map((f) => labels[f]).join(', ');
     }
+
 }

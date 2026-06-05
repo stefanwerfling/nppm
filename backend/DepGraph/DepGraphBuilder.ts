@@ -30,7 +30,7 @@ export type DepGraphNode = {
     status: DepGraphStatus;
     vulnCount: number;
     latestVersion: string|null;
-    deps: {name: string; version: string}[];
+    deps: {name: string; version: string;}[];
 };
 
 export type DepGraphResponse = {
@@ -40,7 +40,7 @@ export type DepGraphResponse = {
         type: string;
     };
     /** Top-level deps declared by the project root. Frontend uses this as the tree's root children. */
-    rootDeps: {name: string; version: string}[];
+    rootDeps: {name: string; version: string;}[];
     /** All resolved packages, keyed by `<name>@<version>`. */
     packages: Record<string, DepGraphNode>;
     /**
@@ -87,10 +87,12 @@ export class DepGraphBuilder {
     ): Promise<DepGraphResponse|null> {
         const lockfile = await project.loadLockfile();
         if (!lockfile) {
-            // No lockfile: fall back to the declared root manifest so
-            // remote projects without a committed package-lock.json
-            // (typical for browser extensions and many libraries)
-            // still get a shallow first-level view instead of a 404.
+            /*
+             * No lockfile: fall back to the declared root manifest so
+             * remote projects without a committed package-lock.json
+             * (typical for browser extensions and many libraries)
+             * still get a shallow first-level view instead of a 404.
+             */
             return DepGraphBuilder._buildFromManifest(projectUnid, project, registry);
         }
 
@@ -103,9 +105,11 @@ export class DepGraphBuilder {
             dependentPath: string,
             depName: string
         ): LockedPackage|null => {
-            // Walk upward from the dependent's directory, looking for
-            // `node_modules/<depName>` at each level — the same
-            // algorithm npm uses at install time.
+            /*
+             * Walk upward from the dependent's directory, looking for
+             * `node_modules/<depName>` at each level — the same
+             * algorithm npm uses at install time.
+             */
             let cursor = dependentPath;
             while (true) {
                 const probe = DepGraphBuilder._joinNodeModules(cursor, depName);
@@ -121,8 +125,10 @@ export class DepGraphBuilder {
             }
         };
 
-        // Pre-resolve a name→pkg map for top-level lookups (used by
-        // root deps and by the upward walk when it bottoms out).
+        /*
+         * Pre-resolve a name→pkg map for top-level lookups (used by
+         * root deps and by the upward walk when it bottoms out).
+         */
         const topLevel = new Map<string, LockedPackage>();
         for (const pkg of lockfile.packages) {
             if (DepGraphBuilder._isTopLevelPath(pkg.path)) {
@@ -130,21 +136,25 @@ export class DepGraphBuilder {
             }
         }
 
-        // For each lockfile package, build its `deps` array resolved
-        // to concrete `name@version` keys.
+        /*
+         * For each lockfile package, build its `deps` array resolved
+         * to concrete `name@version` keys.
+         */
         const packages: Record<string, DepGraphNode> = {};
 
         for (const pkg of lockfile.packages) {
             const key = `${pkg.name}@${pkg.version}`;
             if (packages[key]) {
-                // Same `name@version` can appear multiple times
-                // (nested installs at different paths). Keep the
-                // first; deps are package-identity properties, not
-                // path-dependent.
+                /*
+                 * Same `name@version` can appear multiple times
+                 * (nested installs at different paths). Keep the
+                 * first; deps are package-identity properties, not
+                 * path-dependent.
+                 */
                 continue;
             }
 
-            const resolvedDeps: {name: string; version: string}[] = [];
+            const resolvedDeps: {name: string; version: string;}[] = [];
             const allDeps = {...pkg.deps, ...pkg.peerDeps, ...pkg.optionalDeps};
 
             for (const depName of Object.keys(allDeps)) {
@@ -154,9 +164,11 @@ export class DepGraphBuilder {
                 if (target) {
                     resolvedDeps.push({name: target.name, version: target.version});
                 } else {
-                    // Unresolved peer / optional / missing — record
-                    // as a version-less placeholder so the UI can
-                    // flag it.
+                    /*
+                     * Unresolved peer / optional / missing — record
+                     * as a version-less placeholder so the UI can
+                     * flag it.
+                     */
                     resolvedDeps.push({name: depName, version: ''});
                 }
             }
@@ -169,19 +181,21 @@ export class DepGraphBuilder {
                 name: pkg.name,
                 version: pkg.version,
                 status: DepGraphBuilder._deriveStatus(pkg.version, latest, vulnCount),
-                vulnCount,
+                vulnCount: vulnCount,
                 latestVersion: latest,
                 deps: resolvedDeps
             };
         }
 
-        // Root deps come from the project root manifest, not from
-        // the lockfile (the lockfile's root entry only knows what was
-        // at install time, but the manifest is the canonical "what
-        // does the project declare").
+        /*
+         * Root deps come from the project root manifest, not from
+         * the lockfile (the lockfile's root entry only knows what was
+         * at install time, but the manifest is the canonical "what
+         * does the project declare").
+         */
         const manifests = await project.loadManifests();
         const rootManifest = manifests.find((m) => m.workspace === undefined);
-        const rootDeps: {name: string; version: string}[] = [];
+        const rootDeps: {name: string; version: string;}[] = [];
 
         if (rootManifest) {
             const seen = new Set<string>();
@@ -206,8 +220,8 @@ export class DepGraphBuilder {
                 name: project.getName(),
                 type: project.getType()
             },
-            rootDeps,
-            packages
+            rootDeps: rootDeps,
+            packages: packages
         };
     }
 
@@ -235,7 +249,7 @@ export class DepGraphBuilder {
             return null;
         }
 
-        const rootDeps: {name: string; version: string}[] = [];
+        const rootDeps: {name: string; version: string;}[] = [];
         const packages: Record<string, DepGraphNode> = {};
         const seen = new Set<string>();
 
@@ -253,9 +267,11 @@ export class DepGraphBuilder {
             }
             const regHit = await registry.fetchOne(dep.name);
             const latest = regHit?.latest ?? null;
-            // CVE lookup needs an exact installed version which the
-            // manifest doesn't carry — leave at 0 / unknown so the
-            // shallow view doesn't lie about safety.
+            /*
+             * CVE lookup needs an exact installed version which the
+             * manifest doesn't carry — leave at 0 / unknown so the
+             * shallow view doesn't lie about safety.
+             */
             packages[key] = {
                 name: dep.name,
                 version: declared,
@@ -272,15 +288,17 @@ export class DepGraphBuilder {
                 name: project.getName(),
                 type: project.getType()
             },
-            rootDeps,
-            packages,
+            rootDeps: rootDeps,
+            packages: packages,
             fromManifestOnly: true
         };
     }
 
     private static _isTopLevelPath(path: string): boolean {
-        // `node_modules/foo` or `node_modules/@scope/foo` — no
-        // further `node_modules/` segments.
+        /*
+         * `node_modules/foo` or `node_modules/@scope/foo` — no
+         * further `node_modules/` segments.
+         */
         const segments = path.split('/');
         let nm = 0;
         for (const s of segments) {
@@ -292,10 +310,12 @@ export class DepGraphBuilder {
     }
 
     private static _joinNodeModules(basePath: string, depName: string): string {
-        // `basePath` is the dependent's path; we want the *directory*
-        // it lives in plus `/node_modules/<depName>`. For
-        // `node_modules/a/node_modules/b` that's
-        // `node_modules/a/node_modules/<depName>`.
+        /*
+         * `basePath` is the dependent's path; we want the *directory*
+         * it lives in plus `/node_modules/<depName>`. For
+         * `node_modules/a/node_modules/b` that's
+         * `node_modules/a/node_modules/<depName>`.
+         */
         if (basePath === '') {
             return `node_modules/${depName}`;
         }
@@ -303,11 +323,13 @@ export class DepGraphBuilder {
     }
 
     private static _stripLastSegment(path: string): string {
-        // `node_modules/a/node_modules/b` → `node_modules/a` so the
-        // next upward probe lands at
-        // `node_modules/a/node_modules/<dep>`. For a top-level
-        // `node_modules/a` (or `@scope/a`), strip back to empty so
-        // the next probe is `node_modules/<dep>` (i.e. hoisted).
+        /*
+         * `node_modules/a/node_modules/b` → `node_modules/a` so the
+         * next upward probe lands at
+         * `node_modules/a/node_modules/<dep>`. For a top-level
+         * `node_modules/a` (or `@scope/a`), strip back to empty so
+         * the next probe is `node_modules/<dep>` (i.e. hoisted).
+         */
         const nmIdx = path.lastIndexOf('/node_modules/');
         if (nmIdx === -1) {
             return ''; // top-level — next walk hits the root
@@ -316,7 +338,7 @@ export class DepGraphBuilder {
     }
 
     private static _readVulnCount(cache: JsonCache, name: string, version: string): number {
-        type Wrap = {data: OsvVulnerability[]|null};
+        type Wrap = {data: OsvVulnerability[]|null;};
         const hit = cache.get<Wrap>(`osv_${name}@${version}`);
         if (!hit || hit.data === null) {
             return 0;
@@ -333,4 +355,5 @@ export class DepGraphBuilder {
         }
         return current === latest ? 'aligned' : 'outdated';
     }
+
 }

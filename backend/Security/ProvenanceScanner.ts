@@ -97,6 +97,7 @@ export class ProvenanceScanner {
             signatureCount: 0
         };
     }
+
 }
 
 /**

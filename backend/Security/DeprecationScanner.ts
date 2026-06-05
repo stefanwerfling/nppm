@@ -71,7 +71,7 @@ export class DeprecationScanner {
 
         const installedReason = map[version] ?? null;
         const latest = pkg.latest ?? null;
-        const latestReason = latest && latest !== version ? (map[latest] ?? null) : null;
+        const latestReason = latest && latest !== version ? map[latest] ?? null : null;
 
         let otherCount = 0;
         for (const v of Object.keys(map)) {
@@ -96,11 +96,12 @@ export class DeprecationScanner {
         }
 
         return {
-            level,
-            installedReason,
+            level: level,
+            installedReason: installedReason,
             latestReason: latest === version ? installedReason : latestReason,
             latestVersion: latest,
             otherDeprecatedCount: otherCount
         };
     }
+
 }

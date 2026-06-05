@@ -13,6 +13,7 @@ import {UnusedSeverity} from '../backend/Unused/UnusedReport.js';
  * the manifests injected at construction time.
  */
 class TestLocalProject extends ProjectLocal {
+
     private readonly _manifests: PackageManifest[];
 
     constructor(root: string, manifests: PackageManifest[]) {
@@ -27,6 +28,7 @@ class TestLocalProject extends ProjectLocal {
     public async loadLockfile(): Promise<Lockfile|null> {
         return null;
     }
+
 }
 
 /**
@@ -35,7 +37,7 @@ class TestLocalProject extends ProjectLocal {
  */
 function makeFs(files: Record<string, string>): UnusedFs {
     return {
-        existsSync: (p) => Object.prototype.hasOwnProperty.call(files, p),
+        existsSync: (p) => Object.hasOwn(files, p),
         readdirSync: (p) => {
             const prefix = `${p}/`;
             const out = new Set<string>();
@@ -67,15 +69,15 @@ function manifest(
     scripts: Record<string, string> = {}
 ): PackageManifest {
     return {
-        name,
+        name: name,
         version: '1.0.0',
-        workspace,
-        scripts,
+        workspace: workspace,
+        scripts: scripts,
         dependencies: Object.entries(deps).map(([n, t]) => ({
             name: n,
             version: '^1.0.0',
             type: t,
-            workspace
+            workspace: workspace
         }))
     };
 }
@@ -83,11 +85,11 @@ function manifest(
 describe('UnusedDetector.scan', () => {
     const ROOT = '/p';
 
-    it('flags a dep that nothing imports as unused/risk', async () => {
+    it('flags a dep that nothing imports as unused/risk', async() => {
         const detector = new UnusedDetector({}, makeFs({
             [ROOT]: '<dir>',
             [`${ROOT}/src`]: '<dir>',
-            [`${ROOT}/src/index.ts`]: `import {a} from 'lodash';\n`
+            [`${ROOT}/src/index.ts`]: 'import {a} from \'lodash\';\n'
         }));
         const project = new TestLocalProject(ROOT, [
             manifest('app', {lodash: DependencyType.dependency, unused: DependencyType.dependency})
@@ -103,11 +105,11 @@ describe('UnusedDetector.scan', () => {
         expect(unusedEntry.severity).toBe(UnusedSeverity.risk);
     });
 
-    it('suppresses a default-allowlisted bin tool to severity=info', async () => {
+    it('suppresses a default-allowlisted bin tool to severity=info', async() => {
         const detector = new UnusedDetector({}, makeFs({
             [ROOT]: '<dir>',
             [`${ROOT}/src`]: '<dir>',
-            [`${ROOT}/src/index.ts`]: `// no imports\n`
+            [`${ROOT}/src/index.ts`]: '// no imports\n'
         }));
         const project = new TestLocalProject(ROOT, [
             manifest('app', {vite: DependencyType.dev})
@@ -121,11 +123,11 @@ describe('UnusedDetector.scan', () => {
         expect(vite.reason).toMatch(/allowlist/);
     });
 
-    it('suppresses a dep referenced from a `scripts:` body', async () => {
+    it('suppresses a dep referenced from a `scripts:` body', async() => {
         const detector = new UnusedDetector({}, makeFs({
             [ROOT]: '<dir>',
             [`${ROOT}/src`]: '<dir>',
-            [`${ROOT}/src/index.ts`]: `// no imports\n`
+            [`${ROOT}/src/index.ts`]: '// no imports\n'
         }));
         const project = new TestLocalProject(ROOT, [
             manifest(
@@ -143,7 +145,7 @@ describe('UnusedDetector.scan', () => {
         expect(finding.reason).toMatch(/scripts/);
     });
 
-    it('honors the `tsc → typescript` bin alias', async () => {
+    it('honors the `tsc → typescript` bin alias', async() => {
         const detector = new UnusedDetector({}, makeFs({
             [ROOT]: '<dir>',
             [`${ROOT}/src`]: '<dir>',
@@ -164,11 +166,11 @@ describe('UnusedDetector.scan', () => {
         expect(ts.severity).toBe(UnusedSeverity.info);
     });
 
-    it('reports a dep only used in dev-paths as misplaced', async () => {
+    it('reports a dep only used in dev-paths as misplaced', async() => {
         const detector = new UnusedDetector({}, makeFs({
             [ROOT]: '<dir>',
             [`${ROOT}/src`]: '<dir>',
-            [`${ROOT}/src/foo.test.ts`]: `import f from 'devonly';\n`
+            [`${ROOT}/src/foo.test.ts`]: 'import f from \'devonly\';\n'
         }));
         const project = new TestLocalProject(ROOT, [
             manifest('app', {devonly: DependencyType.dependency})
@@ -181,11 +183,11 @@ describe('UnusedDetector.scan', () => {
         expect(m!.firstImport).toBe('src/foo.test.ts');
     });
 
-    it('reports an undeclared import as missing', async () => {
+    it('reports an undeclared import as missing', async() => {
         const detector = new UnusedDetector({}, makeFs({
             [ROOT]: '<dir>',
             [`${ROOT}/src`]: '<dir>',
-            [`${ROOT}/src/index.ts`]: `import x from 'leaked-transitive';\n`
+            [`${ROOT}/src/index.ts`]: 'import x from \'leaked-transitive\';\n'
         }));
         const project = new TestLocalProject(ROOT, [
             manifest('app', {})
@@ -197,15 +199,15 @@ describe('UnusedDetector.scan', () => {
         expect(m).toBeDefined();
     });
 
-    it('does not report `@types/X` as unused when X is imported', async () => {
+    it('does not report `@types/X` as unused when X is imported', async() => {
         const detector = new UnusedDetector({}, makeFs({
             [ROOT]: '<dir>',
             [`${ROOT}/src`]: '<dir>',
-            [`${ROOT}/src/index.ts`]: `import React from 'react';\n`
+            [`${ROOT}/src/index.ts`]: 'import React from \'react\';\n'
         }));
         const project = new TestLocalProject(ROOT, [
             manifest('app', {
-                react: DependencyType.dependency,
+                'react': DependencyType.dependency,
                 '@types/react': DependencyType.dev
             })
         ]);
@@ -213,19 +215,21 @@ describe('UnusedDetector.scan', () => {
         const report = await detector.scan(project);
 
         const t = report.unused.find((u) => u.name === '@types/react');
-        // @types/react is "unused with severity=info, transitively used"
-        // — it stays in the list but is downgraded, not silently dropped.
+        /*
+         * @types/react is "unused with severity=info, transitively used"
+         * — it stays in the list but is downgraded, not silently dropped.
+         */
         expect(t).toBeDefined();
         expect(t!.severity).toBe(UnusedSeverity.info);
         expect(t!.reason).toMatch(/@types/);
     });
 
-    it('flags dynamic `import(varName)` via scanLimits without losing the file', async () => {
+    it('flags dynamic `import(varName)` via scanLimits without losing the file', async() => {
         const detector = new UnusedDetector({}, makeFs({
             [ROOT]: '<dir>',
             [`${ROOT}/src`]: '<dir>',
             [`${ROOT}/src/index.ts`]:
-                "const name = 'lodash'; const m = await import(name);\n"
+                'const name = \'lodash\'; const m = await import(name);\n'
         }));
         const project = new TestLocalProject(ROOT, [
             manifest('app', {lodash: DependencyType.dependency})
@@ -235,18 +239,20 @@ describe('UnusedDetector.scan', () => {
 
         expect(report.scanLimits.length).toBeGreaterThan(0);
         expect(report.scanLimits[0].file).toBe('src/index.ts');
-        // lodash got no static hit, so it shows up as risk (not the
-        // dynamic spec's fault we can't see the link).
+        /*
+         * lodash got no static hit, so it shows up as risk (not the
+         * dynamic spec's fault we can't see the link).
+         */
         const lodash = report.unused.find((u) => u.name === 'lodash')!;
         expect(lodash.severity).toBe(UnusedSeverity.risk);
     });
 
-    it('does not flag a workspace package name as missing', async () => {
+    it('does not flag a workspace package name as missing', async() => {
         const detector = new UnusedDetector({}, makeFs({
             [ROOT]: '<dir>',
             [`${ROOT}/apps`]: '<dir>',
             [`${ROOT}/apps/web`]: '<dir>',
-            [`${ROOT}/apps/web/index.ts`]: `import x from '@scope/api';\n`
+            [`${ROOT}/apps/web/index.ts`]: 'import x from \'@scope/api\';\n'
         }));
         const project = new TestLocalProject(ROOT, [
             manifest('@scope/root', {}),
@@ -259,12 +265,12 @@ describe('UnusedDetector.scan', () => {
         expect(report.missing.find((m) => m.name === '@scope/api')).toBeUndefined();
     });
 
-    it('does not flag Node built-ins as missing', async () => {
+    it('does not flag Node built-ins as missing', async() => {
         const detector = new UnusedDetector({}, makeFs({
             [ROOT]: '<dir>',
             [`${ROOT}/src`]: '<dir>',
             [`${ROOT}/src/index.ts`]:
-                "import fs from 'fs';\nimport path from 'node:path';\n"
+                'import fs from \'fs\';\nimport path from \'node:path\';\n'
         }));
         const project = new TestLocalProject(ROOT, [manifest('app', {})]);
 
@@ -274,7 +280,7 @@ describe('UnusedDetector.scan', () => {
         expect(report.missing.find((m) => m.name === 'path')).toBeUndefined();
     });
 
-    it('returns supported:false for remote projects', async () => {
+    it('returns supported:false for remote projects', async() => {
         const detector = new UnusedDetector({}, makeFs({}));
         const cache = new JsonCache('/tmp/nppm-test-unused-remote-cache', 1);
         const remote = new ProjectGithub('owner/repo', 'demo', undefined, undefined, cache);
@@ -288,7 +294,7 @@ describe('UnusedDetector.scan', () => {
         expect(report.missing).toEqual([]);
     });
 
-    it('honours a user allowlist on top of the default', async () => {
+    it('honours a user allowlist on top of the default', async() => {
         const detector = new UnusedDetector(
             {allowlist: ['my-custom-cli']},
             makeFs({

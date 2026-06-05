@@ -59,8 +59,10 @@ describe('DashboardBuilder.scorePerPackage', () => {
     });
 
     it('uses the wider denominator when fewer entries are provided', () => {
-        // Caller passes only the non-null entries plus a packageCount of 50
-        // → 1 warn / (50 × 30) → 100 × (1 − 10/1500) ≈ 99.33 → 99
+        /*
+         * Caller passes only the non-null entries plus a packageCount of 50
+         * → 1 warn / (50 × 30) → 100 × (1 − 10/1500) ≈ 99.33 → 99
+         */
         const cell = DashboardBuilder.scorePerPackage(['warn'], 50);
         expect(cell.score).toBe(99);
         expect(cell.total).toBe(50);
@@ -75,8 +77,10 @@ describe('DashboardBuilder.scorePerPackage', () => {
 
 describe('DashboardBuilder.scorePerProject', () => {
     it('counts each finding individually against the package denominator', () => {
-        // 2 info + 1 warn in a 5-package project → (1+1+10)/(5×30) = 12/150
-        // → 100 × (1 − 0.08) = 92
+        /*
+         * 2 info + 1 warn in a 5-package project → (1+1+10)/(5×30) = 12/150
+         * → 100 × (1 − 0.08) = 92
+         */
         const cell = DashboardBuilder.scorePerProject(['info', 'info', 'warn'], 5);
         expect(cell.score).toBe(92);
         expect(cell.counts).toEqual({info: 2, warn: 1, risk: 0});
@@ -96,7 +100,7 @@ describe('DashboardBuilder severity normalisers', () => {
     });
 
     it('drops permissive licenses, lifts proprietary to risk', () => {
-        const make = (severity: LicenseSeverity) => ({name: 'x', version: '1', spdx: 'X', severity});
+        const make = (severity: LicenseSeverity) => ({name: 'x', version: '1', spdx: 'X', severity: severity});
         expect(DashboardBuilder.licenseSeverity(make(LicenseSeverity.permissive))).toBe(null);
         expect(DashboardBuilder.licenseSeverity(make(LicenseSeverity.weakCopyleft))).toBe('info');
         expect(DashboardBuilder.licenseSeverity(make(LicenseSeverity.unknown))).toBe('info');

@@ -35,7 +35,7 @@ export class InstalledSize {
      * UI as "uncovered" without skewing the size.
      */
     public static async compute(
-        packages: {name: string; version: string}[],
+        packages: {name: string; version: string;}[],
         registry: Registry
     ): Promise<InstalledSizeResult> {
         let totalBytes = 0;
@@ -48,6 +48,7 @@ export class InstalledSize {
                 covered++;
             }
         }
-        return {totalBytes, coveredCount: covered, totalCount: packages.length};
+        return {totalBytes: totalBytes, coveredCount: covered, totalCount: packages.length};
     }
+
 }

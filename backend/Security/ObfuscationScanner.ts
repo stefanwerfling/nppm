@@ -108,13 +108,15 @@ export class ObfuscationScanner {
             if (typeof f.content !== 'string' || f.content.length === 0) {
                 continue;
             }
-            // Cap on per-file regex work. Beyond this size we're
-            // looking at vendored mega-bundles where the build-path
-            // classifier would land us at info anyway; spending
-            // hundreds of ms on regex matching per file would block
-            // the dashboard SSE pipeline (every package's tarball
-            // gets walked here). 2 MB of source is more than enough
-            // to spot a packed payload.
+            /*
+             * Cap on per-file regex work. Beyond this size we're
+             * looking at vendored mega-bundles where the build-path
+             * classifier would land us at info anyway; spending
+             * hundreds of ms on regex matching per file would block
+             * the dashboard SSE pipeline (every package's tarball
+             * gets walked here). 2 MB of source is more than enough
+             * to spot a packed payload.
+             */
             if (f.content.length > MAX_FILE_BYTES) {
                 continue;
             }
@@ -149,7 +151,7 @@ export class ObfuscationScanner {
                 bestRank = r;
             }
         }
-        return {name, version, maxSeverity: best, count: findings.length};
+        return {name: name, version: version, maxSeverity: best, count: findings.length};
     }
 
     /**
@@ -179,10 +181,12 @@ export class ObfuscationScanner {
         const signals: ObfuscationSignal[] = [];
         const details: string[] = [];
 
-        // -- eval-decoded chain (strongest single signal) --
-        // `eval(atob(…))`, `Function(atob(…))()`, `new Function(atob(…))`.
-        // The whitespace/argument tolerance is intentional: obfuscator
-        // output often inserts dead variables between the call sites.
+        /*
+         * -- eval-decoded chain (strongest single signal) --
+         * `eval(atob(…))`, `Function(atob(…))()`, `new Function(atob(…))`.
+         * The whitespace/argument tolerance is intentional: obfuscator
+         * output often inserts dead variables between the call sites.
+         */
         const evalDecoded = /\b(?:eval|new\s+Function|Function)\s*\(\s*(?:atob|Buffer\.from|String\.fromCharCode)\b/g;
         const evalMatches = content.match(evalDecoded);
         if (evalMatches && evalMatches.length > 0) {
@@ -199,13 +203,15 @@ export class ObfuscationScanner {
             details.push(`${obfuscatorCount} _0x identifiers (${obfuscatorDensity.toFixed(1)}/kB)`);
         }
 
-        // -- hex-string array (packed payload) --
-        // Matches `["\x..", "\xAABBCC", …]` arrays with at least 8
-        // entries — short ones can be lookup tables (e.g. PNG header
-        // bytes). The inner `(?:\\x[0-9a-f]{2})+` is bounded —
-        // each iteration consumes exactly 4 input characters, so the
-        // outer `{7,}` repetition stays linear-time even on huge
-        // minified bundles (no catastrophic backtracking).
+        /*
+         * -- hex-string array (packed payload) --
+         * Matches `["\x..", "\xAABBCC", …]` arrays with at least 8
+         * entries — short ones can be lookup tables (e.g. PNG header
+         * bytes). The inner `(?:\\x[0-9a-f]{2})+` is bounded —
+         * each iteration consumes exactly 4 input characters, so the
+         * outer `{7,}` repetition stays linear-time even on huge
+         * minified bundles (no catastrophic backtracking).
+         */
         const hexArrayMatch = content.match(
             /\[\s*(?:"(?:\\x[0-9a-f]{2})+"\s*,\s*){7,}"(?:\\x[0-9a-f]{2})+"\s*\]/gi
         );
@@ -245,10 +251,12 @@ export class ObfuscationScanner {
             return null;
         }
 
-        // -- severity rollup --
-        // Build-artifact paths cap at info even when signals fire: a
-        // minified `dist/index.min.js` IS supposed to look that way.
-        // Source paths escalate based on which signals fired.
+        /*
+         * -- severity rollup --
+         * Build-artifact paths cap at info even when signals fire: a
+         * minified `dist/index.min.js` IS supposed to look that way.
+         * Source paths escalate based on which signals fired.
+         */
         let severity: ObfuscationSeverity;
         if (isBuild) {
             severity = ObfuscationSeverity.info;
@@ -265,11 +273,12 @@ export class ObfuscationScanner {
         }
 
         return {
-            path,
-            severity,
-            signals,
+            path: path,
+            severity: severity,
+            signals: signals,
             detail: details.join(', '),
             isBuildArtifact: isBuild
         };
     }
+
 }

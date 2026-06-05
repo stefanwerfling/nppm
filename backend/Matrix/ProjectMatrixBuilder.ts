@@ -91,8 +91,10 @@ export class ProjectMatrixBuilder {
             // best-effort
         }
 
-        // Workspaces, with `root` always leading so the user's eye
-        // lands on the canonical column first.
+        /*
+         * Workspaces, with `root` always leading so the user's eye
+         * lands on the canonical column first.
+         */
         const workspaceLabels: string[] = [ROOT_LABEL];
         const labelByManifest = new Map<PackageManifest, string>();
 
@@ -120,9 +122,11 @@ export class ProjectMatrixBuilder {
 
                 const existing = bucket.get(dep.name);
                 if (existing) {
-                    // Multiple buckets within one workspace shouldn't
-                    // happen (manifest = single package.json), but be
-                    // defensive: union the dep types.
+                    /*
+                     * Multiple buckets within one workspace shouldn't
+                     * happen (manifest = single package.json), but be
+                     * defensive: union the dep types.
+                     */
                     if (!existing.types.includes(dep.type)) {
                         existing.types.push(dep.type);
                     }
@@ -142,8 +146,10 @@ export class ProjectMatrixBuilder {
             }
         }
 
-        // Batched registry lookup — same Registry instance the global
-        // matrix uses, so the cache is shared.
+        /*
+         * Batched registry lookup — same Registry instance the global
+         * matrix uses, so the cache is shared.
+         */
         const hits = await registry.fetchMany(Array.from(allNames));
 
         const rows: ProjectMatrixRow[] = [];
@@ -159,23 +165,25 @@ export class ProjectMatrixBuilder {
                 }
             }
 
-            // Git-only rows: the registry packument for `name` belongs
-            // to an unrelated public package — using its `latest`
-            // would surface a foreign author's version in the column
-            // (the figtree / fundon collision again). Force `latest=null`
-            // and stamp `gitLatest` with the stripped origin URL so
-            // the HEAD fetcher can fill in version + short SHA below.
+            /*
+             * Git-only rows: the registry packument for `name` belongs
+             * to an unrelated public package — using its `latest`
+             * would surface a foreign author's version in the column
+             * (the figtree / fundon collision again). Force `latest=null`
+             * and stamp `gitLatest` with the stripped origin URL so
+             * the HEAD fetcher can fill in version + short SHA below.
+             */
             const allCellsGit = versionsForStatus.length > 0
                 && versionsForStatus.every((v) => GitResolver.isGitVersion(v));
-            const reg = allCellsGit ? null : (hits.get(name) ?? null);
+            const reg = allCellsGit ? null : hits.get(name) ?? null;
             const latest = reg?.latest ?? null;
             const latestPublishedAt = (latest && reg?.time?.[latest]) ?? null;
 
             const row: ProjectMatrixRow = {
-                name,
-                cells,
-                latest,
-                latestPublishedAt,
+                name: name,
+                cells: cells,
+                latest: latest,
+                latestPublishedAt: latestPublishedAt,
                 status: MatrixBuilder.computeStatusFromVersions(versionsForStatus, latest)
             };
             if (allCellsGit) {
@@ -197,7 +205,7 @@ export class ProjectMatrixBuilder {
                 }
             }
             const resolved = new Map<string, GitHeadInfo|null>();
-            await Promise.all(Array.from(distinctUrls).map(async (url) => {
+            await Promise.all(Array.from(distinctUrls).map(async(url) => {
                 try {
                     resolved.set(url, await headFetcher.fetch(url));
                 } catch {
@@ -226,8 +234,9 @@ export class ProjectMatrixBuilder {
                 name: project.getName(),
                 type: project.getType()
             },
-            workspaces: workspaceLabels.map((label) => ({label})),
-            rows
+            workspaces: workspaceLabels.map((label) => ({label: label})),
+            rows: rows
         };
     }
+
 }

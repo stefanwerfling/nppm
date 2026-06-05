@@ -45,10 +45,12 @@ export class TemplateResolver {
 
     constructor(catalogue: Map<string, Template>, filesDirFor?: TemplateSourceResolver) {
         this._catalogue = catalogue;
-        // Default resolver maps `<id>` → `nppm-templates/<id>/files`
-        // relative to wherever the tests instantiate from. The
-        // backend overrides this via the second arg with the on-disk
-        // path computed from `templateLoader.getFilesDir(id)`.
+        /*
+         * Default resolver maps `<id>` → `nppm-templates/<id>/files`
+         * relative to wherever the tests instantiate from. The
+         * backend overrides this via the second arg with the on-disk
+         * path computed from `templateLoader.getFilesDir(id)`.
+         */
         this._filesDirFor = filesDirFor ?? ((id) => path.join('nppm-templates', id, 'files'));
     }
 
@@ -156,7 +158,7 @@ export class TemplateResolver {
     ): ResolvedTemplateWorkspace {
         const base: ResolvedTemplateWorkspace = existing ?? {
             path: from.path,
-            sourceId,
+            sourceId: sourceId,
             packages: {runtime: {}, dev: {}, peer: {}, optional: {}},
             forbidden: [],
             root: {},
@@ -179,11 +181,13 @@ export class TemplateResolver {
             TemplateResolver._mergeRoot(base.root, from.root);
         }
         if (from.files) {
-            // Workspace files share the per-template `files/` directory
-            // — paths are workspace-relative but stored under the
-            // template's source folder using the workspace path as a
-            // sub-folder. The applier joins them with the project's
-            // workspace root.
+            /*
+             * Workspace files share the per-template `files/` directory
+             * — paths are workspace-relative but stored under the
+             * template's source folder using the workspace path as a
+             * sub-folder. The applier joins them with the project's
+             * workspace root.
+             */
             const filesByPath = new Map<string, ResolvedTemplateFile>(
                 base.files.map((f) => [f.path, f])
             );
@@ -200,8 +204,10 @@ export class TemplateResolver {
             }
             base.files = [...filesByPath.values()];
         }
-        // Track the template that last touched this workspace —
-        // ownership reported in the UI tooltip.
+        /*
+         * Track the template that last touched this workspace —
+         * ownership reported in the UI tooltip.
+         */
         base.sourceId = sourceId;
         return base;
     }
@@ -227,10 +233,10 @@ export class TemplateResolver {
 
     private static _mergeRoot(into: TemplateRoot, from: TemplateRoot): void {
         if (from.engines) {
-            into.engines = {...(into.engines ?? {}), ...from.engines};
+            into.engines = {...into.engines ?? {}, ...from.engines};
         }
         if (from.scripts) {
-            into.scripts = {...(into.scripts ?? {}), ...from.scripts};
+            into.scripts = {...into.scripts ?? {}, ...from.scripts};
         }
         if (from.private !== undefined) {
             into.private = from.private;
@@ -256,4 +262,5 @@ export class TemplateResolver {
             sourceIds: []
         };
     }
+
 }

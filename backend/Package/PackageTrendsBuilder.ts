@@ -48,7 +48,7 @@ export type PackageTrendsResponse = {
     name: string;
     versions: PackageVersionMeta[];
     releasesByMonth: ReleaseMonthBucket[];
-    downloads: {day: string; downloads: number}[]|null;
+    downloads: {day: string; downloads: number;}[]|null;
 };
 
 /**
@@ -86,18 +86,20 @@ export class PackageTrendsBuilder {
                 ? pkg.dependencyCounts[version]
                 : null;
             meta.push({
-                version,
-                releasedAt,
+                version: version,
+                releasedAt: releasedAt,
                 unpackedSize: typeof dist?.unpackedSize === 'number' ? dist.unpackedSize : null,
                 fileCount: typeof dist?.fileCount === 'number' ? dist.fileCount : null,
-                publisher,
-                maintainerCount,
-                depCount
+                publisher: publisher,
+                maintainerCount: maintainerCount,
+                depCount: depCount
             });
         }
 
-        // Chronological — undated rows sort to the bottom so the
-        // chart doesn't bunch them at the left edge of the X axis.
+        /*
+         * Chronological — undated rows sort to the bottom so the
+         * chart doesn't bunch them at the left edge of the X axis.
+         */
         meta.sort((a, b) => {
             if (a.releasedAt === null && b.releasedAt === null) {
                 return a.version.localeCompare(b.version);
@@ -111,9 +113,11 @@ export class PackageTrendsBuilder {
             return a.releasedAt.localeCompare(b.releasedAt);
         });
 
-        // Releases per calendar month. Keys are sorted lexically;
-        // YYYY-MM sorts chronologically as text so no Date() parsing
-        // needed in the bucket loop.
+        /*
+         * Releases per calendar month. Keys are sorted lexically;
+         * YYYY-MM sorts chronologically as text so no Date() parsing
+         * needed in the bucket loop.
+         */
         const byMonth = new Map<string, number>();
         for (const [version, ts] of Object.entries(time)) {
             if (!knownVersions.has(version)) {
@@ -127,14 +131,15 @@ export class PackageTrendsBuilder {
         }
         const releasesByMonth: ReleaseMonthBucket[] = [];
         for (const [month, count] of byMonth) {
-            releasesByMonth.push({month, count});
+            releasesByMonth.push({month: month, count: count});
         }
         releasesByMonth.sort((a, b) => a.month.localeCompare(b.month));
 
         return {
             name: pkg.name,
             versions: meta,
-            releasesByMonth
+            releasesByMonth: releasesByMonth
         };
     }
+
 }

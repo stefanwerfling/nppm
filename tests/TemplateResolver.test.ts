@@ -3,7 +3,7 @@ import {Template} from '../backend/Templates/Template.js';
 import {TemplateResolver} from '../backend/Templates/TemplateResolver.js';
 
 function mk(id: string, body: Partial<Template> = {}): Template {
-    return {id, ...body};
+    return {id: id, ...body};
 }
 
 describe('TemplateResolver', () => {

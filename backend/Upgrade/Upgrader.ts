@@ -15,7 +15,7 @@ import {EditResult, PackageJsonEditor} from './PackageJsonEditor.js';
 export type SpawnFn = (
     command: string,
     args: readonly string[],
-    options: {cwd: string; env?: NodeJS.ProcessEnv}
+    options: {cwd: string; env?: NodeJS.ProcessEnv;}
 ) => ChildProcess;
 
 /**
@@ -57,14 +57,16 @@ export class Upgrader {
      * means the project root; anything else is treated as a
      * directory relative to the root.
      */
-    public resolvePackageJson(request: ApiUpgradeRequest): {abs: string; rel: string} {
+    public resolvePackageJson(request: ApiUpgradeRequest): {abs: string; rel: string;} {
         const wsDir = request.workspace && request.workspace.length > 0 ? request.workspace : '';
         const rel = wsDir.length > 0
             ? path.join(wsDir, 'package.json')
             : 'package.json';
-        // SafePath rejects workspaces like `../../etc` that would let an
-        // upgrade-apply call write a package.json outside the project.
-        return {abs: SafePath.join(this._projectRoot, rel), rel};
+        /*
+         * SafePath rejects workspaces like `../../etc` that would let an
+         * upgrade-apply call write a package.json outside the project.
+         */
+        return {abs: SafePath.join(this._projectRoot, rel), rel: rel};
     }
 
     /**
@@ -83,7 +85,7 @@ export class Upgrader {
         }
         const source = fs.readFileSync(abs, 'utf-8');
         const result = PackageJsonEditor.apply(source, request.depType, request.name, request.toRange);
-        return {path: abs, rel, result};
+        return {path: abs, rel: rel, result: result};
     }
 
     /**
@@ -105,7 +107,7 @@ export class Upgrader {
         const lockPath = path.join(this._projectRoot, 'package-lock.json');
         const backup = this._backups.save(this._projectRoot, [abs, lockPath]);
         fs.writeFileSync(abs, result.after);
-        return {backup, result, path: abs, rel};
+        return {backup: backup, result: result, path: abs, rel: rel};
     }
 
     /**
@@ -120,12 +122,14 @@ export class Upgrader {
      */
     public applyMany(requests: ApiUpgradeRequest[]): {
         backup: BackupStamp;
-        results: {request: ApiUpgradeRequest; path: string; rel: string; result: EditResult}[];
+        results: {request: ApiUpgradeRequest; path: string; rel: string; result: EditResult;}[];
     } {
-        // Plan everything up-front so the snapshot covers exactly the
-        // files we're about to touch — and so a parse failure aborts
-        // before we've mutated anything.
-        const planned: {request: ApiUpgradeRequest; abs: string; rel: string; result: EditResult}[] = [];
+        /*
+         * Plan everything up-front so the snapshot covers exactly the
+         * files we're about to touch — and so a parse failure aborts
+         * before we've mutated anything.
+         */
+        const planned: {request: ApiUpgradeRequest; abs: string; rel: string; result: EditResult;}[] = [];
         const touched = new Set<string>();
         for (const request of requests) {
             const {abs, rel} = this.resolvePackageJson(request);
@@ -134,7 +138,7 @@ export class Upgrader {
             }
             const source = fs.readFileSync(abs, 'utf-8');
             const result = PackageJsonEditor.apply(source, request.depType, request.name, request.toRange);
-            planned.push({request, abs, rel, result});
+            planned.push({request: request, abs: abs, rel: rel, result: result});
             touched.add(abs);
         }
 
@@ -152,7 +156,7 @@ export class Upgrader {
         }
 
         return {
-            backup,
+            backup: backup,
             results: planned.map((p) => ({request: p.request, path: p.abs, rel: p.rel, result: p.result}))
         };
     }
@@ -182,7 +186,7 @@ export class Upgrader {
         sink.onStart(label, cwd);
         let child: ChildProcess;
         try {
-            child = this._spawn(command, args, {cwd, env: process.env});
+            child = this._spawn(command, args, {cwd: cwd, env: process.env});
         } catch (e) {
             sink.onError(`spawn failed: ${(e as Error).message}`);
             sink.onEnd(null);
@@ -204,10 +208,11 @@ export class Upgrader {
      */
     private static _deadProcess(): ChildProcess {
         const noop = {
-            kill(): boolean {
+            kill: function(): boolean {
                 return false;
             }
         };
         return noop as unknown as ChildProcess;
     }
+
 }

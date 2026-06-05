@@ -31,11 +31,11 @@ describe('ProjectGithub.constructor normalisation', () => {
 
     it('handles SSH and shorthand prefixes', () => {
         expect(repoFromKey(new ProjectGithub('git@github.com:OpenSourcePKG/nppm.git', 'nppm')))
-            .toBe('OpenSourcePKG/nppm');
+        .toBe('OpenSourcePKG/nppm');
         expect(repoFromKey(new ProjectGithub('git+https://github.com/OpenSourcePKG/nppm.git', 'nppm')))
-            .toBe('OpenSourcePKG/nppm');
+        .toBe('OpenSourcePKG/nppm');
         expect(repoFromKey(new ProjectGithub('github:OpenSourcePKG/nppm', 'nppm')))
-            .toBe('OpenSourcePKG/nppm');
+        .toBe('OpenSourcePKG/nppm');
     });
 
     it('leaves a clearly malformed input untouched so the caller sees a real failure later', () => {

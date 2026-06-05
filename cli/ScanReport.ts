@@ -120,9 +120,11 @@ export class ScanReportBuilder {
         const findings: ScanFinding[] = [];
 
         if (input.vulnsByKey) {
-            // OSV batch only returns IDs (no per-vuln severity). For
-            // a CI gate "any known CVE = risk" matches npm audit's
-            // default and avoids per-vuln single-query latency.
+            /*
+             * OSV batch only returns IDs (no per-vuln severity). For
+             * a CI gate "any known CVE = risk" matches npm audit's
+             * default and avoids per-vuln single-query latency.
+             */
             for (const [key, ids] of input.vulnsByKey.entries()) {
                 if (ids === null) {
                     continue;
@@ -193,12 +195,14 @@ export class ScanReportBuilder {
                         message: `${h.license.severity}${h.license.spdx ? ` (${h.license.spdx})` : ''}`
                     });
                 }
-                // External-sources aggregator — emits one row per
-                // (pkg, source) pair when at least one source returned
-                // a non-info verdict. Info-only deps.dev rows are
-                // dropped to keep the report focused on actionable
-                // signals (matches the License "permissive drops out"
-                // convention).
+                /*
+                 * External-sources aggregator — emits one row per
+                 * (pkg, source) pair when at least one source returned
+                 * a non-info verdict. Info-only deps.dev rows are
+                 * dropped to keep the report focused on actionable
+                 * signals (matches the License "permissive drops out"
+                 * convention).
+                 */
                 if (h.external.level !== null) {
                     const sev = ScanReportBuilder._externalToUnified(h.external.level);
                     if (sev !== null) {
@@ -211,10 +215,12 @@ export class ScanReportBuilder {
                         });
                     }
                 }
-                // Obfuscation — info drops (legitimate minification
-                // in `dist/`), warn/risk fire. The aggregated max
-                // severity is enough for the gate; per-file detail
-                // lives in the panel.
+                /*
+                 * Obfuscation — info drops (legitimate minification
+                 * in `dist/`), warn/risk fire. The aggregated max
+                 * severity is enough for the gate; per-file detail
+                 * lives in the panel.
+                 */
                 if (h.obfuscation.maxSeverity !== null) {
                     const sev = ScanReportBuilder._obfuscationToUnified(h.obfuscation.maxSeverity);
                     if (sev !== null) {
@@ -240,8 +246,10 @@ export class ScanReportBuilder {
                         });
                     }
                 }
-                // Capability — single-capability info drops out;
-                // dangerous combinations fire.
+                /*
+                 * Capability — single-capability info drops out;
+                 * dangerous combinations fire.
+                 */
                 if (h.capability.severity !== null) {
                     const sev = ScanReportBuilder._capabilityToUnified(h.capability.severity);
                     if (sev !== null) {
@@ -254,9 +262,11 @@ export class ScanReportBuilder {
                         });
                     }
                 }
-                // Deprecation — info-only ("only older versions
-                // deprecated") drops out, same convention as license
-                // permissive + external info.
+                /*
+                 * Deprecation — info-only ("only older versions
+                 * deprecated") drops out, same convention as license
+                 * permissive + external info.
+                 */
                 if (h.deprecation.level !== null) {
                     const sev = ScanReportBuilder._deprecationToUnified(h.deprecation.level);
                     if (sev !== null) {
@@ -328,7 +338,7 @@ export class ScanReportBuilder {
             packagesScanned: input.packagesScanned,
             filesScanned: input.unused?.supported ? input.unused.filesScanned : 0,
             maxSeverity: max,
-            findings,
+            findings: findings,
             error: input.error ?? null
         };
     }
@@ -354,7 +364,7 @@ export class ScanReportBuilder {
         return {
             version: '1',
             timestamp: new Date().toISOString(),
-            projects,
+            projects: projects,
             summary: {
                 totalProjects: projects.length,
                 projectsWithFindings: withFindings,
@@ -363,9 +373,11 @@ export class ScanReportBuilder {
         };
     }
 
-    // The non-license enums share the same string values as
-    // `UnifiedSeverity`. The casts here just satisfy TS — runtime
-    // shape is identical.
+    /*
+     * The non-license enums share the same string values as
+     * `UnifiedSeverity`. The casts here just satisfy TS — runtime
+     * shape is identical.
+     */
     private static _scriptToUnified(s: ScriptSeverity): UnifiedSeverity {
         return s as unknown as UnifiedSeverity;
     }
@@ -437,4 +449,5 @@ export class ScanReportBuilder {
             case CapabilitySeverity.risk: return UnifiedSeverity.risk;
         }
     }
+
 }

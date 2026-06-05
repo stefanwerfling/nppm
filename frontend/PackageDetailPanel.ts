@@ -125,11 +125,13 @@ export class PackageDetailPanel {
                 this._diffTarget = cleanedLatest;
             }
 
-            // Git deps that pinned a `#ref` can be diffed against
-            // the same URL stripped to HEAD (= current default
-            // branch tip). Without a ref the user's version *is*
-            // HEAD-effective, so the diff would be empty — leave
-            // `_diffTarget` null in that case.
+            /*
+             * Git deps that pinned a `#ref` can be diffed against
+             * the same URL stripped to HEAD (= current default
+             * branch tip). Without a ref the user's version *is*
+             * HEAD-effective, so the diff would be empty — leave
+             * `_diffTarget` null in that case.
+             */
             if (PackageDetailPanel._isGitVersion(version) && version.includes('#')) {
                 this._diffTarget = version.replace(/#.*$/, '');
             }
@@ -224,13 +226,13 @@ export class PackageDetailPanel {
         }
         this._body.innerHTML = '';
 
-        const tabs: {value: Tab; label: string}[] = [
+        const tabs: {value: Tab; label: string;}[] = [
             {value: Tab.files, label: I18n.t('Files')},
             {value: Tab.deps, label: I18n.t('Dependencies')},
             {value: Tab.diff, label: this._diffTarget
-                ? (PackageDetailPanel._isGitVersion(this._diffTarget)
+                ? PackageDetailPanel._isGitVersion(this._diffTarget)
                     ? I18n.t('Diff against HEAD')
-                    : I18n.t('Diff against {target}', {target: this._diffTarget}))
+                    : I18n.t('Diff against {target}', {target: this._diffTarget})
                 : I18n.t('Diff')},
             {value: Tab.releases, label: I18n.t('Releases')},
             {value: Tab.security, label: this._securityTabLabel()},
@@ -300,7 +302,7 @@ export class PackageDetailPanel {
                 return;
             case Tab.trends:
                 this._renderTrendsTab();
-                return;
+                
         }
     }
 
@@ -321,10 +323,12 @@ export class PackageDetailPanel {
             return;
         }
 
-        // The license arrives as part of the security report — if the
-        // report has not loaded yet, kick that fetch off so the user
-        // doesn't have to flip to the Security tab first. We still
-        // show a placeholder while we wait.
+        /*
+         * The license arrives as part of the security report — if the
+         * report has not loaded yet, kick that fetch off so the user
+         * doesn't have to flip to the Security tab first. We still
+         * show a placeholder while we wait.
+         */
         if (!this._securityReport) {
             if (this._securityError) {
                 const err = document.createElement('div');
@@ -432,7 +436,7 @@ export class PackageDetailPanel {
             I18n.t('Y = number of names in the version\'s `maintainers[]` array. A growing line means the project picked up co-maintainers; a sudden drop from N to 1 right before a takeover incident is the event-stream / ua-parser-js pattern. Solo-author packages stay flat at 1 — that\'s a risk *signal*, not a verdict.')
         ));
 
-        type Pt = {iso: string; count: number; version: string};
+        type Pt = {iso: string; count: number; version: string;};
         const points: Pt[] = [];
         for (const v of t.versions) {
             if (v.releasedAt && typeof v.maintainerCount === 'number') {
@@ -473,7 +477,7 @@ export class PackageDetailPanel {
             I18n.t('Y = `Object.keys(dependencies).length` per published version — runtime deps only, devDeps and peers are intentionally excluded. A flat line is the goal for a leaf utility; a spike is the classic "stable utility quietly grew a framework" smell, worth checking the diff between that version and its predecessor.')
         ));
 
-        type Pt = {iso: string; count: number; version: string};
+        type Pt = {iso: string; count: number; version: string;};
         const points: Pt[] = [];
         for (const v of t.versions) {
             if (v.releasedAt && typeof v.depCount === 'number') {
@@ -515,7 +519,7 @@ export class PackageDetailPanel {
             I18n.t('Each point is one published version: X = release date, Y = the registry-reported `dist.unpackedSize`. Watch for a sudden jump — that\'s usually when a stable utility absorbed a heavyweight dependency or started bundling a runtime. A slow upward drift is normal as features accumulate.')
         ));
 
-        type Pt = {iso: string; size: number; version: string};
+        type Pt = {iso: string; size: number; version: string;};
         const points: Pt[] = [];
         for (const v of t.versions) {
             if (v.releasedAt && typeof v.unpackedSize === 'number') {
@@ -559,15 +563,17 @@ export class PackageDetailPanel {
             return section;
         }
 
-        // Restrict to the last 24 months so the bars stay readable
-        // on packages with a decade of monthly releases. Back-fill
-        // zeros so the X axis is continuous.
+        /*
+         * Restrict to the last 24 months so the bars stay readable
+         * on packages with a decade of monthly releases. Back-fill
+         * zeros so the X axis is continuous.
+         */
         const lookup = new Map<string, number>();
         for (const b of t.releasesByMonth) {
             lookup.set(b.month, b.count);
         }
         const now = new Date();
-        const months: {month: string; count: number}[] = [];
+        const months: {month: string; count: number;}[] = [];
         for (let i = 23; i >= 0; i--) {
             const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
             const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -704,7 +710,7 @@ export class PackageDetailPanel {
      * size-over-versions and downloads-over-time.
      */
     private static _lineChart(
-        points: {timestamp: string; value: number; tooltip: string}[],
+        points: {timestamp: string; value: number; tooltip: string;}[],
         yFormatter: (v: number) => string
     ): SVGElement {
         const svgNs = 'http://www.w3.org/2000/svg';
@@ -771,9 +777,11 @@ export class PackageDetailPanel {
         poly.setAttribute('points', points.map((p) => `${xPx(p.timestamp)},${yPx(p.value)}`).join(' '));
         svg.appendChild(poly);
 
-        // Dots only for sparse series (< 60 points). Daily-downloads
-        // series have 365 points — drawing each dot makes the chart
-        // unreadable, the polyline alone tells the story.
+        /*
+         * Dots only for sparse series (< 60 points). Daily-downloads
+         * series have 365 points — drawing each dot makes the chart
+         * unreadable, the polyline alone tells the story.
+         */
         if (points.length < 60) {
             for (const p of points) {
                 const dot = document.createElementNS(svgNs, 'circle');
@@ -796,7 +804,7 @@ export class PackageDetailPanel {
      * bar per month over the last 24, labelled at first / mid / last
      * so the visual cadence is clear without crowding.
      */
-    private static _barChart(months: {month: string; count: number}[]): SVGElement {
+    private static _barChart(months: {month: string; count: number;}[]): SVGElement {
         const svgNs = 'http://www.w3.org/2000/svg';
         const W = 560;
         const H = 180;
@@ -874,7 +882,7 @@ export class PackageDetailPanel {
         if (n <= 1) {
             return 1;
         }
-        const mag = Math.pow(10, Math.floor(Math.log10(n)));
+        const mag = 10**Math.floor(Math.log10(n));
         const lead = n / mag;
         let snap: number;
         if (lead <= 1) {
@@ -966,12 +974,14 @@ export class PackageDetailPanel {
 
         wrap.appendChild(card);
 
-        // Cross-check: list LICENSE* files actually shipped in the
-        // tarball. Helps spot the "we declared MIT but ship a GPL
-        // LICENSE file" smell — a separate signal from the manifest's
-        // self-report.
+        /*
+         * Cross-check: list LICENSE* files actually shipped in the
+         * tarball. Helps spot the "we declared MIT but ship a GPL
+         * LICENSE file" smell — a separate signal from the manifest's
+         * self-report.
+         */
         const licenseFiles = this._fingerprint?.files
-            .filter((f) => /(^|\/)(LICEN[SC]E|COPYING|NOTICE)(\.[^/]+)?$/i.test(f.path));
+        .filter((f) => /(^|\/)(LICEN[SC]E|COPYING|NOTICE)(\.[^/]+)?$/i.test(f.path));
 
         const filesSection = document.createElement('div');
         filesSection.className = 'pdp-section';
@@ -1042,9 +1052,11 @@ export class PackageDetailPanel {
     }
 
     private _securityTabLabel(): string {
-        // Adds a count badge to the tab once the report has loaded —
-        // e.g. "Security (3)". The user can see "is there anything in
-        // there" without clicking. Churn counts when severity > info.
+        /*
+         * Adds a count badge to the tab once the report has loaded —
+         * e.g. "Security (3)". The user can see "is there anything in
+         * there" without clicking. Churn counts when severity > info.
+         */
         if (!this._securityReport) {
             return I18n.t('Security');
         }
@@ -1086,7 +1098,7 @@ export class PackageDetailPanel {
         }
 
         const m = fp.manifest;
-        const sections: {label: string; map: Record<string, string>}[] = [
+        const sections: {label: string; map: Record<string, string>;}[] = [
             {label: 'dependencies', map: m.dependencies},
             {label: 'devDependencies', map: m.devDependencies},
             {label: 'peerDependencies', map: m.peerDependencies},
@@ -1225,10 +1237,12 @@ export class PackageDetailPanel {
             wrap.appendChild(hint);
         }
 
-        // Render only the first INITIAL_COUNT cards by default and
-        // let the user expand on demand. Applies to both commits
-        // (git deps) and npm registry releases — long histories
-        // benefit equally from the collapse.
+        /*
+         * Render only the first INITIAL_COUNT cards by default and
+         * let the user expand on demand. Applies to both commits
+         * (git deps) and npm registry releases — long histories
+         * benefit equally from the collapse.
+         */
         const INITIAL_COUNT = 5;
         const collapse = !this._releasesShowAll
             && data.releases.length > INITIAL_COUNT;
@@ -1374,9 +1388,11 @@ export class PackageDetailPanel {
     private _renderSecurityBody(report: SecurityReport): HTMLElement {
         const wrap = document.createElement('div');
 
-        // Git-installed packages skip OSV (no ecosystem-version key)
-        // and churn (no previous published version). Flag that up-front
-        // so an empty vuln list isn't mistaken for "verified safe".
+        /*
+         * Git-installed packages skip OSV (no ecosystem-version key)
+         * and churn (no previous published version). Flag that up-front
+         * so an empty vuln list isn't mistaken for "verified safe".
+         */
         if (PackageDetailPanel._isGitVersion(report.version)) {
             const note = document.createElement('div');
             note.className = 'pdp-error';
@@ -1393,31 +1409,35 @@ export class PackageDetailPanel {
         const obfuscationInteresting = report.obfuscation.some(
             (f) => f.severity === ObfuscationSeverity.warn || f.severity === ObfuscationSeverity.risk
         );
-        const manifestRedFlagsInteresting = !!report.manifestRedFlags
+        const manifestRedFlagsInteresting = report.manifestRedFlags !== null
             && (report.manifestRedFlags.severity === ManifestRedFlagSeverity.warn
                 || report.manifestRedFlags.severity === ManifestRedFlagSeverity.risk);
-        const capabilityInteresting = !!report.capability
+        const capabilityInteresting = report.capability !== null
             && (report.capability.severity === CapabilitySeverity.warn
                 || report.capability.severity === CapabilitySeverity.risk);
         const interestingChurn = report.churn && report.churn.severity !== ChurnSeverity.info;
         const interestingMaintainer = report.maintainer && report.maintainer.severity !== MaintainerSeverity.info;
 
-        // Combined-signal banner: a fresh publisher *and* an outsized
-        // diff in the same release is the textbook account-takeover
-        // pattern (event-stream, ua-parser-js, @solana/web3.js, …).
+        /*
+         * Combined-signal banner: a fresh publisher *and* an outsized
+         * diff in the same release is the textbook account-takeover
+         * pattern (event-stream, ua-parser-js, @solana/web3.js, …).
+         */
         const supplyChainBanner = PackageDetailPanel._supplyChainRisk(report.maintainer, report.churn);
         if (supplyChainBanner) {
             wrap.appendChild(supplyChainBanner);
         }
 
-        // "Boring" path — none of the high-noise core scanners turned
-        // anything up. Show it as an info banner *above* the section
-        // list rather than short-circuiting the render: the user still
-        // needs to see Provenance / Freshness / Cadence / Typosquat /
-        // External-source verdicts, which are independent of the five
-        // tested here. Cards default-collapse when their bodies don't
-        // carry severity classes, so a truly clean package shows the
-        // banner + five collapsed rows below.
+        /*
+         * "Boring" path — none of the high-noise core scanners turned
+         * anything up. Show it as an info banner *above* the section
+         * list rather than short-circuiting the render: the user still
+         * needs to see Provenance / Freshness / Cadence / Typosquat /
+         * External-source verdicts, which are independent of the five
+         * tested here. Cards default-collapse when their bodies don't
+         * carry severity classes, so a truly clean package shows the
+         * banner + five collapsed rows below.
+         */
         if (vulnCount === 0 && scriptCount === 0 && patternCount === 0 && binaryCount === 0
             && !interestingChurn && !interestingMaintainer && !obfuscationInteresting
             && !manifestRedFlagsInteresting && !capabilityInteresting && report.vulns !== null) {
@@ -1427,16 +1447,18 @@ export class PackageDetailPanel {
             wrap.appendChild(ok);
         }
 
-        // Each scanner section becomes its own collapsible card. The
-        // ignoreScripts banner stays inline (it's a recommendation, not
-        // a finding) so the user sees the verdict next to the scripts
-        // it relates to. Cards default-collapse when their findings
-        // lack risk/warn signals — caller can override via `hasIssue`
-        // for sections whose body doesn't carry an unambiguous
-        // severity class (e.g. CVEs, where "any" hit is interesting).
+        /*
+         * Each scanner section becomes its own collapsible card. The
+         * ignoreScripts banner stays inline (it's a recommendation, not
+         * a finding) so the user sees the verdict next to the scripts
+         * it relates to. Cards default-collapse when their findings
+         * lack risk/warn signals — caller can override via `hasIssue`
+         * for sections whose body doesn't carry an unambiguous
+         * severity class (e.g. CVEs, where "any" hit is interesting).
+         */
         const card = (
             node: HTMLElement,
-            opts: {hasIssue?: boolean} = {}
+            opts: {hasIssue?: boolean;} = {}
         ): HTMLElement => PackageDetailPanel._makeCollapsibleCard(node, opts);
 
         wrap.appendChild(card(
@@ -1470,11 +1492,11 @@ export class PackageDetailPanel {
         ));
         wrap.appendChild(card(
             this._renderChurnSection(report.churn),
-            {hasIssue: !!interestingChurn}
+            {hasIssue: Boolean(interestingChurn)}
         ));
         wrap.appendChild(card(
             this._renderMaintainerSection(report.maintainer),
-            {hasIssue: !!interestingMaintainer}
+            {hasIssue: Boolean(interestingMaintainer)}
         ));
         wrap.appendChild(card(this._renderProvenanceSection(report.provenance)));
         wrap.appendChild(card(this._renderFreshnessSection(report.freshness)));
@@ -1487,7 +1509,7 @@ export class PackageDetailPanel {
         ));
         wrap.appendChild(card(
             this._renderDeprecationSection(report.deprecation),
-            {hasIssue: !!report.deprecation
+            {hasIssue: report.deprecation !== null
                     && (report.deprecation.level === DeprecationLevel.warn
                         || report.deprecation.level === DeprecationLevel.risk)}
         ));
@@ -1652,7 +1674,7 @@ export class PackageDetailPanel {
      */
     private static _makeCollapsibleCard(
         section: HTMLElement,
-        opts: {hasIssue?: boolean} = {}
+        opts: {hasIssue?: boolean;} = {}
     ): HTMLElement {
         if (!section.classList.contains('pdp-section')) {
             return section;
@@ -1665,9 +1687,9 @@ export class PackageDetailPanel {
 
         const hasIssue = opts.hasIssue !== undefined
             ? opts.hasIssue
-            : !!section.querySelector(
+            : Boolean(section.querySelector(
                 '.pdp-sev-risk, .pdp-sev-warn, [class*="-risk"], [class*="-warn"]'
-            );
+            ));
 
         const body = document.createElement('div');
         body.className = 'pdp-card-body';
@@ -1714,8 +1736,10 @@ export class PackageDetailPanel {
         if (finding === null
             || finding.level === TyposquatLevel.exact
             || finding.level === TyposquatLevel.unrelated) {
-            // Returning an empty <div> keeps the appendChild chain
-            // simple while contributing no visible content.
+            /*
+             * Returning an empty <div> keeps the appendChild chain
+             * simple while contributing no visible content.
+             */
             const empty = document.createElement('div');
             empty.style.display = 'none';
             return empty;
@@ -1742,9 +1766,8 @@ export class PackageDetailPanel {
         if (finding.closestMatch) {
             const target = document.createElement('span');
             target.className = 'pdp-script-hook';
-            target.textContent = `${I18n.t('closest popular')}: ${finding.closestMatch}` + (
-                finding.distance !== null ? ` (d=${finding.distance})` : ''
-            );
+            target.textContent = `${I18n.t('closest popular')}: ${finding.closestMatch}${  
+                finding.distance !== null ? ` (d=${finding.distance})` : ''}`;
             head.appendChild(target);
         }
         card.appendChild(head);
@@ -2099,10 +2122,12 @@ export class PackageDetailPanel {
             head.appendChild(gap);
         }
 
-        // 2FA pill — `true` / `false` only render when the registry
-        // was willing to answer; `undefined`/`null` (typical on the
-        // public mirror) is rendered as a small "?" so the user knows
-        // we asked but couldn't tell.
+        /*
+         * 2FA pill — `true` / `false` only render when the registry
+         * was willing to answer; `undefined`/`null` (typical on the
+         * public mirror) is rendered as a small "?" so the user knows
+         * we asked but couldn't tell.
+         */
         const tfa = document.createElement('span');
         tfa.className = 'pdp-tfa';
         const tfaState = finding.currentPublisher2FA;
@@ -2247,9 +2272,11 @@ export class PackageDetailPanel {
         const list = document.createElement('div');
         list.className = 'pdp-scripts';
 
-        // Risk first, warn next, info last — same convention as the
-        // other per-file scanners. Within a tier we keep input order
-        // (file walk order from the fingerprint).
+        /*
+         * Risk first, warn next, info last — same convention as the
+         * other per-file scanners. Within a tier we keep input order
+         * (file walk order from the fingerprint).
+         */
         const rank: Record<ObfuscationSeverity, number> = {
             [ObfuscationSeverity.risk]: 0,
             [ObfuscationSeverity.warn]: 1,
@@ -2545,9 +2572,11 @@ export class PackageDetailPanel {
         id.textContent = v.id;
         head.appendChild(id);
 
-        // First severity score wins for the badge — OSV often lists
-        // both CVSS_V3 and the GHSA-derived score; either is fine for a
-        // glance.
+        /*
+         * First severity score wins for the badge — OSV often lists
+         * both CVSS_V3 and the GHSA-derived score; either is fine for a
+         * glance.
+         */
         if (v.severity.length > 0) {
             const sev = document.createElement('span');
             sev.className = 'pdp-vuln-sev';
@@ -2789,8 +2818,11 @@ export class PackageDetailPanel {
         wrap.appendChild(list);
         return wrap;
     }
+
 }
 
-// `PackageFingerprintManifest` is re-exported so consumers that touch
-// the panel's contract don't need to import from two places.
+/*
+ * `PackageFingerprintManifest` is re-exported so consumers that touch
+ * the panel's contract don't need to import from two places.
+ */
 export type {PackageFingerprintManifest};

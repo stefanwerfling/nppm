@@ -100,9 +100,11 @@ export class GlobalScanView {
                 vulnIds: data.vulnIds,
                 projects: data.projects ?? []
             });
-            // Re-render only when this row matters or the table is small
-            // enough that a full repaint is cheap. For a large set the
-            // batched `progress` event will trigger a paint instead.
+            /*
+             * Re-render only when this row matters or the table is small
+             * enough that a full repaint is cheap. For a large set the
+             * batched `progress` event will trigger a paint instead.
+             */
             if ((data.vulnIds && data.vulnIds.length > 0) || this._rows.size < 100) {
                 this._renderTable();
             }
@@ -209,9 +211,11 @@ export class GlobalScanView {
         });
 
         rows.sort((a, b) => {
-            // Rows with vulns float to the top; within each tier sort by
-            // name + version. Failed lookups (vulnIds === null) come
-            // last because they're noise.
+            /*
+             * Rows with vulns float to the top; within each tier sort by
+             * name + version. Failed lookups (vulnIds === null) come
+             * last because they're noise.
+             */
             const sa = GlobalScanView._scoreRow(a);
             const sb = GlobalScanView._scoreRow(b);
             if (sa !== sb) {
@@ -303,4 +307,5 @@ export class GlobalScanView {
         }
         return r.vulnIds.length;
     }
+
 }

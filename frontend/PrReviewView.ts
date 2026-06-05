@@ -62,9 +62,11 @@ export class PrReviewView {
         this._projectUnid = unid;
         this._projectName = name;
         this._projectType = type;
-        // Reset refs to defaults when entering from a fresh project
-        // switch; staying on the previous user-typed value would
-        // confuse cross-project navigation.
+        /*
+         * Reset refs to defaults when entering from a fresh project
+         * switch; staying on the previous user-typed value would
+         * confuse cross-project navigation.
+         */
         this._base = 'main';
         this._head = 'HEAD';
         await this._reload();
@@ -75,10 +77,12 @@ export class PrReviewView {
         if (!unid) {
             return;
         }
-        // PR-review needs a local git checkout to walk `git log` over,
-        // so the backend rejects remote projects with a 400. Short-
-        // circuit here with a friendlier explanation than the raw
-        // "PR review only supported for local projects" error.
+        /*
+         * PR-review needs a local git checkout to walk `git log` over,
+         * so the backend rejects remote projects with a 400. Short-
+         * circuit here with a friendlier explanation than the raw
+         * "PR review only supported for local projects" error.
+         */
         if (this._projectType !== ConfigProjectType.local) {
             this._renderNotApplicable();
             return;
@@ -268,8 +272,10 @@ export class PrReviewView {
         name.textContent = c.name;
         head.appendChild(name);
 
-        // Click → open security panel on the new version (after).
-        // Falls back to the old version when the dep was removed.
+        /*
+         * Click → open security panel on the new version (after).
+         * Falls back to the old version when the dep was removed.
+         */
         const targetVersion = c.resolvedAfter ?? c.resolvedBefore;
         if (targetVersion) {
             head.classList.add('pr-card-head-clickable');
@@ -496,4 +502,5 @@ export class PrReviewView {
         header.appendChild(toggle);
         return header;
     }
+
 }

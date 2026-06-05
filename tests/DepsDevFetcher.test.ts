@@ -5,16 +5,16 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {JsonCache} from '../backend/Cache/JsonCache.js';
 import {DepsDevFetcher} from '../backend/Security/External/DepsDevFetcher.js';
 
-function stubFetch(impl: (url: string) => {ok: boolean; status?: number; body?: unknown}): () => void {
+function stubFetch(impl: (url: string) => {ok: boolean; status?: number; body?: unknown;}): () => void {
     const original = globalThis.fetch;
-    globalThis.fetch = (async (input: RequestInfo|URL) => {
+    globalThis.fetch = (async(input: RequestInfo|URL) => {
         const url = typeof input === 'string' ? input : input.toString();
         const res = impl(url);
         return {
             ok: res.ok,
             status: res.status ?? (res.ok ? 200 : 500),
             statusText: res.ok ? 'OK' : 'Error',
-            json: async () => res.body ?? {}
+            json: async() => res.body ?? {}
         } as unknown as Response;
     }) as typeof fetch;
     return () => {
@@ -71,7 +71,7 @@ describe('DepsDevFetcher.fetch', () => {
         fs.rmSync(dir, {recursive: true, force: true});
     });
 
-    it('caches the parsed result so a second call never re-fetches', async () => {
+    it('caches the parsed result so a second call never re-fetches', async() => {
         let calls = 0;
         const restore = stubFetch(() => {
             calls++;

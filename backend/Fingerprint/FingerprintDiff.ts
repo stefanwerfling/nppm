@@ -42,7 +42,7 @@ export class FingerprintDiffer {
             }
 
             if (beforeFile.sha256 !== afterFile.sha256) {
-                modified.push({path, before: beforeFile, after: afterFile});
+                modified.push({path: path, before: beforeFile, after: afterFile});
             }
         }
 
@@ -56,6 +56,7 @@ export class FingerprintDiffer {
         removed.sort((a, b) => a.path.localeCompare(b.path));
         modified.sort((a, b) => a.path.localeCompare(b.path));
 
-        return {added, removed, modified};
+        return {added: added, removed: removed, modified: modified};
     }
+
 }

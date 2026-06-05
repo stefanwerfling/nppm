@@ -49,8 +49,10 @@ export class ChurnScanner {
     }
 
     public async scan(name: string, version: string): Promise<ChurnFinding|null> {
-        // Git installs have no published predecessor in the registry,
-        // so there's no meaningful "previous version" to diff against.
+        /*
+         * Git installs have no published predecessor in the registry,
+         * so there's no meaningful "previous version" to diff against.
+         */
         if (GitResolver.isGitVersion(version)) {
             return null;
         }
@@ -98,8 +100,8 @@ export class ChurnScanner {
             added: diff.added.length,
             removed: diff.removed.length,
             modified: diff.modified.length,
-            severity,
-            reason
+            severity: severity,
+            reason: reason
         };
     }
 
@@ -115,7 +117,7 @@ export class ChurnScanner {
             return null;
         }
 
-        let best: {v: string; t: SemverTriple}|null = null;
+        let best: {v: string; t: SemverTriple;}|null = null;
 
         for (const raw of versions) {
             const t = ChurnScanner._parseSemver(raw);
@@ -126,7 +128,7 @@ export class ChurnScanner {
                 continue;
             }
             if (!best || ChurnScanner._compare(t, best.t) > 0) {
-                best = {v: raw, t};
+                best = {v: raw, t: t};
             }
         }
 
@@ -141,7 +143,7 @@ export class ChurnScanner {
      */
     private static _parseSemver(v: string): SemverTriple|null {
         const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v.trim());
-        return m ? [+m[1], +m[2], +m[3]] : null;
+        return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
     }
 
     private static _compare(a: SemverTriple, b: SemverTriple): number {
@@ -215,4 +217,5 @@ export class ChurnScanner {
             reason: `Normal ${bump}-bump size`
         };
     }
+
 }

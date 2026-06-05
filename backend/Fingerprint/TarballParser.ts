@@ -39,14 +39,16 @@ export class TarballParser {
      * for a branch tarball) — `GitHeadFetcher` reads it to learn the
      * HEAD commit without an extra API call.
      */
-    public static parseWithPrefix(tgz: Buffer): {entries: TarEntry[]; prefix: string|null} {
+    public static parseWithPrefix(tgz: Buffer): {entries: TarEntry[]; prefix: string|null;} {
         const tar = zlib.gunzipSync(tgz);
         const raw = TarballParser._walkTar(tar);
         const stripped = TarballParser._stripCommonPrefix(raw);
-        // If the prefix was stripped, `stripped` and `raw` differ in
-        // path lengths; otherwise they're the same array. Sniff the
-        // prefix off the first entry of `raw` only if stripping
-        // happened.
+        /*
+         * If the prefix was stripped, `stripped` and `raw` differ in
+         * path lengths; otherwise they're the same array. Sniff the
+         * prefix off the first entry of `raw` only if stripping
+         * happened.
+         */
         if (stripped === raw || raw.length === 0) {
             return {entries: stripped, prefix: null};
         }
@@ -142,8 +144,10 @@ export class TarballParser {
                 entries.push({path: fullName, content: Buffer.from(content)});
             }
 
-            // Skip the content (rounded up to the next 512-byte block)
-            // for *every* entry type, file or not.
+            /*
+             * Skip the content (rounded up to the next 512-byte block)
+             * for *every* entry type, file or not.
+             */
             offset += Math.ceil(size / BLOCK) * BLOCK;
         }
 
@@ -183,4 +187,5 @@ export class TarballParser {
             content: e.content
         }));
     }
+
 }

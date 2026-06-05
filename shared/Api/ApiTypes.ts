@@ -148,9 +148,9 @@ export type ApiConfigSettings = {
         };
         external?: {
             enabled?: boolean;
-            socket?: {enabled?: boolean; apiKey?: string};
-            openssf?: {enabled?: boolean};
-            depsDev?: {enabled?: boolean};
+            socket?: {enabled?: boolean; apiKey?: string;};
+            openssf?: {enabled?: boolean;};
+            depsDev?: {enabled?: boolean;};
         };
     };
 };
@@ -253,7 +253,7 @@ export type ApiComplianceFinding = {
  * `worst` collapses to a single matrix-badge tier.
  */
 export type ApiComplianceResponse = {
-    project: {unid: string; name: string};
+    project: {unid: string; name: string;};
     templateIds: string[];
     findings: ApiComplianceFinding[];
     worst: 'info'|'warn'|'risk'|null;
@@ -348,10 +348,10 @@ export type ApiTemplateBody = {
     extends?: string[];
     mode?: 'additive'|'strict';
     packages?: {
-        runtime?: Record<string, {version?: string; required?: boolean}>;
-        dev?: Record<string, {version?: string; required?: boolean}>;
-        peer?: Record<string, {version?: string; required?: boolean}>;
-        optional?: Record<string, {version?: string; required?: boolean}>;
+        runtime?: Record<string, {version?: string; required?: boolean;}>;
+        dev?: Record<string, {version?: string; required?: boolean;}>;
+        peer?: Record<string, {version?: string; required?: boolean;}>;
+        optional?: Record<string, {version?: string; required?: boolean;}>;
     };
     forbidden?: string[];
     root?: {
@@ -361,7 +361,7 @@ export type ApiTemplateBody = {
         type?: string;
         packageManager?: string;
     };
-    files?: {path: string; mode?: 'create'|'merge-json'|'report-only'}[];
+    files?: {path: string; mode?: 'create'|'merge-json'|'report-only';}[];
     workspaces?: {
         path: string;
         packages?: ApiTemplateBody['packages'];
@@ -519,18 +519,22 @@ export type ApiAnalyzeResultEvent = {
     name: string;
     version: string;
     vulnIds: string[]|null;
-    // Project sources where this exact `name@version` was found. Only
-    // populated by the global stream; the per-project stream omits it
-    // (the project is implicit there).
+    /*
+     * Project sources where this exact `name@version` was found. Only
+     * populated by the global stream; the per-project stream omits it
+     * (the project is implicit there).
+     */
     projects?: string[];
 };
 
 export type ApiAnalyzeProgressEvent = {
     current: number;
     total: number;
-    // Optional human-readable phase label ("Collecting packages from
-    // kavula …", "Scanning CVEs …"). Used by the global scan, ignored
-    // by the per-project one.
+    /*
+     * Optional human-readable phase label ("Collecting packages from
+     * kavula …", "Scanning CVEs …"). Used by the global scan, ignored
+     * by the per-project one.
+     */
     phase?: string;
 };
 
@@ -559,8 +563,8 @@ export type ApiFingerprintResponse = {
  * even on the null case).
  */
 export type ApiFingerprintDiffResponse = {
-    before: {name: string; version: string};
-    after: {name: string; version: string};
+    before: {name: string; version: string;};
+    after: {name: string; version: string;};
     diff: FingerprintDiff|null;
 };
 
@@ -584,7 +588,7 @@ export type ApiMatrixSecurityEntry = {
 };
 
 export type ApiMatrixSecurityRequest = {
-    packages: {name: string; version: string}[];
+    packages: {name: string; version: string;}[];
 };
 
 export type ApiMatrixSecurityResponse = {
@@ -599,7 +603,7 @@ export type ApiMatrixSecurityResponse = {
  * milliseconds.
  */
 export type ApiMatrixHeuristicsRequest = {
-    packages: {name: string; version: string}[];
+    packages: {name: string; version: string;}[];
 };
 
 export type ApiMatrixHeuristicsResponse = {
@@ -641,7 +645,7 @@ export type ApiBundleEntry = {
 };
 
 export type ApiBundlesRequest = {
-    packages: {name: string; version: string}[];
+    packages: {name: string; version: string;}[];
 };
 
 export type ApiBundlesResponse = {
@@ -885,7 +889,7 @@ export type ApiUpgradeRequest = {
  * install scripts before clicking apply.
  */
 export type ApiUpgradePreviewResponse = {
-    project: {unid: string; name: string};
+    project: {unid: string; name: string;};
     /** Echoed back so the frontend can render the modal heading. */
     request: ApiUpgradeRequest;
     /**
@@ -952,7 +956,7 @@ export type ApiLifecycleScript = {
 };
 
 export type ApiLifecycleScriptsResponse = {
-    project: {unid: string; name: string};
+    project: {unid: string; name: string;};
     /** All install-lifecycle hooks across `node_modules/*`. Empty when none. */
     scripts: ApiLifecycleScript[];
     /** Whether the per-script "Run" button is enabled (mirrors `actions.allowInstall`). */
@@ -999,8 +1003,8 @@ export type ApiBulkUpgradeSkipReason =
  * with a reason, so the modal can list both buckets at once.
  */
 export type ApiBulkUpgradePreviewResult =
-    {pick: ApiBulkUpgradePick; preview: ApiUpgradePreviewResponse}
-    |{pick: ApiBulkUpgradePick; skipped: ApiBulkUpgradeSkipReason; msg?: string};
+    {pick: ApiBulkUpgradePick; preview: ApiUpgradePreviewResponse;}
+    |{pick: ApiBulkUpgradePick; skipped: ApiBulkUpgradeSkipReason; msg?: string;};
 
 export type ApiBulkUpgradePreviewRequest = {
     picks: ApiBulkUpgradePick[];

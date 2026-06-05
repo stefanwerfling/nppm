@@ -2,9 +2,9 @@ import {describe, expect, it} from 'vitest';
 import {JsonCache} from '../backend/Cache/JsonCache.js';
 import {CommitsHttpFetcher, GitCommitsFetcher} from '../backend/Releases/GitCommitsFetcher.js';
 
-function stubHttp(map: Record<string, {ok: boolean; status: number; body: unknown}>): CommitsHttpFetcher {
+function stubHttp(map: Record<string, {ok: boolean; status: number; body: unknown;}>): CommitsHttpFetcher {
     return {
-        async fetch(url) {
+        fetch: async function(url) {
             if (!(url in map)) {
                 throw new Error(`unexpected fetch ${url}`);
             }
@@ -15,13 +15,13 @@ function stubHttp(map: Record<string, {ok: boolean; status: number; body: unknow
 }
 
 describe('GitCommitsFetcher', () => {
-    it('maps a GitHub commit list to GitCommit rows', async () => {
+    it('maps a GitHub commit list to GitCommit rows', async() => {
         const sha = '0123456789abcdef0123456789abcdef01234567';
         const http = stubHttp({
             'https://api.github.com/repos/stefanwerfling/figtree/commits?per_page=50': {
                 ok: true, status: 200, body: [
                     {
-                        sha,
+                        sha: sha,
                         html_url: `https://github.com/stefanwerfling/figtree/commit/${sha}`,
                         commit: {
                             message: 'Add health endpoint\n\nBody text',
@@ -32,7 +32,7 @@ describe('GitCommitsFetcher', () => {
                 ]
             }
         });
-        const fetcher = new GitCommitsFetcher(null, {http});
+        const fetcher = new GitCommitsFetcher(null, {http: http});
         const resp = await fetcher.fetch('git+https://github.com/stefanwerfling/figtree.git');
         expect(resp).not.toBeNull();
         expect(resp!.host).toBe('github');
@@ -45,29 +45,29 @@ describe('GitCommitsFetcher', () => {
         expect(c.date).toBe('2026-06-04T08:30:00Z');
     });
 
-    it('forwards the GH token as a Bearer header when configured', async () => {
+    it('forwards the GH token as a Bearer header when configured', async() => {
         let seenHeaders: Record<string, string> = {};
         const http: CommitsHttpFetcher = {
-            async fetch(_url, headers) {
+            fetch: async function(_url, headers) {
                 seenHeaders = headers;
                 return {ok: true, status: 200, statusText: 'ok', body: []};
             }
         };
-        const fetcher = new GitCommitsFetcher(null, {http, githubToken: 't0k3n'});
+        const fetcher = new GitCommitsFetcher(null, {http: http, githubToken: 't0k3n'});
         await fetcher.fetch('git+https://github.com/o/r.git');
         expect(seenHeaders.Authorization).toBe('Bearer t0k3n');
     });
 
-    it('routes a gitea-host URL to the gitea v1 commits endpoint with the per-instance token', async () => {
+    it('routes a gitea-host URL to the gitea v1 commits endpoint with the per-instance token', async() => {
         const sha = 'feedface'.padEnd(40, '0');
         let seenAuth: string|undefined;
         const http: CommitsHttpFetcher = {
-            async fetch(url, headers) {
+            fetch: async function(url, headers) {
                 expect(url).toBe('https://gitea.example.com/api/v1/repos/o/r/commits?limit=50');
                 seenAuth = headers.Authorization;
                 return {ok: true, status: 200, statusText: 'ok', body: [
                     {
-                        sha,
+                        sha: sha,
                         html_url: `https://gitea.example.com/o/r/commit/${sha}`,
                         created: '2026-06-04T09:00:00Z',
                         commit: {
@@ -81,9 +81,9 @@ describe('GitCommitsFetcher', () => {
         };
         const giteaTokens = new Map([['gitea.example.com', 'gitea-tok']]);
         const fetcher = new GitCommitsFetcher(null, {
-            http,
+            http: http,
             giteaHosts: ['gitea.example.com'],
-            giteaTokens
+            giteaTokens: giteaTokens
         });
         const resp = await fetcher.fetch('git+https://gitea.example.com/o/r.git');
         expect(seenAuth).toBe('token gitea-tok');
@@ -91,30 +91,30 @@ describe('GitCommitsFetcher', () => {
         expect(resp?.commits[0].subject).toBe('Update deps');
     });
 
-    it('returns null for hosts we do not (yet) support', async () => {
+    it('returns null for hosts we do not (yet) support', async() => {
         let called = false;
         const http: CommitsHttpFetcher = {
-            async fetch() {
+            fetch: async function() {
                 called = true;
                 return {ok: true, status: 200, statusText: 'ok', body: []};
             }
         };
-        const fetcher = new GitCommitsFetcher(null, {http});
+        const fetcher = new GitCommitsFetcher(null, {http: http});
         const resp = await fetcher.fetch('git+https://gitlab.com/o/r.git');
         expect(resp).toBeNull();
         expect(called).toBe(false);
     });
 
-    it('caches successful responses and serves a second call from the pocket', async () => {
+    it('caches successful responses and serves a second call from the pocket', async() => {
         let n = 0;
         const http: CommitsHttpFetcher = {
-            async fetch() {
+            fetch: async function() {
                 n++;
                 return {ok: true, status: 200, statusText: 'ok', body: []};
             }
         };
-        const cache = new JsonCache('/tmp/nppm-gitcommits-' + Math.random().toString(36).slice(2), 60);
-        const fetcher = new GitCommitsFetcher(cache, {http});
+        const cache = new JsonCache(`/tmp/nppm-gitcommits-${  Math.random().toString(36).slice(2)}`, 60);
+        const fetcher = new GitCommitsFetcher(cache, {http: http});
         await fetcher.fetch('git+https://github.com/o/r.git');
         await fetcher.fetch('git+https://github.com/o/r.git');
         expect(n).toBe(1);

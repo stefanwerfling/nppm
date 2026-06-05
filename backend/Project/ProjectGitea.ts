@@ -24,8 +24,8 @@ type GiteaCommitEntry = {
     sha: string;
     created?: string;
     commit?: {
-        committer?: {date?: string};
-        author?: {date?: string};
+        committer?: {date?: string;};
+        author?: {date?: string;};
     };
 };
 
@@ -51,7 +51,7 @@ export class ProjectGitea extends ProjectRemote {
         ref?: string,
         token?: string,
         cache?: JsonCache,
-        opts: {hidden?: boolean; configIndex?: number; templates?: string[]} = {}
+        opts: {hidden?: boolean; configIndex?: number; templates?: string[];} = {}
     ) {
         super(displayName, opts);
         this._apiBase = ProjectGitea._toApiBase(repoUrl);
@@ -113,8 +113,8 @@ export class ProjectGitea extends ProjectRemote {
         }
 
         return data
-            .filter((e) => e.type === 'dir')
-            .map((e) => e.name);
+        .filter((e) => e.type === 'dir')
+        .map((e) => e.name);
     }
 
     public async fetchFileAtRef(repoPath: string, ref: string): Promise<string|null> {
@@ -142,7 +142,7 @@ export class ProjectGitea extends ProjectRemote {
             }
 
             const cacheKey = `gitea_commits_${this._apiBase}_${this._ref ?? 'HEAD'}_${cleanPath}_p${page}`;
-            type Wrap = {data: GiteaCommitEntry[]|null};
+            type Wrap = {data: GiteaCommitEntry[]|null;};
             let chunk: GiteaCommitEntry[]|null = null;
 
             if (this._cache) {
@@ -194,7 +194,7 @@ export class ProjectGitea extends ProjectRemote {
         const ref = this._ref ?? 'HEAD';
         const url = `${this._apiBase}/commits/${encodeURIComponent(ref)}`;
         const cacheKey = `gitea_head_${this._apiBase}_${ref}`;
-        type Wrap = {data: string|null};
+        type Wrap = {data: string|null;};
 
         if (this._cache) {
             const hit = this._cache.get<Wrap>(cacheKey);
@@ -209,7 +209,7 @@ export class ProjectGitea extends ProjectRemote {
                 this._cache?.set<Wrap>(cacheKey, {data: null});
                 return null;
             }
-            const body = (await res.json()) as {sha?: string};
+            const body = (await res.json()) as {sha?: string;};
             const sha = typeof body.sha === 'string' ? body.sha : null;
             this._cache?.set<Wrap>(cacheKey, {data: sha});
             return sha;
@@ -223,8 +223,10 @@ export class ProjectGitea extends ProjectRemote {
             Accept: 'application/json'
         };
         if (this._token) {
-            // Gitea historically used `token X`; newer versions also
-            // accept `Bearer X`. The token form is the safer default.
+            /*
+             * Gitea historically used `token X`; newer versions also
+             * accept `Bearer X`. The token form is the safer default.
+             */
             headers.Authorization = `token ${this._token}`;
         }
         return headers;
@@ -242,10 +244,12 @@ export class ProjectGitea extends ProjectRemote {
             url.searchParams.set('ref', ref);
         }
 
-        // Wrap in `{data: ...}` so we can distinguish a cached-404
-        // (`{data: null}`) from a cache miss.
+        /*
+         * Wrap in `{data: ...}` so we can distinguish a cached-404
+         * (`{data: null}`) from a cache miss.
+         */
         const cacheKey = `gitea_${this._apiBase}_${ref ?? 'HEAD'}_${cleanPath}`;
-        type Wrap = {data: GiteaContentEntry|GiteaContentEntry[]|null};
+        type Wrap = {data: GiteaContentEntry|GiteaContentEntry[]|null;};
 
         if (this._cache) {
             const hit = this._cache.get<Wrap>(cacheKey);
@@ -266,7 +270,7 @@ export class ProjectGitea extends ProjectRemote {
         }
 
         const data = (await res.json()) as GiteaContentEntry|GiteaContentEntry[];
-        this._cache?.set<Wrap>(cacheKey, {data});
+        this._cache?.set<Wrap>(cacheKey, {data: data});
         return data;
     }
 
@@ -288,4 +292,5 @@ export class ProjectGitea extends ProjectRemote {
         const repo = parts[parts.length - 1];
         return `${u.origin}/api/v1/repos/${owner}/${repo}`;
     }
+
 }

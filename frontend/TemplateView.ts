@@ -124,11 +124,13 @@ export class TemplateView {
             return;
         }
 
-        // Apply bar — opens TemplateApplyModal for the user to pick +
-        // apply a subset of findings. Skipped for remote projects:
-        // the backend rejects compliance-apply for non-local projects
-        // anyway, but we'd rather not even offer the button than show
-        // an error after the user clicked it.
+        /*
+         * Apply bar — opens TemplateApplyModal for the user to pick +
+         * apply a subset of findings. Skipped for remote projects:
+         * the backend rejects compliance-apply for non-local projects
+         * anyway, but we'd rather not even offer the button than show
+         * an error after the user clicked it.
+         */
         if (this._projectType === ConfigProjectType.local) {
             const applyBar = document.createElement('div');
             applyBar.className = 'tv-applybar';
@@ -255,7 +257,7 @@ export class TemplateView {
 
     private static _groupBySeverity(
         findings: ApiComplianceFinding[]
-    ): {risk: ApiComplianceFinding[]; warn: ApiComplianceFinding[]; info: ApiComplianceFinding[]} {
+    ): {risk: ApiComplianceFinding[]; warn: ApiComplianceFinding[]; info: ApiComplianceFinding[];} {
         const out = {risk: [] as ApiComplianceFinding[], warn: [] as ApiComplianceFinding[], info: [] as ApiComplianceFinding[]};
         for (const f of findings) {
             out[f.severity].push(f);
@@ -288,9 +290,10 @@ export class TemplateView {
 
     private static _escape(s: string): string {
         return s
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
     }
+
 }

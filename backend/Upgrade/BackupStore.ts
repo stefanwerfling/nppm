@@ -47,8 +47,10 @@ export class BackupStore {
                 continue;
             }
             const rel = path.relative(baseDir, abs);
-            // path.relative may yield `../...` if the file is outside
-            // baseDir; skip those to avoid escaping the backup pocket.
+            /*
+             * path.relative may yield `../...` if the file is outside
+             * baseDir; skip those to avoid escaping the backup pocket.
+             */
             if (rel.startsWith('..')) {
                 continue;
             }
@@ -58,7 +60,7 @@ export class BackupStore {
             files.push(rel);
         }
 
-        return {dir, files};
+        return {dir: dir, files: files};
     }
 
     /**
@@ -73,7 +75,8 @@ export class BackupStore {
             `${d.getUTCFullYear()}`
             + `-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`
             + `T${pad(d.getUTCHours())}-${pad(d.getUTCMinutes())}-${pad(d.getUTCSeconds())}`
-            + `Z`
+            + 'Z'
         );
     }
+
 }

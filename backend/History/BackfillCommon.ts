@@ -27,7 +27,7 @@ export type SnapshotSource = 'committed'|'package-json';
 export type GitHistorySnapshot = {
     sha: string;
     timestamp: number;
-    packages: {name: string; version: string}[];
+    packages: {name: string; version: string;}[];
     source: SnapshotSource;
 };
 
@@ -46,7 +46,7 @@ export type GitHistorySnapshot = {
 export type GitBackfillResult = {
     headSha: string|null;
     entries: HistoryEntry[];
-    finalState: {name: string; version: string}[];
+    finalState: {name: string; version: string;}[];
     /**
      * Which file was the actual data source. Lets the SSE handler
      * decide whether to seed `lastSnapshot` from `finalState`
@@ -78,7 +78,7 @@ export class BackfillCommon {
      * declared semver ranges, not resolved concrete versions —
      * downstream code that needs to query OSV must filter them out.
      */
-    public static parsePackageJsonToPackages(content: string): {name: string; version: string}[]|null {
+    public static parsePackageJsonToPackages(content: string): {name: string; version: string;}[]|null {
         let raw: unknown;
         try {
             raw = JSON.parse(content);
@@ -89,7 +89,7 @@ export class BackfillCommon {
             return null;
         }
         const obj = raw as Record<string, unknown>;
-        const out: {name: string; version: string}[] = [];
+        const out: {name: string; version: string;}[] = [];
         const seen = new Set<string>();
 
         const buckets = [
@@ -107,7 +107,7 @@ export class BackfillCommon {
                     continue;
                 }
                 seen.add(name);
-                out.push({name, version: value});
+                out.push({name: name, version: value});
             }
         }
         return out;
@@ -120,11 +120,11 @@ export class BackfillCommon {
      * skip the commit in that case so one bad commit doesn't kill the
      * whole walk.
      */
-    public static parseLockfileToPackages(content: string): {name: string; version: string}[]|null {
+    public static parseLockfileToPackages(content: string): {name: string; version: string;}[]|null {
         try {
             const lockfile = LockfileReader.parse(content, 'committed');
             const seen = new Set<string>();
-            const out: {name: string; version: string}[] = [];
+            const out: {name: string; version: string;}[] = [];
             for (const p of lockfile.packages) {
                 const key = `${p.name}@${p.version}`;
                 if (seen.has(key)) {
@@ -149,10 +149,10 @@ export class BackfillCommon {
      */
     public static snapshotsToEntries(snapshots: GitHistorySnapshot[]): {
         entries: HistoryEntry[];
-        finalState: {name: string; version: string}[];
+        finalState: {name: string; version: string;}[];
     } {
         const entries: HistoryEntry[] = [];
-        let prev: {name: string; version: string}[] = [];
+        let prev: {name: string; version: string;}[] = [];
 
         for (const snap of snapshots) {
             const entry = BackfillCommon.diffSnapshots(
@@ -168,7 +168,7 @@ export class BackfillCommon {
             prev = snap.packages;
         }
 
-        return {entries, finalState: prev};
+        return {entries: entries, finalState: prev};
     }
 
     /**
@@ -180,8 +180,8 @@ export class BackfillCommon {
      * with a distinct badge.
      */
     public static diffSnapshots(
-        prev: {name: string; version: string}[],
-        next: {name: string; version: string}[],
+        prev: {name: string; version: string;}[],
+        next: {name: string; version: string;}[],
         timestamp: number,
         sha: string,
         source: SnapshotSource = 'committed'
@@ -202,21 +202,21 @@ export class BackfillCommon {
         for (const [name, version] of nextByName) {
             const p = prevByName.get(name);
             if (p === undefined) {
-                added.push({name, version});
+                added.push({name: name, version: version});
             } else if (p !== version) {
                 const bumpType = BackfillCommon.detectBumpType(p, version);
                 updated.push({
-                    name,
+                    name: name,
                     fromVersion: p,
                     toVersion: version,
-                    bumpType,
+                    bumpType: bumpType,
                     reason: BackfillCommon.describeReason(bumpType)
                 });
             }
         }
         for (const [name, version] of prevByName) {
             if (!nextByName.has(name)) {
-                removed.push({name, version});
+                removed.push({name: name, version: version});
             }
         }
 
@@ -229,11 +229,11 @@ export class BackfillCommon {
         updated.sort((a, b) => a.name.localeCompare(b.name));
 
         return {
-            timestamp,
+            timestamp: timestamp,
             lockfileSource: source,
-            added,
-            removed,
-            updated,
+            added: added,
+            removed: removed,
+            updated: updated,
             source: 'git',
             commitSha: sha
         };
@@ -269,6 +269,7 @@ export class BackfillCommon {
 
     private static _parseTriple(v: string): [number, number, number]|null {
         const m = /^(\d+)\.(\d+)\.(\d+)/.exec(v.trim());
-        return m ? [+m[1], +m[2], +m[3]] : null;
+        return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
     }
+
 }

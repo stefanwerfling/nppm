@@ -22,9 +22,11 @@ export class Purl {
         if (lower.startsWith('@')) {
             const slash = lower.indexOf('/');
             if (slash < 0) {
-                // Malformed scoped name — treat as a single segment so
-                // the result is still a parseable PURL (callers can spot
-                // the weird shape from the missing slash).
+                /*
+                 * Malformed scoped name — treat as a single segment so
+                 * the result is still a parseable PURL (callers can spot
+                 * the weird shape from the missing slash).
+                 */
                 path = encodeURIComponent(lower);
             } else {
                 const scope = lower.slice(1, slash);
@@ -36,4 +38,5 @@ export class Purl {
         }
         return `pkg:npm/${path}@${encodeURIComponent(version)}`;
     }
+
 }

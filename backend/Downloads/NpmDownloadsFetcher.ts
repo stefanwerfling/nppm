@@ -6,7 +6,7 @@ import {JsonCache} from '../Cache/JsonCache.js';
  * unscoped names typo'd, or private packages that aren't on the
  * public registry).
  */
-type Wrap = {data: number|null};
+type Wrap = {data: number|null;};
 
 /**
  * Optional progress callback fired per batch — lets the Dashboard
@@ -72,10 +72,12 @@ export class NpmDownloadsFetcher {
         const scoped = misses.filter((n) => n.startsWith('@'));
         const unscoped = misses.filter((n) => !n.startsWith('@'));
 
-        // Bulk-fetch unscoped names. npm's bulk endpoint replies with
-        // a `{name: {downloads, package, ...}}` map; absent names land
-        // as `null` and we cache the negative so repeat misses don't
-        // keep hammering the API.
+        /*
+         * Bulk-fetch unscoped names. npm's bulk endpoint replies with
+         * a `{name: {downloads, package, ...}}` map; absent names land
+         * as `null` and we cache the negative so repeat misses don't
+         * keep hammering the API.
+         */
         for (let i = 0; i < unscoped.length; i += this._bulkSize) {
             const batch = unscoped.slice(i, i + this._bulkSize);
             const map = await this._fetchBulk(batch);
@@ -87,12 +89,14 @@ export class NpmDownloadsFetcher {
             tick(batch.length);
         }
 
-        // Scoped names — one HTTP each. Concurrency-cap at 10 mirrors
-        // the registry fetcher so we don't open a thousand sockets on
-        // a cold-cache run against a workspace full of @types/* deps.
+        /*
+         * Scoped names — one HTTP each. Concurrency-cap at 10 mirrors
+         * the registry fetcher so we don't open a thousand sockets on
+         * a cold-cache run against a workspace full of @types/* deps.
+         */
         const queue = [...scoped];
         const workers: Promise<void>[] = [];
-        const runOne = async (): Promise<void> => {
+        const runOne = async(): Promise<void> => {
             while (queue.length > 0) {
                 const name = queue.shift();
                 if (name === undefined) {
@@ -127,10 +131,12 @@ export class NpmDownloadsFetcher {
                 return result;
             }
             const raw = await res.json() as unknown;
-            // Single-name batches respond with the bare object instead
-            // of a {name: object} map — collapse both shapes here.
+            /*
+             * Single-name batches respond with the bare object instead
+             * of a {name: object} map — collapse both shapes here.
+             */
             if (names.length === 1 && raw && typeof raw === 'object' && 'downloads' in raw) {
-                const d = (raw as {downloads?: unknown}).downloads;
+                const d = (raw as {downloads?: unknown;}).downloads;
                 result.set(names[0], typeof d === 'number' ? d : null);
                 return result;
             }
@@ -138,7 +144,7 @@ export class NpmDownloadsFetcher {
                 for (const n of names) {
                     const entry = (raw as Record<string, unknown>)[n];
                     if (entry && typeof entry === 'object' && 'downloads' in entry) {
-                        const d = (entry as {downloads?: unknown}).downloads;
+                        const d = (entry as {downloads?: unknown;}).downloads;
                         result.set(n, typeof d === 'number' ? d : null);
                     } else {
                         result.set(n, null);
@@ -164,7 +170,7 @@ export class NpmDownloadsFetcher {
             if (!res.ok) {
                 return null;
             }
-            const raw = await res.json() as {downloads?: unknown};
+            const raw = await res.json() as {downloads?: unknown;};
             return typeof raw.downloads === 'number' ? raw.downloads : null;
         } catch {
             return null;
@@ -185,27 +191,27 @@ export class NpmDownloadsFetcher {
     public async fetchRange(
         name: string,
         period: 'last-week'|'last-month'|'last-year' = 'last-year'
-    ): Promise<{day: string; downloads: number}[]|null> {
+    ): Promise<{day: string; downloads: number;}[]|null> {
         const key = `range_${period}_${name}`;
-        const cached = this._cache.get<{data: {day: string; downloads: number}[]|null}>(key);
+        const cached = this._cache.get<{data: {day: string; downloads: number;}[]|null;}>(key);
         if (cached) {
             return cached.data;
         }
-        let result: {day: string; downloads: number}[]|null = null;
+        let result: {day: string; downloads: number;}[]|null = null;
         try {
             const url = `${this._baseUrl}/downloads/range/${period}/${name}`;
             const res = await fetch(url, {headers: {Accept: 'application/json'}});
             if (res.ok) {
-                const raw = await res.json() as {downloads?: unknown};
+                const raw = await res.json() as {downloads?: unknown;};
                 if (Array.isArray(raw.downloads)) {
                     result = [];
                     for (const row of raw.downloads) {
                         if (row && typeof row === 'object'
-                            && typeof (row as {day?: unknown}).day === 'string'
-                            && typeof (row as {downloads?: unknown}).downloads === 'number') {
+                            && typeof (row as {day?: unknown;}).day === 'string'
+                            && typeof (row as {downloads?: unknown;}).downloads === 'number') {
                             result.push({
-                                day: (row as {day: string}).day,
-                                downloads: (row as {downloads: number}).downloads
+                                day: (row as {day: string;}).day,
+                                downloads: (row as {downloads: number;}).downloads
                             });
                         }
                     }
@@ -227,4 +233,5 @@ export class NpmDownloadsFetcher {
     private static _cacheKey(name: string): string {
         return `dl_${name}`;
     }
+
 }

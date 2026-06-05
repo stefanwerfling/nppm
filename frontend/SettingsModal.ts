@@ -32,6 +32,7 @@ const EDITOR_KEYS: readonly string[] = [
  * run dev` for the new value to apply.
  */
 export class SettingsModal {
+
     private _backdrop: HTMLElement|null = null;
     private _panel: HTMLElement|null = null;
     private _activeTab: TabId = 'general';
@@ -155,7 +156,7 @@ export class SettingsModal {
     private _renderTabs(): HTMLElement {
         const bar = document.createElement('div');
         bar.className = 'sm-tabs';
-        const tabs: {id: TabId; label: string}[] = [
+        const tabs: {id: TabId; label: string;}[] = [
             {id: 'general', label: I18n.t('General')},
             {id: 'registry', label: I18n.t('Registry')},
             {id: 'actions', label: I18n.t('Actions')},
@@ -192,7 +193,7 @@ export class SettingsModal {
                 return;
             case 'security':
                 this._renderSecurity(body);
-                return;
+                
         }
     }
 
@@ -314,8 +315,10 @@ export class SettingsModal {
                 resolve();
             });
             es.addEventListener('error', () => {
-                // Connection drop or end-of-stream. Treat both as
-                // "done with whatever we got".
+                /*
+                 * Connection drop or end-of-stream. Treat both as
+                 * "done with whatever we got".
+                 */
                 es.close();
                 resolve();
             });
@@ -382,10 +385,12 @@ export class SettingsModal {
         body.appendChild(this._textareaField('sm-udp', I18n.t('Dev path globs (one per line, replaces defaults)'), (u.devPathGlobs ?? []).join('\n')));
 
         body.appendChild(this._sectionHead(I18n.t('External reputation sources')));
-        // The master switch defaults to "on" — leaving it unchecked
-        // here means the user explicitly turned every source off; the
-        // backend then short-circuits the scanner without making any
-        // network calls.
+        /*
+         * The master switch defaults to "on" — leaving it unchecked
+         * here means the user explicitly turned every source off; the
+         * backend then short-circuits the scanner without making any
+         * network calls.
+         */
         body.appendChild(this._checkboxField('sm-ext-en', I18n.t('Enable external sources'), e.enabled !== false));
         body.appendChild(this._checkboxField('sm-ext-socket-en', I18n.t('socket.dev (needs API key)'), e.socket?.enabled !== false));
         body.appendChild(this._textField('sm-ext-socket-key', I18n.t('socket.dev API key ($ENV ok)'), e.socket?.apiKey, '$SOCKET_DEV_API_KEY'));
@@ -453,7 +458,7 @@ export class SettingsModal {
         cls: string,
         label: string,
         value: string,
-        options: {value: string; label: string}[]
+        options: {value: string; label: string;}[]
     ): HTMLElement {
         const row = document.createElement('div');
         row.className = 'pfm-row';
@@ -513,7 +518,7 @@ export class SettingsModal {
                 return;
             case 'security':
                 this._collectSecurity();
-                return;
+                
         }
     }
 
@@ -533,16 +538,20 @@ export class SettingsModal {
         }
         this._current.server = Object.keys(server).length > 0 ? server : undefined;
 
-        // Browser: persist `{open: true|false}` only when the user
-        // toggled it on; if false we drop the section so disk shape
-        // stays minimal.
+        /*
+         * Browser: persist `{open: true|false}` only when the user
+         * toggled it on; if false we drop the section so disk shape
+         * stays minimal.
+         */
         this._current.browser = open ? {open: true} : undefined;
 
-        // UI: only persist `startView` when the user picked the
-        // non-default (dashboard). The matrix fallback is implicit in
-        // `Nppm.start()` so an empty `ui` section keeps the existing
-        // landing behaviour.
-        this._current.ui = startView === 'dashboard' ? {startView} : undefined;
+        /*
+         * UI: only persist `startView` when the user picked the
+         * non-default (dashboard). The matrix fallback is implicit in
+         * `Nppm.start()` so an empty `ui` section keeps the existing
+         * landing behaviour.
+         */
+        this._current.ui = startView === 'dashboard' ? {startView: startView} : undefined;
 
         const cache: NonNullable<ApiConfigSettings['cache']> = {};
         if (cdir !== undefined) {
@@ -634,10 +643,12 @@ export class SettingsModal {
             sec.unused = unused;
         }
 
-        // External-sources: each checkbox tracks an explicit boolean
-        // (default-on) so the persisted value distinguishes "left
-        // default" (omit) from "deliberately disabled" (false). The
-        // API-key field is optional; falsy values stay absent.
+        /*
+         * External-sources: each checkbox tracks an explicit boolean
+         * (default-on) so the persisted value distinguishes "left
+         * default" (omit) from "deliberately disabled" (false). The
+         * API-key field is optional; falsy values stay absent.
+         */
         const ext: NonNullable<NonNullable<ApiConfigSettings['security']>['external']> = {};
         const extEnableEl = this._panel?.querySelector<HTMLInputElement>('.sm-ext-en');
         if (extEnableEl && extEnableEl.checked === false) {
@@ -708,9 +719,11 @@ export class SettingsModal {
             security: this._current.security,
             ui: this._current.ui
         };
-        // Drop undefined keys — the backend wipes any unmentioned
-        // section anyway, but keeping the wire payload tight makes
-        // server-side logs cleaner.
+        /*
+         * Drop undefined keys — the backend wipes any unmentioned
+         * section anyway, but keeping the wire payload tight makes
+         * server-side logs cleaner.
+         */
         for (const key of Object.keys(body) as (keyof ApiConfigMutationRequest)[]) {
             if (body[key] === undefined) {
                 delete body[key];
@@ -748,4 +761,5 @@ export class SettingsModal {
         err.textContent = msg;
         this._panel.appendChild(err);
     }
+
 }

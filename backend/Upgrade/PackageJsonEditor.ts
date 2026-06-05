@@ -58,7 +58,7 @@ export class PackageJsonEditor {
             return {changed: false, before: source, after: source};
         }
         const depsObj = deps as Record<string, string>;
-        if (!Object.prototype.hasOwnProperty.call(depsObj, name)) {
+        if (!Object.hasOwn(depsObj, name)) {
             return {changed: false, before: source, after: source};
         }
         if (depsObj[name] === toRange) {
@@ -69,7 +69,7 @@ export class PackageJsonEditor {
         const indent = PackageJsonEditor._detectIndent(source);
         const trailing = source.endsWith('\n') ? '\n' : '';
         const after = JSON.stringify(parsed, null, indent) + trailing;
-        return {changed: true, before: source, after};
+        return {changed: true, before: source, after: after};
     }
 
     /**
@@ -109,9 +109,10 @@ export class PackageJsonEditor {
                 return null;
             }
             const depsObj = deps as Record<string, string>;
-            return Object.prototype.hasOwnProperty.call(depsObj, name) ? depsObj[name] : null;
+            return Object.hasOwn(depsObj, name) ? depsObj[name] : null;
         } catch {
             return null;
         }
     }
+
 }

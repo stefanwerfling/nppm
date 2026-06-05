@@ -95,9 +95,11 @@ describe('WhyModal.collectPaths', () => {
     });
 
     it('does not loop on cyclic peer-dep edges', () => {
-        // Two packages depending on each other — pathologically rare
-        // but possible with peer-dep loops. The seen-set should stop
-        // the walk before it grows unbounded.
+        /*
+         * Two packages depending on each other — pathologically rare
+         * but possible with peer-dep loops. The seen-set should stop
+         * the walk before it grows unbounded.
+         */
         const g: ApiDepGraphResponse = {
             project: {unid: 'x', name: 'x', type: 'local' as never},
             rootDeps: [{name: 'a', version: '1.0.0'}],

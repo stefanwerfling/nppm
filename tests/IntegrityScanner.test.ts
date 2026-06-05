@@ -23,7 +23,7 @@ function seedRegistry(cache: JsonCache, pkg: RegistryPackage): void {
 }
 
 /** Convenience builder for the LockedPackage shape — short and focused. */
-function lp(opts: Partial<LockedPackage> & {name: string; version: string}): LockedPackage {
+function lp(opts: Partial<LockedPackage> & {name: string; version: string;}): LockedPackage {
     return {
         name: opts.name,
         version: opts.version,
@@ -48,8 +48,10 @@ describe('IntegrityScanner', () => {
     beforeEach(() => {
         dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nppm-int-'));
         cache = new JsonCache(dir, 60);
-        // Stub fetch to return null — every miss should already be
-        // seeded by the test; this enforces no surprise network.
+        /*
+         * Stub fetch to return null — every miss should already be
+         * seeded by the test; this enforces no surprise network.
+         */
         registry = new Registry('http://test', cache);
         scanner = new IntegrityScanner(registry);
     });
@@ -58,7 +60,7 @@ describe('IntegrityScanner', () => {
         fs.rmSync(dir, {recursive: true, force: true});
     });
 
-    it('returns no findings when integrity + tarball match registry', async () => {
+    it('returns no findings when integrity + tarball match registry', async() => {
         seedRegistry(cache, {
             name: 'lodash',
             latest: '4.17.21',
@@ -80,7 +82,7 @@ describe('IntegrityScanner', () => {
         expect(findings).toEqual([]);
     });
 
-    it('flags integrity mismatch as risk', async () => {
+    it('flags integrity mismatch as risk', async() => {
         seedRegistry(cache, {
             name: 'evil',
             latest: '1.0.0',
@@ -111,7 +113,7 @@ describe('IntegrityScanner', () => {
         });
     });
 
-    it('flags tarball redirect as info when integrity still matches', async () => {
+    it('flags tarball redirect as info when integrity still matches', async() => {
         seedRegistry(cache, {
             name: 'mirrored',
             latest: '2.0.0',
@@ -139,7 +141,7 @@ describe('IntegrityScanner', () => {
         });
     });
 
-    it('flags missing integrity in the lockfile as info', async () => {
+    it('flags missing integrity in the lockfile as info', async() => {
         seedRegistry(cache, {
             name: 'old',
             latest: '0.1.0',
@@ -168,13 +170,15 @@ describe('IntegrityScanner', () => {
         });
     });
 
-    it('flags private packages (registry returns null) as info', async () => {
-        // No seeding — `registry.fetchOne('private-pkg')` will try
-        // the network, get a non-2xx (stubbed via no fetcher), and
-        // return null.
-        // Override the global fetch for this test to simulate 404.
+    it('flags private packages (registry returns null) as info', async() => {
+        /*
+         * No seeding — `registry.fetchOne('private-pkg')` will try
+         * the network, get a non-2xx (stubbed via no fetcher), and
+         * return null.
+         * Override the global fetch for this test to simulate 404.
+         */
         const origFetch = globalThis.fetch;
-        globalThis.fetch = async () => new Response(null, {status: 404});
+        globalThis.fetch = async() => new Response(null, {status: 404});
         try {
             const findings = await scanner.scan([lp({
                 name: 'private-pkg',
@@ -193,7 +197,7 @@ describe('IntegrityScanner', () => {
         }
     });
 
-    it('produces no finding when registry knows the package but not the version (cold dist cache)', async () => {
+    it('produces no finding when registry knows the package but not the version (cold dist cache)', async() => {
         // Older cache entry without `dist` — defer judgment.
         seedRegistry(cache, {
             name: 'oldcache',
@@ -210,7 +214,7 @@ describe('IntegrityScanner', () => {
         expect(findings).toEqual([]);
     });
 
-    it('dedupes nested installs to one finding per name@version', async () => {
+    it('dedupes nested installs to one finding per name@version', async() => {
         seedRegistry(cache, {
             name: 'evil',
             latest: '1.0.0',
@@ -235,7 +239,7 @@ describe('IntegrityScanner', () => {
         expect(findings).toHaveLength(1);
     });
 
-    it('skips git-installed packages (no registry anchor)', async () => {
+    it('skips git-installed packages (no registry anchor)', async() => {
         const findings = await scanner.scan([lp({
             name: 'vts',
             version: 'git+https://github.com/OpenSourcePKG/vts.git',
@@ -245,7 +249,7 @@ describe('IntegrityScanner', () => {
         expect(findings).toEqual([]);
     });
 
-    it('summarize rolls up severity counts and picks the max', async () => {
+    it('summarize rolls up severity counts and picks the max', async() => {
         seedRegistry(cache, {
             name: 'pkg-r', latest: '1.0.0', versions: ['1.0.0'],
             dist: {'1.0.0': {tarball: 'https://r/p.tgz', integrity: 'sha512-a'}}

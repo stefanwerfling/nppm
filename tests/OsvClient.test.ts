@@ -16,8 +16,8 @@ describe('OsvClient', () => {
         fs.rmSync(dir, {recursive: true, force: true});
     });
 
-    it('normalises an OSV response into compact records', async () => {
-        const fetcher = async () => ({
+    it('normalises an OSV response into compact records', async() => {
+        const fetcher = async() => ({
             vulns: [
                 {
                     id: 'GHSA-xxxx-yyyy-zzzz',
@@ -41,23 +41,23 @@ describe('OsvClient', () => {
         expect(vulns![0].references[0]).toEqual({type: 'WEB', url: 'https://example.com/advisory'});
     });
 
-    it('returns [] when OSV reports no known vulns', async () => {
-        const client = new OsvClient(null, async () => ({vulns: []}));
+    it('returns [] when OSV reports no known vulns', async() => {
+        const client = new OsvClient(null, async() => ({vulns: []}));
         const vulns = await client.query('clean-pkg', '1.0.0');
         expect(vulns).toEqual([]);
     });
 
-    it('returns null when the OSV request throws', async () => {
-        const client = new OsvClient(null, async () => {
+    it('returns null when the OSV request throws', async() => {
+        const client = new OsvClient(null, async() => {
             throw new Error('network down');
         });
         expect(await client.query('foo', '1.0.0')).toBeNull();
     });
 
-    it('caches successful answers (no second fetch)', async () => {
+    it('caches successful answers (no second fetch)', async() => {
         let calls = 0;
         const cache = new JsonCache(dir, 60);
-        const client = new OsvClient(cache, async () => {
+        const client = new OsvClient(cache, async() => {
             calls++;
             return {vulns: []};
         });
@@ -67,10 +67,10 @@ describe('OsvClient', () => {
         expect(calls).toBe(1);
     });
 
-    it('caches the failure case under the {data: null} envelope', async () => {
+    it('caches the failure case under the {data: null} envelope', async() => {
         let calls = 0;
         const cache = new JsonCache(dir, 60);
-        const client = new OsvClient(cache, async () => {
+        const client = new OsvClient(cache, async() => {
             calls++;
             throw new Error('boom');
         });
@@ -83,9 +83,9 @@ describe('OsvClient', () => {
     });
 
     describe('queryBatch', () => {
-        it('batches misses into one /v1/querybatch call and returns IDs', async () => {
+        it('batches misses into one /v1/querybatch call and returns IDs', async() => {
             const calls: object[] = [];
-            const batchFetcher = async (body: object) => {
+            const batchFetcher = async(body: object) => {
                 calls.push(body);
                 return {
                     results: [
@@ -106,17 +106,17 @@ describe('OsvClient', () => {
             expect(calls).toHaveLength(1);
         });
 
-        it('reuses the single-query cache (full records → just take IDs)', async () => {
+        it('reuses the single-query cache (full records → just take IDs)', async() => {
             let batchCalls = 0;
             const cache = new JsonCache(dir, 60);
 
             // Seed the single-query cache via query().
-            const single = new OsvClient(cache, async () => ({
+            const single = new OsvClient(cache, async() => ({
                 vulns: [{id: 'GHSA-zzz', summary: 'x'}]
             }));
             await single.query('warm', '1.0.0');
 
-            const batchFetcher = async () => {
+            const batchFetcher = async() => {
                 batchCalls++;
                 return {results: []};
             };
@@ -127,10 +127,10 @@ describe('OsvClient', () => {
             expect(batchCalls).toBe(0); // never hit the batch endpoint
         });
 
-        it('caches batch results so a second call does not refetch', async () => {
+        it('caches batch results so a second call does not refetch', async() => {
             let batchCalls = 0;
             const cache = new JsonCache(dir, 60);
-            const batchFetcher = async () => {
+            const batchFetcher = async() => {
                 batchCalls++;
                 return {results: [{vulns: []}]};
             };
@@ -142,9 +142,9 @@ describe('OsvClient', () => {
             expect(batchCalls).toBe(1);
         });
 
-        it('stores null for failed chunks', async () => {
+        it('stores null for failed chunks', async() => {
             const cache = new JsonCache(dir, 60);
-            const batchFetcher = async () => {
+            const batchFetcher = async() => {
                 throw new Error('boom');
             };
 

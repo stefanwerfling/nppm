@@ -42,7 +42,7 @@ export class ProjectLocal implements Project {
     constructor(
         absoluteRoot: string,
         configName?: string,
-        opts: {hidden?: boolean; configIndex?: number; templates?: string[]} = {}
+        opts: {hidden?: boolean; configIndex?: number; templates?: string[];} = {}
     ) {
         this._root = absoluteRoot;
         this._name = configName ?? path.basename(absoluteRoot);
@@ -81,8 +81,10 @@ export class ProjectLocal implements Project {
     }
 
     public getKey(): string {
-        // Absolute on-disk root: stable across renames of `name`, and
-        // unique even for two projects whose configured `name` collides.
+        /*
+         * Absolute on-disk root: stable across renames of `name`, and
+         * unique even for two projects whose configured `name` collides.
+         */
         return `local:${this._root}`;
     }
 
@@ -91,14 +93,16 @@ export class ProjectLocal implements Project {
     }
 
     public async loadLockfile(): Promise<Lockfile|null> {
-        // Resolution order, in decreasing fidelity:
-        //   1. Committed `<root>/package-lock.json`
-        //   2. npm's hidden `<root>/node_modules/.package-lock.json`
-        //      (same shape, same data — just written by npm into
-        //      node_modules so projects that gitignore the committed
-        //      lockfile still expose it locally)
-        //   3. Synthesized walk of `<root>/node_modules/*` manifests
-        //      (no dev/peer/optional flags, no nested data)
+        /*
+         * Resolution order, in decreasing fidelity:
+         *   1. Committed `<root>/package-lock.json`
+         *   2. npm's hidden `<root>/node_modules/.package-lock.json`
+         *      (same shape, same data — just written by npm into
+         *      node_modules so projects that gitignore the committed
+         *      lockfile still expose it locally)
+         *   3. Synthesized walk of `<root>/node_modules/*` manifests
+         *      (no dev/peer/optional flags, no nested data)
+         */
         const lockPath = path.join(this._root, 'package-lock.json');
         if (fs.existsSync(lockPath)) {
             return LockfileReader.parse(fs.readFileSync(lockPath, 'utf-8'), 'committed');
@@ -171,9 +175,9 @@ export class ProjectLocal implements Project {
         ];
 
         return {
-            name,
-            version,
-            workspace,
+            name: name,
+            version: version,
+            workspace: workspace,
             dependencies: deps,
             scripts: ProjectLocal._extractScripts(raw.scripts),
             engines: ProjectLocal._extractStringMap(raw.engines),
@@ -222,7 +226,7 @@ export class ProjectLocal implements Project {
 
         for (const [name, version] of Object.entries(block as Record<string, unknown>)) {
             if (typeof version === 'string') {
-                out.push({name, version, type, workspace});
+                out.push({name: name, version: version, type: type, workspace: workspace});
             }
         }
 
@@ -241,7 +245,7 @@ export class ProjectLocal implements Project {
         if (Array.isArray(raw.workspaces)) {
             patterns = raw.workspaces.filter((v): v is string => typeof v === 'string');
         } else if (raw.workspaces && typeof raw.workspaces === 'object') {
-            const ws = raw.workspaces as {packages?: unknown};
+            const ws = raw.workspaces as {packages?: unknown;};
 
             if (Array.isArray(ws.packages)) {
                 patterns = ws.packages.filter((v): v is string => typeof v === 'string');
@@ -276,4 +280,5 @@ export class ProjectLocal implements Project {
 
         return Array.from(out);
     }
+
 }

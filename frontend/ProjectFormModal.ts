@@ -12,8 +12,8 @@ import {I18n} from './I18n.js';
  * returns enough metadata for `name`/`type`/`root`).
  */
 export type ProjectFormMode =
-    | {kind: 'add'}
-    | {kind: 'edit'; project: ApiProject; extras: ApiProjectMutationRequest};
+    | {kind: 'add';}
+    | {kind: 'edit'; project: ApiProject; extras: ApiProjectMutationRequest;};
 
 /**
  * Modal form for adding or editing a project in `nppm.json`.
@@ -359,7 +359,7 @@ export class ProjectFormModal {
         ref?: string;
         token?: string;
         templates?: string[];
-    } {
+        } {
         if (this._mode.kind === 'add') {
             return {type: ConfigProjectType.local};
         }
@@ -396,7 +396,7 @@ export class ProjectFormModal {
             }
         }
         return {
-            type,
+            type: type,
             name: get('.pfm-name'),
             path: get('.pfm-path'),
             repo: get('.pfm-repo'),
@@ -450,4 +450,5 @@ export class ProjectFormModal {
         err.textContent = msg;
         this._panel.appendChild(err);
     }
+
 }

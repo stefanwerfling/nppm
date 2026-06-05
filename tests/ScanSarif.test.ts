@@ -9,22 +9,22 @@ import {UnusedSeverity} from '../backend/Unused/UnusedReport.js';
 
 function heuristic(name: string, version: string): HeuristicsBatchEntry {
     return {
-        name,
-        version,
-        scripts: {name, version, maxSeverity: null, count: 0},
-        patterns: {name, version, maxSeverity: null, count: 0},
-        binaries: {name, version, maxSeverity: null, riskCount: 0, totalCount: 0},
-        maintainer: {name, version, severity: null, publisher: null},
-        license: {name, version, spdx: 'MIT', severity: LicenseSeverity.permissive},
-        provenance: {name, version, level: null},
-        freshness: {name, version, level: null, packageAgeDays: null, maintainerAgeDays: null},
-        cadence: {name, version, level: null, daysSinceLastRelease: null, medianCadenceDays: null},
-        typosquat: {name, version, level: null, closestMatch: null, hasConfusables: false},
-        external: {name, version, level: null, count: 0},
-        deprecation: {name, version, level: null},
-        obfuscation: {name, version, maxSeverity: null, count: 0},
-        manifestRedFlags: {name, version, severity: null, count: 0},
-        capability: {name, version, severity: null, count: 0}
+        name: name,
+        version: version,
+        scripts: {name: name, version: version, maxSeverity: null, count: 0},
+        patterns: {name: name, version: version, maxSeverity: null, count: 0},
+        binaries: {name: name, version: version, maxSeverity: null, riskCount: 0, totalCount: 0},
+        maintainer: {name: name, version: version, severity: null, publisher: null},
+        license: {name: name, version: version, spdx: 'MIT', severity: LicenseSeverity.permissive},
+        provenance: {name: name, version: version, level: null},
+        freshness: {name: name, version: version, level: null, packageAgeDays: null, maintainerAgeDays: null},
+        cadence: {name: name, version: version, level: null, daysSinceLastRelease: null, medianCadenceDays: null},
+        typosquat: {name: name, version: version, level: null, closestMatch: null, hasConfusables: false},
+        external: {name: name, version: version, level: null, count: 0},
+        deprecation: {name: name, version: version, level: null},
+        obfuscation: {name: name, version: version, maxSeverity: null, count: 0},
+        manifestRedFlags: {name: name, version: version, severity: null, count: 0},
+        capability: {name: name, version: version, severity: null, count: 0}
     };
 }
 

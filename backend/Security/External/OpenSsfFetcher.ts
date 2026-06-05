@@ -20,11 +20,11 @@ export type ScorecardRepo = {
  */
 export type ScorecardResult = {
     score: number|null;
-    checks: {name: string; score: number; reason?: string}[];
+    checks: {name: string; score: number; reason?: string;}[];
     repoUrl: string;
 };
 
-type Wrap = {data: ScorecardResult|null};
+type Wrap = {data: ScorecardResult|null;};
 
 /**
  * Fetches the OpenSSF Scorecard for a given repo. The public API
@@ -95,9 +95,9 @@ export class OpenSsfFetcher {
                 continue;
             }
             const reason = typeof cc.reason === 'string' ? cc.reason : undefined;
-            checks.push({name, score: cs, reason});
+            checks.push({name: name, score: cs, reason: reason});
         }
-        return {score, checks, repoUrl};
+        return {score: score, checks: checks, repoUrl: repoUrl};
     }
 
     /**
@@ -124,8 +124,10 @@ export class OpenSsfFetcher {
             return null;
         }
 
-        // npm shorthand `owner/repo` (assumed GitHub) — matches before
-        // the longer host-prefixed patterns so `lodash/lodash` resolves.
+        /*
+         * npm shorthand `owner/repo` (assumed GitHub) — matches before
+         * the longer host-prefixed patterns so `lodash/lodash` resolves.
+         */
         const shorthand = /^([a-z0-9][a-z0-9._-]*)\/([a-z0-9][a-z0-9._-]*)$/i.exec(trimmed);
         if (shorthand) {
             return {host: 'github.com', owner: shorthand[1], repo: OpenSsfFetcher._stripGit(shorthand[2])};
@@ -135,21 +137,21 @@ export class OpenSsfFetcher {
             const shortPrefix = host.split('.')[0]; // 'github' | 'gitlab' | 'bitbucket'
             const prefixMatch = new RegExp(`^${shortPrefix}:([^/]+)/([^/#]+?)(?:#.+)?$`, 'i').exec(trimmed);
             if (prefixMatch) {
-                return {host, owner: prefixMatch[1], repo: OpenSsfFetcher._stripGit(prefixMatch[2])};
+                return {host: host, owner: prefixMatch[1], repo: OpenSsfFetcher._stripGit(prefixMatch[2])};
             }
             const httpMatch = new RegExp(
                 `^(?:git\\+)?https?://${OpenSsfFetcher._escapeHost(host)}/([^/]+)/([^/#?]+?)(?:\\.git)?(?:[/#?].*)?$`,
                 'i'
             ).exec(trimmed);
             if (httpMatch) {
-                return {host, owner: httpMatch[1], repo: OpenSsfFetcher._stripGit(httpMatch[2])};
+                return {host: host, owner: httpMatch[1], repo: OpenSsfFetcher._stripGit(httpMatch[2])};
             }
             const sshMatch = new RegExp(
                 `^git(?:\\+ssh://git)?@${OpenSsfFetcher._escapeHost(host)}[:/]([^/]+)/([^/#]+?)(?:\\.git)?(?:#.+)?$`,
                 'i'
             ).exec(trimmed);
             if (sshMatch) {
-                return {host, owner: sshMatch[1], repo: OpenSsfFetcher._stripGit(sshMatch[2])};
+                return {host: host, owner: sshMatch[1], repo: OpenSsfFetcher._stripGit(sshMatch[2])};
             }
         }
         return null;
@@ -166,4 +168,5 @@ export class OpenSsfFetcher {
     private static _cacheKey(repo: ScorecardRepo): string {
         return `openssf_${repo.host}_${repo.owner}_${repo.repo}`;
     }
+
 }

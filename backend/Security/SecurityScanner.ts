@@ -264,11 +264,13 @@ export class SecurityScanner {
     }
 
     public async scan(name: string, version: string): Promise<SecurityReport> {
-        // OSV, fingerprint, churn, maintainer, and the registry lookup
-        // for the license all hit independent caches/network endpoints
-        // — fire them in parallel. The registry, maintainer, and churn
-        // scans share one packument cache so warm runs are
-        // essentially free.
+        /*
+         * OSV, fingerprint, churn, maintainer, and the registry lookup
+         * for the license all hit independent caches/network endpoints
+         * — fire them in parallel. The registry, maintainer, and churn
+         * scans share one packument cache so warm runs are
+         * essentially free.
+         */
         const [vulns, fingerprint, churn, maintainer, reg, external] = await Promise.all([
             this._osv.query(name, version),
             this._fingerprint.build(name, version),
@@ -277,7 +279,7 @@ export class SecurityScanner {
             this._registry.fetchOne(name),
             this._external
                 ? this._external.scan(name, version)
-                : Promise.resolve({name, version, level: null, findings: []} as ExternalFinding)
+                : Promise.resolve({name: name, version: version, level: null, findings: []} as ExternalFinding)
         ]);
 
         const scriptFindings = ScriptScanner.scan(fingerprint?.manifest ?? null);
@@ -287,18 +289,22 @@ export class SecurityScanner {
         const manifestRedFlags = ManifestRedFlagsScanner.classify(fingerprint?.manifest ?? null);
         const capability = fingerprint ? CapabilityScanner.scan(fingerprint.files) : null;
 
-        // Git-installed packages don't correspond to the registry
-        // entry of the same name — the npm-published `figtree` could
-        // be a 10-year-old unrelated package while the user installs
-        // from `github:owner/figtree`. Skip every name-keyed
-        // registry-derived scanner so the matrix doesn't flag a
-        // brand-new git dep based on someone else's package.
+        /*
+         * Git-installed packages don't correspond to the registry
+         * entry of the same name — the npm-published `figtree` could
+         * be a 10-year-old unrelated package while the user installs
+         * from `github:owner/figtree`. Skip every name-keyed
+         * registry-derived scanner so the matrix doesn't flag a
+         * brand-new git dep based on someone else's package.
+         */
         const isGit = GitResolver.isGitVersion(version);
 
-        // Prefer the manifest license (per-version, can differ between
-        // releases) over the packument license (top-level, version-
-        // agnostic). For git deps the packument belongs to an
-        // unrelated package, so the fallback is suppressed.
+        /*
+         * Prefer the manifest license (per-version, can differ between
+         * releases) over the packument license (top-level, version-
+         * agnostic). For git deps the packument belongs to an
+         * unrelated package, so the fallback is suppressed.
+         */
         const spdx = fingerprint?.manifest?.license
             ?? (isGit ? null : reg?.license)
             ?? null;
@@ -313,25 +319,25 @@ export class SecurityScanner {
         const deprecation = isGit ? null : DeprecationScanner.classify(version, reg);
 
         return {
-            name,
-            version,
-            vulns,
-            scriptFindings,
-            churn,
-            patternFindings,
-            binaryFindings,
-            maintainer,
+            name: name,
+            version: version,
+            vulns: vulns,
+            scriptFindings: scriptFindings,
+            churn: churn,
+            patternFindings: patternFindings,
+            binaryFindings: binaryFindings,
+            maintainer: maintainer,
             license: this._license.classify(spdx),
-            provenance,
-            freshness,
-            cadence,
-            ignoreScripts,
-            typosquat,
-            external,
-            deprecation,
+            provenance: provenance,
+            freshness: freshness,
+            cadence: cadence,
+            ignoreScripts: ignoreScripts,
+            typosquat: typosquat,
+            external: external,
+            deprecation: deprecation,
             obfuscation: obfuscationFindings,
-            manifestRedFlags,
-            capability
+            manifestRedFlags: manifestRedFlags,
+            capability: capability
         };
     }
 
@@ -348,15 +354,15 @@ export class SecurityScanner {
      * reaching into the private `_churn` instance.
      */
     public async scanChurnBatch(
-        packages: {name: string; version: string}[],
+        packages: {name: string; version: string;}[],
         concurrency = 10,
-        onProgress?: (done: number, total: number, pkg: {name: string; version: string}) => void
+        onProgress?: (done: number, total: number, pkg: {name: string; version: string;}) => void
     ): Promise<(ChurnFinding|null)[]> {
         const result: (ChurnFinding|null)[] = new Array(packages.length);
         let cursor = 0;
         let done = 0;
 
-        const runOne = async (): Promise<void> => {
+        const runOne = async(): Promise<void> => {
             while (true) {
                 const i = cursor++;
                 if (i >= packages.length) {
@@ -396,26 +402,28 @@ export class SecurityScanner {
      * are emitted with `maxSeverity: null, count: 0`.
      */
     public async scanHeuristicsBatch(
-        packages: {name: string; version: string}[],
+        packages: {name: string; version: string;}[],
         concurrency = 10,
-        onProgress?: (done: number, total: number, pkg: {name: string; version: string}) => void
+        onProgress?: (done: number, total: number, pkg: {name: string; version: string;}) => void
     ): Promise<HeuristicsBatchEntry[]> {
         const result: HeuristicsBatchEntry[] = new Array(packages.length);
         let cursor = 0;
         let done = 0;
 
-        const runOne = async (): Promise<void> => {
+        const runOne = async(): Promise<void> => {
             while (true) {
                 const i = cursor++;
                 if (i >= packages.length) {
                     return;
                 }
                 const pkg = packages[i];
-                // Fingerprint download (slow on cold start) and the
-                // registry-based scans (maintainer + license + external)
-                // all run in parallel. The registry/maintainer/external
-                // calls share the packument cache so warm runs are
-                // instant; external also hits its own three TTL caches.
+                /*
+                 * Fingerprint download (slow on cold start) and the
+                 * registry-based scans (maintainer + license + external)
+                 * all run in parallel. The registry/maintainer/external
+                 * calls share the packument cache so warm runs are
+                 * instant; external also hits its own three TTL caches.
+                 */
                 const externalP = this._external
                     ? this._external.scan(pkg.name, pkg.version)
                     : Promise.resolve({name: pkg.name, version: pkg.version, level: null, findings: []} as ExternalFinding);
@@ -426,11 +434,13 @@ export class SecurityScanner {
                     externalP
                 ]);
 
-                // Git deps share a name with whatever was pushed to
-                // npm under the same identifier; the registry packument
-                // belongs to that unrelated package. Suppress every
-                // packument-derived fallback so the matrix doesn't
-                // report a foreign package's license or provenance.
+                /*
+                 * Git deps share a name with whatever was pushed to
+                 * npm under the same identifier; the registry packument
+                 * belongs to that unrelated package. Suppress every
+                 * packument-derived fallback so the matrix doesn't
+                 * report a foreign package's license or provenance.
+                 */
                 const isGit = GitResolver.isGitVersion(pkg.version);
                 const spdx = fingerprint?.manifest?.license
                     ?? (isGit ? null : reg?.license)
@@ -484,7 +494,7 @@ export class SecurityScanner {
                     provenance: {
                         name: pkg.name,
                         version: pkg.version,
-                        level: isGit ? null : (ProvenanceScanner.classify(reg?.dist?.[pkg.version])?.level ?? null)
+                        level: isGit ? null : ProvenanceScanner.classify(reg?.dist?.[pkg.version])?.level ?? null
                     },
                     freshness: SecurityScanner._freshnessSummary(
                         pkg.name, pkg.version,
@@ -522,14 +532,16 @@ export class SecurityScanner {
         firstPublishedAt: string|null,
         maintainerCreatedAt: string|null
     ): FreshnessSummary {
-        // Git-installed packages: registry data is for an unrelated
-        // npm name-collision (see scan() for the figtree example).
+        /*
+         * Git-installed packages: registry data is for an unrelated
+         * npm name-collision (see scan() for the figtree example).
+         */
         const finding = GitResolver.isGitVersion(version)
             ? null
-            : FreshnessScanner.classify({firstPublishedAt, maintainerCreatedAt});
+            : FreshnessScanner.classify({firstPublishedAt: firstPublishedAt, maintainerCreatedAt: maintainerCreatedAt});
         return {
-            name,
-            version,
+            name: name,
+            version: version,
             level: finding?.level ?? null,
             packageAgeDays: finding?.packageAgeDays ?? null,
             maintainerAgeDays: finding?.maintainerAgeDays ?? null
@@ -544,8 +556,8 @@ export class SecurityScanner {
             ? null
             : TyposquatScanner.classify(name);
         return {
-            name,
-            version,
+            name: name,
+            version: version,
             level: finding?.level ?? null,
             closestMatch: finding?.closestMatch ?? null,
             hasConfusables: finding?.hasConfusables ?? false
@@ -560,7 +572,7 @@ export class SecurityScanner {
         const finding = GitResolver.isGitVersion(version)
             ? null
             : DeprecationScanner.classify(version, pkg);
-        return {name, version, level: finding?.level ?? null};
+        return {name: name, version: version, level: finding?.level ?? null};
     }
 
     private static _cadenceSummary(
@@ -572,8 +584,8 @@ export class SecurityScanner {
             ? null
             : CadenceScanner.classify(timeMap);
         return {
-            name,
-            version,
+            name: name,
+            version: version,
             level: finding?.level ?? null,
             daysSinceLastRelease: finding?.daysSinceLastRelease ?? null,
             medianCadenceDays: finding?.medianCadenceDays ?? null
@@ -605,4 +617,5 @@ export class SecurityScanner {
         }
         return best;
     }
+
 }

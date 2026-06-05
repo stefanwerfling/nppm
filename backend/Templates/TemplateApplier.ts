@@ -17,7 +17,7 @@ export type TemplateApplyOutcome = {
 };
 
 export type TemplateApplyResult = {
-    backup: {dir: string; files: string[]}|null;
+    backup: {dir: string; files: string[];}|null;
     outcomes: TemplateApplyOutcome[];
 };
 
@@ -27,13 +27,13 @@ export type TemplateApplyResult = {
  * disambiguates between root-level and per-workspace targets.
  */
 type ParsedTarget =
-    | {kind: 'package'; bucket: 'runtime'|'dev'|'peer'|'optional'; name: string; workspace?: string}
-    | {kind: 'forbidden'; name: string; workspace?: string}
-    | {kind: 'extra'; name: string; workspace?: string}
-    | {kind: 'root'; key: string; workspace?: string}
-    | {kind: 'file'; path: string; workspace?: string}
-    | {kind: 'workspace-missing'; workspace: string}
-    | {kind: 'unknown'};
+    | {kind: 'package'; bucket: 'runtime'|'dev'|'peer'|'optional'; name: string; workspace?: string;}
+    | {kind: 'forbidden'; name: string; workspace?: string;}
+    | {kind: 'extra'; name: string; workspace?: string;}
+    | {kind: 'root'; key: string; workspace?: string;}
+    | {kind: 'file'; path: string; workspace?: string;}
+    | {kind: 'workspace-missing'; workspace: string;}
+    | {kind: 'unknown';};
 
 const BUCKET_FIELD: Record<'runtime'|'dev'|'peer'|'optional', string> = {
     runtime: 'dependencies',
@@ -71,8 +71,10 @@ export class TemplateApplier {
     }): TemplateApplyResult {
         const parsedTargets = opts.selectedTargets.map(TemplateApplier._parseTarget);
 
-        // Bucket the targets per affected file so we can read + mutate
-        // + write each file exactly once.
+        /*
+         * Bucket the targets per affected file so we can read + mutate
+         * + write each file exactly once.
+         */
         const fileGroups = new Map<string, ParsedTarget[]>();
         const fileShipTargets: ParsedTarget[] = [];
         const skips: TemplateApplyOutcome[] = [];
@@ -98,8 +100,10 @@ export class TemplateApplier {
             fileGroups.set(pkgJson, arr);
         }
 
-        // Collect every file we'll write to so the backup is complete
-        // before the first mutation.
+        /*
+         * Collect every file we'll write to so the backup is complete
+         * before the first mutation.
+         */
         const filesToBackup = new Set<string>();
         for (const f of fileGroups.keys()) {
             if (fs.existsSync(f)) {
@@ -158,8 +162,10 @@ export class TemplateApplier {
                 opts.onProgress?.(counter, total, outcome);
             }
 
-            // Write back the mutated JSON, preserving indent + trailing
-            // newline like PackageJsonEditor does.
+            /*
+             * Write back the mutated JSON, preserving indent + trailing
+             * newline like PackageJsonEditor does.
+             */
             const indent = TemplateApplier._detectIndent(source);
             const trailing = source.endsWith('\n') ? '\n' : '';
             const after = JSON.stringify(parsed, null, indent) + trailing;
@@ -193,7 +199,7 @@ export class TemplateApplier {
 
         return {
             backup: backupStamp ? {dir: backupStamp.dir, files: backupStamp.files} : null,
-            outcomes
+            outcomes: outcomes
         };
     }
 
@@ -291,7 +297,7 @@ export class TemplateApplier {
         }
         if (key === 'packageManager' && root.packageManager !== undefined) {
             parsed.packageManager = root.packageManager;
-            return;
+            
         }
     }
 
@@ -317,10 +323,12 @@ export class TemplateApplier {
             return false;
         }
         const obj = b as Record<string, string>;
-        if (Object.prototype.hasOwnProperty.call(obj, name)) {
+        if (Object.hasOwn(obj, name)) {
             delete obj[name];
-            // If bucket is now empty, drop it from the package.json
-            // to keep the file clean.
+            /*
+             * If bucket is now empty, drop it from the package.json
+             * to keep the file clean.
+             */
             if (Object.keys(obj).length === 0) {
                 delete parsed[bucket];
             }
@@ -337,7 +345,7 @@ export class TemplateApplier {
      * leave alone", never "overwrite".
      */
     private static _applyFileShip(
-        t: Extract<ParsedTarget, {kind: 'file'}>,
+        t: Extract<ParsedTarget, {kind: 'file';}>,
         projectRoot: string,
         template: ResolvedTemplate
     ): TemplateApplyOutcome {
@@ -434,10 +442,12 @@ export class TemplateApplier {
     }
 
     private static _packageJsonFor(workspace: string|undefined, projectRoot: string): string {
-        // Both `workspace` and `relPath` can ultimately originate from a
-        // remote template the user added, so contain them via SafePath
-        // — `../../etc/...` segments throw instead of silently writing
-        // outside the project root.
+        /*
+         * Both `workspace` and `relPath` can ultimately originate from a
+         * remote template the user added, so contain them via SafePath
+         * — `../../etc/...` segments throw instead of silently writing
+         * outside the project root.
+         */
         if (workspace === undefined || workspace.length === 0) {
             return SafePath.join(projectRoot, 'package.json');
         }
@@ -507,8 +517,10 @@ export class TemplateApplier {
         if (rest.startsWith('workspace:')) {
             // `workspace:<path>` (bare) or `workspace:<path>:<rest>`.
             const after = rest.slice('workspace:'.length);
-            // The workspace path itself can contain `/` but never `:`
-            // in our emit; find the first colon.
+            /*
+             * The workspace path itself can contain `/` but never `:`
+             * in our emit; find the first colon.
+             */
             const colon = after.indexOf(':');
             if (colon < 0) {
                 return {kind: 'workspace-missing', workspace: after};
@@ -517,18 +529,18 @@ export class TemplateApplier {
             rest = after.slice(colon + 1);
         }
         if (rest.startsWith('file:')) {
-            return {kind: 'file', path: rest.slice('file:'.length), workspace};
+            return {kind: 'file', path: rest.slice('file:'.length), workspace: workspace};
         }
         if (rest.startsWith('forbidden:')) {
-            return {kind: 'forbidden', name: rest.slice('forbidden:'.length), workspace};
+            return {kind: 'forbidden', name: rest.slice('forbidden:'.length), workspace: workspace};
         }
         if (rest.startsWith('extra:')) {
-            return {kind: 'extra', name: rest.slice('extra:'.length), workspace};
+            return {kind: 'extra', name: rest.slice('extra:'.length), workspace: workspace};
         }
         for (const b of ['runtime', 'dev', 'peer', 'optional'] as const) {
             const prefix = `${b}:`;
             if (rest.startsWith(prefix)) {
-                return {kind: 'package', bucket: b, name: rest.slice(prefix.length), workspace};
+                return {kind: 'package', bucket: b, name: rest.slice(prefix.length), workspace: workspace};
             }
         }
         // Root metadata: `engines.<k>`, `scripts.<k>`, `private`, `type`, `packageManager`.
@@ -539,8 +551,9 @@ export class TemplateApplier {
             || rest === 'type'
             || rest === 'packageManager'
         ) {
-            return {kind: 'root', key: rest, workspace};
+            return {kind: 'root', key: rest, workspace: workspace};
         }
         return {kind: 'unknown'};
     }
+
 }

@@ -17,7 +17,7 @@ function seedOsv(cache: JsonCache, name: string, version: string, vulns: OsvVuln
     cache.set(`osv_${name}@${version}`, {data: vulns});
 }
 
-function entry(args: Partial<HistoryEntry> & {timestamp: number}): HistoryEntry {
+function entry(args: Partial<HistoryEntry> & {timestamp: number;}): HistoryEntry {
     return {
         timestamp: args.timestamp,
         lockfileSource: args.lockfileSource ?? 'committed',
@@ -165,8 +165,10 @@ describe('TimelineBuilder', () => {
         const builder = new TimelineBuilder(cache);
         const out = builder.build(FAKE_PROJECT, history, false);
 
-        // pkg@1.0.0 was upgraded away before the CVE was disclosed —
-        // no exposure should be reported for that version.
+        /*
+         * pkg@1.0.0 was upgraded away before the CVE was disclosed —
+         * no exposure should be reported for that version.
+         */
         const v1 = out.exposures.filter((e) => e.version === '1.0.0');
         expect(v1).toEqual([]);
     });
@@ -213,9 +215,11 @@ describe('TimelineBuilder', () => {
             modified: null
         }]);
 
-        // Package is in lastSnapshot but never explicitly added by an
-        // entry — simulating "was already in node_modules when nppm
-        // first ran on this project, no git backfill yet".
+        /*
+         * Package is in lastSnapshot but never explicitly added by an
+         * entry — simulating "was already in node_modules when nppm
+         * first ran on this project, no git backfill yet".
+         */
         const history: HistoryFile = {
             projectKey: 'k',
             projectName: 'demo',

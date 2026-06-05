@@ -10,7 +10,7 @@ import {HistoryFile} from '../History/History.js';
 export type ProjectGrowthSeries = {
     unid: string;
     name: string;
-    points: {timestamp: string; count: number}[];
+    points: {timestamp: string; count: number;}[];
 };
 
 /**
@@ -89,7 +89,7 @@ export class DashboardGrowthBuilder {
             series.push({unid: p.unid, name: p.name, points: clipped});
         }
         const total = DashboardGrowthBuilder._ecosystemTotal(series);
-        return {series, total};
+        return {series: series, total: total};
     }
 
     /**
@@ -98,11 +98,11 @@ export class DashboardGrowthBuilder {
      * (empty file, no lastSnapshot). Public so tests can exercise the
      * replay without going through `build`.
      */
-    public static replay(history: HistoryFile): {timestamp: string; count: number}[] {
+    public static replay(history: HistoryFile): {timestamp: string; count: number;}[] {
         return DashboardGrowthBuilder._replay(history);
     }
 
-    private static _replay(history: HistoryFile): {timestamp: string; count: number}[] {
+    private static _replay(history: HistoryFile): {timestamp: string; count: number;}[] {
         if (!history.lastSnapshot) {
             return [];
         }
@@ -113,13 +113,15 @@ export class DashboardGrowthBuilder {
         }
         const baseline = finalCount - netDelta;
 
-        const out: {timestamp: string; count: number}[] = [];
+        const out: {timestamp: string; count: number;}[] = [];
 
-        // Anchor the baseline at one millisecond before the first
-        // entry so the line has a flat start instead of a vertical
-        // jump from 0 → baseline at entry_0. When there are no
-        // entries, the baseline equals the lastSnapshot and one point
-        // suffices.
+        /*
+         * Anchor the baseline at one millisecond before the first
+         * entry so the line has a flat start instead of a vertical
+         * jump from 0 → baseline at entry_0. When there are no
+         * entries, the baseline equals the lastSnapshot and one point
+         * suffices.
+         */
         if (history.entries.length === 0) {
             out.push({
                 timestamp: new Date(history.lastSnapshot.timestamp).toISOString(),
@@ -143,11 +145,13 @@ export class DashboardGrowthBuilder {
             });
         }
 
-        // Append the latest snapshot timestamp when it post-dates the
-        // last entry — the snapshot can advance without a delta when
-        // the user re-ran `npm install` and the lockfile didn't
-        // actually change. Avoids the trend chart looking stale at the
-        // right edge.
+        /*
+         * Append the latest snapshot timestamp when it post-dates the
+         * last entry — the snapshot can advance without a delta when
+         * the user re-ran `npm install` and the lockfile didn't
+         * actually change. Avoids the trend chart looking stale at the
+         * right edge.
+         */
         const lastEntryTs = history.entries[history.entries.length - 1].timestamp;
         if (history.lastSnapshot.timestamp > lastEntryTs) {
             out.push({
@@ -164,14 +168,14 @@ export class DashboardGrowthBuilder {
      * edge. `sinceMs <= 0` returns the input untouched.
      */
     private static _clipToCutoff(
-        points: {timestamp: string; count: number}[],
+        points: {timestamp: string; count: number;}[],
         sinceMs: number
-    ): {timestamp: string; count: number}[] {
+    ): {timestamp: string; count: number;}[] {
         if (sinceMs <= 0) {
             return points;
         }
-        let anchor: {timestamp: string; count: number}|null = null;
-        const inside: {timestamp: string; count: number}[] = [];
+        let anchor: {timestamp: string; count: number;}|null = null;
+        const inside: {timestamp: string; count: number;}[] = [];
         for (const p of points) {
             const t = new Date(p.timestamp).getTime();
             if (t < sinceMs) {
@@ -181,14 +185,18 @@ export class DashboardGrowthBuilder {
             }
         }
         if (inside.length === 0) {
-            // Range falls entirely after the last event — carry the
-            // last known count forward as a single point so the
-            // project's line is still visible.
+            /*
+             * Range falls entirely after the last event — carry the
+             * last known count forward as a single point so the
+             * project's line is still visible.
+             */
             return anchor ? [anchor] : [];
         }
         if (anchor) {
-            // Re-stamp the anchor to the cutoff so the line starts
-            // exactly at the left edge instead of one tick beyond it.
+            /*
+             * Re-stamp the anchor to the cutoff so the line starts
+             * exactly at the left edge instead of one tick beyond it.
+             */
             return [
                 {timestamp: new Date(sinceMs).toISOString(), count: anchor.count},
                 ...inside
@@ -205,7 +213,7 @@ export class DashboardGrowthBuilder {
      * instant).
      */
     private static _ecosystemTotal(series: ProjectGrowthSeries[]): EcosystemGrowthPoint[] {
-        type Event = {ts: number; unid: string; count: number};
+        type Event = {ts: number; unid: string; count: number;};
         const events: Event[] = [];
         for (const s of series) {
             for (const p of s.points) {
@@ -218,9 +226,11 @@ export class DashboardGrowthBuilder {
         const out: EcosystemGrowthPoint[] = [];
         let i = 0;
         while (i < events.length) {
-            // Drain all events that share this exact timestamp so the
-            // emitted total reflects every per-project update at that
-            // instant, not just the first one in encounter order.
+            /*
+             * Drain all events that share this exact timestamp so the
+             * emitted total reflects every per-project update at that
+             * instant, not just the first one in encounter order.
+             */
             const ts = events[i].ts;
             while (i < events.length && events[i].ts === ts) {
                 latest.set(events[i].unid, events[i].count);
@@ -234,4 +244,5 @@ export class DashboardGrowthBuilder {
         }
         return out;
     }
+
 }

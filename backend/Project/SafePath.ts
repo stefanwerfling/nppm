@@ -37,4 +37,5 @@ export class SafePath {
             `path escapes project root: ${parts.join('/')} (resolved to ${candidate})`
         );
     }
+
 }

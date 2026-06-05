@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
-import {ConfigProjectType} from '../Config/Config.js';
-import {RemoteGitHistoryBackfill} from '../History/RemoteGitHistoryBackfill.js';
-import {ProjectRemote, RemoteCommit} from '../Project/ProjectRemote.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
+import {RemoteGitHistoryBackfill} from '../backend/History/RemoteGitHistoryBackfill.js';
+import {ProjectRemote, RemoteCommit} from '../backend/Project/ProjectRemote.js';
 
 /**
  * Test double for `ProjectRemote` that fills the commit-listing

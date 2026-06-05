@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {IgnoreScriptsLevel, IgnoreScriptsScanner} from '../Security/IgnoreScriptsScanner.js';
-import {ScriptFinding, ScriptSeverity} from '../Security/ScriptScanner.js';
+import {IgnoreScriptsLevel, IgnoreScriptsScanner} from '../backend/Security/IgnoreScriptsScanner.js';
+import {ScriptFinding, ScriptSeverity} from '../backend/Security/ScriptScanner.js';
 
 function finding(opts: Partial<ScriptFinding> & {hook: string; script: string}): ScriptFinding {
     return {

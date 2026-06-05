@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {PackageTrendsBuilder} from '../Package/PackageTrendsBuilder.js';
-import {RegistryPackage} from '../Registry/Registry.js';
+import {PackageTrendsBuilder} from '../backend/Package/PackageTrendsBuilder.js';
+import {RegistryPackage} from '../backend/Registry/Registry.js';
 
 const mkPkg = (overrides: Partial<RegistryPackage>): RegistryPackage => ({
     name: 'demo',

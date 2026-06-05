@@ -2,12 +2,12 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {Registry} from '../Registry/Registry.js';
-import {DepsDevFetcher} from '../Security/External/DepsDevFetcher.js';
-import {OpenSsfFetcher} from '../Security/External/OpenSsfFetcher.js';
-import {SocketDevFetcher} from '../Security/External/SocketDevFetcher.js';
-import {ExternalSeverity, ExternalSourcesScanner} from '../Security/ExternalSourcesScanner.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {Registry} from '../backend/Registry/Registry.js';
+import {DepsDevFetcher} from '../backend/Security/External/DepsDevFetcher.js';
+import {OpenSsfFetcher} from '../backend/Security/External/OpenSsfFetcher.js';
+import {SocketDevFetcher} from '../backend/Security/External/SocketDevFetcher.js';
+import {ExternalSeverity, ExternalSourcesScanner} from '../backend/Security/ExternalSourcesScanner.js';
 
 type StubResponse = {ok: boolean; status?: number; body?: unknown};
 

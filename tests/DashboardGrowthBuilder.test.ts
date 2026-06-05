@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {DashboardGrowthBuilder} from '../Dashboard/DashboardGrowthBuilder.js';
-import {HistoryEntry, HistoryFile} from '../History/History.js';
+import {DashboardGrowthBuilder} from '../backend/Dashboard/DashboardGrowthBuilder.js';
+import {HistoryEntry, HistoryFile} from '../backend/History/History.js';
 
 const mkEntry = (
     timestamp: number,

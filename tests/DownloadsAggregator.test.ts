@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {DownloadsAggregator} from '../Dashboard/DownloadsAggregator.js';
+import {DownloadsAggregator} from '../backend/Dashboard/DownloadsAggregator.js';
 
 describe('DownloadsAggregator.fold', () => {
     it('sums per-project distinct-name downloads', () => {

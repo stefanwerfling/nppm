@@ -4,8 +4,8 @@ import os from 'os';
 import path from 'path';
 import zlib from 'zlib';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {FingerprintBuilder} from '../Fingerprint/FingerprintBuilder.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {FingerprintBuilder} from '../backend/Fingerprint/FingerprintBuilder.js';
 
 const BLOCK = 512;
 

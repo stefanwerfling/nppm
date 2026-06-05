@@ -1,4 +1,4 @@
-import {ApiFsBrowseResponse} from '../Api/ApiTypes.js';
+import {ApiFsBrowseResponse} from '../shared/Api/ApiTypes.js';
 import {I18n} from './I18n.js';
 
 /**

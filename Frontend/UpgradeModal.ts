@@ -3,7 +3,7 @@ import {
     ApiLifecycleScriptsResponse,
     ApiUpgradePreviewResponse,
     ApiUpgradeRequest
-} from '../Api/ApiTypes.js';
+} from '../shared/Api/ApiTypes.js';
 import {Api} from './Api.js';
 import {I18n} from './I18n.js';
 

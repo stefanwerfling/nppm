@@ -1,5 +1,5 @@
 import {hierarchy, tree, HierarchyPointNode} from 'd3-hierarchy';
-import {DepGraphNode, DepGraphResponse, DepGraphStatus} from '../DepGraph/DepGraphBuilder.js';
+import {DepGraphNode, DepGraphResponse, DepGraphStatus} from '../backend/DepGraph/DepGraphBuilder.js';
 import {Api} from './Api.js';
 import {I18n} from './I18n.js';
 

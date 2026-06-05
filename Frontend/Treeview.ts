@@ -1,5 +1,5 @@
-import {ApiProject} from '../Api/ApiTypes.js';
-import {ConfigProjectType} from '../Config/Config.js';
+import {ApiProject} from '../shared/Api/ApiTypes.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
 import {I18n} from './I18n.js';
 
 /**

@@ -2,13 +2,13 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {ConfigProjectType} from '../Config/Config.js';
-import {MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
-import {ProjectMatrixBuilder} from '../Matrix/ProjectMatrixBuilder.js';
-import {DependencyType, PackageManifest} from '../Project/PackageManifest.js';
-import {Project} from '../Project/Project.js';
-import {Registry, RegistryPackage} from '../Registry/Registry.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
+import {MatrixRowStatus} from '../backend/Matrix/MatrixBuilder.js';
+import {ProjectMatrixBuilder} from '../backend/Matrix/ProjectMatrixBuilder.js';
+import {DependencyType, PackageManifest} from '../backend/Project/PackageManifest.js';
+import {Project} from '../backend/Project/Project.js';
+import {Registry, RegistryPackage} from '../backend/Registry/Registry.js';
 
 function manifest(name: string, deps: Record<string, string>, workspace?: string): PackageManifest {
     return {

@@ -1,21 +1,21 @@
-import {ConfigProjectType} from '../Config/Config.js';
-import {DepGraphResponse} from '../DepGraph/DepGraphBuilder.js';
-import {FingerprintDiff, PackageFingerprint} from '../Fingerprint/Fingerprint.js';
-import {HistoryEntry} from '../History/History.js';
-import {ProjectMatrixResponse} from '../Matrix/ProjectMatrixBuilder.js';
-import {Lockfile} from '../Project/Lockfile.js';
-import {PackageDependency} from '../Project/PackageManifest.js';
-import {ReleasesResponse} from '../Releases/Releases.js';
-import {IntegrityFinding, IntegritySeverity, IntegritySummary} from '../Security/IntegrityScanner.js';
-import {DashboardCell, DashboardColumn, DashboardResponse, ScannerId} from '../Dashboard/DashboardBuilder.js';
-import {DashboardHistoryEntry} from '../Dashboard/DashboardHistoryStore.js';
-import {DashboardGrowth} from '../Dashboard/DashboardGrowthBuilder.js';
-import {PackageTrendsResponse} from '../Package/PackageTrendsBuilder.js';
-import {ImpactReport} from '../Security/ImpactAnalyzer.js';
-import {HeuristicsBatchEntry, SecurityReport} from '../Security/SecurityScanner.js';
-import {PrReviewReport} from '../PrReview/PrReview.js';
-import {UnusedReport} from '../Unused/UnusedReport.js';
-import {VulnerabilityTimelineResponse} from '../Vulnerability/Timeline.js';
+import {ConfigProjectType} from '../../backend/Config/Config.js';
+import {DepGraphResponse} from '../../backend/DepGraph/DepGraphBuilder.js';
+import {FingerprintDiff, PackageFingerprint} from '../../backend/Fingerprint/Fingerprint.js';
+import {HistoryEntry} from '../../backend/History/History.js';
+import {ProjectMatrixResponse} from '../../backend/Matrix/ProjectMatrixBuilder.js';
+import {Lockfile} from '../../backend/Project/Lockfile.js';
+import {PackageDependency} from '../../backend/Project/PackageManifest.js';
+import {ReleasesResponse} from '../../backend/Releases/Releases.js';
+import {IntegrityFinding, IntegritySeverity, IntegritySummary} from '../../backend/Security/IntegrityScanner.js';
+import {DashboardCell, DashboardColumn, DashboardResponse, ScannerId} from '../../backend/Dashboard/DashboardBuilder.js';
+import {DashboardHistoryEntry} from '../../backend/Dashboard/DashboardHistoryStore.js';
+import {DashboardGrowth} from '../../backend/Dashboard/DashboardGrowthBuilder.js';
+import {PackageTrendsResponse} from '../../backend/Package/PackageTrendsBuilder.js';
+import {ImpactReport} from '../../backend/Security/ImpactAnalyzer.js';
+import {HeuristicsBatchEntry, SecurityReport} from '../../backend/Security/SecurityScanner.js';
+import {PrReviewReport} from '../../backend/PrReview/PrReview.js';
+import {UnusedReport} from '../../backend/Unused/UnusedReport.js';
+import {VulnerabilityTimelineResponse} from '../../backend/Vulnerability/Timeline.js';
 
 /**
  * One project as returned by `GET /api/projects`. `error` is populated

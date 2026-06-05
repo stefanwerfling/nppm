@@ -2,12 +2,12 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import {SchemaErrors} from 'vts';
-import {SchemaConfig} from '../Config/Config.js';
-import {ConfigLoader, LoadedConfig} from '../Config/ConfigLoader.js';
-import {Project} from '../Project/Project.js';
-import {CycloneDxBuilder} from '../Sbom/CycloneDxBuilder.js';
-import {SbomCollector} from '../Sbom/SbomCollector.js';
-import {SpdxBuilder} from '../Sbom/SpdxBuilder.js';
+import {SchemaConfig} from '../backend/Config/Config.js';
+import {ConfigLoader, LoadedConfig} from '../backend/Config/ConfigLoader.js';
+import {Project} from '../backend/Project/Project.js';
+import {CycloneDxBuilder} from '../backend/Sbom/CycloneDxBuilder.js';
+import {SbomCollector} from '../backend/Sbom/SbomCollector.js';
+import {SpdxBuilder} from '../backend/Sbom/SpdxBuilder.js';
 
 /**
  * Output format the SBOM CLI emits. Mirrored on `--format` and the

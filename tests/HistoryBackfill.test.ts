@@ -2,8 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {HistoryEntry} from '../History/History.js';
-import {HistoryStore} from '../History/HistoryStore.js';
+import {HistoryEntry} from '../backend/History/History.js';
+import {HistoryStore} from '../backend/History/HistoryStore.js';
 
 function gitEntry(ts: number, sha: string, added: {name: string; version: string}[]): HistoryEntry {
     return {

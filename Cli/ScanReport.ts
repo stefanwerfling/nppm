@@ -1,16 +1,16 @@
-import {ConfigProjectType} from '../Config/Config.js';
-import {BinarySeverity} from '../Security/BinaryScanner.js';
-import {CapabilitySeverity} from '../Security/CapabilityScanner.js';
-import {DeprecationLevel} from '../Security/DeprecationScanner.js';
-import {ExternalSeverity} from '../Security/ExternalSourcesScanner.js';
-import {ManifestRedFlagSeverity} from '../Security/ManifestRedFlagsScanner.js';
-import {ObfuscationSeverity} from '../Security/ObfuscationScanner.js';
-import {LicenseSeverity} from '../Security/LicenseScanner.js';
-import {MaintainerSeverity} from '../Security/MaintainerScanner.js';
-import {PatternSeverity} from '../Security/PatternScanner.js';
-import {ScriptSeverity} from '../Security/ScriptScanner.js';
-import {HeuristicsBatchEntry} from '../Security/SecurityScanner.js';
-import {UnusedReport, UnusedSeverity} from '../Unused/UnusedReport.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
+import {BinarySeverity} from '../backend/Security/BinaryScanner.js';
+import {CapabilitySeverity} from '../backend/Security/CapabilityScanner.js';
+import {DeprecationLevel} from '../backend/Security/DeprecationScanner.js';
+import {ExternalSeverity} from '../backend/Security/ExternalSourcesScanner.js';
+import {ManifestRedFlagSeverity} from '../backend/Security/ManifestRedFlagsScanner.js';
+import {ObfuscationSeverity} from '../backend/Security/ObfuscationScanner.js';
+import {LicenseSeverity} from '../backend/Security/LicenseScanner.js';
+import {MaintainerSeverity} from '../backend/Security/MaintainerScanner.js';
+import {PatternSeverity} from '../backend/Security/PatternScanner.js';
+import {ScriptSeverity} from '../backend/Security/ScriptScanner.js';
+import {HeuristicsBatchEntry} from '../backend/Security/SecurityScanner.js';
+import {UnusedReport, UnusedSeverity} from '../backend/Unused/UnusedReport.js';
 
 /**
  * Unified severity ladder the CLI uses for `--fail-on`. Each scanner

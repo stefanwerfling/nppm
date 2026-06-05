@@ -1,11 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 import {SchemaErrors} from 'vts';
-import {SchemaConfig} from '../Config/Config.js';
-import {ConfigLoader, LoadedConfig} from '../Config/ConfigLoader.js';
-import {ProjectLocal} from '../Project/ProjectLocal.js';
-import {PrReviewBuilder} from '../PrReview/PrReviewBuilder.js';
-import {PrReviewReport} from '../PrReview/PrReview.js';
+import {SchemaConfig} from '../backend/Config/Config.js';
+import {ConfigLoader, LoadedConfig} from '../backend/Config/ConfigLoader.js';
+import {ProjectLocal} from '../backend/Project/ProjectLocal.js';
+import {PrReviewBuilder} from '../backend/PrReview/PrReviewBuilder.js';
+import {PrReviewReport} from '../backend/PrReview/PrReview.js';
 import {ActionFormatter} from './ActionFormat.js';
 import {GithubClient} from './GithubClient.js';
 import {runScan} from './Scan.js';

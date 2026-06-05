@@ -2,8 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {NpmDownloadsFetcher} from '../Downloads/NpmDownloadsFetcher.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {NpmDownloadsFetcher} from '../backend/Downloads/NpmDownloadsFetcher.js';
 
 describe('NpmDownloadsFetcher', () => {
     let dir: string;

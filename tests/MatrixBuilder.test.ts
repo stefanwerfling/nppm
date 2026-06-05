@@ -2,12 +2,12 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {ConfigProjectType} from '../Config/Config.js';
-import {MatrixBuilder, MatrixRowStatus} from '../Matrix/MatrixBuilder.js';
-import {DependencyType, PackageManifest} from '../Project/PackageManifest.js';
-import {Project} from '../Project/Project.js';
-import {Registry, RegistryPackage} from '../Registry/Registry.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
+import {MatrixBuilder, MatrixRowStatus} from '../backend/Matrix/MatrixBuilder.js';
+import {DependencyType, PackageManifest} from '../backend/Project/PackageManifest.js';
+import {Project} from '../backend/Project/Project.js';
+import {Registry, RegistryPackage} from '../backend/Registry/Registry.js';
 
 /**
  * A fake Project whose manifests are inlined. Lets the matrix

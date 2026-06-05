@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {TemplateLoader} from '../Templates/TemplateLoader.js';
+import {TemplateLoader} from '../backend/Templates/TemplateLoader.js';
 
 describe('TemplateLoader', () => {
     let tmp = '';

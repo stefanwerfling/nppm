@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {LockfileReader} from '../Project/Lockfile.js';
+import {LockfileReader} from '../backend/Project/Lockfile.js';
 
 /**
  * In-memory fs-like adapter for `scanNodeModules`. Keys are absolute

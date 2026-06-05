@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {TyposquatLevel, TyposquatScanner} from '../Security/TyposquatScanner.js';
+import {TyposquatLevel, TyposquatScanner} from '../backend/Security/TyposquatScanner.js';
 
 describe('TyposquatScanner.levenshtein', () => {
     it('returns 0 for identical strings', () => {

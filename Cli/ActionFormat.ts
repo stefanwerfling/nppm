@@ -1,4 +1,4 @@
-import {PrChangeKind, PrDepChange, PrReviewReport} from '../PrReview/PrReview.js';
+import {PrChangeKind, PrDepChange, PrReviewReport} from '../backend/PrReview/PrReview.js';
 
 /**
  * Static marker the bot looks for to find its own previous comment

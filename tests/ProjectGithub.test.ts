@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {ProjectGithub} from '../Project/ProjectGithub.js';
+import {ProjectGithub} from '../backend/Project/ProjectGithub.js';
 
 /**
  * `getKey()` is `github:<repo>@<ref>` so we use it as a witness for

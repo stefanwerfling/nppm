@@ -2,8 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {BundlephobiaFetcher} from '../Bundle/BundlephobiaFetcher.js';
-import {JsonCache} from '../Cache/JsonCache.js';
+import {BundlephobiaFetcher} from '../backend/Bundle/BundlephobiaFetcher.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
 
 /**
  * Replace the global fetch with a fixed-response stub for the

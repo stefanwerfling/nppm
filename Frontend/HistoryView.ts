@@ -4,8 +4,8 @@ import {
     ApiHistoryBackfillProgressEvent,
     ApiHistoryBackfillStartEvent,
     ApiHistoryResponse
-} from '../Api/ApiTypes.js';
-import {HistoryAdded, HistoryEntry, HistoryRemoved, HistoryUpdate} from '../History/History.js';
+} from '../shared/Api/ApiTypes.js';
+import {HistoryAdded, HistoryEntry, HistoryRemoved, HistoryUpdate} from '../backend/History/History.js';
 import {Api} from './Api.js';
 import {I18n} from './I18n.js';
 

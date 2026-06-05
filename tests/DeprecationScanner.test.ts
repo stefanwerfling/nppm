@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {RegistryPackage} from '../Registry/Registry.js';
-import {DeprecationLevel, DeprecationScanner} from '../Security/DeprecationScanner.js';
+import {RegistryPackage} from '../backend/Registry/Registry.js';
+import {DeprecationLevel, DeprecationScanner} from '../backend/Security/DeprecationScanner.js';
 
 function makePkg(over: Partial<RegistryPackage>): RegistryPackage {
     return {

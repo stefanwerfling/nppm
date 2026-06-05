@@ -1,9 +1,9 @@
 import zlib from 'zlib';
 import {describe, expect, it} from 'vitest';
-import {FingerprintBuilder} from '../Fingerprint/FingerprintBuilder.js';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {Registry, RegistryPackage} from '../Registry/Registry.js';
-import {ChurnScanner, ChurnSeverity} from '../Security/ChurnScanner.js';
+import {FingerprintBuilder} from '../backend/Fingerprint/FingerprintBuilder.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {Registry, RegistryPackage} from '../backend/Registry/Registry.js';
+import {ChurnScanner, ChurnSeverity} from '../backend/Security/ChurnScanner.js';
 
 const BLOCK = 512;
 

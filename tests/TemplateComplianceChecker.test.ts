@@ -2,9 +2,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, it, expect} from 'vitest';
-import {DependencyType, PackageManifest} from '../Project/PackageManifest.js';
-import {ResolvedTemplate} from '../Templates/Template.js';
-import {TemplateComplianceChecker} from '../Templates/TemplateComplianceChecker.js';
+import {DependencyType, PackageManifest} from '../backend/Project/PackageManifest.js';
+import {ResolvedTemplate} from '../backend/Templates/Template.js';
+import {TemplateComplianceChecker} from '../backend/Templates/TemplateComplianceChecker.js';
 
 function mkManifest(extras: Partial<PackageManifest> = {}): PackageManifest {
     return {

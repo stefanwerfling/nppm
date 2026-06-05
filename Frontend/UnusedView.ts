@@ -1,11 +1,11 @@
-import {ApiUnusedResponse} from '../Api/ApiTypes.js';
+import {ApiUnusedResponse} from '../shared/Api/ApiTypes.js';
 import {
     MisplacedFinding,
     MissingFinding,
     ScanLimit,
     UnusedFinding,
     UnusedSeverity
-} from '../Unused/UnusedReport.js';
+} from '../backend/Unused/UnusedReport.js';
 import {Api} from './Api.js';
 import {I18n} from './I18n.js';
 

@@ -2,9 +2,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {GithubRelease, ReleasesFetcher} from '../Releases/ReleasesFetcher.js';
-import {Registry, RegistryPackage} from '../Registry/Registry.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {GithubRelease, ReleasesFetcher} from '../backend/Releases/ReleasesFetcher.js';
+import {Registry, RegistryPackage} from '../backend/Registry/Registry.js';
 
 describe('parseGithubRepo', () => {
     it('parses git+https github URLs', () => {

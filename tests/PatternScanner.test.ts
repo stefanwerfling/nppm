@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {FileFingerprint} from '../Fingerprint/Fingerprint.js';
-import {PatternScanner, PatternSeverity} from '../Security/PatternScanner.js';
+import {FileFingerprint} from '../backend/Fingerprint/Fingerprint.js';
+import {PatternScanner, PatternSeverity} from '../backend/Security/PatternScanner.js';
 
 function file(path: string, content: string|undefined): FileFingerprint {
     const f: FileFingerprint = {path, sha256: 'x', size: content?.length ?? 0};

@@ -64,52 +64,52 @@ import {
     ApiUpgradeRequest,
     ApiLifecycleScriptsResponse,
     ApiLifecycleRunRequest
-} from './Api/ApiTypes.js';
-import {JsonCache} from './Cache/JsonCache.js';
-import {ConfigProjectType, SchemaConfig} from './Config/Config.js';
-import {ConfigLoader} from './Config/ConfigLoader.js';
-import {NppmDirs} from './Config/NppmDirs.js';
-import {FingerprintBuilder} from './Fingerprint/FingerprintBuilder.js';
-import {FingerprintDiffer} from './Fingerprint/FingerprintDiff.js';
-import {GitResolver} from './Fingerprint/GitResolver.js';
-import {GitHistoryBackfill} from './History/GitHistoryBackfill.js';
-import {HistoryStore} from './History/HistoryStore.js';
-import {RemoteGitHistoryBackfill} from './History/RemoteGitHistoryBackfill.js';
-import {CellFinding, DashboardBuilder, DashboardCell, DashboardColumn, ScannerId, SCANNER_IDS} from './Dashboard/DashboardBuilder.js';
-import {DashboardHistoryStore} from './Dashboard/DashboardHistoryStore.js';
-import {DashboardGrowthBuilder, GrowthProjectInput} from './Dashboard/DashboardGrowthBuilder.js';
-import {InstalledSize} from './Dashboard/InstalledSize.js';
-import {DownloadsAggregator} from './Dashboard/DownloadsAggregator.js';
-import {NpmDownloadsFetcher} from './Downloads/NpmDownloadsFetcher.js';
-import {PackageTrendsBuilder} from './Package/PackageTrendsBuilder.js';
-import {DepGraphBuilder} from './DepGraph/DepGraphBuilder.js';
-import {ImpactAnalyzer, ImpactProjectReport} from './Security/ImpactAnalyzer.js';
-import {MatrixBuilder} from './Matrix/MatrixBuilder.js';
-import {ProjectMatrixBuilder} from './Matrix/ProjectMatrixBuilder.js';
-import {Project} from './Project/Project.js';
-import {GitCommitsFetcher} from './Releases/GitCommitsFetcher.js';
-import {GitHeadFetcher} from './Releases/GitHeadFetcher.js';
-import {ReleasesFetcher} from './Releases/ReleasesFetcher.js';
-import {CycloneDxBuilder} from './Sbom/CycloneDxBuilder.js';
-import {SbomCollector} from './Sbom/SbomCollector.js';
-import {SpdxBuilder} from './Sbom/SpdxBuilder.js';
-import {LifecycleScriptScanner} from './Upgrade/LifecycleScriptScanner.js';
-import {PackageJsonEditor} from './Upgrade/PackageJsonEditor.js';
-import {Upgrader} from './Upgrade/Upgrader.js';
-import {IntegrityScanner} from './Security/IntegrityScanner.js';
-import {MutableResolutionScanner} from './Security/MutableResolutionScanner.js';
-import {PrReviewBuilder} from './PrReview/PrReviewBuilder.js';
-import {ProjectGitea} from './Project/ProjectGitea.js';
-import {ProjectGithub} from './Project/ProjectGithub.js';
-import {ProjectLocal} from './Project/ProjectLocal.js';
-import {ProjectRemote} from './Project/ProjectRemote.js';
-import {SchemaTemplate, Template} from './Templates/Template.js';
-import {TemplateApplier} from './Templates/TemplateApplier.js';
-import {TemplateComplianceChecker} from './Templates/TemplateComplianceChecker.js';
-import {TemplateLoader} from './Templates/TemplateLoader.js';
-import {TemplateResolver} from './Templates/TemplateResolver.js';
-import {BackupStore} from './Upgrade/BackupStore.js';
-import {TimelineBuilder} from './Vulnerability/TimelineBuilder.js';
+} from './shared/Api/ApiTypes.js';
+import {JsonCache} from './backend/Cache/JsonCache.js';
+import {ConfigProjectType, SchemaConfig} from './backend/Config/Config.js';
+import {ConfigLoader} from './backend/Config/ConfigLoader.js';
+import {NppmDirs} from './backend/Config/NppmDirs.js';
+import {FingerprintBuilder} from './backend/Fingerprint/FingerprintBuilder.js';
+import {FingerprintDiffer} from './backend/Fingerprint/FingerprintDiff.js';
+import {GitResolver} from './backend/Fingerprint/GitResolver.js';
+import {GitHistoryBackfill} from './backend/History/GitHistoryBackfill.js';
+import {HistoryStore} from './backend/History/HistoryStore.js';
+import {RemoteGitHistoryBackfill} from './backend/History/RemoteGitHistoryBackfill.js';
+import {CellFinding, DashboardBuilder, DashboardCell, DashboardColumn, ScannerId, SCANNER_IDS} from './backend/Dashboard/DashboardBuilder.js';
+import {DashboardHistoryStore} from './backend/Dashboard/DashboardHistoryStore.js';
+import {DashboardGrowthBuilder, GrowthProjectInput} from './backend/Dashboard/DashboardGrowthBuilder.js';
+import {InstalledSize} from './backend/Dashboard/InstalledSize.js';
+import {DownloadsAggregator} from './backend/Dashboard/DownloadsAggregator.js';
+import {NpmDownloadsFetcher} from './backend/Downloads/NpmDownloadsFetcher.js';
+import {PackageTrendsBuilder} from './backend/Package/PackageTrendsBuilder.js';
+import {DepGraphBuilder} from './backend/DepGraph/DepGraphBuilder.js';
+import {ImpactAnalyzer, ImpactProjectReport} from './backend/Security/ImpactAnalyzer.js';
+import {MatrixBuilder} from './backend/Matrix/MatrixBuilder.js';
+import {ProjectMatrixBuilder} from './backend/Matrix/ProjectMatrixBuilder.js';
+import {Project} from './backend/Project/Project.js';
+import {GitCommitsFetcher} from './backend/Releases/GitCommitsFetcher.js';
+import {GitHeadFetcher} from './backend/Releases/GitHeadFetcher.js';
+import {ReleasesFetcher} from './backend/Releases/ReleasesFetcher.js';
+import {CycloneDxBuilder} from './backend/Sbom/CycloneDxBuilder.js';
+import {SbomCollector} from './backend/Sbom/SbomCollector.js';
+import {SpdxBuilder} from './backend/Sbom/SpdxBuilder.js';
+import {LifecycleScriptScanner} from './backend/Upgrade/LifecycleScriptScanner.js';
+import {PackageJsonEditor} from './backend/Upgrade/PackageJsonEditor.js';
+import {Upgrader} from './backend/Upgrade/Upgrader.js';
+import {IntegrityScanner} from './backend/Security/IntegrityScanner.js';
+import {MutableResolutionScanner} from './backend/Security/MutableResolutionScanner.js';
+import {PrReviewBuilder} from './backend/PrReview/PrReviewBuilder.js';
+import {ProjectGitea} from './backend/Project/ProjectGitea.js';
+import {ProjectGithub} from './backend/Project/ProjectGithub.js';
+import {ProjectLocal} from './backend/Project/ProjectLocal.js';
+import {ProjectRemote} from './backend/Project/ProjectRemote.js';
+import {SchemaTemplate, Template} from './backend/Templates/Template.js';
+import {TemplateApplier} from './backend/Templates/TemplateApplier.js';
+import {TemplateComplianceChecker} from './backend/Templates/TemplateComplianceChecker.js';
+import {TemplateLoader} from './backend/Templates/TemplateLoader.js';
+import {TemplateResolver} from './backend/Templates/TemplateResolver.js';
+import {BackupStore} from './backend/Upgrade/BackupStore.js';
+import {TimelineBuilder} from './backend/Vulnerability/TimelineBuilder.js';
 
 /**
  * Backend wiring for the Vite dev server. Exposes one public method
@@ -3846,9 +3846,9 @@ class Server {
     private static _instantiateProject(
         body: ApiProjectMutationRequest,
         projectRoot: string,
-        remoteCache: import('./Cache/JsonCache.js').JsonCache,
+        remoteCache: import('./backend/Cache/JsonCache.js').JsonCache,
         configIndex: number
-    ): import('./Project/Project.js').Project {
+    ): import('./backend/Project/Project.js').Project {
         const hidden = body.hidden === true;
         const templates = Array.isArray(body.templates) ? body.templates : [];
         if (body.type === ConfigProjectType.local) {
@@ -3884,7 +3884,7 @@ class Server {
      */
     private static async _toApiProject(
         unid: string,
-        project: import('./Project/Project.js').Project
+        project: import('./backend/Project/Project.js').Project
     ): Promise<ApiProject> {
         const root = project instanceof ProjectLocal ? project.getRoot() : undefined;
         try {

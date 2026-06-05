@@ -10,9 +10,9 @@ import {
     ApiDashboardScanProgressEvent,
     ApiDashboardScanStartEvent,
     ApiDashboardSnapshotResponse
-} from '../Api/ApiTypes.js';
-import {DashboardCell, DashboardColumn, ScannerId} from '../Dashboard/DashboardBuilder.js';
-import {DashboardHistoryEntry} from '../Dashboard/DashboardHistoryStore.js';
+} from '../shared/Api/ApiTypes.js';
+import {DashboardCell, DashboardColumn, ScannerId} from '../backend/Dashboard/DashboardBuilder.js';
+import {DashboardHistoryEntry} from '../backend/Dashboard/DashboardHistoryStore.js';
 import {EcoBoxId, EcosystemBoxModal} from './EcosystemBoxModal.js';
 import {I18n} from './I18n.js';
 import {ImpactModal} from './ImpactModal.js';

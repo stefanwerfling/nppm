@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {PackageFingerprintManifest} from '../Fingerprint/Fingerprint.js';
-import {ScriptScanner, ScriptSeverity} from '../Security/ScriptScanner.js';
+import {PackageFingerprintManifest} from '../backend/Fingerprint/Fingerprint.js';
+import {ScriptScanner, ScriptSeverity} from '../backend/Security/ScriptScanner.js';
 
 function mf(scripts: Record<string, string>): PackageFingerprintManifest {
     return {

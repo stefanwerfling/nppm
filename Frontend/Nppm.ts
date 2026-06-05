@@ -1,4 +1,4 @@
-import {ApiProject} from '../Api/ApiTypes.js';
+import {ApiProject} from '../shared/Api/ApiTypes.js';
 import {Api} from './Api.js';
 import {BadgeFilterModal} from './BadgeFilterModal.js';
 import {BulkUpgradeModal} from './BulkUpgradeModal.js';

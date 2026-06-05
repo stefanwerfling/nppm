@@ -1,5 +1,5 @@
 import {describe, it, expect} from 'vitest';
-import {ConfigProjectType, SchemaConfig} from '../Config/Config.js';
+import {ConfigProjectType, SchemaConfig} from '../backend/Config/Config.js';
 
 describe('Config schema', () => {
 

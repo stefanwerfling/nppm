@@ -1,7 +1,7 @@
 import zlib from 'zlib';
 import {describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {GitHeadFetcher, HeadTarballFetcher} from '../Releases/GitHeadFetcher.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {GitHeadFetcher, HeadTarballFetcher} from '../backend/Releases/GitHeadFetcher.js';
 
 const BLOCK = 512;
 

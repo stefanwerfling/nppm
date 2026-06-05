@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {PackageFingerprint} from '../Fingerprint/Fingerprint.js';
-import {FingerprintDiffer} from '../Fingerprint/FingerprintDiff.js';
+import {PackageFingerprint} from '../backend/Fingerprint/Fingerprint.js';
+import {FingerprintDiffer} from '../backend/Fingerprint/FingerprintDiff.js';
 
 function fp(name: string, version: string, files: {path: string; sha256: string}[]): PackageFingerprint {
     return {

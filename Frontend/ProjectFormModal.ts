@@ -1,5 +1,5 @@
-import {ApiProject, ApiProjectMutationRequest, ApiProjectMutationResponse, ApiTemplateSummary} from '../Api/ApiTypes.js';
-import {ConfigProjectType} from '../Config/Config.js';
+import {ApiProject, ApiProjectMutationRequest, ApiProjectMutationResponse, ApiTemplateSummary} from '../shared/Api/ApiTypes.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
 import {Api} from './Api.js';
 import {DirectoryPickerModal} from './DirectoryPickerModal.js';
 import {I18n} from './I18n.js';

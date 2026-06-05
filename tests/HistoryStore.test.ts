@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {HistoryStore} from '../History/HistoryStore.js';
+import {HistoryStore} from '../backend/History/HistoryStore.js';
 
 describe('HistoryStore', () => {
     let dir: string;

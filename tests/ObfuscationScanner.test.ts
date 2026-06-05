@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {FileFingerprint} from '../Fingerprint/Fingerprint.js';
-import {ObfuscationScanner, ObfuscationSeverity} from '../Security/ObfuscationScanner.js';
+import {FileFingerprint} from '../backend/Fingerprint/Fingerprint.js';
+import {ObfuscationScanner, ObfuscationSeverity} from '../backend/Security/ObfuscationScanner.js';
 
 function f(path: string, content: string): FileFingerprint {
     return {path, sha256: 'x', size: content.length, content};

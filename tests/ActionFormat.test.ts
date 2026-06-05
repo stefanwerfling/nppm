@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {ConfigProjectType} from '../Config/Config.js';
-import {PrReviewReport} from '../PrReview/PrReview.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
+import {PrReviewReport} from '../backend/PrReview/PrReview.js';
 import {ActionFormatter, STICKY_MARKER} from '../Cli/ActionFormat.js';
 
 function emptyReport(name: string): PrReviewReport {

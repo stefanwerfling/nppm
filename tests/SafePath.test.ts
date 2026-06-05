@@ -1,6 +1,6 @@
 import path from 'path';
 import {describe, expect, it} from 'vitest';
-import {SafePath} from '../Project/SafePath.js';
+import {SafePath} from '../backend/Project/SafePath.js';
 
 describe('SafePath.join', () => {
     const root = '/srv/project';

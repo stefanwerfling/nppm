@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {DepGraphNode, DepGraphResponse} from '../DepGraph/DepGraphBuilder.js';
-import {ImpactAnalyzer} from '../Security/ImpactAnalyzer.js';
+import {DepGraphNode, DepGraphResponse} from '../backend/DepGraph/DepGraphBuilder.js';
+import {ImpactAnalyzer} from '../backend/Security/ImpactAnalyzer.js';
 
 function node(
     name: string,

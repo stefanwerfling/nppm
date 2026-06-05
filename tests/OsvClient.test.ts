@@ -2,8 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {OsvClient} from '../Security/OsvClient.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {OsvClient} from '../backend/Security/OsvClient.js';
 
 describe('OsvClient', () => {
     let dir: string;

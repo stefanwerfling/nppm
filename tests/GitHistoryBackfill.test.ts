@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {GitHistoryBackfill, GitRunner} from '../History/GitHistoryBackfill.js';
+import {GitHistoryBackfill, GitRunner} from '../backend/History/GitHistoryBackfill.js';
 
 /**
  * Build an in-memory `GitRunner` backed by a fake commit-graph. Each

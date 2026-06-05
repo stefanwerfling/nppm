@@ -1,5 +1,5 @@
-import {ApiPackagesResponse} from '../Api/ApiTypes.js';
-import {DependencyType} from '../Project/PackageManifest.js';
+import {ApiPackagesResponse} from '../shared/Api/ApiTypes.js';
+import {DependencyType} from '../backend/Project/PackageManifest.js';
 import {I18n} from './I18n.js';
 
 /**

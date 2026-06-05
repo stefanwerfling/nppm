@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {FreshnessLevel, FreshnessScanner} from '../Security/FreshnessScanner.js';
+import {FreshnessLevel, FreshnessScanner} from '../backend/Security/FreshnessScanner.js';
 
 // Pinned "now" so the day-age maths are deterministic across runs.
 const NOW = Date.parse('2026-06-01T00:00:00Z');

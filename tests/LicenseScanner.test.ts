@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {LicenseScanner, LicenseSeverity} from '../Security/LicenseScanner.js';
+import {LicenseScanner, LicenseSeverity} from '../backend/Security/LicenseScanner.js';
 
 describe('LicenseScanner.classify — single SPDX atoms', () => {
     const s = new LicenseScanner();

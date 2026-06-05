@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
-import {CycloneDxBuilder} from '../Sbom/CycloneDxBuilder.js';
-import {SbomData} from '../Sbom/SbomCollector.js';
-import {SpdxBuilder} from '../Sbom/SpdxBuilder.js';
+import {CycloneDxBuilder} from '../backend/Sbom/CycloneDxBuilder.js';
+import {SbomData} from '../backend/Sbom/SbomCollector.js';
+import {SpdxBuilder} from '../backend/Sbom/SpdxBuilder.js';
 
 function fixture(): SbomData {
     return {

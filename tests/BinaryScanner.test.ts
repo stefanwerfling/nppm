@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {FileFingerprint} from '../Fingerprint/Fingerprint.js';
-import {BinaryScanner, BinarySeverity} from '../Security/BinaryScanner.js';
+import {FileFingerprint} from '../backend/Fingerprint/Fingerprint.js';
+import {BinaryScanner, BinarySeverity} from '../backend/Security/BinaryScanner.js';
 
 function f(path: string, size = 1): FileFingerprint {
     return {path, sha256: 'x', size};

@@ -1,6 +1,6 @@
 import {describe, it, expect} from 'vitest';
-import {Template} from '../Templates/Template.js';
-import {TemplateResolver} from '../Templates/TemplateResolver.js';
+import {Template} from '../backend/Templates/Template.js';
+import {TemplateResolver} from '../backend/Templates/TemplateResolver.js';
 
 function mk(id: string, body: Partial<Template> = {}): Template {
     return {id, ...body};

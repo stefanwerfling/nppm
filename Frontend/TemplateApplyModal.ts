@@ -1,4 +1,4 @@
-import {ApiComplianceApplyEndEvent, ApiComplianceApplyProgressEvent, ApiComplianceFinding} from '../Api/ApiTypes.js';
+import {ApiComplianceApplyEndEvent, ApiComplianceApplyProgressEvent, ApiComplianceFinding} from '../shared/Api/ApiTypes.js';
 import {I18n} from './I18n.js';
 
 type Step = 'review'|'log';

@@ -4,7 +4,7 @@ import {
     ApiAnalyzeProgressEvent,
     ApiAnalyzeResultEvent,
     ApiAnalyzeStartEvent
-} from '../Api/ApiTypes.js';
+} from '../shared/Api/ApiTypes.js';
 import {I18n} from './I18n.js';
 
 /**

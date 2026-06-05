@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {LifecycleScriptScanner} from '../Upgrade/LifecycleScriptScanner.js';
+import {LifecycleScriptScanner} from '../backend/Upgrade/LifecycleScriptScanner.js';
 
 function writePkg(dir: string, pkg: object): void {
     fs.mkdirSync(dir, {recursive: true});

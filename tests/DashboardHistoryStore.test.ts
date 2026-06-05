@@ -2,9 +2,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {DashboardHistoryStore} from '../Dashboard/DashboardHistoryStore.js';
-import {DashboardResponse, SCANNER_IDS} from '../Dashboard/DashboardBuilder.js';
-import {ConfigProjectType} from '../Config/Config.js';
+import {DashboardHistoryStore} from '../backend/Dashboard/DashboardHistoryStore.js';
+import {DashboardResponse, SCANNER_IDS} from '../backend/Dashboard/DashboardBuilder.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
 
 const mkDashboard = (rows: {
     unid: string;

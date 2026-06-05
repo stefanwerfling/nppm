@@ -1,7 +1,7 @@
 import {ChildProcess, spawn} from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import {ApiUpgradeRequest} from '../Api/ApiTypes.js';
+import {ApiUpgradeRequest} from '../../shared/Api/ApiTypes.js';
 import {NppmDirs} from '../Config/NppmDirs.js';
 import {SafePath} from '../Project/SafePath.js';
 import {BackupStamp, BackupStore} from './BackupStore.js';

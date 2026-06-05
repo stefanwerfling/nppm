@@ -1,11 +1,11 @@
 import {describe, expect, it} from 'vitest';
-import {DependencyType, PackageManifest} from '../Project/PackageManifest.js';
-import {ProjectLocal} from '../Project/ProjectLocal.js';
-import {Lockfile} from '../Project/Lockfile.js';
-import {ProjectGithub} from '../Project/ProjectGithub.js';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {UnusedDetector, UnusedFs} from '../Unused/UnusedDetector.js';
-import {UnusedSeverity} from '../Unused/UnusedReport.js';
+import {DependencyType, PackageManifest} from '../backend/Project/PackageManifest.js';
+import {ProjectLocal} from '../backend/Project/ProjectLocal.js';
+import {Lockfile} from '../backend/Project/Lockfile.js';
+import {ProjectGithub} from '../backend/Project/ProjectGithub.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {UnusedDetector, UnusedFs} from '../backend/Unused/UnusedDetector.js';
+import {UnusedSeverity} from '../backend/Unused/UnusedReport.js';
 
 /**
  * Lightweight `ProjectLocal` test subclass: keeps the real

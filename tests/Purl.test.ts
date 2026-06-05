@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {Purl} from '../Sbom/Purl.js';
+import {Purl} from '../backend/Sbom/Purl.js';
 
 describe('Purl.npm', () => {
     it('encodes a plain package', () => {

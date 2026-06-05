@@ -1,4 +1,4 @@
-import {DashboardColumn, ScannerId} from '../Dashboard/DashboardBuilder.js';
+import {DashboardColumn, ScannerId} from '../backend/Dashboard/DashboardBuilder.js';
 import {I18n} from './I18n.js';
 
 /**

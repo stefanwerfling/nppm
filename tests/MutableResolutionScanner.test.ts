@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {Lockfile, LockedPackage} from '../Project/Lockfile.js';
-import {MutableResolutionScanner, MutableResolutionSeverity} from '../Security/MutableResolutionScanner.js';
+import {Lockfile, LockedPackage} from '../backend/Project/Lockfile.js';
+import {MutableResolutionScanner, MutableResolutionSeverity} from '../backend/Security/MutableResolutionScanner.js';
 
 function pkg(over: Partial<LockedPackage>): LockedPackage {
     return {

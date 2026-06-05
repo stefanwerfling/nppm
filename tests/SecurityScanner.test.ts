@@ -1,12 +1,12 @@
 import crypto from 'crypto';
 import zlib from 'zlib';
 import {describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {FingerprintBuilder} from '../Fingerprint/FingerprintBuilder.js';
-import {Registry} from '../Registry/Registry.js';
-import {OsvClient} from '../Security/OsvClient.js';
-import {ScriptSeverity} from '../Security/ScriptScanner.js';
-import {SecurityScanner} from '../Security/SecurityScanner.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {FingerprintBuilder} from '../backend/Fingerprint/FingerprintBuilder.js';
+import {Registry} from '../backend/Registry/Registry.js';
+import {OsvClient} from '../backend/Security/OsvClient.js';
+import {ScriptSeverity} from '../backend/Security/ScriptScanner.js';
+import {SecurityScanner} from '../backend/Security/SecurityScanner.js';
 
 const BLOCK = 512;
 

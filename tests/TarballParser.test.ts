@@ -1,6 +1,6 @@
 import zlib from 'zlib';
 import {describe, expect, it} from 'vitest';
-import {TarballParser} from '../Fingerprint/TarballParser.js';
+import {TarballParser} from '../backend/Fingerprint/TarballParser.js';
 
 const BLOCK = 512;
 

@@ -1,4 +1,4 @@
-import {ApiTemplatesMatrixResponse, ApiTemplatesMatrixRow} from '../Api/ApiTypes.js';
+import {ApiTemplatesMatrixResponse, ApiTemplatesMatrixRow} from '../shared/Api/ApiTypes.js';
 import {Api} from './Api.js';
 import {I18n} from './I18n.js';
 import {TemplateFormModal} from './TemplateFormModal.js';

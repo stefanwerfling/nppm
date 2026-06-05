@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {CommitsHttpFetcher, GitCommitsFetcher} from '../Releases/GitCommitsFetcher.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {CommitsHttpFetcher, GitCommitsFetcher} from '../backend/Releases/GitCommitsFetcher.js';
 
 function stubHttp(map: Record<string, {ok: boolean; status: number; body: unknown}>): CommitsHttpFetcher {
     return {

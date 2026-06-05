@@ -2,10 +2,10 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {ConfigProjectType} from '../Config/Config.js';
-import {PrReviewBuilder, GitFileReader} from '../PrReview/PrReviewBuilder.js';
-import {OsvClient} from '../Security/OsvClient.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
+import {PrReviewBuilder, GitFileReader} from '../backend/PrReview/PrReviewBuilder.js';
+import {OsvClient} from '../backend/Security/OsvClient.js';
 
 /**
  * In-memory `GitFileReader` for the suite. `files` is keyed by

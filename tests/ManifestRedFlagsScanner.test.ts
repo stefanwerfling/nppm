@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {PackageFingerprintManifest} from '../Fingerprint/Fingerprint.js';
-import {ManifestRedFlagSeverity, ManifestRedFlagsScanner} from '../Security/ManifestRedFlagsScanner.js';
+import {PackageFingerprintManifest} from '../backend/Fingerprint/Fingerprint.js';
+import {ManifestRedFlagSeverity, ManifestRedFlagsScanner} from '../backend/Security/ManifestRedFlagsScanner.js';
 
 function m(over: Partial<PackageFingerprintManifest>): PackageFingerprintManifest {
     return {

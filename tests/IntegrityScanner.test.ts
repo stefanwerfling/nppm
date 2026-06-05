@@ -2,15 +2,15 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {LockedPackage} from '../Project/Lockfile.js';
-import {Registry, RegistryPackage} from '../Registry/Registry.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {LockedPackage} from '../backend/Project/Lockfile.js';
+import {Registry, RegistryPackage} from '../backend/Registry/Registry.js';
 import {
     IntegrityFinding,
     IntegrityFindingKind,
     IntegrityScanner,
     IntegritySeverity
-} from '../Security/IntegrityScanner.js';
+} from '../backend/Security/IntegrityScanner.js';
 
 /**
  * Seed the registry cache with a full `RegistryPackage` envelope so

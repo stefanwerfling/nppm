@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {GitResolver} from '../Fingerprint/GitResolver.js';
+import {GitResolver} from '../backend/Fingerprint/GitResolver.js';
 
 describe('GitResolver.isGitVersion', () => {
     it('detects every git-shape npm understands', () => {

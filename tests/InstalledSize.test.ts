@@ -2,9 +2,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {Registry, RegistryPackage} from '../Registry/Registry.js';
-import {InstalledSize} from '../Dashboard/InstalledSize.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {Registry, RegistryPackage} from '../backend/Registry/Registry.js';
+import {InstalledSize} from '../backend/Dashboard/InstalledSize.js';
 
 describe('InstalledSize.compute', () => {
     let dir: string;

@@ -2,10 +2,10 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {DependencyType, PackageManifest} from '../Project/PackageManifest.js';
-import {ResolvedTemplate} from '../Templates/Template.js';
-import {TemplateApplier} from '../Templates/TemplateApplier.js';
-import {BackupStore} from '../Upgrade/BackupStore.js';
+import {DependencyType, PackageManifest} from '../backend/Project/PackageManifest.js';
+import {ResolvedTemplate} from '../backend/Templates/Template.js';
+import {TemplateApplier} from '../backend/Templates/TemplateApplier.js';
+import {BackupStore} from '../backend/Upgrade/BackupStore.js';
 
 function mkManifest(extras: Partial<PackageManifest> = {}): PackageManifest {
     return {

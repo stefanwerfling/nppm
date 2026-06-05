@@ -2,8 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {DependencyType} from '../Project/PackageManifest.js';
-import {ProjectLocal} from '../Project/ProjectLocal.js';
+import {DependencyType} from '../backend/Project/PackageManifest.js';
+import {ProjectLocal} from '../backend/Project/ProjectLocal.js';
 
 describe('ProjectLocal', () => {
     let root: string;

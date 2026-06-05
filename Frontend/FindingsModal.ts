@@ -1,4 +1,4 @@
-import {CellFinding, DashboardCell, ScannerId} from '../Dashboard/DashboardBuilder.js';
+import {CellFinding, DashboardCell, ScannerId} from '../backend/Dashboard/DashboardBuilder.js';
 import {I18n} from './I18n.js';
 
 /**

@@ -1,4 +1,4 @@
-import {ApiDepGraphResponse} from '../Api/ApiTypes.js';
+import {ApiDepGraphResponse} from '../shared/Api/ApiTypes.js';
 import {Api} from './Api.js';
 import {I18n} from './I18n.js';
 

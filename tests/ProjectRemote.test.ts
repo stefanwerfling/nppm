@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {ConfigProjectType} from '../Config/Config.js';
-import {ProjectRemote, RemoteCommit} from '../Project/ProjectRemote.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
+import {ProjectRemote, RemoteCommit} from '../backend/Project/ProjectRemote.js';
 
 /**
  * Minimal test double that fills the abstract transport hooks from

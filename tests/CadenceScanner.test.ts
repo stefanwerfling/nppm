@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {CadenceLevel, CadenceScanner} from '../Security/CadenceScanner.js';
+import {CadenceLevel, CadenceScanner} from '../backend/Security/CadenceScanner.js';
 
 // Pinned "now" so day-age maths is deterministic across runs.
 const NOW = Date.parse('2026-06-01T00:00:00Z');

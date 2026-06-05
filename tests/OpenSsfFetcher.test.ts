@@ -2,8 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {OpenSsfFetcher} from '../Security/External/OpenSsfFetcher.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {OpenSsfFetcher} from '../backend/Security/External/OpenSsfFetcher.js';
 
 function stubFetch(impl: (url: string) => {ok: boolean; status?: number; body?: unknown}): () => void {
     const original = globalThis.fetch;

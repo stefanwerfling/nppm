@@ -5,9 +5,9 @@ import {
     ApiAnalyzeResultEvent,
     ApiAnalyzeStartEvent,
     ApiIntegrityResponse
-} from '../Api/ApiTypes.js';
-import {Lockfile, LockedPackage} from '../Project/Lockfile.js';
-import {IntegrityFinding, IntegritySeverity} from '../Security/IntegrityScanner.js';
+} from '../shared/Api/ApiTypes.js';
+import {Lockfile, LockedPackage} from '../backend/Project/Lockfile.js';
+import {IntegrityFinding, IntegritySeverity} from '../backend/Security/IntegrityScanner.js';
 import {Api} from './Api.js';
 import {EditorUrl} from './EditorUrl.js';
 import {I18n} from './I18n.js';

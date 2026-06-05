@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {ProvenanceLevel, ProvenanceScanner} from '../Security/ProvenanceScanner.js';
+import {ProvenanceLevel, ProvenanceScanner} from '../backend/Security/ProvenanceScanner.js';
 
 describe('ProvenanceScanner.classify', () => {
     it('returns null when no dist record is available', () => {

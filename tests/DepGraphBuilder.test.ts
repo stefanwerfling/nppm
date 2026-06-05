@@ -2,13 +2,13 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {ConfigProjectType} from '../Config/Config.js';
-import {DepGraphBuilder} from '../DepGraph/DepGraphBuilder.js';
-import {Lockfile, LockedPackage} from '../Project/Lockfile.js';
-import {DependencyType, PackageManifest} from '../Project/PackageManifest.js';
-import {Project} from '../Project/Project.js';
-import {Registry, RegistryPackage} from '../Registry/Registry.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
+import {DepGraphBuilder} from '../backend/DepGraph/DepGraphBuilder.js';
+import {Lockfile, LockedPackage} from '../backend/Project/Lockfile.js';
+import {DependencyType, PackageManifest} from '../backend/Project/PackageManifest.js';
+import {Project} from '../backend/Project/Project.js';
+import {Registry, RegistryPackage} from '../backend/Registry/Registry.js';
 
 class FakeProject implements Project {
     constructor(

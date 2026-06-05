@@ -5,8 +5,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {ApiUpgradeRequest} from '../Api/ApiTypes.js';
-import {SpawnFn, StreamSink, Upgrader} from '../Upgrade/Upgrader.js';
+import {ApiUpgradeRequest} from '../shared/Api/ApiTypes.js';
+import {SpawnFn, StreamSink, Upgrader} from '../backend/Upgrade/Upgrader.js';
 
 /**
  * Build a fake `ChildProcess` whose stdout/stderr replay scripted

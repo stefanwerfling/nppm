@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {PackageJsonEditor} from '../Upgrade/PackageJsonEditor.js';
+import {PackageJsonEditor} from '../backend/Upgrade/PackageJsonEditor.js';
 
 describe('PackageJsonEditor.apply', () => {
     it('bumps the range in dependencies and preserves 2-space indent', () => {

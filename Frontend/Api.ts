@@ -33,8 +33,8 @@ import {
     ApiVulnerabilityTimelineResponse,
     ApiPrReviewResponse,
     ApiIntegrityResponse
-} from '../Api/ApiTypes.js';
-import {MatrixResponse} from '../Matrix/MatrixBuilder.js';
+} from '../shared/Api/ApiTypes.js';
+import {MatrixResponse} from '../backend/Matrix/MatrixBuilder.js';
 
 /**
  * Thin wrapper around fetch — surfaces non-2xx as thrown errors so

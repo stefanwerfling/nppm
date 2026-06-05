@@ -1,8 +1,8 @@
 import {describe, expect, it} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {Registry, RegistryPackage} from '../Registry/Registry.js';
-import {MaintainerScanner, MaintainerSeverity} from '../Security/MaintainerScanner.js';
-import {NpmUserFetcher} from '../Security/NpmUserFetcher.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {Registry, RegistryPackage} from '../backend/Registry/Registry.js';
+import {MaintainerScanner, MaintainerSeverity} from '../backend/Security/MaintainerScanner.js';
+import {NpmUserFetcher} from '../backend/Security/NpmUserFetcher.js';
 
 function makeRegistry(name: string, pkg: RegistryPackage): Registry {
     // Stand-in: poke the static `RegistryPackage` straight into a fresh

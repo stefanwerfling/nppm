@@ -1,6 +1,6 @@
-import {ApiPrReviewResponse} from '../Api/ApiTypes.js';
-import {ConfigProjectType} from '../Config/Config.js';
-import {PrChangeKind, PrDepChange} from '../PrReview/PrReview.js';
+import {ApiPrReviewResponse} from '../shared/Api/ApiTypes.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
+import {PrChangeKind, PrDepChange} from '../backend/PrReview/PrReview.js';
 import {Api} from './Api.js';
 import {I18n} from './I18n.js';
 

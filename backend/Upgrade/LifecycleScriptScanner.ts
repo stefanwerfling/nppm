@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import {ApiLifecycleScript} from '../Api/ApiTypes.js';
+import {ApiLifecycleScript} from '../../shared/Api/ApiTypes.js';
 
 /**
  * Install-lifecycle hooks npm runs by default. `prepare` runs on

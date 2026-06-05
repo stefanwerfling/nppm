@@ -1,5 +1,5 @@
-import {ApiComplianceFinding, ApiComplianceResponse} from '../Api/ApiTypes.js';
-import {ConfigProjectType} from '../Config/Config.js';
+import {ApiComplianceFinding, ApiComplianceResponse} from '../shared/Api/ApiTypes.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
 import {I18n} from './I18n.js';
 import {TemplateApplyModal} from './TemplateApplyModal.js';
 

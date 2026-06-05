@@ -1,18 +1,18 @@
 import {describe, expect, it} from 'vitest';
-import {DashboardBuilder, SCANNER_IDS} from '../Dashboard/DashboardBuilder.js';
-import {BinarySeverity} from '../Security/BinaryScanner.js';
-import {CadenceLevel} from '../Security/CadenceScanner.js';
-import {ChurnSeverity} from '../Security/ChurnScanner.js';
-import {FreshnessLevel} from '../Security/FreshnessScanner.js';
-import {IgnoreScriptsLevel} from '../Security/IgnoreScriptsScanner.js';
-import {IntegrityFindingKind, IntegritySeverity} from '../Security/IntegrityScanner.js';
-import {LicenseSeverity} from '../Security/LicenseScanner.js';
-import {MaintainerSeverity} from '../Security/MaintainerScanner.js';
-import {ProvenanceLevel} from '../Security/ProvenanceScanner.js';
-import {ScriptSeverity} from '../Security/ScriptScanner.js';
-import {TyposquatLevel} from '../Security/TyposquatScanner.js';
-import {UnusedSeverity} from '../Unused/UnusedReport.js';
-import {ConfigProjectType} from '../Config/Config.js';
+import {DashboardBuilder, SCANNER_IDS} from '../backend/Dashboard/DashboardBuilder.js';
+import {BinarySeverity} from '../backend/Security/BinaryScanner.js';
+import {CadenceLevel} from '../backend/Security/CadenceScanner.js';
+import {ChurnSeverity} from '../backend/Security/ChurnScanner.js';
+import {FreshnessLevel} from '../backend/Security/FreshnessScanner.js';
+import {IgnoreScriptsLevel} from '../backend/Security/IgnoreScriptsScanner.js';
+import {IntegrityFindingKind, IntegritySeverity} from '../backend/Security/IntegrityScanner.js';
+import {LicenseSeverity} from '../backend/Security/LicenseScanner.js';
+import {MaintainerSeverity} from '../backend/Security/MaintainerScanner.js';
+import {ProvenanceLevel} from '../backend/Security/ProvenanceScanner.js';
+import {ScriptSeverity} from '../backend/Security/ScriptScanner.js';
+import {TyposquatLevel} from '../backend/Security/TyposquatScanner.js';
+import {UnusedSeverity} from '../backend/Unused/UnusedReport.js';
+import {ConfigProjectType} from '../backend/Config/Config.js';
 
 describe('DashboardBuilder.scorePerPackage', () => {
     it('returns 100 when nothing is flagged', () => {

@@ -2,8 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {JsonCache} from '../Cache/JsonCache.js';
-import {Registry} from '../Registry/Registry.js';
+import {JsonCache} from '../backend/Cache/JsonCache.js';
+import {Registry} from '../backend/Registry/Registry.js';
 
 /**
  * Build a fetch double that maps URL → response body. Throws if a

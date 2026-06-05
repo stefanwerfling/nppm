@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {ApiDepGraphResponse} from '../Api/ApiTypes.js';
+import {ApiDepGraphResponse} from '../shared/Api/ApiTypes.js';
 import {WhyModal} from '../Frontend/WhyModal.js';
 
 /**

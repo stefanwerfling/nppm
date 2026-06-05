@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {BackupStore} from '../Upgrade/BackupStore.js';
+import {BackupStore} from '../backend/Upgrade/BackupStore.js';
 
 describe('BackupStore.save', () => {
     let tmp: string;

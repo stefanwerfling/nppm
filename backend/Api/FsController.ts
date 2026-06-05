@@ -1,7 +1,9 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import {SchemaErrors} from 'vts';
 import {ApiFsBrowseEntry, ApiFsBrowseResponse} from '../../shared/Api/ApiTypes.js';
+import {SchemaApiFsBrowseQuery} from './Schemas/SchemaApiFsBrowse.js';
 import {ServerContext} from './ServerContext.js';
 
 /**
@@ -18,6 +20,14 @@ export class FsController {
 
     public static register(ctx: ServerContext): void {
         ctx.app.get('/api/fs/browse', async(req, res): Promise<void> => {
+            const qErrors: SchemaErrors = [];
+            if (!SchemaApiFsBrowseQuery.validate(req.query, qErrors)) {
+                res.status(400).json({
+                    success: false,
+                    msg: `invalid query: ${JSON.stringify(qErrors)}`
+                });
+                return;
+            }
             const requested = typeof req.query.path === 'string' && req.query.path.length > 0
                 ? req.query.path
                 : process.cwd();

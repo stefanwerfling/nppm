@@ -8,6 +8,7 @@ import {
     ApiConfigResponse
 } from '../../shared/Api/ApiTypes.js';
 import {SchemaConfig} from '../Config/Config.js';
+import {SchemaApiConfigMutation} from './Schemas/SchemaApiConfig.js';
 import {ServerContext} from './ServerContext.js';
 
 /**
@@ -47,11 +48,15 @@ export class ConfigController {
 
     private static _registerPutConfig(ctx: ServerContext): void {
         ctx.app.put('/api/config', async(req, res): Promise<void> => {
-            const body = req.body as ApiConfigMutationRequest;
-            if (!body || typeof body !== 'object' || Array.isArray(body)) {
-                res.status(400).json({success: false, msg: 'request body required'});
+            const bodyErrors: SchemaErrors = [];
+            if (!SchemaApiConfigMutation.validate(req.body, bodyErrors)) {
+                res.status(400).json({
+                    success: false,
+                    msg: `invalid request body: ${JSON.stringify(bodyErrors)}`
+                });
                 return;
             }
+            const body = req.body as ApiConfigMutationRequest;
             try {
                 ctx.mutateConfig((cfg): void => {
                     /*

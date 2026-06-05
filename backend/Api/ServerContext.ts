@@ -2,6 +2,7 @@ import {Express} from 'express';
 import fs from 'fs';
 import {LoadedConfig} from '../Config/ConfigLoader.js';
 import {Project} from '../Project/Project.js';
+import {TemplateComplianceChecker} from '../Templates/TemplateComplianceChecker.js';
 import {TemplateLoader} from '../Templates/TemplateLoader.js';
 import {Template} from '../Templates/Template.js';
 
@@ -28,7 +29,9 @@ export type ServerContextOpts = {
     configFile: string|undefined;
     loaded: LoadedConfig;
     projects: Map<string, Project>;
+    templatesDir: string;
     templateLoader: TemplateLoader;
+    templateChecker: TemplateComplianceChecker;
     initialTemplates: Map<string, Template>;
 };
 
@@ -51,7 +54,9 @@ export class ServerContext {
     public readonly configFile: string|undefined;
     public readonly loaded: LoadedConfig;
     public readonly projects: Map<string, Project>;
+    public readonly templatesDir: string;
     public readonly templateLoader: TemplateLoader;
+    public readonly templateChecker: TemplateComplianceChecker;
     private _templates: Map<string, Template>;
 
     public constructor(opts: ServerContextOpts) {
@@ -60,7 +65,9 @@ export class ServerContext {
         this.configFile = opts.configFile;
         this.loaded = opts.loaded;
         this.projects = opts.projects;
+        this.templatesDir = opts.templatesDir;
         this.templateLoader = opts.templateLoader;
+        this.templateChecker = opts.templateChecker;
         this._templates = opts.initialTemplates;
     }
 

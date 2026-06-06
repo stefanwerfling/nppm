@@ -1,7 +1,6 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import {defineConfig, Plugin, ViteDevServer} from 'vite';
 import {SchemaErrors} from 'vts';
@@ -30,7 +29,6 @@ import {ConfigProjectType, SchemaConfig} from './backend/Config/Config.js';
 import {ConfigLoader} from './backend/Config/ConfigLoader.js';
 import {NppmDirs} from './backend/Config/NppmDirs.js';
 import {FingerprintBuilder} from './backend/Fingerprint/FingerprintBuilder.js';
-import {FingerprintDiffer} from './backend/Fingerprint/FingerprintDiff.js';
 import {GitHistoryBackfill} from './backend/History/GitHistoryBackfill.js';
 import {HistoryStore} from './backend/History/HistoryStore.js';
 import {RemoteGitHistoryBackfill} from './backend/History/RemoteGitHistoryBackfill.js';
@@ -50,22 +48,24 @@ import {TimelineBuilder} from './backend/Vulnerability/TimelineBuilder.js';
 
 /**
  * Backend wiring for the Vite dev server. Exposes one public method
- * (`plugin()`) that the Vite config registers — the entire Express
- * app, project loop, route handlers, and SSE streams are wired up
- * inside `configureServer`. Kept as a class so the previously-free
- * `expandEnv` helper has a real home as a private static.
+ * (`plugin()`) that the Vite config registers — `configureServer`
+ * constructs every backend service (registry / OSV / fingerprint /
+ * history stores / template loader / …), packs them into a single
+ * `ServerContext`, and hands the context to each
+ * `backend/Api/*Controller.ts` via `register(ctx)`. The Controllers
+ * own every HTTP route; this file owns no routes.
  */
 class Server {
 
     /**
-     * Returns the Vite plugin object. The body matches the original
-     * `expressMiddleware` factory; the only structural change is that
-     * `expandEnv` is now a private static of this class.
+     * Returns the Vite plugin object. Express setup → ConfigLoader →
+     * service construction → ServerContext → register every
+     * Controller → mount the Express app as Vite middleware.
      */
     public static plugin(): Plugin {
         return {
             name: 'vite-express-middleware',
-            configureServer: function(server: ViteDevServer) {
+            configureServer: (server: ViteDevServer): void => {
                 const app = express();
                 app.use(express.json());
 
@@ -95,11 +95,11 @@ class Server {
                 if (configFile && fs.existsSync(configFile)) {
                     const raw = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
                     const errors: SchemaErrors = [];
-                    if (!SchemaConfig.validate(raw, errors)) {
+                    if (SchemaConfig.validate(raw, errors)) {
+                        rawConfig = raw;
+                    } else {
                         console.log('nppm.json has an incorrect structure:');
                         console.log(errors);
-                    } else {
-                        rawConfig = raw;
                     }
                 }
 
@@ -244,9 +244,10 @@ class Server {
 
                 /*
                  * Shared bag of state + helpers passed to every
-                 * extracted Controller. Routes that still live inline
-                 * inside this closure read the same local variables
-                 * directly; the migration to controllers is incremental.
+                 * Controller. Holds the loaded config, project map,
+                 * history/cache stores, fingerprint builders, and the
+                 * remote-host fetchers — anything a route handler might
+                 * need without having to be re-constructed per request.
                  */
                 const ctx = new ServerContext({
                     app: app,

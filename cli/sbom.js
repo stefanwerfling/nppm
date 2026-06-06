@@ -7,8 +7,10 @@ import {fileURLToPath} from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nppmRoot = path.resolve(__dirname, '..');
 
-// Same Vite-as-TS-loader trick as cli/scan.js — Vite is already a
-// runtime dep, so we reuse it instead of adding tsx.
+/*
+ * Same Vite-as-TS-loader trick as cli/scan.js — Vite is already a
+ * runtime dep, so we reuse it instead of adding tsx.
+ */
 const vite = await createServer({
     configFile: false,
     root: nppmRoot,

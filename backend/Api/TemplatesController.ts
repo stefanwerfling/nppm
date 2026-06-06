@@ -497,4 +497,5 @@ export class TemplatesController {
             sourceUrl: src?.kind === 'remote' ? src.url : undefined
         };
     }
+
 }

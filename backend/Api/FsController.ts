@@ -42,7 +42,7 @@ export class FsController {
                 const response = await FsController._listDirectory(requested, showHidden);
                 res.status(200).json(response);
             } catch (e) {
-                const err = e as NodeJS.ErrnoException;
+                const err = e as Error & {code?: string;};
                 if (err.code === 'ENOENT') {
                     /*
                      * Fall back to home directory when the requested
@@ -102,4 +102,5 @@ export class FsController {
             entries: entries
         };
     }
+
 }

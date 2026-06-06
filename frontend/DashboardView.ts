@@ -1667,5 +1667,4 @@ export class DashboardView {
         });
     }
 
-
 }

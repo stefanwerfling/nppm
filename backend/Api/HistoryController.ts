@@ -27,10 +27,10 @@ export class HistoryController {
             }
             try {
                 const file = ctx.historyStore.read(project.getKey(), project.getName());
-                const gitAvailable = project instanceof ProjectLocal
-                    && ctx.gitBackfill.isAvailable(project.getRoot())
-                    || project instanceof ProjectRemote
-                    && ctx.remoteBackfill.isAvailable(project);
+                const gitAvailable = (project instanceof ProjectLocal
+                    && ctx.gitBackfill.isAvailable(project.getRoot()))
+                    || (project instanceof ProjectRemote
+                        && ctx.remoteBackfill.isAvailable(project));
                 const response: ApiHistoryResponse = {
                     project: {
                         unid: req.params.id,
@@ -157,4 +157,5 @@ export class HistoryController {
             }
         });
     }
+
 }

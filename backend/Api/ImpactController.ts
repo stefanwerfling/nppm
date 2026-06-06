@@ -57,4 +57,5 @@ export class ImpactController {
             res.status(200).json(report);
         });
     }
+
 }

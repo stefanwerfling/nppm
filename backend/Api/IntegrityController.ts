@@ -38,8 +38,8 @@ export class IntegrityController {
                 const findings = await ctx.integrityScanner.scan(lockfile.packages);
                 const totalScanned = new Set(
                     lockfile.packages
-                        .filter((p): boolean => Boolean(p.name) && Boolean(p.version))
-                        .map((p): string => `${p.name}@${p.version}`)
+                    .filter((p): boolean => Boolean(p.name) && Boolean(p.version))
+                    .map((p): string => `${p.name}@${p.version}`)
                 ).size;
                 const summary = IntegrityScanner.summarize(findings, totalScanned);
                 const response: ApiIntegrityResponse = {
@@ -58,4 +58,5 @@ export class IntegrityController {
             }
         });
     }
+
 }

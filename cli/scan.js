@@ -7,10 +7,12 @@ import {fileURLToPath} from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nppmRoot = path.resolve(__dirname, '..');
 
-// Vite is already a runtime dep — reuse it as the TS loader instead of
-// pulling in a second one (tsx). `middlewareMode + appType:'custom'`
-// gives us a server we never wire HTTP onto; we just call
-// `ssrLoadModule` to transpile + import the TypeScript entry.
+/*
+ * Vite is already a runtime dep — reuse it as the TS loader instead of
+ * pulling in a second one (tsx). `middlewareMode + appType:'custom'`
+ * gives us a server we never wire HTTP onto; we just call
+ * `ssrLoadModule` to transpile + import the TypeScript entry.
+ */
 const vite = await createServer({
     configFile: false,
     root: nppmRoot,

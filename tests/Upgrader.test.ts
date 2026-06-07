@@ -163,7 +163,9 @@ describe('Upgrader', () => {
         const upgrader = new Upgrader(tmp, spawnStub);
         const c = collectSink();
         upgrader.runInstall(c.sink);
-        await new Promise((r) => setTimeout(r, 20));
+        await new Promise((r) => {
+            setTimeout(r, 20);
+        });
         expect(c.started?.command).toBe('npm install --ignore-scripts --no-audit --no-fund');
         expect(c.stdout).toBe('ok\n');
         expect(c.ended).toBe(0);
@@ -178,7 +180,9 @@ describe('Upgrader', () => {
         const upgrader = new Upgrader(tmp, spawnStub);
         const c = collectSink();
         upgrader.runRebuild('sharp', c.sink);
-        await new Promise((r) => setTimeout(r, 20));
+        await new Promise((r) => {
+            setTimeout(r, 20);
+        });
         expect(c.stdout).toContain('rebuilt sharp');
         expect(c.ended).toBe(0);
     });

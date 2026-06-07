@@ -45,7 +45,7 @@ class FakeProject implements Project {
         return null;
     }
     public isHidden() { return false; }
-    public setHidden(_v: boolean) {}
+    public setHidden(_v: boolean) { /* no-op: stub satisfies Project interface */ }
     public getConfigIndex() { return -1; }
     public getTemplates() { return []; }
 

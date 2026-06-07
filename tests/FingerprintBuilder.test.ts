@@ -162,7 +162,6 @@ describe('FingerprintBuilder', () => {
         binary.copy(padded);
 
         // Hand-roll because buildTgz writes string content; we need bytes.
-        const zlib = await import('zlib');
         const headerBytes = ((): Buffer => {
             const h = Buffer.alloc(512);
             h.write('package/odd.js', 0, 100, 'utf8');

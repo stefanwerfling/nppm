@@ -323,7 +323,7 @@ describe('MatrixBuilder.build', () => {
             },
             loadLockfile: async() => null,
             isHidden: () => false,
-            setHidden: () => {},
+            setHidden: () => { /* no-op stub */ },
             getConfigIndex: () => -1,
             getTemplates: () => []
         };

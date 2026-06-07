@@ -178,7 +178,9 @@ describe('SecurityScanner.scanHeuristicsBatch', () => {
         const builder = new FingerprintBuilder(null, async() => {
             inflight++;
             peak = Math.max(peak, inflight);
-            await new Promise((r) => setTimeout(r, 5));
+            await new Promise((r) => {
+                setTimeout(r, 5);
+            });
             inflight--;
             return buildTgz([{name: 'package/package.json', content: '{}'}]);
         });

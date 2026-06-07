@@ -164,11 +164,11 @@ describe('DashboardGrowthBuilder.build', () => {
             [{name: 'a', version: '1'}, {name: 'b', version: '1'}, {name: 'c', version: '1'}],
             now - 86400_000, // 1 day ago
             [
-                mkEntry(now - 30 * 86400_000, ['a@1', 'b@1'], []), // 30 days ago
+                mkEntry(now - (30 * 86400_000), ['a@1', 'b@1'], []), // 30 days ago
                 mkEntry(now - 86400_000, ['c@1'], []) // 1 day ago
             ]
         );
-        const cutoff = now - 7 * 86400_000;
+        const cutoff = now - (7 * 86400_000);
         const out = DashboardGrowthBuilder.build(
             [{unid: 'x', name: 'X', history: h}],
             cutoff

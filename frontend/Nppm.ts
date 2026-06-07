@@ -107,7 +107,7 @@ export class Nppm {
     private _matrixScores: Map<string, number> = new Map();
     private _dashboardScores: Map<string, number> = new Map();
 
-    constructor() {
+    public constructor() {
         const treeRoot = document.getElementById('treeview');
         const listRoot = document.getElementById('list');
         const resizer = document.getElementById('resizer');
@@ -180,6 +180,7 @@ export class Nppm {
             void this._refreshProjects();
         });
 
+        // eslint-disable-next-line no-new
         new Resizer(resizer, controls);
 
         /*

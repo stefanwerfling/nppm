@@ -42,7 +42,7 @@ export class GlobalScanView {
     private _filterIssuesOnly: boolean = false;
     private _onAnalysisStart: (() => void)|null = null;
 
-    constructor(
+    public constructor(
         root: HTMLElement,
         topbarBtn: HTMLButtonElement,
         topbarProgress: HTMLElement,
@@ -222,7 +222,7 @@ export class GlobalScanView {
                 return sb - sa;
             }
             const n = a.name.localeCompare(b.name);
-            return n !== 0 ? n : a.version.localeCompare(b.version);
+            return n === 0 ? a.version.localeCompare(b.version) : n;
         });
 
         host.innerHTML = '';

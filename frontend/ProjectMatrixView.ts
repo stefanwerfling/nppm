@@ -37,7 +37,7 @@ export class ProjectMatrixView {
         toRange: string;
     }) => void)|null = null;
 
-    constructor(root: HTMLElement) {
+    public constructor(root: HTMLElement) {
         this._root = root;
     }
 
@@ -198,7 +198,7 @@ export class ProjectMatrixView {
             const td = document.createElement('td');
             td.className = 'matrix-cell';
 
-            if (!cellData) {
+            if (cellData === undefined) {
                 td.classList.add('matrix-cell-missing');
                 td.textContent = '—';
             } else {
@@ -436,6 +436,8 @@ export class ProjectMatrixView {
                 return 'peer';
             case DependencyType.optional:
                 return 'opt';
+            default:
+                return '';
         }
     }
 

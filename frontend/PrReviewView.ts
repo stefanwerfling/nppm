@@ -37,7 +37,7 @@ export class PrReviewView {
     private _onShowTemplate: ((unid: string) => void)|null = null;
     private _onDepClick: ((name: string, version: string) => void)|null = null;
 
-    constructor(root: HTMLElement) {
+    public constructor(root: HTMLElement) {
         this._root = root;
     }
 
@@ -222,7 +222,9 @@ export class PrReviewView {
         const refresh = document.createElement('button');
         refresh.className = 'installed-analyze-btn';
         refresh.textContent = I18n.t('Refresh');
-        refresh.addEventListener('click', () => void this._reload());
+        refresh.addEventListener('click', () => {
+            void this._reload();
+        });
         bar.appendChild(refresh);
 
         return bar;
@@ -395,6 +397,7 @@ export class PrReviewView {
             case 'removed': return I18n.t('removed');
             case 'updated': return I18n.t('updated');
             case 'bucket-changed': return I18n.t('bucket');
+            default: return '';
         }
     }
 

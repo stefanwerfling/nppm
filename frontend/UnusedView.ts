@@ -33,7 +33,7 @@ export class UnusedView {
     private _onShowPr: ((unid: string) => void)|null = null;
     private _onShowTemplate: ((unid: string) => void)|null = null;
 
-    constructor(root: HTMLElement) {
+    public constructor(root: HTMLElement) {
         this._root = root;
     }
 
@@ -323,6 +323,7 @@ export class UnusedView {
             case UnusedSeverity.risk: return 'pdp-sev-risk';
             case UnusedSeverity.warn: return 'pdp-sev-warn';
             case UnusedSeverity.info: return 'pdp-sev-info';
+            default: return '';
         }
     }
 

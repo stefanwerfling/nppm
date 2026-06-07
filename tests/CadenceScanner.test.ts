@@ -5,7 +5,7 @@ import {CadenceLevel, CadenceScanner} from '../backend/Security/CadenceScanner.j
 const NOW = Date.parse('2026-06-01T00:00:00Z');
 
 function daysAgo(n: number): string {
-    return new Date(NOW - n * 86400_000).toISOString();
+    return new Date(NOW - (n * 86400_000)).toISOString();
 }
 
 describe('CadenceScanner.classify', () => {

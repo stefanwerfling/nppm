@@ -21,7 +21,7 @@ export class PackageList {
     private _onShowPr: ((unid: string) => void)|null = null;
     private _onShowTemplate: ((unid: string) => void)|null = null;
 
-    constructor(root: HTMLElement) {
+    public constructor(root: HTMLElement) {
         this._root = root;
     }
 
@@ -246,6 +246,8 @@ export class PackageList {
                 return 'peer';
             case DependencyType.optional:
                 return 'opt';
+            default:
+                return '';
         }
     }
 

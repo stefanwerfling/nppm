@@ -102,10 +102,10 @@ describe('DashboardHistoryStore', () => {
         const store = new DashboardHistoryStore(dir);
         // 5 days old → outside a 3d window.
         store.recordScan(mkDashboard([{unid: 'a', name: 'a', cells: {cve: 60}}]),
-            new Date(Date.now() - 5 * 86400_000).toISOString());
+            new Date(Date.now() - (5 * 86400_000)).toISOString());
         // 2 days old + today → both inside a 3d window.
         store.recordScan(mkDashboard([{unid: 'a', name: 'a', cells: {cve: 70}}]),
-            new Date(Date.now() - 2 * 86400_000).toISOString());
+            new Date(Date.now() - (2 * 86400_000)).toISOString());
         store.recordScan(mkDashboard([{unid: 'a', name: 'a', cells: {cve: 80}}]),
             new Date().toISOString());
         const range = store.readRange(3);

@@ -55,7 +55,7 @@ describe('MaintainerScanner.scan', () => {
             const v = `1.0.${i}`;
             versions.push(v);
             publishers[v] = {name: opts.oldOwner};
-            time[v] = new Date(start + i * 7 * 86400_000).toISOString();
+            time[v] = new Date(start + (i * 7 * 86400_000)).toISOString();
         }
 
         const latest = `1.0.${opts.priorCount}`;
@@ -63,7 +63,7 @@ describe('MaintainerScanner.scan', () => {
         versions.push(latest);
         publishers[latest] = {name: opts.newOwner};
         time[latest] = new Date(
-            Date.parse(time[lastPrior]) + opts.gapDays * 86400_000
+            Date.parse(time[lastPrior]) + (opts.gapDays * 86400_000)
         ).toISOString();
 
         return {

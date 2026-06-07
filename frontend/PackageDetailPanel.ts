@@ -182,7 +182,7 @@ export class PackageDetailPanel {
         document.body.appendChild(backdrop);
         this._backdrop = backdrop;
 
-        this._keyHandler = (e: KeyboardEvent) => {
+        this._keyHandler = (e: KeyboardEvent): void => {
             if (e.key === 'Escape') {
                 this._close();
             }
@@ -229,11 +229,7 @@ export class PackageDetailPanel {
         const tabs: {value: Tab; label: string;}[] = [
             {value: Tab.files, label: I18n.t('Files')},
             {value: Tab.deps, label: I18n.t('Dependencies')},
-            {value: Tab.diff, label: this._diffTarget
-                ? PackageDetailPanel._isGitVersion(this._diffTarget)
-                    ? I18n.t('Diff against HEAD')
-                    : I18n.t('Diff against {target}', {target: this._diffTarget})
-                : I18n.t('Diff')},
+            {value: Tab.diff, label: PackageDetailPanel._diffTabLabel(this._diffTarget)},
             {value: Tab.releases, label: I18n.t('Releases')},
             {value: Tab.security, label: this._securityTabLabel()},
             {value: Tab.license, label: this._licenseTabLabel()},
@@ -740,8 +736,8 @@ export class PackageDetailPanel {
         }
         const yMax = PackageDetailPanel._niceCeil(Math.max(max, 1));
         const xPx = (iso: string): number =>
-            PAD_L + ((new Date(iso).getTime() - tStart) / tSpan) * PLOT_W;
-        const yPx = (v: number): number => PAD_T + (1 - v / yMax) * PLOT_H;
+            PAD_L + (((new Date(iso).getTime() - tStart) / tSpan) * PLOT_W);
+        const yPx = (v: number): number => PAD_T + ((1 - (v / yMax)) * PLOT_H);
 
         for (const tick of [0, yMax / 2, yMax]) {
             const y = yPx(tick);
@@ -831,7 +827,7 @@ export class PackageDetailPanel {
         const gap = (PLOT_W / months.length) * 0.2;
 
         for (const tick of [0, yMax / 2, yMax]) {
-            const y = PAD_T + (1 - tick / yMax) * PLOT_H;
+            const y = PAD_T + ((1 - (tick / yMax)) * PLOT_H);
             const line = document.createElementNS(svgNs, 'line');
             line.setAttribute('class', 'pdp-trends-grid');
             line.setAttribute('x1', String(PAD_L));
@@ -849,7 +845,7 @@ export class PackageDetailPanel {
         }
 
         months.forEach((m, i) => {
-            const x = PAD_L + i * (barW + gap) + gap / 2;
+            const x = PAD_L + (i * (barW + gap)) + (gap / 2);
             const h = (m.count / yMax) * PLOT_H;
             const y = PAD_T + PLOT_H - h;
             const rect = document.createElementNS(svgNs, 'rect');
@@ -865,7 +861,7 @@ export class PackageDetailPanel {
         });
 
         for (const idx of [0, Math.floor(months.length / 2), months.length - 1]) {
-            const x = PAD_L + idx * (barW + gap) + barW / 2;
+            const x = PAD_L + (idx * (barW + gap)) + (barW / 2);
             const lbl = document.createElementNS(svgNs, 'text');
             lbl.setAttribute('class', 'pdp-trends-axis');
             lbl.setAttribute('x', String(x));
@@ -1033,6 +1029,8 @@ export class PackageDetailPanel {
             case LicenseSeverity.strongCopyleft:
             case LicenseSeverity.proprietary:
                 return 'risk';
+            default:
+                return 'info';
         }
     }
 
@@ -1048,6 +1046,8 @@ export class PackageDetailPanel {
                 return 'PROPRIETARY';
             case LicenseSeverity.unknown:
                 return 'UNKNOWN';
+            default:
+                return '';
         }
     }
 
@@ -1549,9 +1549,7 @@ export class PackageDetailPanel {
 
         const pill = document.createElement('span');
         pill.className = `pdp-tfa pdp-deprecation-pill-${finding.level}`;
-        pill.textContent = finding.level === DeprecationLevel.risk
-            ? 'DEPRECATED'
-            : finding.level === DeprecationLevel.warn ? 'LATEST DEPRECATED' : 'PRIOR DEPRECATED';
+        pill.textContent = PackageDetailPanel._deprecationPillLabel(finding.level);
         head.appendChild(pill);
         card.appendChild(head);
 
@@ -1653,6 +1651,7 @@ export class PackageDetailPanel {
             case 'socket': return 'socket.dev';
             case 'openssf': return 'OpenSSF';
             case 'depsDev': return 'deps.dev';
+            default: return '';
         }
     }
 
@@ -1685,11 +1684,11 @@ export class PackageDetailPanel {
         }
         section.classList.add('pdp-card');
 
-        const hasIssue = opts.hasIssue !== undefined
-            ? opts.hasIssue
-            : Boolean(section.querySelector(
+        const hasIssue = opts.hasIssue === undefined
+            ? Boolean(section.querySelector(
                 '.pdp-sev-risk, .pdp-sev-warn, [class*="-risk"], [class*="-warn"]'
-            ));
+            ))
+            : opts.hasIssue;
 
         const body = document.createElement('div');
         body.className = 'pdp-card-body';
@@ -1766,8 +1765,8 @@ export class PackageDetailPanel {
         if (finding.closestMatch) {
             const target = document.createElement('span');
             target.className = 'pdp-script-hook';
-            target.textContent = `${I18n.t('closest popular')}: ${finding.closestMatch}${  
-                finding.distance !== null ? ` (d=${finding.distance})` : ''}`;
+            target.textContent = `${I18n.t('closest popular')}: ${finding.closestMatch}${
+                finding.distance === null ? '' : ` (d=${finding.distance})`}`;
             head.appendChild(target);
         }
         card.appendChild(head);
@@ -1822,6 +1821,8 @@ export class PackageDetailPanel {
                 return I18n.t('--ignore-scripts: NOT safe — package needs the hook');
             case IgnoreScriptsLevel.avoidScripts:
                 return I18n.t('--ignore-scripts: STRONGLY recommended');
+            default:
+                return '';
         }
     }
 
@@ -1863,19 +1864,19 @@ export class PackageDetailPanel {
 
         const lastLine = document.createElement('div');
         lastLine.className = 'pdp-fresh-line';
-        lastLine.textContent = finding.daysSinceLastRelease !== null
-            ? I18n.t('Last release: {n} days ago', {n: finding.daysSinceLastRelease})
-            : I18n.t('Last release: unknown');
+        lastLine.textContent = finding.daysSinceLastRelease === null
+            ? I18n.t('Last release: unknown')
+            : I18n.t('Last release: {n} days ago', {n: finding.daysSinceLastRelease});
         body.appendChild(lastLine);
 
         const cadenceLine = document.createElement('div');
         cadenceLine.className = 'pdp-fresh-line';
-        cadenceLine.textContent = finding.medianCadenceDays !== null
-            ? I18n.t('Median cadence: every {n} days over {count} releases', {
+        cadenceLine.textContent = finding.medianCadenceDays === null
+            ? I18n.t('Median cadence: not enough releases to compute')
+            : I18n.t('Median cadence: every {n} days over {count} releases', {
                 n: finding.medianCadenceDays,
                 count: finding.releaseCount
-            })
-            : I18n.t('Median cadence: not enough releases to compute');
+            });
         body.appendChild(cadenceLine);
 
         card.appendChild(body);
@@ -1894,6 +1895,7 @@ export class PackageDetailPanel {
             case CadenceLevel.info: return 'ALIVE';
             case CadenceLevel.warn: return 'STALE';
             case CadenceLevel.risk: return 'STALE!';
+            default: return '';
         }
     }
 
@@ -1937,16 +1939,16 @@ export class PackageDetailPanel {
 
         const pkgLine = document.createElement('div');
         pkgLine.className = 'pdp-fresh-line';
-        pkgLine.textContent = finding.packageAgeDays !== null
-            ? I18n.t('Package: first published {n} days ago', {n: finding.packageAgeDays})
-            : I18n.t('Package: publish date unknown');
+        pkgLine.textContent = finding.packageAgeDays === null
+            ? I18n.t('Package: publish date unknown')
+            : I18n.t('Package: first published {n} days ago', {n: finding.packageAgeDays});
         body.appendChild(pkgLine);
 
         const mntLine = document.createElement('div');
         mntLine.className = 'pdp-fresh-line';
-        mntLine.textContent = finding.maintainerAgeDays !== null
-            ? I18n.t('Publisher account: {n} days old', {n: finding.maintainerAgeDays})
-            : I18n.t('Publisher account: age unknown (registry did not disclose)');
+        mntLine.textContent = finding.maintainerAgeDays === null
+            ? I18n.t('Publisher account: age unknown (registry did not disclose)')
+            : I18n.t('Publisher account: {n} days old', {n: finding.maintainerAgeDays});
         body.appendChild(mntLine);
 
         card.appendChild(body);
@@ -1965,6 +1967,7 @@ export class PackageDetailPanel {
             case FreshnessLevel.info: return 'OK';
             case FreshnessLevel.warn: return 'NEW';
             case FreshnessLevel.risk: return 'NEW!';
+            default: return '';
         }
     }
 
@@ -2046,6 +2049,7 @@ export class PackageDetailPanel {
             case ProvenanceLevel.provenance: return 'PROV ✓';
             case ProvenanceLevel.signed: return 'SIGNED';
             case ProvenanceLevel.unsigned: return 'UNSIGNED';
+            default: return '';
         }
     }
 
@@ -2057,6 +2061,8 @@ export class PackageDetailPanel {
                 return I18n.t('Registry-signed only. The npm key proves the tarball came from npm — but not from any specific build job or repo.');
             case ProvenanceLevel.unsigned:
                 return I18n.t('No signature at all — typical for very old releases or non-npm mirrors that strip signatures.');
+            default:
+                return '';
         }
     }
 
@@ -2169,6 +2175,7 @@ export class PackageDetailPanel {
             case MaintainerSeverity.info: return 'OK';
             case MaintainerSeverity.warn: return 'WARN';
             case MaintainerSeverity.risk: return 'RISK';
+            default: return '';
         }
     }
 
@@ -2229,6 +2236,7 @@ export class PackageDetailPanel {
             case BinarySeverity.info: return 'INFO';
             case BinarySeverity.warn: return 'WARN';
             case BinarySeverity.risk: return 'RISK';
+            default: return '';
         }
     }
 
@@ -2474,6 +2482,7 @@ export class PackageDetailPanel {
             case PatternSeverity.info: return 'INFO';
             case PatternSeverity.warn: return 'WARN';
             case PatternSeverity.risk: return 'RISK';
+            default: return '';
         }
     }
 
@@ -2531,6 +2540,7 @@ export class PackageDetailPanel {
             case ChurnSeverity.info: return 'OK';
             case ChurnSeverity.warn: return 'WARN';
             case ChurnSeverity.risk: return 'RISK';
+            default: return '';
         }
     }
 
@@ -2665,6 +2675,7 @@ export class PackageDetailPanel {
             case ScriptSeverity.info: return 'INFO';
             case ScriptSeverity.warn: return 'WARN';
             case ScriptSeverity.risk: return 'RISK';
+            default: return '';
         }
     }
 
@@ -2701,10 +2712,10 @@ export class PackageDetailPanel {
                 return;
             }
 
-            if (!response.diff) {
-                this._diffError = I18n.t('One of the two versions is unavailable.');
-            } else {
+            if (response.diff) {
                 this._diffCache = response.diff;
+            } else {
+                this._diffError = I18n.t('One of the two versions is unavailable.');
             }
 
             this._renderActiveTab();
@@ -2817,6 +2828,26 @@ export class PackageDetailPanel {
 
         wrap.appendChild(list);
         return wrap;
+    }
+
+    private static _diffTabLabel(target: string|null): string {
+        if (target === null || target === '') {
+            return I18n.t('Diff');
+        }
+        if (PackageDetailPanel._isGitVersion(target)) {
+            return I18n.t('Diff against HEAD');
+        }
+        return I18n.t('Diff against {target}', {target: target});
+    }
+
+    private static _deprecationPillLabel(level: DeprecationLevel): string {
+        if (level === DeprecationLevel.risk) {
+            return 'DEPRECATED';
+        }
+        if (level === DeprecationLevel.warn) {
+            return 'LATEST DEPRECATED';
+        }
+        return 'PRIOR DEPRECATED';
     }
 
 }

@@ -306,14 +306,18 @@ export class UpgradeModal {
         const editOnly = document.createElement('button');
         editOnly.className = 'umd-btn umd-btn-primary';
         editOnly.textContent = I18n.t('Apply edit only');
-        editOnly.addEventListener('click', () => void this._apply('edit', preview));
+        editOnly.addEventListener('click', () => {
+            void this._apply('edit', preview);
+        });
         wrap.appendChild(editOnly);
 
         if (preview.allowInstall) {
             const install = document.createElement('button');
             install.className = 'umd-btn umd-btn-risky';
             install.textContent = I18n.t('Apply edit + install (--ignore-scripts)');
-            install.addEventListener('click', () => void this._apply('install', preview));
+            install.addEventListener('click', () => {
+                void this._apply('install', preview);
+            });
             wrap.appendChild(install);
         } else {
             const note = document.createElement('div');
@@ -472,7 +476,9 @@ export class UpgradeModal {
             const run = document.createElement('button');
             run.className = 'umd-btn umd-btn-risky';
             run.textContent = I18n.t('Run');
-            run.addEventListener('click', () => void this._runScript(s, preview));
+            run.addEventListener('click', () => {
+                void this._runScript(s, preview);
+            });
             row.appendChild(run);
         }
         return row;
@@ -539,8 +545,11 @@ export class UpgradeModal {
         const reader = body.getReader();
         const decoder = new TextDecoder();
         let buf = '';
-        while (true) {
+        let streamDone = false;
+        while (!streamDone) {
+            // eslint-disable-next-line no-await-in-loop
             const {value, done} = await reader.read();
+            streamDone = done;
             if (done) {
                 break;
             }
@@ -558,10 +567,16 @@ export class UpgradeModal {
         }
     }
 
-    private static _dispatchEvent(raw: string, // SSE payloads come from our own backend; trust the shape at the
-        // edge of the dispatcher so each callback can declare its narrow type.
+    /*
+     * SSE payloads come from our own backend; trust the shape at the
+     * edge of the dispatcher so each callback can declare its narrow
+     * type.
+     */
+    private static _dispatchEvent(
+        raw: string,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        handlers: Record<string, (data: any) => void>): void {
+        handlers: Record<string, (data: any) => void>
+    ): void {
         let name = 'message';
         const dataLines: string[] = [];
         for (const line of raw.split('\n')) {

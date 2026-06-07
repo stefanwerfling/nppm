@@ -207,6 +207,7 @@ nppm/
 │   │   ├── VulnerabilityTimelineView.ts  retroactive CVE exposure window per name@version
 │   │   ├── PrReviewView.ts             diffs package.json + lockfile between two git refs
 │   │   ├── DashboardView.ts            cross-project scanner matrix (three tabs — Scanner Score / Overall Evaluation / Trend). Emits per-project averages on snapshot load + column-end + scan-end to drive the treeview ring (Dashboard-wins precedence; Matrix is fallback). Manifest-fallback projects render an orange ⓘ next to the column header carrying the `column.note` tooltip.
+│   │   ├── Dashboard/                  DashboardView extracted helpers (Formatters, ScannerMeta, ChartRenderer)
 │   │   ├── TemplatesView.ts            cross-project compliance matrix (Templates treeview entry)
 │   │   ├── TemplateView.ts             per-project right-pane tab showing the compliance diff
 │   │   └── GlobalScanView.ts           SSE-driven global scan results
@@ -227,11 +228,9 @@ nppm/
 │   │   ├── BadgeFilterModal.ts         per-badge filter chooser for the cross-project matrix
 │   │   └── WhyModal.ts                 inverted-dep-graph BFS (`npm why`-style) for one installed name
 │   │
-│   ├── Widgets/                        reusable chrome
-│   │   ├── Treeview.ts                 left-pane project list
-│   │   └── Resizer.ts                  splitter logic
-│   │
-│   └── Dashboard/          DashboardView extracted helpers (Formatters, ScannerMeta, ChartRenderer)
+│   └── Widgets/                        reusable chrome
+│       ├── Treeview.ts                 left-pane project list
+│       └── Resizer.ts                  splitter logic
 │
 ├── tests/                  vitest, all unit, no network
 ├── doc/                    user-facing manuals + screenshot script

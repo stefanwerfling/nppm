@@ -184,6 +184,36 @@ html, body {
     opacity: 1;
 }
 
+/*
+ * Inline rate-limit banner used by DashboardView + Matrix when the
+ * GithubRateLimitGuard is in active cool-down. Stays a single row of
+ * muted-red text so it doesn't dominate the view; the topbar pill
+ * carries the countdown.
+ */
+.gh-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    margin: 0 0 8px 0;
+    border: 1px solid #c0392b;
+    border-radius: 4px;
+    background: rgba(192, 57, 43, 0.08);
+    font-size: 12px;
+    color: #f8c4bb;
+}
+.gh-banner-icon {
+    color: #ff6b5b;
+    font-size: 14px;
+}
+.gh-banner-text {
+    flex: 1;
+}
+.gh-banner-hint {
+    color: var(--c-muted);
+    font-size: 11px;
+}
+
 .global-filter {
     font-size: 12px;
     color: var(--c-muted);

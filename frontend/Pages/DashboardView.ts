@@ -13,6 +13,7 @@ import {
 } from '../../shared/Api/ApiTypes.js';
 import {DashboardCell, DashboardColumn, ScannerId} from '../../backend/Dashboard/DashboardBuilder.js';
 import {DashboardHistoryEntry} from '../../backend/Dashboard/DashboardHistoryStore.js';
+import {GithubRateLimitBanner} from '../Widgets/GithubRateLimitBanner.js';
 import {ChartRenderer} from './Dashboard/ChartRenderer.js';
 import {Formatters} from './Dashboard/Formatters.js';
 import {ScannerMeta} from './Dashboard/ScannerMeta.js';
@@ -72,6 +73,7 @@ export class DashboardView {
     private _trendRangeDays: 30|90|365 = 90;
     private _trendMetric: 'score'|'packages'|'size'|'downloads' = 'score';
     private _widgetStripHost: HTMLElement|null = null;
+    private _rateLimitBannerHost: HTMLElement|null = null;
 
     public constructor(root: HTMLElement) {
         this._root = root;
@@ -284,6 +286,18 @@ export class DashboardView {
 
         this._root.appendChild(header);
 
+        /*
+         * Rate-limit banner slot. Empty unless `GithubRateLimitBanner`
+         * decides we should show something; refreshed on every
+         * `show()` so the user sees the latest state when navigating
+         * back to the Dashboard.
+         */
+        const bannerHost = document.createElement('div');
+        bannerHost.className = 'dash-ratelimit-banner';
+        this._rateLimitBannerHost = bannerHost;
+        this._root.appendChild(bannerHost);
+        void this._refreshRateLimitBanner();
+
         const progressEl = document.createElement('div');
         progressEl.className = 'dash-progress';
         const progressLabel = document.createElement('div');
@@ -321,6 +335,18 @@ export class DashboardView {
         tableHost.className = 'dash-table-host';
         this._tableHost = tableHost;
         this._root.appendChild(tableHost);
+    }
+
+    private async _refreshRateLimitBanner(): Promise<void> {
+        const host = this._rateLimitBannerHost;
+        if (!host) {
+            return;
+        }
+        host.innerHTML = '';
+        const el = await GithubRateLimitBanner.tryRender();
+        if (el && host === this._rateLimitBannerHost) {
+            host.appendChild(el);
+        }
     }
 
     private _renderTabBar(): void {

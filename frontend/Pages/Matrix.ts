@@ -19,6 +19,7 @@ import {ObfuscationSeverity, ObfuscationSummary} from '../../backend/Security/Ob
 import {TyposquatLevel, TyposquatSummary} from '../../backend/Security/TyposquatScanner.js';
 import {PatternSummary, ScriptSummary} from '../../backend/Security/SecurityScanner.js';
 import {Api} from '../Util/Api.js';
+import {GithubRateLimitBanner} from '../Widgets/GithubRateLimitBanner.js';
 import {I18n} from '../Util/I18n.js';
 import {GitResolver} from '../../backend/Fingerprint/GitResolver.js';
 import {Version} from '../Util/Version.js';
@@ -833,6 +834,17 @@ export class Matrix {
 
         this._root.innerHTML = '';
 
+        /*
+         * Rate-limit banner slot. Empty unless `GithubRateLimitBanner`
+         * decides we should show something — refreshed on every
+         * `setData()` (which fires after every Matrix navigation /
+         * project change) so the user sees the latest state.
+         */
+        const bannerHost = document.createElement('div');
+        bannerHost.className = 'matrix-ratelimit-banner';
+        this._root.appendChild(bannerHost);
+        void Matrix._fillRateLimitBanner(bannerHost);
+
         const header = document.createElement('div');
         header.className = 'matrix-header';
         header.appendChild(this._renderFilters());
@@ -845,6 +857,13 @@ export class Matrix {
         this._root.appendChild(tableWrap);
 
         this._root.appendChild(this._renderBulkFooter());
+    }
+
+    private static async _fillRateLimitBanner(host: HTMLElement): Promise<void> {
+        const el = await GithubRateLimitBanner.tryRender();
+        if (el && host.isConnected) {
+            host.appendChild(el);
+        }
     }
 
     private _renderFilters(): HTMLElement {

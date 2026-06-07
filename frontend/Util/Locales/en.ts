@@ -750,5 +750,7 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     '{host}: rate-limited, retry in {min} min': '{host}: rate-limited, retry in {min} min',
     '{host}: {n} requests left': '{host}: {n} requests left',
     'GitHub returned 403 rate-limit-exceeded. Further requests will be skipped until the window resets. Set GH_TOKEN to raise the limit from 60/h to 5000/h.': 'GitHub returned 403 rate-limit-exceeded. Further requests will be skipped until the window resets. Set GH_TOKEN to raise the limit from 60/h to 5000/h.',
-    'GitHub anonymous rate-limit is running low. Set GH_TOKEN to raise the limit from 60/h to 5000/h.': 'GitHub anonymous rate-limit is running low. Set GH_TOKEN to raise the limit from 60/h to 5000/h.'
+    'GitHub anonymous rate-limit is running low. Set GH_TOKEN to raise the limit from 60/h to 5000/h.': 'GitHub anonymous rate-limit is running low. Set GH_TOKEN to raise the limit from 60/h to 5000/h.',
+    'GitHub rate-limit reached on {host}; data from GitHub-hosted projects may be incomplete until ~{min} min from now.': 'GitHub rate-limit reached on {host}; data from GitHub-hosted projects may be incomplete until ~{min} min from now.',
+    'Set GH_TOKEN to raise the limit from 60/h to 5000/h.': 'Set GH_TOKEN to raise the limit from 60/h to 5000/h.'
 };

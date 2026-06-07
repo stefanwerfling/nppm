@@ -347,7 +347,7 @@ export class Matrix {
      */
     private _securityGen: number = 0;
 
-    constructor(root: HTMLElement) {
+    public constructor(root: HTMLElement) {
         this._root = root;
 
         const state = Matrix._loadState();
@@ -592,7 +592,7 @@ export class Matrix {
                 continue;
             }
             const cap = t.count * PACKAGE_CAP;
-            const health = Math.round(100 * Math.max(0, 1 - t.score / cap));
+            const health = Math.round(100 * Math.max(0, 1 - (t.score / cap)));
             out.set(unid, health);
         }
         return out;
@@ -1060,7 +1060,7 @@ export class Matrix {
             pill.textContent = Matrix._formatBytes(bundle.gzip);
             pill.title = I18n.t('Bundle: {gzip} gzipped, {size} minified, {deps} transitive deps', {
                 gzip: Matrix._formatBytes(bundle.gzip),
-                size: bundle.size !== null ? Matrix._formatBytes(bundle.size) : '?',
+                size: bundle.size === null ? '?' : Matrix._formatBytes(bundle.size),
                 deps: bundle.dependencyCount ?? '?'
             });
             nameCell.appendChild(pill);
@@ -1423,7 +1423,7 @@ export class Matrix {
             const td = document.createElement('td');
             td.className = 'matrix-cell';
 
-            if (!cellData) {
+            if (cellData === undefined) {
                 td.classList.add('matrix-cell-missing');
                 td.textContent = '—';
             } else {
@@ -1544,7 +1544,7 @@ export class Matrix {
                  */
                 const refs = new Set<string>();
                 for (const c of Object.values(row.cells)) {
-                    const m = c.version.match(/#(.+)$/);
+                    const m = c.version.match(/#(.+)$/u);
                     refs.add(m ? m[1] : 'HEAD');
                 }
                 latestTd.classList.add('matrix-cell-latest-git');
@@ -1632,6 +1632,8 @@ export class Matrix {
                 const lic = this._licensesByName.get(row.name);
                 return lic !== undefined && Matrix._isLicenseNotable(lic.severity);
             }
+            default:
+                return true;
         }
     }
 
@@ -1646,12 +1648,12 @@ export class Matrix {
         if (this._sort === MatrixSort.status) {
             copy.sort((a, b) => {
                 const rankDiff = STATUS_RANK[a.status] - STATUS_RANK[b.status];
-                return rankDiff !== 0 ? rankDiff : a.name.localeCompare(b.name);
+                return rankDiff === 0 ? a.name.localeCompare(b.name) : rankDiff;
             });
         } else if (this._sort === MatrixSort.severity) {
             copy.sort((a, b) => {
                 const diff = this._scoreFor(b) - this._scoreFor(a);
-                return diff !== 0 ? diff : a.name.localeCompare(b.name);
+                return diff === 0 ? a.name.localeCompare(b.name) : diff;
             });
         } else {
             copy.sort((a, b) => a.name.localeCompare(b.name));
@@ -1867,6 +1869,7 @@ export class Matrix {
             case ScriptSeverity.risk: return 'SCRIPT!';
             case ScriptSeverity.warn: return 'SCRIPT';
             case ScriptSeverity.info: return 'script';
+            default: return '';
         }
     }
 
@@ -1880,6 +1883,8 @@ export class Matrix {
                 return 'peer';
             case DependencyType.optional:
                 return 'opt';
+            default:
+                return '';
         }
     }
 

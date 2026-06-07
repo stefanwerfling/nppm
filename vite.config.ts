@@ -8,6 +8,7 @@ import {ConfigController} from './backend/Api/ConfigController.js';
 import {DashboardController} from './backend/Api/DashboardController.js';
 import {FingerprintController} from './backend/Api/FingerprintController.js';
 import {FsController} from './backend/Api/FsController.js';
+import {GithubController} from './backend/Api/GithubController.js';
 import {HistoryController} from './backend/Api/HistoryController.js';
 import {ImpactController} from './backend/Api/ImpactController.js';
 import {IntegrityController} from './backend/Api/IntegrityController.js';
@@ -292,6 +293,7 @@ class Server {
                 LockfileController.register(ctx);
                 MatrixController.register(ctx);
                 DashboardController.register(ctx);
+                GithubController.register(ctx);
 
                 server.middlewares.use(app);
             }

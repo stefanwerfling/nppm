@@ -148,6 +148,29 @@ export class GithubRateLimitGuard {
     }
 
     /**
+     * Snapshot of every host we've seen activity on, intended for the
+     * topbar pill / dashboard banner. Drops entries whose `resetAt`
+     * window has already elapsed so the UI never shows stale state.
+     */
+    public static snapshot(): GithubRateLimitSnapshotEntry[] {
+        const now = Date.now();
+        const out: GithubRateLimitSnapshotEntry[] = [];
+        for (const [host, s] of this._state) {
+            if (now >= s.resetAt) {
+                this._state.delete(host);
+                continue;
+            }
+            out.push({
+                host: host,
+                remaining: s.remaining,
+                resetAt: s.resetAt,
+                cooldownActive: s.remaining === 0
+            });
+        }
+        return out;
+    }
+
+    /**
      * Wipe the in-memory state. Tests use this between cases so one
      * cool-down doesn't leak into the next. Not part of the public
      * runtime contract — production code never calls it.
@@ -157,3 +180,16 @@ export class GithubRateLimitGuard {
     }
 
 }
+
+/**
+ * One row of `GithubRateLimitGuard.snapshot()`. Same shape goes over
+ * the wire as `ApiGithubRateLimitEntry`.
+ */
+export type GithubRateLimitSnapshotEntry = {
+    host: string;
+    remaining: number;
+    /** Epoch ms when the window resets. */
+    resetAt: number;
+    /** `true` when `remaining === 0` and we're inside the window. */
+    cooldownActive: boolean;
+};

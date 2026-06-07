@@ -738,5 +738,9 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'packageManager': 'packageManager',
     'File content lives on disk at nppm-templates/<id>/files/<path>. Edit it with your normal editor; this form only tracks declared files.': 'Datei-Inhalte liegen auf der Platte unter nppm-templates/<id>/files/<path>. Editiere sie mit deinem Editor; das Formular erfasst nur die deklarierten Dateien.',
     'Remote template (read-only)': 'Remote-Template (read-only)',
-    'Remote template from {url}': 'Remote-Template von {url}'
+    'Remote template from {url}': 'Remote-Template von {url}',
+    '{host}: rate-limited, retry in {min} min': '{host}: Rate-Limit erreicht, neuer Versuch in {min} min',
+    '{host}: {n} requests left': '{host}: noch {n} Anfragen',
+    'GitHub returned 403 rate-limit-exceeded. Further requests will be skipped until the window resets. Set GH_TOKEN to raise the limit from 60/h to 5000/h.': 'GitHub hat 403 (Rate-Limit überschritten) zurückgegeben. Weitere Anfragen werden übersprungen bis das Fenster zurückgesetzt ist. Setze GH_TOKEN um das Limit von 60/h auf 5000/h zu erhöhen.',
+    'GitHub anonymous rate-limit is running low. Set GH_TOKEN to raise the limit from 60/h to 5000/h.': 'GitHub-Rate-Limit für anonyme Zugriffe wird knapp. Setze GH_TOKEN um das Limit von 60/h auf 5000/h zu erhöhen.'
 };

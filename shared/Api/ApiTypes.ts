@@ -1019,3 +1019,20 @@ export type ApiBulkUpgradeApplyRequest = {
     picks: ApiBulkUpgradePick[];
     mode: 'edit'|'install';
 };
+/**
+ * One host's rate-limit state as surfaced by
+ * `GET /api/github/ratelimit`. Mirrors `GithubRateLimitSnapshotEntry`
+ * from the guard; the topbar pill renders one of these per row.
+ */
+export type ApiGithubRateLimitEntry = {
+    host: string;
+    remaining: number;
+    /** Epoch ms when the window resets. */
+    resetAt: number;
+    /** `true` when `remaining === 0` and we're still inside the window. */
+    cooldownActive: boolean;
+};
+
+export type ApiGithubRateLimitResponse = {
+    hosts: ApiGithubRateLimitEntry[];
+};

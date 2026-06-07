@@ -144,6 +144,46 @@ html, body {
     pointer-events: none;
 }
 
+/*
+ * GitHub rate-limit pill. Three states share the same shell; only
+ * the colour tier changes:
+ *   - hidden (no observation yet, or remaining > _LOW threshold)
+ *   - warn (remaining low but > 0): yellow border + muted text
+ *   - cool-down (remaining === 0): red border + countdown
+ */
+.topbar-github-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    margin-right: 6px;
+    border: 1px solid var(--c-muted);
+    border-radius: 999px;
+    font-size: 11px;
+    color: var(--c-text);
+    background: rgba(255, 255, 255, 0.04);
+    cursor: help;
+    user-select: none;
+}
+.topbar-github-pill-warn {
+    border-color: #d4a017;
+    color: #f0c040;
+}
+.topbar-github-pill-cooldown {
+    border-color: #c0392b;
+    color: #ff6b5b;
+    background: rgba(192, 57, 43, 0.12);
+}
+.topbar-github-pill::before {
+    content: '\25CF';
+    font-size: 9px;
+    opacity: 0.7;
+}
+.topbar-github-pill-cooldown::before {
+    color: #ff6b5b;
+    opacity: 1;
+}
+
 .global-filter {
     font-size: 12px;
     color: var(--c-muted);

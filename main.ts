@@ -1,5 +1,6 @@
 import 'normalize.css';
 import './main.css';
+import {GithubRateLimitPill} from './frontend/Widgets/GithubRateLimitPill.js';
 import {I18n, LANGUAGES} from './frontend/Util/I18n.js';
 import {ImpactModal} from './frontend/Modals/ImpactModal.js';
 import {Nppm} from './frontend/Nppm.js';
@@ -71,11 +72,20 @@ class Bootstrap {
         });
     }
 
+    public static mountGithubRateLimitPill(): void {
+        const host = document.getElementById('topbar-github-pill');
+        if (!host) {
+            return;
+        }
+        new GithubRateLimitPill(host).mount();
+    }
+
 }
 
 Bootstrap.mountLanguagePicker();
 Bootstrap.mountSettingsButton();
 Bootstrap.mountImpactButton();
+Bootstrap.mountGithubRateLimitPill();
 
 const app = new Nppm();
 void app.start();

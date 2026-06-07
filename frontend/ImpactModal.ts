@@ -148,7 +148,9 @@ export class ImpactModal {
         const runBtn = document.createElement('button');
         runBtn.className = 'umd-btn umd-btn-primary';
         runBtn.textContent = I18n.t('Scan impact');
-        runBtn.addEventListener('click', () => void this._run());
+        runBtn.addEventListener('click', () => {
+            void this._run();
+        });
         this._runBtn = runBtn;
 
         bar.appendChild(nameLabel);

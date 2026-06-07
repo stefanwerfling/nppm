@@ -251,9 +251,9 @@ export class PackageList {
 
     private static _esc(s: string): string {
         return s
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/&/gu, '&amp;')
+        .replace(/</gu, '&lt;')
+        .replace(/>/gu, '&gt;');
     }
 
 }

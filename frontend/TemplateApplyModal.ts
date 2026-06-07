@@ -305,7 +305,7 @@ export class TemplateApplyModal {
                 while ((nl = buf.indexOf('\n\n')) >= 0) {
                     const block = buf.slice(0, nl);
                     buf = buf.slice(nl + 2);
-                    const evMatch = /^event: (\S+)\s*\ndata: (.*)$/s.exec(block);
+                    const evMatch = /^event: (\S+)\s*\ndata: (.*)$/su.exec(block);
                     if (!evMatch) {
                         continue;
                     }

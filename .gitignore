@@ -1,4 +1,5 @@
 .idea/
+.nppm/
 .nppm-backups
 .nppm-cache
 .nppm-history

@@ -133,7 +133,7 @@ export class PackageDetailPanel {
              * `_diffTarget` null in that case.
              */
             if (PackageDetailPanel._isGitVersion(version) && version.includes('#')) {
-                this._diffTarget = version.replace(/#.*$/, '');
+                this._diffTarget = version.replace(/#.*$/u, '');
             }
 
             this._renderTabs();
@@ -981,7 +981,7 @@ export class PackageDetailPanel {
          * self-report.
          */
         const licenseFiles = this._fingerprint?.files
-        .filter((f) => /(^|\/)(LICEN[SC]E|COPYING|NOTICE)(\.[^/]+)?$/i.test(f.path));
+        .filter((f) => /(^|\/)(LICEN[SC]E|COPYING|NOTICE)(\.[^/]+)?$/iu.test(f.path));
 
         const filesSection = document.createElement('div');
         filesSection.className = 'pdp-section';
@@ -2243,7 +2243,7 @@ export class PackageDetailPanel {
     }
 
     private static _isGitVersion(v: string): boolean {
-        return /^(git\+|git:\/\/|git@|github:|gitlab:|bitbucket:)/i.test(v.trim());
+        return /^(git\+|git:\/\/|git@|github:|gitlab:|bitbucket:)/iu.test(v.trim());
     }
 
     /**

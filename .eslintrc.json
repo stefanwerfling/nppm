@@ -168,6 +168,7 @@
     "no-shadow": "off",
     "no-sync": "off",
     "no-ternary": "off",
+    "no-undef": "off",
     "no-undefined": "off",
     "no-underscore-dangle": "off",
     "no-unused-vars": "off",

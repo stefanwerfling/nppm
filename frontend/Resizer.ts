@@ -10,7 +10,7 @@ export class Resizer {
     private readonly _min: number;
     private readonly _max: number;
 
-    constructor(handle: HTMLElement, target: HTMLElement, min = 160, max = 600) {
+    public constructor(handle: HTMLElement, target: HTMLElement, min = 160, max = 600) {
         this._handle = handle;
         this._target = target;
         this._min = min;

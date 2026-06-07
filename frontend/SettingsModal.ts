@@ -142,7 +142,9 @@ export class SettingsModal {
         save.type = 'button';
         save.className = 'umd-btn umd-btn-primary';
         save.textContent = I18n.t('Save');
-        save.addEventListener('click', () => void this._submit());
+        save.addEventListener('click', () => {
+            void this._submit();
+        });
         actions.appendChild(save);
         const cancel = document.createElement('button');
         cancel.type = 'button';

@@ -45,7 +45,7 @@ export class HistoryView {
     private _progressBar: HTMLElement|null = null;
     private _progressText: HTMLElement|null = null;
 
-    constructor(root: HTMLElement) {
+    public constructor(root: HTMLElement) {
         this._root = root;
     }
 

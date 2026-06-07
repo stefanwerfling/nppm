@@ -183,41 +183,53 @@ nppm/
 │   │
 │   └── Bundle/BundlephobiaFetcher.ts  permanent-cache bundlephobia client
 │
-├── frontend/               every browser-side module
+├── frontend/               every browser-side module, grouped by role
 │   ├── Nppm.ts             top-level orchestrator (panes, routing)
-│   ├── Matrix.ts           global matrix view
-│   ├── ProjectMatrixView.ts  per-project matrix
-│   ├── PackageList.ts      declared-deps table
-│   ├── InstalledView.ts    lockfile/node_modules table + analyze bar
-│   ├── HistoryView.ts      timeline cards
-│   ├── DepTreeView.ts      D3-collapsible tree
-│   ├── UnusedView.ts       per-project depcheck-style report (unused/misplaced/missing)
-│   ├── VulnerabilityTimelineView.ts  retroactive CVE exposure window per name@version
-│   ├── PrReviewView.ts     diffs package.json + lockfile between two git refs
-│   ├── DashboardView.ts    cross-project scanner matrix split into three tabs: **Scanner Score** (rows × cols = scanners × projects, score rings; treeview __dashboard__ sentinel → SSE /api/dashboard/scan; cell click → FindingsModal; header click → project drill-down; snapshot first-paint; per-package progress detail; survives view switches; header strip above the table renders a 3-segment Macro-Donut with ecosystem avg + "↑X pts vs last scan" delta from `/api/dashboard/history` previous, plus Top-10 Worst Packages aggregated by CellFinding label/severity-weight with row-click → ImpactModal), **Overall Evaluation** (ecosystem hero card built from `_columns` only — no extra fetch), and **Trend** (hand-rolled SVG multi-line chart with 4 metric chips: Score reads dashboard-history `overall`; Packages reads `/api/dashboard/growth`; Size reads history-entry `totalSizeBytes` + `perProject[].sizeBytes`; Downloads reads `totalDownloadsLastWeek` + `perProject[].downloadsLastWeek`. Range chips 30d/90d/365d. Per-project lines + heavier overall line. Dynamic Y-axis with `_niceCeil`. Old entries without a metric drop out via `typeof === 'number'` filter — no migration needed). Emits per-project averages on snapshot load + column-end + scan-end to drive the treeview ring (Dashboard-wins precedence; Matrix is fallback). Manifest-fallback projects render an orange ⓘ next to the column header carrying the `column.note` tooltip.
-│   ├── EcosystemBoxModal.ts  detail modal for the Overall-Evaluation hero card boxes. Dispatches on box id and renders the matching breakdown: project lists (Projects / Healthy / At-risk, with "Open in Matrix" CTA), per-scanner averages (Ecosystem health), per-scanner severity counts (Info / Risk roll-ups), per-package lists with project attribution (CVE / Deprecated / Maintainer / Typosquat). Package rows aren't clickable — cross-project matrix is the drill surface.
-│   ├── FindingsModal.ts    drill-down modal on Dashboard cell click — scanner label + project + top-50 findings + "Open in <view>" for cve/integrity/unused/template
-│   ├── ImpactModal.ts      cross-project blast-radius modal (topbar "Impact" button → /api/impact)
-│   ├── UpgradeModal.ts     overlay: preview → edit/install → lifecycle-scripts list + Run buttons
-│   ├── BulkUpgradeModal.ts cross-project bulk wizard: grouped preview + per-project SSE install log
-│   ├── SettingsModal.ts    tabbed editor for the non-projects sections of nppm.json
-│   ├── DirectoryPickerModal.ts  backend-driven filesystem picker for the ProjectFormModal Path field
-│   ├── TemplatesView.ts    cross-project compliance matrix (Templates treeview entry)
-│   ├── TemplateView.ts     per-project right-pane tab showing the compliance diff
-│   ├── TemplateApplyModal.ts  pick-checkbox modal + SSE log for `POST .../compliance/apply`
-│   ├── TemplateFormModal.ts  tabbed editor (General/Packages/Forbidden/Root/Files) backing the CRUD endpoints
-│   ├── WorkspaceDriftModal.ts  per-project breakdown for the matrix `WS` badge + "Open project matrix" jump
-│   ├── EditorUrl.ts        URL-handler templates for vscode/vscodium/cursor/phpstorm/webstorm/idea/subl
-│   ├── GlobalScanView.ts   SSE-driven global scan results
-│   ├── PackageDetailPanel.ts  modal w/ 7 tabs (Files/Deps/Diff/Releases/Security/License/Trends). Trends tab renders 5 hand-rolled SVG sub-charts from `/api/packages/:name/trends`: unpacked-size/version, maintainer-count/version, direct-deps/version, releases/month (back-filled 24m bars), daily downloads (last-year polyline, dots dropped above 60 points). Each sub-chart has an info `i` icon next to the heading with a viewport-safe tooltip (mirrors DashboardView `_wireTooltip` pattern).
-│   ├── Treeview.ts         left-pane project list
-│   ├── Resizer.ts          splitter logic
 │   ├── Api.ts              `fetch()` wrapper
 │   ├── I18n.ts             public i18n API + LANGUAGES + LOCALES registry
-│   ├── Locales/en.ts       English translations (source-of-truth identity map)
-│   ├── Locales/de.ts       German translations
+│   ├── EditorUrl.ts        URL-handler templates for vscode/vscodium/cursor/phpstorm/webstorm/idea/subl
 │   ├── Version.ts          shared cleanRange helper
-│   └── logo.svg            32×32 brand mark
+│   ├── logo.svg            32×32 brand mark
+│   │
+│   ├── Pages/                          right-pane views
+│   │   ├── Matrix.ts                   global matrix view
+│   │   ├── ProjectMatrixView.ts        per-project matrix
+│   │   ├── PackageList.ts              declared-deps table
+│   │   ├── InstalledView.ts            lockfile/node_modules table + analyze bar
+│   │   ├── HistoryView.ts              timeline cards
+│   │   ├── DepTreeView.ts              D3-collapsible tree
+│   │   ├── UnusedView.ts               per-project depcheck-style report (unused/misplaced/missing)
+│   │   ├── VulnerabilityTimelineView.ts  retroactive CVE exposure window per name@version
+│   │   ├── PrReviewView.ts             diffs package.json + lockfile between two git refs
+│   │   ├── DashboardView.ts            cross-project scanner matrix (three tabs — Scanner Score / Overall Evaluation / Trend). Emits per-project averages on snapshot load + column-end + scan-end to drive the treeview ring (Dashboard-wins precedence; Matrix is fallback). Manifest-fallback projects render an orange ⓘ next to the column header carrying the `column.note` tooltip.
+│   │   ├── TemplatesView.ts            cross-project compliance matrix (Templates treeview entry)
+│   │   ├── TemplateView.ts             per-project right-pane tab showing the compliance diff
+│   │   └── GlobalScanView.ts           SSE-driven global scan results
+│   │
+│   ├── Modals/                         overlays + slide-out panels
+│   │   ├── PackageDetailPanel.ts       modal w/ 7 tabs (Files/Deps/Diff/Releases/Security/License/Trends). Trends tab renders 5 hand-rolled SVG sub-charts from `/api/packages/:name/trends`.
+│   │   ├── EcosystemBoxModal.ts        detail modal for the Overall-Evaluation hero card boxes.
+│   │   ├── FindingsModal.ts            drill-down modal on Dashboard cell click — scanner label + project + top-50 findings + "Open in <view>"
+│   │   ├── ImpactModal.ts              cross-project blast-radius modal (topbar "Impact" button → /api/impact)
+│   │   ├── UpgradeModal.ts             overlay: preview → edit/install → lifecycle-scripts list + Run buttons
+│   │   ├── BulkUpgradeModal.ts         cross-project bulk wizard: grouped preview + per-project SSE install log
+│   │   ├── SettingsModal.ts            tabbed editor for the non-projects sections of nppm.json
+│   │   ├── DirectoryPickerModal.ts     backend-driven filesystem picker for the ProjectFormModal Path field
+│   │   ├── ProjectFormModal.ts         add/edit project (local, github, gitea)
+│   │   ├── TemplateApplyModal.ts       pick-checkbox modal + SSE log for `POST .../compliance/apply`
+│   │   ├── TemplateFormModal.ts        tabbed editor (General/Packages/Forbidden/Root/Files) backing the CRUD endpoints
+│   │   ├── WorkspaceDriftModal.ts      per-project breakdown for the matrix `WS` badge + "Open project matrix" jump
+│   │   ├── BadgeFilterModal.ts         per-badge filter chooser for the cross-project matrix
+│   │   └── WhyModal.ts                 inverted-dep-graph BFS (`npm why`-style) for one installed name
+│   │
+│   ├── Widgets/                        reusable chrome
+│   │   ├── Treeview.ts                 left-pane project list
+│   │   └── Resizer.ts                  splitter logic
+│   │
+│   ├── Dashboard/          DashboardView extracted helpers (Formatters, ScannerMeta, ChartRenderer)
+│   ├── Locales/
+│   │   ├── en.ts           English translations (source-of-truth identity map)
+│   │   └── de.ts           German translations
 │
 ├── tests/                  vitest, all unit, no network
 ├── doc/                    user-facing manuals + screenshot script
@@ -368,7 +380,7 @@ migrations leave both sides alone rather than merging.
   `latest = null` for rows where every cell is a git URL, and stamp
   `gitLatest` (carrying the stripped origin + per-row HEAD info from
   `GitHeadFetcher`) so the frontend can render `1.0.28 · 7d3f12a`.
-  `frontend/Matrix.setData` excludes git-only rows from the
+  `frontend/Pages/Matrix.setData` excludes git-only rows from the
   `/api/matrix/heuristics` batch entirely. The dashboard SSE +
   per-/cross-project OSV scans in `vite.config.ts` use
   `pkg.resolved` as the scanner-version when it's a git URL, keeping

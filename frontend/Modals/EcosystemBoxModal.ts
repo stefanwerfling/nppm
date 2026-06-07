@@ -1,5 +1,5 @@
-import {DashboardColumn, ScannerId} from '../backend/Dashboard/DashboardBuilder.js';
-import {I18n} from './I18n.js';
+import {DashboardColumn, ScannerId} from '../../backend/Dashboard/DashboardBuilder.js';
+import {I18n} from '../I18n.js';
 
 /**
  * Box identifiers used by the Overall-Evaluation hero card. Each

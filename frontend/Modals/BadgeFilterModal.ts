@@ -1,5 +1,5 @@
-import {I18n} from './I18n.js';
-import {MATRIX_BADGES, MatrixBadgeId, MatrixBadgeMeta} from './Matrix.js';
+import {I18n} from '../I18n.js';
+import {MATRIX_BADGES, MatrixBadgeId, MatrixBadgeMeta} from '../Pages/Matrix.js';
 
 /**
  * Handler fired when the user clicks "Apply" — the modal hands the

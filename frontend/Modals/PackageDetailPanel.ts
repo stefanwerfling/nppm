@@ -3,29 +3,29 @@ import {
     FingerprintDiff,
     PackageFingerprint,
     PackageFingerprintManifest
-} from '../backend/Fingerprint/Fingerprint.js';
-import {Release, ReleasesResponse} from '../backend/Releases/Releases.js';
-import {BinaryFinding, BinarySeverity} from '../backend/Security/BinaryScanner.js';
-import {ChurnFinding, ChurnSeverity} from '../backend/Security/ChurnScanner.js';
-import {LicenseSeverity} from '../backend/Security/LicenseScanner.js';
-import {CadenceFinding, CadenceLevel} from '../backend/Security/CadenceScanner.js';
-import {FreshnessFinding, FreshnessLevel} from '../backend/Security/FreshnessScanner.js';
-import {IgnoreScriptsFinding, IgnoreScriptsLevel} from '../backend/Security/IgnoreScriptsScanner.js';
-import {TyposquatFinding, TyposquatLevel} from '../backend/Security/TyposquatScanner.js';
-import {MaintainerFinding, MaintainerSeverity} from '../backend/Security/MaintainerScanner.js';
-import {CapabilityFinding, CapabilitySeverity} from '../backend/Security/CapabilityScanner.js';
-import {DeprecationFinding, DeprecationLevel} from '../backend/Security/DeprecationScanner.js';
-import {ExternalFinding, ExternalSeverity, ExternalSource, ExternalSourceFinding} from '../backend/Security/ExternalSourcesScanner.js';
-import {ManifestRedFlagSeverity, ManifestRedFlagsFinding} from '../backend/Security/ManifestRedFlagsScanner.js';
-import {ObfuscationFinding, ObfuscationSeverity} from '../backend/Security/ObfuscationScanner.js';
-import {ProvenanceFinding, ProvenanceLevel} from '../backend/Security/ProvenanceScanner.js';
-import {OsvVulnerability} from '../backend/Security/OsvClient.js';
-import {PatternFinding, PatternSeverity} from '../backend/Security/PatternScanner.js';
-import {ScriptFinding, ScriptSeverity} from '../backend/Security/ScriptScanner.js';
-import {SecurityReport} from '../backend/Security/SecurityScanner.js';
-import {Api} from './Api.js';
-import {I18n} from './I18n.js';
-import {Version} from './Version.js';
+} from '../../backend/Fingerprint/Fingerprint.js';
+import {Release, ReleasesResponse} from '../../backend/Releases/Releases.js';
+import {BinaryFinding, BinarySeverity} from '../../backend/Security/BinaryScanner.js';
+import {ChurnFinding, ChurnSeverity} from '../../backend/Security/ChurnScanner.js';
+import {LicenseSeverity} from '../../backend/Security/LicenseScanner.js';
+import {CadenceFinding, CadenceLevel} from '../../backend/Security/CadenceScanner.js';
+import {FreshnessFinding, FreshnessLevel} from '../../backend/Security/FreshnessScanner.js';
+import {IgnoreScriptsFinding, IgnoreScriptsLevel} from '../../backend/Security/IgnoreScriptsScanner.js';
+import {TyposquatFinding, TyposquatLevel} from '../../backend/Security/TyposquatScanner.js';
+import {MaintainerFinding, MaintainerSeverity} from '../../backend/Security/MaintainerScanner.js';
+import {CapabilityFinding, CapabilitySeverity} from '../../backend/Security/CapabilityScanner.js';
+import {DeprecationFinding, DeprecationLevel} from '../../backend/Security/DeprecationScanner.js';
+import {ExternalFinding, ExternalSeverity, ExternalSource, ExternalSourceFinding} from '../../backend/Security/ExternalSourcesScanner.js';
+import {ManifestRedFlagSeverity, ManifestRedFlagsFinding} from '../../backend/Security/ManifestRedFlagsScanner.js';
+import {ObfuscationFinding, ObfuscationSeverity} from '../../backend/Security/ObfuscationScanner.js';
+import {ProvenanceFinding, ProvenanceLevel} from '../../backend/Security/ProvenanceScanner.js';
+import {OsvVulnerability} from '../../backend/Security/OsvClient.js';
+import {PatternFinding, PatternSeverity} from '../../backend/Security/PatternScanner.js';
+import {ScriptFinding, ScriptSeverity} from '../../backend/Security/ScriptScanner.js';
+import {SecurityReport} from '../../backend/Security/SecurityScanner.js';
+import {Api} from '../Api.js';
+import {I18n} from '../I18n.js';
+import {Version} from '../Version.js';
 
 enum Tab {
     files = 'files',
@@ -73,7 +73,7 @@ export class PackageDetailPanel {
      * collapsed again.
      */
     private _releasesShowAll: boolean = false;
-    private _trends: import('../shared/Api/ApiTypes.js').ApiPackageTrendsResponse|null = null;
+    private _trends: import('../../shared/Api/ApiTypes.js').ApiPackageTrendsResponse|null = null;
     private _trendsError: string|null = null;
     private _trendsInflight: boolean = false;
 
@@ -405,7 +405,7 @@ export class PackageDetailPanel {
         this._tabPane.appendChild(this._renderTrendsBody(this._trends));
     }
 
-    private _renderTrendsBody(t: import('../shared/Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
+    private _renderTrendsBody(t: import('../../shared/Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
         const wrap = document.createElement('div');
         wrap.className = 'pdp-trends';
 
@@ -424,7 +424,7 @@ export class PackageDetailPanel {
      * peak → consolidation. A sudden drop right before a takeover
      * incident is what the user is hunting for here.
      */
-    private static _renderMaintainersOverVersions(t: import('../shared/Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
+    private static _renderMaintainersOverVersions(t: import('../../shared/Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
         const section = document.createElement('div');
         section.className = 'pdp-trends-section';
         section.appendChild(PackageDetailPanel._sectionHead(
@@ -465,7 +465,7 @@ export class PackageDetailPanel {
      * worth a look at the diff between that version and its
      * predecessor.
      */
-    private static _renderDepsOverVersions(t: import('../shared/Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
+    private static _renderDepsOverVersions(t: import('../../shared/Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
         const section = document.createElement('div');
         section.className = 'pdp-trends-section';
         section.appendChild(PackageDetailPanel._sectionHead(
@@ -507,7 +507,7 @@ export class PackageDetailPanel {
      * the full version timeline so the user can see when growth
      * accelerated relative to release dates.
      */
-    private static _renderSizeOverVersions(t: import('../shared/Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
+    private static _renderSizeOverVersions(t: import('../../shared/Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
         const section = document.createElement('div');
         section.className = 'pdp-trends-section';
         section.appendChild(PackageDetailPanel._sectionHead(
@@ -543,7 +543,7 @@ export class PackageDetailPanel {
      * months. Each bar = one month; backfilled with zeros for months
      * without a release so the cadence (and gaps in it) is visible.
      */
-    private static _renderReleasesByMonth(t: import('../shared/Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
+    private static _renderReleasesByMonth(t: import('../../shared/Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
         const section = document.createElement('div');
         section.className = 'pdp-trends-section';
         section.appendChild(PackageDetailPanel._sectionHead(
@@ -586,7 +586,7 @@ export class PackageDetailPanel {
      * when the downloads API was unreachable or the package isn't
      * indexed (private package, mirror).
      */
-    private static _renderDownloadsRange(t: import('../shared/Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
+    private static _renderDownloadsRange(t: import('../../shared/Api/ApiTypes.js').ApiPackageTrendsResponse): HTMLElement {
         const section = document.createElement('div');
         section.className = 'pdp-trends-section';
         section.appendChild(PackageDetailPanel._sectionHead(

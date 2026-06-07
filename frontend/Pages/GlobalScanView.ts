@@ -4,8 +4,8 @@ import {
     ApiAnalyzeProgressEvent,
     ApiAnalyzeResultEvent,
     ApiAnalyzeStartEvent
-} from '../shared/Api/ApiTypes.js';
-import {I18n} from './I18n.js';
+} from '../../shared/Api/ApiTypes.js';
+import {I18n} from '../I18n.js';
 
 /**
  * One row in the global scan result. We keep both `vulnIds` and the

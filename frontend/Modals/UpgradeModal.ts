@@ -3,9 +3,9 @@ import {
     ApiLifecycleScriptsResponse,
     ApiUpgradePreviewResponse,
     ApiUpgradeRequest
-} from '../shared/Api/ApiTypes.js';
-import {Api} from './Api.js';
-import {I18n} from './I18n.js';
+} from '../../shared/Api/ApiTypes.js';
+import {Api} from '../Api.js';
+import {I18n} from '../I18n.js';
 
 /**
  * Inputs the orchestrator hands the modal when an outdated cell is

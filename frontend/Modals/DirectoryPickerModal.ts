@@ -1,5 +1,5 @@
-import {ApiFsBrowseResponse} from '../shared/Api/ApiTypes.js';
-import {I18n} from './I18n.js';
+import {ApiFsBrowseResponse} from '../../shared/Api/ApiTypes.js';
+import {I18n} from '../I18n.js';
 
 /**
  * Lightweight directory picker. Backend-driven because browsers

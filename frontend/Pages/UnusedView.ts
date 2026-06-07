@@ -1,13 +1,13 @@
-import {ApiUnusedResponse} from '../shared/Api/ApiTypes.js';
+import {ApiUnusedResponse} from '../../shared/Api/ApiTypes.js';
 import {
     MisplacedFinding,
     MissingFinding,
     ScanLimit,
     UnusedFinding,
     UnusedSeverity
-} from '../backend/Unused/UnusedReport.js';
-import {Api} from './Api.js';
-import {I18n} from './I18n.js';
+} from '../../backend/Unused/UnusedReport.js';
+import {Api} from '../Api.js';
+import {I18n} from '../I18n.js';
 
 /**
  * Per-project depcheck-style hygiene scan. Renders three sections —

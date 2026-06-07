@@ -1,9 +1,9 @@
 import 'normalize.css';
 import './main.css';
 import {I18n, LANGUAGES} from './frontend/I18n.js';
-import {ImpactModal} from './frontend/ImpactModal.js';
+import {ImpactModal} from './frontend/Modals/ImpactModal.js';
 import {Nppm} from './frontend/Nppm.js';
-import {SettingsModal} from './frontend/SettingsModal.js';
+import {SettingsModal} from './frontend/Modals/SettingsModal.js';
 
 /**
  * One-shot bootstrap glue. Static methods because the file has no

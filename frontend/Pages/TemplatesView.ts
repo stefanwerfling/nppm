@@ -1,7 +1,7 @@
-import {ApiTemplatesMatrixResponse, ApiTemplatesMatrixRow} from '../shared/Api/ApiTypes.js';
-import {Api} from './Api.js';
-import {I18n} from './I18n.js';
-import {TemplateFormModal} from './TemplateFormModal.js';
+import {ApiTemplatesMatrixResponse, ApiTemplatesMatrixRow} from '../../shared/Api/ApiTypes.js';
+import {Api} from '../Api.js';
+import {I18n} from '../I18n.js';
+import {TemplateFormModal} from '../Modals/TemplateFormModal.js';
 
 /**
  * Cross-project template-compliance matrix. Rows = templates, columns

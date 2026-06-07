@@ -10,15 +10,15 @@ import {
     ApiDashboardScanProgressEvent,
     ApiDashboardScanStartEvent,
     ApiDashboardSnapshotResponse
-} from '../shared/Api/ApiTypes.js';
-import {DashboardCell, DashboardColumn, ScannerId} from '../backend/Dashboard/DashboardBuilder.js';
-import {DashboardHistoryEntry} from '../backend/Dashboard/DashboardHistoryStore.js';
-import {ChartRenderer} from './Dashboard/ChartRenderer.js';
-import {Formatters} from './Dashboard/Formatters.js';
-import {ScannerMeta} from './Dashboard/ScannerMeta.js';
-import {EcoBoxId, EcosystemBoxModal} from './EcosystemBoxModal.js';
-import {I18n} from './I18n.js';
-import {ImpactModal} from './ImpactModal.js';
+} from '../../shared/Api/ApiTypes.js';
+import {DashboardCell, DashboardColumn, ScannerId} from '../../backend/Dashboard/DashboardBuilder.js';
+import {DashboardHistoryEntry} from '../../backend/Dashboard/DashboardHistoryStore.js';
+import {ChartRenderer} from '../Dashboard/ChartRenderer.js';
+import {Formatters} from '../Dashboard/Formatters.js';
+import {ScannerMeta} from '../Dashboard/ScannerMeta.js';
+import {EcoBoxId, EcosystemBoxModal} from '../Modals/EcosystemBoxModal.js';
+import {I18n} from '../I18n.js';
+import {ImpactModal} from '../Modals/ImpactModal.js';
 
 /**
  * Cross-project Dashboard view. Rows = scanners, columns = projects,

@@ -4,10 +4,10 @@ import {
     ApiHistoryBackfillProgressEvent,
     ApiHistoryBackfillStartEvent,
     ApiHistoryResponse
-} from '../shared/Api/ApiTypes.js';
-import {HistoryAdded, HistoryEntry, HistoryRemoved, HistoryUpdate} from '../backend/History/History.js';
-import {Api} from './Api.js';
-import {I18n} from './I18n.js';
+} from '../../shared/Api/ApiTypes.js';
+import {HistoryAdded, HistoryEntry, HistoryRemoved, HistoryUpdate} from '../../backend/History/History.js';
+import {Api} from '../Api.js';
+import {I18n} from '../I18n.js';
 
 /**
  * Per-project timeline of package changes. Lists entries newest-first

@@ -5,12 +5,12 @@ import {
     ApiAnalyzeResultEvent,
     ApiAnalyzeStartEvent,
     ApiIntegrityResponse
-} from '../shared/Api/ApiTypes.js';
-import {Lockfile, LockedPackage} from '../backend/Project/Lockfile.js';
-import {IntegrityFinding} from '../backend/Security/IntegrityScanner.js';
-import {Api} from './Api.js';
-import {EditorUrl} from './EditorUrl.js';
-import {I18n} from './I18n.js';
+} from '../../shared/Api/ApiTypes.js';
+import {Lockfile, LockedPackage} from '../../backend/Project/Lockfile.js';
+import {IntegrityFinding} from '../../backend/Security/IntegrityScanner.js';
+import {Api} from '../Api.js';
+import {EditorUrl} from '../EditorUrl.js';
+import {I18n} from '../I18n.js';
 
 /**
  * Active sub-view inside the project detail. Mirrors `PackageList`'s

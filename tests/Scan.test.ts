@@ -111,6 +111,7 @@ function makeEnvironment(opts: {
         unusedDetector: unusedDetector,
         bundlephobiaFetcher: bundlephobiaFetcher,
         allowInstall: false,
+        githubToken: undefined,
         editor: undefined,
         projects: opts.projects,
         externalScanner: externalScanner

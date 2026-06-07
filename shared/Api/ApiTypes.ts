@@ -121,6 +121,13 @@ export type ApiConfigSettings = {
     actions?: {
         allowInstall?: boolean;
         editor?: string;
+        /**
+         * Token used for `api.github.com` and `codeload.github.com`
+         * calls (lifts the anonymous 60/h rate-limit to 5000/h).
+         * Accepts a literal string or a `$VARNAME` placeholder that
+         * the backend resolves from the environment at load time.
+         */
+        githubToken?: string;
     };
     /**
      * In-app UX preferences. `startView` picks the first view the

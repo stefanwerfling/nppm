@@ -75,6 +75,7 @@ function makeEnvironment(projects: Project[], cacheDir: string): LoadedConfig {
         unusedDetector: unusedDetector,
         bundlephobiaFetcher: bundlephobiaFetcher,
         allowInstall: false,
+        githubToken: undefined,
         editor: undefined,
         projects: projects,
         externalScanner: externalScanner

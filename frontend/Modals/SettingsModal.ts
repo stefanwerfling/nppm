@@ -357,6 +357,12 @@ export class SettingsModal {
                 ...EDITOR_KEYS.map((k) => ({value: k, label: k}))
             ]
         ));
+        body.appendChild(this._textField(
+            'sm-ghtoken',
+            I18n.t('GitHub token (raises rate-limit to 5000/h, $ENV_VAR supported)'),
+            a.githubToken,
+            '$GH_TOKEN'
+        ));
     }
 
     private _renderSecurity(body: HTMLElement): void {
@@ -581,12 +587,16 @@ export class SettingsModal {
     private _collectActions(): void {
         const allow = this._boolVal('.sm-allow');
         const editor = this._strVal('.sm-editor');
+        const ghToken = this._strVal('.sm-ghtoken');
         const act: NonNullable<ApiConfigSettings['actions']> = {};
         if (allow) {
             act.allowInstall = true;
         }
         if (editor !== undefined) {
             act.editor = editor;
+        }
+        if (ghToken !== undefined) {
+            act.githubToken = ghToken;
         }
         this._current.actions = Object.keys(act).length > 0 ? act : undefined;
     }

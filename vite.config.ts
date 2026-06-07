@@ -136,7 +136,7 @@ class Server {
                  */
                 const releasesCache = new JsonCache(path.join(cacheDir, 'releases'), cacheTtlMinutes);
                 const releasesFetcher = new ReleasesFetcher(registry, releasesCache, {
-                    token: process.env.GH_TOKEN
+                    token: loaded.githubToken
                 });
 
                 /*
@@ -162,7 +162,7 @@ class Server {
                 const gitHeadFetcher = new GitHeadFetcher(releasesCache, {giteaHosts: giteaHosts});
                 const gitCommitsFetcher = new GitCommitsFetcher(releasesCache, {
                     giteaHosts: giteaHosts,
-                    githubToken: process.env.GH_TOKEN,
+                    githubToken: loaded.githubToken,
                     giteaTokens: giteaTokens
                 });
 

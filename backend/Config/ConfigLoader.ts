@@ -75,6 +75,13 @@ export type LoadedConfig = {
      */
     editor: string|undefined;
     /**
+     * Resolved GitHub token for `api.github.com` and `codeload.github.com`
+     * calls. Reads `actions.githubToken` from the config (literal or
+     * `$VARNAME` placeholder) and falls back to `process.env.GH_TOKEN`
+     * when empty. `undefined` means anonymous (60/h limit).
+     */
+    githubToken: string|undefined;
+    /**
      * Projects in *config order*. The Vite plugin re-keys them by UUID
      * for its API surface; the CLI iterates the array directly. Order
      * is preserved so both surfaces agree on `--project=<name>`
@@ -150,12 +157,23 @@ export class ConfigLoader {
             actions?: {
                 allowInstall?: boolean;
                 editor?: string;
+                githubToken?: string;
             };
         };
         const allowInstall = cfg.actions?.allowInstall === true;
         const editor = typeof cfg.actions?.editor === 'string' && cfg.actions.editor.length > 0
             ? cfg.actions.editor
             : undefined;
+        /*
+         * Token resolution order:
+         *   1. `actions.githubToken` literal or `$VAR` expansion
+         *   2. `process.env.GH_TOKEN` (legacy default)
+         *   3. undefined → anonymous (60/h)
+         */
+        const expandedGhToken = ConfigLoader.expandEnv(cfg.actions?.githubToken);
+        const githubToken = expandedGhToken && expandedGhToken.length > 0
+            ? expandedGhToken
+            : process.env.GH_TOKEN;
 
         const registryUrl = cfg.registry?.url ?? 'https://registry.npmjs.org';
         const registryAuth = cfg.registry?.auth;
@@ -337,6 +355,7 @@ export class ConfigLoader {
             bundlephobiaFetcher: bundlephobiaFetcher,
             allowInstall: allowInstall,
             editor: editor,
+            githubToken: githubToken,
             projects: projects,
             externalScanner: externalScanner
         };

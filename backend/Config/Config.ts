@@ -198,10 +198,19 @@ export const SchemaConfigSecurity = Vts.object({
  * rows / cells get a button that fires the matching URL handler
  * (`vscode://file/...`, `phpstorm://open?file=...`, etc.). One known
  * key per supported IDE; absent / unknown leaves the buttons hidden.
+ *
+ * `githubToken` raises GitHub's anonymous 60/h rate-limit to
+ * 5000/h. Accepts a literal string or a `$VARNAME` placeholder that
+ * `ConfigLoader.expandEnv()` resolves from the environment at load
+ * time. The literal form is convenient for one-off local use; the
+ * placeholder form keeps the secret out of the committed config.
+ * `process.env.GH_TOKEN` remains the fallback when this field is
+ * empty, so existing `.env`-based setups keep working unchanged.
  */
 export const SchemaConfigActions = Vts.object({
     allowInstall: Vts.optional(Vts.boolean()),
-    editor: Vts.optional(Vts.string())
+    editor: Vts.optional(Vts.string()),
+    githubToken: Vts.optional(Vts.string())
 });
 
 /**

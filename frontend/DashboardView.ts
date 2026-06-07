@@ -73,7 +73,7 @@ export class DashboardView {
     private _trendMetric: 'score'|'packages'|'size'|'downloads' = 'score';
     private _widgetStripHost: HTMLElement|null = null;
 
-    constructor(root: HTMLElement) {
+    public constructor(root: HTMLElement) {
         this._root = root;
         this._ecoModal.onProjectClick((unid) => {
             this._onProjectClick?.(unid);
@@ -739,7 +739,7 @@ export class DashboardView {
                  */
                 anchorX: 40, anchorY: 26,
                 label: I18n.t('Ecosystem health'),
-                value: ecosystemHealth !== null ? `${ecosystemHealth}/100` : '—',
+                value: ecosystemHealth === null ? '—' : `${ecosystemHealth}/100`,
                 tip: I18n.t('Average scanner score across every project. Click for the per-scanner breakdown.')
             },
             {
@@ -838,7 +838,7 @@ export class DashboardView {
          * the bottom edge even on the shortest box.
          */
         for (const b of boxes) {
-            const boxCenterX = b.left + b.w / 2;
+            const boxCenterX = b.left + (b.w / 2);
             const boxCenterY = b.top + 4;
             const line = document.createElementNS(svgNs, 'line');
             line.setAttribute('x1', String(boxCenterX));
@@ -961,9 +961,7 @@ export class DashboardView {
                 scoreEl.classList.add('dash-overall-score-na');
             } else {
                 scoreEl.textContent = String(a.avg);
-                scoreEl.classList.add(a.avg >= 80 ? 'dash-overall-score-good'
-                    : a.avg >= 60 ? 'dash-overall-score-warn'
-                        : 'dash-overall-score-risk');
+                scoreEl.classList.add(DashboardView._overallScoreClass(a.avg));
             }
             scoreEl.title = I18n.t('{scanned} of {total} scanners contributed', {
                 scanned: a.scannedCells, total: a.totalCells
@@ -1169,7 +1167,7 @@ export class DashboardView {
         num.setAttribute('y', '50');
         num.setAttribute('text-anchor', 'middle');
         num.setAttribute('dominant-baseline', 'central');
-        num.textContent = overall !== null ? `${overall}` : '—';
+        num.textContent = overall === null ? '—' : `${overall}`;
         svg.appendChild(num);
 
         // "/100" suffix underneath.
@@ -1665,6 +1663,21 @@ export class DashboardView {
             overallLabel: I18n.t('Ecosystem total (deduplicated)'),
             valueFormatter: (v) => Formatters.count(v)
         });
+    }
+
+    /*
+     * Map a 0-100 overall-score average to one of the three colour
+     * classes (good ≥ 80, warn ≥ 60, risk otherwise). Pulled out of
+     * the inline ternary so the call site stays single-statement.
+     */
+    private static _overallScoreClass(avg: number): string {
+        if (avg >= 80) {
+            return 'dash-overall-score-good';
+        }
+        if (avg >= 60) {
+            return 'dash-overall-score-warn';
+        }
+        return 'dash-overall-score-risk';
     }
 
 }

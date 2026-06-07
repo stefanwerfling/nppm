@@ -50,7 +50,7 @@ describe('ProjectRemote', () => {
 
     it('throws when the root package.json is missing', async() => {
         const r = new FakeRemote(new Map(), new Map());
-        await expect(r.loadManifests()).rejects.toThrow(/package.json missing/);
+        await expect(r.loadManifests()).rejects.toThrow(/package.json missing/u);
     });
 
     it('reads the root manifest and splits deps into buckets', async() => {

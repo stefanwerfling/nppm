@@ -94,7 +94,7 @@ describe('TemplateResolver', () => {
 
     it('throws on unknown template', () => {
         const r = new TemplateResolver(new Map());
-        expect(() => r.resolve(['nope'])).toThrow(/unknown template "nope"/);
+        expect(() => r.resolve(['nope'])).toThrow(/unknown template "nope"/u);
     });
 
     it('throws on extends cycle', () => {
@@ -102,7 +102,7 @@ describe('TemplateResolver', () => {
             ['a', mk('a', {extends: ['b']})],
             ['b', mk('b', {extends: ['a']})]
         ]);
-        expect(() => new TemplateResolver(cat).resolve(['a'])).toThrow(/cycle/);
+        expect(() => new TemplateResolver(cat).resolve(['a'])).toThrow(/cycle/u);
     });
 
     it('dedupes a diamond-extends graph', () => {

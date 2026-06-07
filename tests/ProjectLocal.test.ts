@@ -27,7 +27,7 @@ describe('ProjectLocal', () => {
 
     it('throws if the root has no package.json', async() => {
         const project = new ProjectLocal(root, 'empty');
-        await expect(project.loadManifests()).rejects.toThrow(/package.json not found/);
+        await expect(project.loadManifests()).rejects.toThrow(/package.json not found/u);
     });
 
     it('loads the root manifest and splits deps into typed buckets', async() => {
@@ -129,6 +129,6 @@ describe('ProjectLocal', () => {
     it('reports invalid root JSON', async() => {
         fs.writeFileSync(path.join(root, 'package.json'), 'not json');
         const project = new ProjectLocal(root, 'r');
-        await expect(project.loadManifests()).rejects.toThrow(/invalid JSON/);
+        await expect(project.loadManifests()).rejects.toThrow(/invalid JSON/u);
     });
 });

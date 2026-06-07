@@ -132,7 +132,7 @@ describe('Upgrader', () => {
             depType: 'dependency',
             fromRange: '^4.17.20',
             toRange: '^4.17.20'
-        })).toThrow(/already at/);
+        })).toThrow(/already at/u);
     });
 
     it('applyEdit() targets a workspace package.json when `workspace` is set', () => {
@@ -232,7 +232,7 @@ describe('Upgrader', () => {
         const upgrader = new Upgrader(tmp, spawnStub);
         const c = collectSink();
         upgrader.runInstall(c.sink);
-        expect(c.error).toMatch(/npm: not found/);
+        expect(c.error).toMatch(/npm: not found/u);
         expect(c.ended).toBeNull();
     });
 });

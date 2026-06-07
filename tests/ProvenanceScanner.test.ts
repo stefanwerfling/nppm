@@ -19,7 +19,7 @@ describe('ProvenanceScanner.classify', () => {
         expect(finding).not.toBeNull();
         expect(finding!.level).toBe(ProvenanceLevel.provenance);
         expect(finding!.predicateType).toBe('https://slsa.dev/provenance/v0.2');
-        expect(finding!.attestationUrl).toMatch(/attestations/);
+        expect(finding!.attestationUrl).toMatch(/attestations/u);
         expect(finding!.signatureCount).toBe(1);
     });
 

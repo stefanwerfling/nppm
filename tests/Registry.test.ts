@@ -256,7 +256,7 @@ describe('Registry', () => {
         expect(dist).toBeDefined();
         expect(dist!.integrity).toBe('sha512-abc');
         expect(dist!.signatures).toEqual([{keyid: 'SHA256:k', sig: 'MEYC'}]);
-        expect(dist!.attestations?.url).toMatch(/attestations\/proven/);
+        expect(dist!.attestations?.url).toMatch(/attestations\/proven/u);
         expect(dist!.attestations?.provenance?.predicateType).toBe('https://slsa.dev/provenance/v0.2');
     });
 

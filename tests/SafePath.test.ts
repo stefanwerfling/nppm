@@ -19,7 +19,7 @@ describe('SafePath.join', () => {
     });
 
     it('rejects a `..` segment that escapes the root', () => {
-        expect(() => SafePath.join(root, '..', 'evil.json')).toThrow(/escapes project root/);
+        expect(() => SafePath.join(root, '..', 'evil.json')).toThrow(/escapes project root/u);
     });
 
     it('rejects a deep `..` chain that escapes via a workspace prefix', () => {
@@ -28,11 +28,11 @@ describe('SafePath.join', () => {
          * segment=`package.json` — the resolved path lands outside `root`.
          */
         expect(() => SafePath.join(root, '../../etc/cron.d/evil', 'package.json'))
-        .toThrow(/escapes project root/);
+        .toThrow(/escapes project root/u);
     });
 
     it('rejects an absolute segment that bypasses the root', () => {
-        expect(() => SafePath.join(root, '/etc/passwd')).toThrow(/escapes project root/);
+        expect(() => SafePath.join(root, '/etc/passwd')).toThrow(/escapes project root/u);
     });
 
     it('rejects a sibling whose path string accidentally starts with the root', () => {
@@ -42,13 +42,13 @@ describe('SafePath.join', () => {
          * would let it through; the `+ path.sep` boundary check stops it.
          */
         expect(() => SafePath.join('/srv/project', '../project-evil', 'package.json'))
-        .toThrow(/escapes project root/);
+        .toThrow(/escapes project root/u);
     });
 
     it('treats a relative root the same way as an absolute one', () => {
         const rel = 'srv/project';
         const abs = path.resolve(rel);
         expect(SafePath.join(rel, 'package.json')).toBe(path.resolve(abs, 'package.json'));
-        expect(() => SafePath.join(rel, '..', 'evil')).toThrow(/escapes project root/);
+        expect(() => SafePath.join(rel, '..', 'evil')).toThrow(/escapes project root/u);
     });
 });

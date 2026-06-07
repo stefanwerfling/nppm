@@ -21,6 +21,6 @@ describe('Purl.npm', () => {
 
     it('handles a malformed scoped name without throwing', () => {
         const out = Purl.npm('@noslash', '1.0.0');
-        expect(out).toMatch(/^pkg:npm\/.+@1\.0\.0$/);
+        expect(out).toMatch(/^pkg:npm\/.+@1\.0\.0$/u);
     });
 });

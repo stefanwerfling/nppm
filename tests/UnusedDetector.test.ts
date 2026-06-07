@@ -120,7 +120,7 @@ describe('UnusedDetector.scan', () => {
         const vite = report.unused.find((u) => u.name === 'vite')!;
         expect(vite).toBeDefined();
         expect(vite.severity).toBe(UnusedSeverity.info);
-        expect(vite.reason).toMatch(/allowlist/);
+        expect(vite.reason).toMatch(/allowlist/u);
     });
 
     it('suppresses a dep referenced from a `scripts:` body', async() => {
@@ -142,7 +142,7 @@ describe('UnusedDetector.scan', () => {
 
         const finding = report.unused.find((u) => u.name === 'my-bin')!;
         expect(finding.severity).toBe(UnusedSeverity.info);
-        expect(finding.reason).toMatch(/scripts/);
+        expect(finding.reason).toMatch(/scripts/u);
     });
 
     it('honors the `tsc → typescript` bin alias', async() => {
@@ -221,7 +221,7 @@ describe('UnusedDetector.scan', () => {
          */
         expect(t).toBeDefined();
         expect(t!.severity).toBe(UnusedSeverity.info);
-        expect(t!.reason).toMatch(/@types/);
+        expect(t!.reason).toMatch(/@types/u);
     });
 
     it('flags dynamic `import(varName)` via scanLimits without losing the file', async() => {

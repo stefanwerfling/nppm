@@ -51,7 +51,7 @@ describe('PatternScanner.scan', () => {
         ]);
 
         expect(findings).toHaveLength(1);
-        expect(findings[0].pattern).toMatch(/base64 literal/);
+        expect(findings[0].pattern).toMatch(/base64 literal/u);
     });
 
     it('skips files without cached content', () => {

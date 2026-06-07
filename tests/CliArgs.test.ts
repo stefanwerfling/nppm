@@ -22,7 +22,7 @@ describe('CliArgsParser', () => {
     });
 
     it('rejects --json and --sarif passed together', () => {
-        expect(() => CliArgsParser.parse(['--json', '--sarif'])).toThrow(/mutually exclusive/);
+        expect(() => CliArgsParser.parse(['--json', '--sarif'])).toThrow(/mutually exclusive/u);
     });
 
     it('accepts both `--key=value` and `--key value` forms', () => {
@@ -57,18 +57,18 @@ describe('CliArgsParser', () => {
     });
 
     it('rejects an invalid --fail-on value', () => {
-        expect(() => CliArgsParser.parse(['--fail-on=catastrophe'])).toThrow(/Invalid --fail-on/);
+        expect(() => CliArgsParser.parse(['--fail-on=catastrophe'])).toThrow(/Invalid --fail-on/u);
     });
 
     it('rejects a non-numeric --concurrency value', () => {
-        expect(() => CliArgsParser.parse(['--concurrency=abc'])).toThrow(/positive integer/);
+        expect(() => CliArgsParser.parse(['--concurrency=abc'])).toThrow(/positive integer/u);
     });
 
     it('rejects --concurrency 0', () => {
-        expect(() => CliArgsParser.parse(['--concurrency=0'])).toThrow(/positive integer/);
+        expect(() => CliArgsParser.parse(['--concurrency=0'])).toThrow(/positive integer/u);
     });
 
     it('rejects a flag with no value', () => {
-        expect(() => CliArgsParser.parse(['--config'])).toThrow(/Missing value/);
+        expect(() => CliArgsParser.parse(['--config'])).toThrow(/Missing value/u);
     });
 });

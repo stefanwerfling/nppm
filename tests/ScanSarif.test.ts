@@ -37,7 +37,7 @@ describe('SarifBuilder.build', () => {
         ]);
         const sarif = SarifBuilder.build(report, '1');
         expect(sarif.version).toBe('2.1.0');
-        expect(sarif.$schema).toMatch(/sarif-2\.1/);
+        expect(sarif.$schema).toMatch(/sarif-2\.1/u);
         expect(sarif.runs).toHaveLength(1);
         expect(sarif.runs[0].results).toEqual([]);
         expect(sarif.runs[0].tool.driver.name).toBe('nppm');

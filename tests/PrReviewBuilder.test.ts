@@ -78,7 +78,7 @@ describe('PrReviewBuilder', () => {
         expect(r.changes).toEqual([]);
         expect(r.baseExists).toBe(false);
         expect(r.headExists).toBe(false);
-        expect(r.notes[0]).toMatch(/Not a git repository/);
+        expect(r.notes[0]).toMatch(/Not a git repository/u);
     });
 
     it('marks ref as missing when it does not resolve', async() => {
@@ -89,7 +89,7 @@ describe('PrReviewBuilder', () => {
         const r = await b.build('/x', 'main', 'HEAD', META);
         expect(r.baseExists).toBe(false);
         expect(r.headExists).toBe(true);
-        expect(r.notes.some((n) => /main/.test(n))).toBe(true);
+        expect(r.notes.some((n) => /main/u.test(n))).toBe(true);
     });
 
     it('reports added deps when the head adds one', async() => {

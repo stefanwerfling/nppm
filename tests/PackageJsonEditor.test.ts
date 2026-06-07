@@ -53,7 +53,7 @@ describe('PackageJsonEditor.apply', () => {
     });
 
     it('throws on an unknown depType', () => {
-        expect(() => PackageJsonEditor.apply('{}', 'unknown', 'lodash', '1.0.0')).toThrow(/unknown depType/);
+        expect(() => PackageJsonEditor.apply('{}', 'unknown', 'lodash', '1.0.0')).toThrow(/unknown depType/u);
     });
 
     it('preserves the absence of a trailing newline', () => {

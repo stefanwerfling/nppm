@@ -332,7 +332,7 @@ describe('MatrixBuilder.build', () => {
 
         const matrix = await MatrixBuilder.build(projects, new FakeRegistry({}));
         const brokenMeta = matrix.projects.find((p) => p.unid === '1')!;
-        expect(brokenMeta.error).toMatch(/boom/);
+        expect(brokenMeta.error).toMatch(/boom/u);
         expect(matrix.rows.map((r) => r.name)).toEqual(['x']);
     });
 });

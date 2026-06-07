@@ -111,7 +111,7 @@ describe('TemplateComplianceChecker', () => {
         const r = checker.check([m], t);
         expect(r.findings).toHaveLength(1);
         expect(r.findings[0].kind).toBe('bucket-wrong');
-        expect(r.findings[0].actual).toMatch(/dev/);
+        expect(r.findings[0].actual).toMatch(/dev/u);
     });
 
     it('flags forbidden packages as risk', () => {
@@ -281,7 +281,7 @@ describe('TemplateComplianceChecker — files', () => {
         t.files = [{path: '.eslintrc.json', mode: 'create', sourcePath: path.join(tplFiles, 'missing.json')}];
         const r = checker.check([mkManifest()], t, {projectRoot: path.join(tmp, 'project')});
         expect(r.findings[0].kind).toBe('file-missing');
-        expect(r.findings[0].actual).toMatch(/template source/);
+        expect(r.findings[0].actual).toMatch(/template source/u);
     });
 
     it('skips file checks when no projectRoot is provided', () => {

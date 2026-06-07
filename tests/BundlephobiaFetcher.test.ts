@@ -123,7 +123,7 @@ describe('BundlephobiaFetcher.fetch', () => {
 
     it('fetchMany resolves a batch keyed by name@version', async() => {
         const restore = stubFetch((url) => {
-            const m = /package=([^&]+)/.exec(url);
+            const m = /package=([^&]+)/u.exec(url);
             const coord = m ? decodeURIComponent(m[1]) : '';
             if (coord === 'a@1.0.0') {
                 return {ok: true, body: {size: 100, gzip: 50, dependencyCount: 0}};

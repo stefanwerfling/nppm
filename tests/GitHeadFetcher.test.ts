@@ -149,7 +149,7 @@ describe('GitHeadFetcher', () => {
         const info = await fetcher.fetch('git+https://github.com/o/r.git');
         expect(info?.version).toBeNull();
         expect(info?.error).toBeDefined();
-        expect(info!.error).toMatch(/GitHub unreachable.*ECONNREFUSED/);
+        expect(info!.error).toMatch(/GitHub unreachable.*ECONNREFUSED/u);
 
         // Second call should retry (no cache poisoning on network errors).
         const info2 = await fetcher.fetch('git+https://github.com/o/r.git');
@@ -171,7 +171,7 @@ describe('GitHeadFetcher', () => {
 
         const info = await fetcher.fetch('git+https://github.com/o/missing.git');
         expect(info?.version).toBeNull();
-        expect(info?.error).toMatch(/Repository not found on GitHub/);
+        expect(info?.error).toMatch(/Repository not found on GitHub/u);
 
         await fetcher.fetch('git+https://github.com/o/missing.git');
         expect(calls).toBe(1); // second call hits the cache

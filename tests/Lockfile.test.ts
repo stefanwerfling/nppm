@@ -121,7 +121,7 @@ describe('LockfileReader.parse', () => {
     });
 
     it('rejects lockfileVersion 1', () => {
-        expect(() => LockfileReader.parse(JSON.stringify({lockfileVersion: 1}))).toThrow(/lockfileVersion/);
+        expect(() => LockfileReader.parse(JSON.stringify({lockfileVersion: 1}))).toThrow(/lockfileVersion/u);
     });
 
     it('extracts the direct dependency map from each entry', () => {
@@ -161,7 +161,7 @@ describe('LockfileReader.parse', () => {
     });
 
     it('throws on missing packages map', () => {
-        expect(() => LockfileReader.parse(JSON.stringify({lockfileVersion: 3}))).toThrow(/packages/);
+        expect(() => LockfileReader.parse(JSON.stringify({lockfileVersion: 3}))).toThrow(/packages/u);
     });
 });
 

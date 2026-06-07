@@ -141,7 +141,7 @@ describe('SbomRunner.run', () => {
         const io = makeIO({argv: ['--help'], cwd: tmp});
         const code = await SbomRunner.run(io);
         expect(code).toBe(0);
-        expect(io.out()).toMatch(/nppm sbom/);
+        expect(io.out()).toMatch(/nppm sbom/u);
     });
 
     it('exits 2 when no projects are configured', async() => {
@@ -149,7 +149,7 @@ describe('SbomRunner.run', () => {
         const io = makeIO({argv: [], cwd: tmp, environmentOverride: env});
         const code = await SbomRunner.run(io);
         expect(code).toBe(2);
-        expect(io.err()).toMatch(/no projects configured/);
+        expect(io.err()).toMatch(/no projects configured/u);
     });
 
     it('exits 2 when more than one project is configured without --project', async() => {
@@ -160,7 +160,7 @@ describe('SbomRunner.run', () => {
         const io = makeIO({argv: [], cwd: tmp, environmentOverride: env});
         const code = await SbomRunner.run(io);
         expect(code).toBe(2);
-        expect(io.err()).toMatch(/more than one project/);
+        expect(io.err()).toMatch(/more than one project/u);
     });
 
     it('exits 2 when --project does not match', async() => {
@@ -170,7 +170,7 @@ describe('SbomRunner.run', () => {
         const io = makeIO({argv: ['--project=ghost'], cwd: tmp, environmentOverride: env});
         const code = await SbomRunner.run(io);
         expect(code).toBe(2);
-        expect(io.err()).toMatch(/not found/);
+        expect(io.err()).toMatch(/not found/u);
     });
 
     it('emits CycloneDX to stdout for a single-project setup', async() => {
@@ -220,13 +220,13 @@ describe('SbomRunner.run', () => {
         const io = makeIO({argv: [], cwd: tmp});
         const code = await SbomRunner.run(io);
         expect(code).toBe(2);
-        expect(io.err()).toMatch(/no projects configured/);
+        expect(io.err()).toMatch(/no projects configured/u);
     });
 
     it('exits 2 when the config is missing', async() => {
         const io = makeIO({argv: [], cwd: tmp});
         const code = await SbomRunner.run(io);
         expect(code).toBe(2);
-        expect(io.err()).toMatch(/config file not found/);
+        expect(io.err()).toMatch(/config file not found/u);
     });
 });

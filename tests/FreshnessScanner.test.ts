@@ -33,7 +33,7 @@ describe('FreshnessScanner.classify', () => {
             {now: NOW}
         );
         expect(out!.level).toBe(FreshnessLevel.risk);
-        expect(out!.reason).toMatch(/3 days old/);
+        expect(out!.reason).toMatch(/3 days old/u);
     });
 
     it('flags warn for ages between the risk and warn thresholds', () => {

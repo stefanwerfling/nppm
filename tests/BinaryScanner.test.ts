@@ -24,7 +24,7 @@ describe('BinaryScanner.scan', () => {
         const findings = BinaryScanner.scan([f('build/Release/bcrypt_lib.node')]);
         expect(findings).toHaveLength(1);
         expect(findings[0].severity).toBe(BinarySeverity.warn);
-        expect(findings[0].kind).toMatch(/Native/);
+        expect(findings[0].kind).toMatch(/Native/u);
     });
 
     it('flags .wasm as info', () => {

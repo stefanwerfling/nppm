@@ -56,7 +56,7 @@ describe('HistoryStore', () => {
             toVersion: '1.0.1',
             bumpType: 'patch'
         });
-        expect(entry!.updated[0].reason).toMatch(/patch-bump/);
+        expect(entry!.updated[0].reason).toMatch(/patch-bump/u);
     });
 
     it('returns null when nothing changed between snapshots', () => {
@@ -86,8 +86,8 @@ describe('HistoryStore', () => {
             }
         );
 
-        expect(entry!.updated[0].reason).toMatch(/GHSA-29mw-wpgm-hmr9/);
-        expect(entry!.updated[0].reason).toMatch(/patch-bump/);
+        expect(entry!.updated[0].reason).toMatch(/GHSA-29mw-wpgm-hmr9/u);
+        expect(entry!.updated[0].reason).toMatch(/patch-bump/u);
     });
 
     it('detects major/minor/patch bumps correctly', () => {

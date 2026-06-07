@@ -208,8 +208,8 @@ describe('ScanFormatter.text / ScanFormatter.json', () => {
             ScanReportBuilder.buildProject({...projectMeta, packagesScanned: 0})
         ]);
         const text = ScanFormatter.text(clean, FailOnLevel.risk);
-        expect(text).toMatch(/no findings/);
-        expect(text).toMatch(/Result: PASS/);
+        expect(text).toMatch(/no findings/u);
+        expect(text).toMatch(/Result: PASS/u);
 
         const h = baseHeuristic('p', '1');
         h.scripts.maxSeverity = ScriptSeverity.risk;
@@ -218,7 +218,7 @@ describe('ScanFormatter.text / ScanFormatter.json', () => {
             ScanReportBuilder.buildProject({...projectMeta, packagesScanned: 1, heuristics: [h]})
         ]);
         const fail = ScanFormatter.text(dirty, FailOnLevel.risk);
-        expect(fail).toMatch(/Result: FAIL/);
+        expect(fail).toMatch(/Result: FAIL/u);
     });
 
     it('ScanFormatter.json produces a parseable payload with stable top-level keys', () => {

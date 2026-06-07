@@ -172,14 +172,14 @@ describe('runScan — surface behaviour', () => {
         const io = makeIO({argv: ['--help'], cwd: tmp});
         const code = await ScanRunner.run(io);
         expect(code).toBe(0);
-        expect(io.out()).toMatch(/nppm scan/);
+        expect(io.out()).toMatch(/nppm scan/u);
     });
 
     it('exits 2 with usage when the config is missing', async() => {
         const io = makeIO({argv: [], cwd: tmp});
         const code = await ScanRunner.run(io);
         expect(code).toBe(2);
-        expect(io.err()).toMatch(/config file not found/);
+        expect(io.err()).toMatch(/config file not found/u);
     });
 
     it('exits 2 when the config fails schema validation', async() => {
@@ -190,7 +190,7 @@ describe('runScan — surface behaviour', () => {
         });
         const code = await ScanRunner.run(io);
         expect(code).toBe(2);
-        expect(io.err()).toMatch(/invalid structure/);
+        expect(io.err()).toMatch(/invalid structure/u);
     });
 
     it('exits 2 when --project filter matches nothing', async() => {
@@ -206,7 +206,7 @@ describe('runScan — surface behaviour', () => {
         });
         const code = await ScanRunner.run(io);
         expect(code).toBe(2);
-        expect(io.err()).toMatch(/no projects matched/);
+        expect(io.err()).toMatch(/no projects matched/u);
     });
 
     it('exits 0 on a clean environment with no projects', async() => {
@@ -244,7 +244,7 @@ describe('runScan — surface behaviour', () => {
         const io = makeIO({argv: ['--fail-on=risk'], cwd: tmp, environmentOverride: env});
         const code = await ScanRunner.run(io);
         expect(code).toBe(1);
-        expect(io.out()).toMatch(/Result: FAIL/);
+        expect(io.out()).toMatch(/Result: FAIL/u);
     });
 
     it('--fail-on=none never trips the gate', async() => {
@@ -318,7 +318,7 @@ describe('runScan — surface behaviour', () => {
         const io = makeIO({argv: ['--json', '--sarif'], cwd: tmp});
         const code = await ScanRunner.run(io);
         expect(code).toBe(2);
-        expect(io.err()).toMatch(/mutually exclusive/);
+        expect(io.err()).toMatch(/mutually exclusive/u);
     });
 
     it('loads a config from disk and runs against an empty project list', async() => {

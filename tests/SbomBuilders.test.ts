@@ -125,7 +125,7 @@ describe('SpdxBuilder.build', () => {
     it('sanitises SPDXIDs so scoped names + dots survive the spec regex', () => {
         const ids = doc.packages.map((p) => p.SPDXID);
         for (const id of ids) {
-            expect(id).toMatch(/^SPDXRef-[A-Za-z0-9.+-]+$/);
+            expect(id).toMatch(/^SPDXRef-[A-Za-z0-9.+-]+$/u);
         }
         const scoped = doc.packages.find((p) => p.name === '@scope/api')!;
         expect(scoped.SPDXID).toBe('SPDXRef-scope-api-1.0.0');
@@ -160,7 +160,7 @@ describe('SpdxBuilder.build', () => {
             expect(p.externalRefs).toEqual([{
                 referenceCategory: 'PACKAGE-MANAGER',
                 referenceType: 'purl',
-                referenceLocator: expect.stringMatching(/^pkg:npm\//) as unknown as string
+                referenceLocator: expect.stringMatching(/^pkg:npm\//u) as unknown as string
             }]);
         }
     });

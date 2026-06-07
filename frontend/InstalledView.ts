@@ -72,7 +72,7 @@ export class InstalledView {
     private _analyzeBtn: HTMLButtonElement|null = null;
     private _rowsByKey: Map<string, HTMLElement> = new Map();
 
-    constructor(root: HTMLElement) {
+    public constructor(root: HTMLElement) {
         this._root = root;
     }
 
@@ -244,7 +244,7 @@ export class InstalledView {
          */
         const sorted = [...this._lockfile.packages].sort((a, b) => {
             const n = a.name.localeCompare(b.name);
-            return n !== 0 ? n : a.version.localeCompare(b.version);
+            return n === 0 ? a.version.localeCompare(b.version) : n;
         });
 
         for (const pkg of sorted) {
@@ -739,6 +739,8 @@ export class InstalledView {
                 return I18n.t('node_modules/.package-lock.json v{n}', {n: lock.lockfileVersion});
             case 'synthesized':
                 return I18n.t('Generated from node_modules (no dev/peer flags)');
+            default:
+                return '';
         }
     }
 
@@ -758,9 +760,9 @@ export class InstalledView {
 
     private static _esc(s: string): string {
         return s
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/&/gu, '&amp;')
+        .replace(/</gu, '&lt;')
+        .replace(/>/gu, '&gt;');
     }
 
 }

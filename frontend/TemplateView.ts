@@ -24,7 +24,7 @@ export class TemplateView {
     private _onShowVulns: ((unid: string) => void)|null = null;
     private _onShowPr: ((unid: string) => void)|null = null;
 
-    constructor(root: HTMLElement) {
+    public constructor(root: HTMLElement) {
         this._root = root;
     }
 
@@ -270,6 +270,7 @@ export class TemplateView {
             case 'risk': return I18n.t('Risk');
             case 'warn': return I18n.t('Warning');
             case 'info': return I18n.t('Info');
+            default: return '';
         }
     }
 
@@ -285,15 +286,16 @@ export class TemplateView {
             case 'file-missing': return I18n.t('File missing');
             case 'file-drift': return I18n.t('File drift');
             case 'workspace-missing': return I18n.t('Workspace missing');
+            default: return '';
         }
     }
 
     private static _escape(s: string): string {
         return s
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/&/gu, '&amp;')
+        .replace(/</gu, '&lt;')
+        .replace(/>/gu, '&gt;')
+        .replace(/"/gu, '&quot;');
     }
 
 }

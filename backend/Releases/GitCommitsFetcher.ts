@@ -1,5 +1,9 @@
 import {JsonCache} from '../Cache/JsonCache.js';
 import {GitResolver, GitDepInfo} from '../Fingerprint/GitResolver.js';
+import {GithubRateLimitError} from '../Github/GithubRateLimitError.js';
+import {GithubRateLimitGuard} from '../Github/GithubRateLimitGuard.js';
+
+const GITHUB_API_HOST = 'api.github.com';
 
 /**
  * One commit row as surfaced in the Releases tab for git-installed
@@ -122,6 +126,16 @@ export class GitCommitsFetcher {
     }
 
     private async _fetchGithub(info: GitDepInfo, limit: number): Promise<GitCommitsResponse|null> {
+        const cooldown = GithubRateLimitGuard.cooldownUntil(GITHUB_API_HOST);
+        if (cooldown !== null) {
+            /*
+             * The guard is already holding a depleted-window state for
+             * api.github.com — throw so the outer `fetch()` catches it
+             * and returns `null` *without* caching the negative. The
+             * next call will retry once the window resets.
+             */
+            throw new GithubRateLimitError(GITHUB_API_HOST, cooldown);
+        }
         const url = `https://api.github.com/repos/${info.owner}/${info.repo}/commits?per_page=${limit}`;
         const headers: Record<string, string> = {
             'User-Agent': 'nppm',
@@ -218,7 +232,17 @@ export class GitCommitsFetcher {
     private static _defaultHttp(): CommitsHttpFetcher {
         return {
             fetch: async function(url, headers) {
-                const res = await fetch(url, {headers: headers});
+                /*
+                 * api.github.com counts against a 60/h anonymous limit;
+                 * route those calls through `GithubRateLimitGuard` so
+                 * the response headers update the shared cool-down
+                 * state. Gitea has per-instance limits but no shared
+                 * X-RateLimit-* convention, so it goes through the
+                 * plain fetch path.
+                 */
+                const res = url.startsWith('https://api.github.com/')
+                    ? await GithubRateLimitGuard.fetch(GITHUB_API_HOST, url, {headers: headers})
+                    : await fetch(url, {headers: headers});
                 let body: unknown = null;
                 try {
                     body = await res.json();

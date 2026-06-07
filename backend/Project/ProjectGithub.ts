@@ -1,6 +1,10 @@
 import {JsonCache} from '../Cache/JsonCache.js';
 import {ConfigProjectType} from '../Config/Config.js';
+import {GithubRateLimitError} from '../Github/GithubRateLimitError.js';
+import {GithubRateLimitGuard} from '../Github/GithubRateLimitGuard.js';
 import {ProjectRemote, RemoteCommit} from './ProjectRemote.js';
+
+const GITHUB_API_HOST = 'api.github.com';
 
 /**
  * Shape we consume from GitHub's contents API. The same envelope is
@@ -158,7 +162,21 @@ export class ProjectGithub extends ProjectRemote {
             }
 
             if (chunk === null) {
-                const res = await fetch(url.toString(), {headers: this._headers()});
+                let res: Response;
+                try {
+                    res = await GithubRateLimitGuard.fetch(
+                        GITHUB_API_HOST, url.toString(), {headers: this._headers()}
+                    );
+                } catch (e) {
+                    if (e instanceof GithubRateLimitError) {
+                        /*
+                         * Don't cache — the moment the window resets we
+                         * want this call to go through again.
+                         */
+                        return null;
+                    }
+                    throw e;
+                }
                 if (res.status === 404) {
                     this._cache?.set<Wrap>(cacheKey, {data: null});
                     return null;
@@ -212,7 +230,9 @@ export class ProjectGithub extends ProjectRemote {
         }
 
         try {
-            const res = await fetch(url, {headers: this._headers()});
+            const res = await GithubRateLimitGuard.fetch(
+                GITHUB_API_HOST, url, {headers: this._headers()}
+            );
             if (!res.ok) {
                 this._cache?.set<Wrap>(cacheKey, {data: null});
                 return null;
@@ -221,7 +241,14 @@ export class ProjectGithub extends ProjectRemote {
             const sha = typeof body.sha === 'string' ? body.sha : null;
             this._cache?.set<Wrap>(cacheKey, {data: sha});
             return sha;
-        } catch {
+        } catch (e) {
+            if (e instanceof GithubRateLimitError) {
+                /*
+                 * Don't poison the cache — let the next call retry
+                 * once the window has reset.
+                 */
+                return null;
+            }
             return null;
         }
     }
@@ -266,7 +293,23 @@ export class ProjectGithub extends ProjectRemote {
             }
         }
 
-        const res = await fetch(url.toString(), {headers: this._headers()});
+        let res: Response;
+        try {
+            res = await GithubRateLimitGuard.fetch(
+                GITHUB_API_HOST, url.toString(), {headers: this._headers()}
+            );
+        } catch (e) {
+            if (e instanceof GithubRateLimitError) {
+                /*
+                 * Don't cache — the moment the window resets we want
+                 * this call to actually fetch. Returning null mirrors
+                 * the 404 path: the caller treats it as "no data for
+                 * this path", and the next paint will retry.
+                 */
+                return null;
+            }
+            throw e;
+        }
 
         if (res.status === 404) {
             this._cache?.set<Wrap>(cacheKey, {data: null});

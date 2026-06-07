@@ -1,6 +1,9 @@
 import {JsonCache} from '../Cache/JsonCache.js';
+import {GithubRateLimitGuard} from '../Github/GithubRateLimitGuard.js';
 import {Registry} from '../Registry/Registry.js';
 import {Release, ReleasesResponse} from './Releases.js';
+
+const GITHUB_API_HOST = 'api.github.com';
 
 /**
  * Strategy the fetcher uses to ask GitHub for releases. Default goes
@@ -153,7 +156,8 @@ export class ReleasesFetcher {
             if (token) {
                 headers.Authorization = `Bearer ${token}`;
             }
-            const res = await fetch(
+            const res = await GithubRateLimitGuard.fetch(
+                GITHUB_API_HOST,
                 `https://api.github.com/repos/${owner}/${repo}/releases?per_page=100`,
                 {headers: headers}
             );

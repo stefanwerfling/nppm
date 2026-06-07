@@ -1,6 +1,6 @@
 import {ApiPackagesResponse} from '../../shared/Api/ApiTypes.js';
 import {DependencyType} from '../../backend/Project/PackageManifest.js';
-import {I18n} from '../I18n.js';
+import {I18n} from '../Util/I18n.js';
 
 /**
  * Right-panel package list for one selected project: a flat table of

@@ -1,5 +1,5 @@
 import {ApiProject} from '../shared/Api/ApiTypes.js';
-import {Api} from './Api.js';
+import {Api} from './Util/Api.js';
 import {BadgeFilterModal} from './Modals/BadgeFilterModal.js';
 import {BulkUpgradeModal} from './Modals/BulkUpgradeModal.js';
 import {DashboardView} from './Pages/DashboardView.js';

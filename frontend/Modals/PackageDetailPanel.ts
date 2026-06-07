@@ -23,9 +23,9 @@ import {OsvVulnerability} from '../../backend/Security/OsvClient.js';
 import {PatternFinding, PatternSeverity} from '../../backend/Security/PatternScanner.js';
 import {ScriptFinding, ScriptSeverity} from '../../backend/Security/ScriptScanner.js';
 import {SecurityReport} from '../../backend/Security/SecurityScanner.js';
-import {Api} from '../Api.js';
-import {I18n} from '../I18n.js';
-import {Version} from '../Version.js';
+import {Api} from '../Util/Api.js';
+import {I18n} from '../Util/I18n.js';
+import {Version} from '../Util/Version.js';
 
 enum Tab {
     files = 'files',

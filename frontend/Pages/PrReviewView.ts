@@ -1,8 +1,8 @@
 import {ApiPrReviewResponse} from '../../shared/Api/ApiTypes.js';
 import {ConfigProjectType} from '../../backend/Config/Config.js';
 import {PrChangeKind, PrDepChange} from '../../backend/PrReview/PrReview.js';
-import {Api} from '../Api.js';
-import {I18n} from '../I18n.js';
+import {Api} from '../Util/Api.js';
+import {I18n} from '../Util/I18n.js';
 
 /**
  * PR Review — diffs `package.json` + `package-lock.json` between two

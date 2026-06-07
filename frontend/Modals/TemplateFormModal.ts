@@ -1,5 +1,5 @@
 import {ApiTemplateBody, ApiTemplateMutationResponse, ApiTemplateSummary} from '../../shared/Api/ApiTypes.js';
-import {I18n} from '../I18n.js';
+import {I18n} from '../Util/I18n.js';
 
 type Mode = {kind: 'add';} | {kind: 'edit'; id: string;};
 

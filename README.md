@@ -290,7 +290,7 @@ server, frontend is plain TypeScript + DOM (no framework).
   the next interaction is against fresh data. `.nppm/history/` is
   kept.
 - **i18n** — English by default, German included. Add a third language by
-  dropping `frontend/Locales/<id>.ts` and registering it in `I18n.ts`.
+  dropping `frontend/Util/Locales/<id>.ts` and registering it in `I18n.ts`.
 
 ## Requirements
 

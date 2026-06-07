@@ -1,6 +1,6 @@
 import {ApiManifest} from '../../shared/Api/ApiTypes.js';
-import {Api} from '../Api.js';
-import {I18n} from '../I18n.js';
+import {Api} from '../Util/Api.js';
+import {I18n} from '../Util/I18n.js';
 
 type Row = {
     workspace: string;

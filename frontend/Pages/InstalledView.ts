@@ -8,9 +8,9 @@ import {
 } from '../../shared/Api/ApiTypes.js';
 import {Lockfile, LockedPackage} from '../../backend/Project/Lockfile.js';
 import {IntegrityFinding} from '../../backend/Security/IntegrityScanner.js';
-import {Api} from '../Api.js';
-import {EditorUrl} from '../EditorUrl.js';
-import {I18n} from '../I18n.js';
+import {Api} from '../Util/Api.js';
+import {EditorUrl} from '../Util/EditorUrl.js';
+import {I18n} from '../Util/I18n.js';
 
 /**
  * Active sub-view inside the project detail. Mirrors `PackageList`'s

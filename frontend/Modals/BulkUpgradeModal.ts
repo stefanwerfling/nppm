@@ -5,8 +5,8 @@ import {
     ApiBulkUpgradePreviewResult,
     ApiUpgradePreviewResponse
 } from '../../shared/Api/ApiTypes.js';
-import {Api} from '../Api.js';
-import {I18n} from '../I18n.js';
+import {Api} from '../Util/Api.js';
+import {I18n} from '../Util/I18n.js';
 
 /**
  * Cross-project Bulk-Upgrade Wizard modal. Opens from the global

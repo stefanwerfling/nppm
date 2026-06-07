@@ -1,6 +1,6 @@
 import 'normalize.css';
 import './main.css';
-import {I18n, LANGUAGES} from './frontend/I18n.js';
+import {I18n, LANGUAGES} from './frontend/Util/I18n.js';
 import {ImpactModal} from './frontend/Modals/ImpactModal.js';
 import {Nppm} from './frontend/Nppm.js';
 import {SettingsModal} from './frontend/Modals/SettingsModal.js';

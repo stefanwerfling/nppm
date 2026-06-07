@@ -185,11 +185,16 @@ nppm/
 │
 ├── frontend/               every browser-side module, grouped by role
 │   ├── Nppm.ts             top-level orchestrator (panes, routing)
-│   ├── Api.ts              `fetch()` wrapper
-│   ├── I18n.ts             public i18n API + LANGUAGES + LOCALES registry
-│   ├── EditorUrl.ts        URL-handler templates for vscode/vscodium/cursor/phpstorm/webstorm/idea/subl
-│   ├── Version.ts          shared cleanRange helper
 │   ├── logo.svg            32×32 brand mark
+│   │
+│   ├── Util/                           framework-neutral helpers
+│   │   ├── Api.ts                      `fetch()` wrapper
+│   │   ├── I18n.ts                     public i18n API + LANGUAGES + LOCALES registry
+│   │   ├── EditorUrl.ts                URL-handler templates for vscode/vscodium/cursor/phpstorm/webstorm/idea/subl
+│   │   ├── Version.ts                  shared cleanRange helper
+│   │   └── Locales/
+│   │       ├── en.ts                   English translations (source-of-truth identity map)
+│   │       └── de.ts                   German translations
 │   │
 │   ├── Pages/                          right-pane views
 │   │   ├── Matrix.ts                   global matrix view
@@ -226,10 +231,7 @@ nppm/
 │   │   ├── Treeview.ts                 left-pane project list
 │   │   └── Resizer.ts                  splitter logic
 │   │
-│   ├── Dashboard/          DashboardView extracted helpers (Formatters, ScannerMeta, ChartRenderer)
-│   ├── Locales/
-│   │   ├── en.ts           English translations (source-of-truth identity map)
-│   │   └── de.ts           German translations
+│   └── Dashboard/          DashboardView extracted helpers (Formatters, ScannerMeta, ChartRenderer)
 │
 ├── tests/                  vitest, all unit, no network
 ├── doc/                    user-facing manuals + screenshot script
@@ -355,7 +357,7 @@ migrations leave both sides alone rather than merging.
   `security.maintainer.{quickHandoverDays,suspiciousGapDays}` in
   `nppm.json`.
 - **i18n** — every user-visible string in the frontend goes through
-  `t()`. Add new strings to `frontend/Locales/en.ts` AND `de.ts` (or
+  `t()`. Add new strings to `frontend/Util/Locales/en.ts` AND `de.ts` (or
   rely on the en-fallback for a while).
 - **No new framework dependency.** D3 is the only client lib; everything
   else is hand-rolled DOM.

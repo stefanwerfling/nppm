@@ -6,8 +6,8 @@ import {
     UnusedFinding,
     UnusedSeverity
 } from '../../backend/Unused/UnusedReport.js';
-import {Api} from '../Api.js';
-import {I18n} from '../I18n.js';
+import {Api} from '../Util/Api.js';
+import {I18n} from '../Util/I18n.js';
 
 /**
  * Per-project depcheck-style hygiene scan. Renders three sections —

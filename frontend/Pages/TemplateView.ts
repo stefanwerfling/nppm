@@ -1,6 +1,6 @@
 import {ApiComplianceFinding, ApiComplianceResponse} from '../../shared/Api/ApiTypes.js';
 import {ConfigProjectType} from '../../backend/Config/Config.js';
-import {I18n} from '../I18n.js';
+import {I18n} from '../Util/I18n.js';
 import {TemplateApplyModal} from '../Modals/TemplateApplyModal.js';
 
 /**

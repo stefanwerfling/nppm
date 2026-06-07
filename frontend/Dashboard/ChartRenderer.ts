@@ -1,4 +1,4 @@
-import {I18n} from '../I18n.js';
+import {I18n} from '../Util/I18n.js';
 import {Formatters} from './Formatters.js';
 
 export type ChartInput = {

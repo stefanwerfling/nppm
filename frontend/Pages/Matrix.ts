@@ -18,10 +18,10 @@ import {ManifestRedFlagSeverity, ManifestRedFlagsSummary} from '../../backend/Se
 import {ObfuscationSeverity, ObfuscationSummary} from '../../backend/Security/ObfuscationScanner.js';
 import {TyposquatLevel, TyposquatSummary} from '../../backend/Security/TyposquatScanner.js';
 import {PatternSummary, ScriptSummary} from '../../backend/Security/SecurityScanner.js';
-import {Api} from '../Api.js';
-import {I18n} from '../I18n.js';
+import {Api} from '../Util/Api.js';
+import {I18n} from '../Util/I18n.js';
 import {GitResolver} from '../../backend/Fingerprint/GitResolver.js';
-import {Version} from '../Version.js';
+import {Version} from '../Util/Version.js';
 
 /**
  * Filter mode buttons above the matrix.

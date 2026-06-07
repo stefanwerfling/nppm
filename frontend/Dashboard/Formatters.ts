@@ -1,4 +1,4 @@
-import {I18n} from '../I18n.js';
+import {I18n} from '../Util/I18n.js';
 
 /**
  * Pure presentation helpers used across the Dashboard view (no

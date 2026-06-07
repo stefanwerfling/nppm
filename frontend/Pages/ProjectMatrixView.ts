@@ -2,8 +2,8 @@ import {ConfigProjectType} from '../../backend/Config/Config.js';
 import {MatrixRowStatus} from '../../backend/Matrix/MatrixBuilder.js';
 import {ProjectMatrixResponse, ProjectMatrixRow} from '../../backend/Matrix/ProjectMatrixBuilder.js';
 import {DependencyType} from '../../backend/Project/PackageManifest.js';
-import {Api} from '../Api.js';
-import {I18n} from '../I18n.js';
+import {Api} from '../Util/Api.js';
+import {I18n} from '../Util/I18n.js';
 
 /**
  * Per-project matrix: rows are packages, columns are this project's

@@ -1,5 +1,5 @@
 import {DashboardCell, ScannerId} from '../../backend/Dashboard/DashboardBuilder.js';
-import {I18n} from '../I18n.js';
+import {I18n} from '../Util/I18n.js';
 
 /**
  * Per-scanner presentation metadata. Strings, icons, and the score

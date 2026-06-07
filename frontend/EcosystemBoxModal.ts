@@ -151,6 +151,8 @@ export class EcosystemBoxModal {
             case 'typosquat-hits':
                 wrap.appendChild(this._renderPackageList(columns, 'typosquat'));
                 return wrap;
+            default:
+                return wrap;
         }
     }
 
@@ -212,9 +214,7 @@ export class EcosystemBoxModal {
             score.className = 'ebm-row-score';
             score.textContent = r.avg === null ? '—' : `${r.avg}/100`;
             if (r.avg !== null) {
-                score.classList.add(r.avg >= 80 ? 'ebm-row-score-good'
-                    : r.avg >= 60 ? 'ebm-row-score-warn'
-                        : 'ebm-row-score-risk');
+                score.classList.add(EcosystemBoxModal._scoreClass(r.avg));
             }
             row.appendChild(score);
             list.appendChild(row);
@@ -261,9 +261,7 @@ export class EcosystemBoxModal {
             const score = document.createElement('span');
             score.className = 'ebm-row-score';
             score.textContent = `${r.avg}/100`;
-            score.classList.add(r.avg >= 80 ? 'ebm-row-score-good'
-                : r.avg >= 60 ? 'ebm-row-score-warn'
-                    : 'ebm-row-score-risk');
+            score.classList.add(EcosystemBoxModal._scoreClass(r.avg));
             row.appendChild(score);
             list.appendChild(row);
         }
@@ -441,7 +439,19 @@ export class EcosystemBoxModal {
                 return I18n.t('Packages with maintainer-handover or 2FA-status patterns matching the event-stream / ua-parser-js incident profiles. Each row shows the project(s) affected.');
             case 'typosquat-hits':
                 return I18n.t('Package names a Levenshtein distance of 1-2 from a popular package, or carrying confusable (non-ASCII) characters. Most matches are intentional namesakes; the rows surface the suspicious ones.');
+            default:
+                return '';
         }
+    }
+
+    private static _scoreClass(avg: number): string {
+        if (avg >= 80) {
+            return 'ebm-row-score-good';
+        }
+        if (avg >= 60) {
+            return 'ebm-row-score-warn';
+        }
+        return 'ebm-row-score-risk';
     }
 
 }

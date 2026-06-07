@@ -153,7 +153,9 @@ export class TemplateApplyModal {
         apply.className = 'umd-btn umd-btn-primary';
         apply.textContent = I18n.t('Apply selected ({n})', {n: this._selected.size});
         apply.disabled = this._selected.size === 0;
-        apply.addEventListener('click', () => void this._submit());
+        apply.addEventListener('click', () => {
+            void this._submit();
+        });
         actions.appendChild(apply);
         const cancel = document.createElement('button');
         cancel.type = 'button';
@@ -296,6 +298,7 @@ export class TemplateApplyModal {
             const decoder = new TextDecoder();
             let buf = '';
             for (;;) {
+                // eslint-disable-next-line no-await-in-loop
                 const {value, done} = await reader.read();
                 if (done) {
                     break;
@@ -355,6 +358,7 @@ export class TemplateApplyModal {
             case 'risk': return I18n.t('Risk');
             case 'warn': return I18n.t('Warning');
             case 'info': return I18n.t('Info');
+            default: return '';
         }
     }
 
@@ -370,6 +374,7 @@ export class TemplateApplyModal {
             case 'file-missing': return I18n.t('File missing');
             case 'file-drift': return I18n.t('File drift');
             case 'workspace-missing': return I18n.t('Workspace missing');
+            default: return '';
         }
     }
 

@@ -17,7 +17,7 @@ export class TemplatesView {
     private readonly _root: HTMLElement;
     private _onCellClick: ((projectUnid: string) => void)|null = null;
 
-    constructor(root: HTMLElement) {
+    public constructor(root: HTMLElement) {
         this._root = root;
     }
 
@@ -79,7 +79,9 @@ export class TemplatesView {
         add.textContent = I18n.t('+ Add template');
         add.addEventListener('click', () => {
             const modal = new TemplateFormModal();
-            modal.onSaved(() => void this.show());
+            modal.onSaved(() => {
+                void this.show();
+            });
             void modal.open({kind: 'add'}, data.rows.map((r) => r.template.id));
         });
         titleBar.appendChild(add);
@@ -181,7 +183,9 @@ export class TemplatesView {
             edit.title = I18n.t('Edit template');
             edit.addEventListener('click', () => {
                 const modal = new TemplateFormModal();
-                modal.onSaved(() => void this.show());
+                modal.onSaved(() => {
+                    void this.show();
+                });
                 void modal.open({kind: 'edit', id: row.template.id}, []);
             });
             actions.appendChild(edit);

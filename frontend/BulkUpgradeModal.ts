@@ -294,7 +294,9 @@ export class BulkUpgradeModal {
         editOnly.className = 'bumd-btn bumd-btn-primary';
         editOnly.textContent = I18n.t('Apply edits only');
         editOnly.disabled = disabled;
-        editOnly.addEventListener('click', () => void this._apply('edit'));
+        editOnly.addEventListener('click', () => {
+            void this._apply('edit');
+        });
         wrap.appendChild(editOnly);
 
         if (preview.allowInstall) {
@@ -302,7 +304,9 @@ export class BulkUpgradeModal {
             install.className = 'bumd-btn bumd-btn-risky';
             install.textContent = I18n.t('Apply edits + install per project (--ignore-scripts)');
             install.disabled = disabled;
-            install.addEventListener('click', () => void this._apply('install'));
+            install.addEventListener('click', () => {
+                void this._apply('install');
+            });
             wrap.appendChild(install);
         } else {
             const note = document.createElement('div');
@@ -416,8 +420,11 @@ export class BulkUpgradeModal {
         const reader = body.getReader();
         const decoder = new TextDecoder();
         let buf = '';
-        while (true) {
+        let streamDone = false;
+        while (!streamDone) {
+            // eslint-disable-next-line no-await-in-loop
             const {value, done} = await reader.read();
+            streamDone = done;
             if (done) {
                 break;
             }

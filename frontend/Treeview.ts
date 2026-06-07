@@ -32,7 +32,7 @@ export class Treeview {
     private _onEdit: TreeviewEditHandler|null = null;
     private _scores: Map<string, number> = new Map();
 
-    constructor(root: HTMLElement) {
+    public constructor(root: HTMLElement) {
         this._root = root;
     }
 
@@ -353,9 +353,7 @@ export class Treeview {
         svg.setAttribute('viewBox', '0 0 36 36');
         svg.setAttribute('width', '32');
         svg.setAttribute('height', '32');
-        const tier = health === undefined
-            ? 'loading'
-            : health >= 80 ? 'good' : health >= 60 ? 'warn' : 'risk';
+        const tier = Treeview._healthTier(health);
         svg.setAttribute('class', `tree-score-ring tree-score-${tier}`);
 
         const bg = document.createElementNS(svgNs, 'circle');
@@ -404,7 +402,22 @@ export class Treeview {
                 return 'GitHub';
             case ConfigProjectType.gitea:
                 return 'Gitea';
+            default:
+                return '';
         }
+    }
+
+    private static _healthTier(health: number|undefined): string {
+        if (health === undefined) {
+            return 'loading';
+        }
+        if (health >= 80) {
+            return 'good';
+        }
+        if (health >= 60) {
+            return 'warn';
+        }
+        return 'risk';
     }
 
 }

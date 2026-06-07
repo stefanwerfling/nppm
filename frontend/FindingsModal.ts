@@ -130,7 +130,7 @@ export class FindingsModal {
             scoreBadge.classList.add('fmd-score-na');
             scoreBadge.textContent = I18n.t('N/A');
         } else {
-            const tier = cell.score >= 80 ? 'good' : cell.score >= 60 ? 'warn' : 'risk';
+            const tier = FindingsModal._scoreTier(cell.score);
             scoreBadge.classList.add(`fmd-score-${tier}`);
             scoreBadge.textContent = `${cell.score}%`;
         }
@@ -268,7 +268,19 @@ export class FindingsModal {
             case 'unused':
             case 'template':
                 return false;
+            default:
+                return false;
         }
+    }
+
+    private static _scoreTier(score: number): string {
+        if (score >= 80) {
+            return 'good';
+        }
+        if (score >= 60) {
+            return 'warn';
+        }
+        return 'risk';
     }
 
     /**

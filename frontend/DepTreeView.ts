@@ -24,7 +24,8 @@ import {I18n} from './I18n.js';
  * is the single place that swaps them around.
  */
 type TreeDatum = {
-    key: string; // unique per node in this view (path-based, not pkg-based)
+    /** Unique per node in this view (path-based, not pkg-based). */
+    key: string;
     label: string;
     pkg: DepGraphNode|null;
     cycle?: boolean;
@@ -70,7 +71,7 @@ export class DepTreeView {
     private _onShowPr: ((unid: string) => void)|null = null;
     private _onShowTemplate: ((unid: string) => void)|null = null;
 
-    constructor(root: HTMLElement) {
+    public constructor(root: HTMLElement) {
         this._root = root;
     }
 
@@ -490,10 +491,10 @@ export class DepTreeView {
         });
         toggle.appendChild(matrix);
 
-        const tree = document.createElement('button');
-        tree.className = 'installed-toggle-btn installed-toggle-btn-active';
-        tree.textContent = I18n.t('Tree');
-        toggle.appendChild(tree);
+        const treeBtn = document.createElement('button');
+        treeBtn.className = 'installed-toggle-btn installed-toggle-btn-active';
+        treeBtn.textContent = I18n.t('Tree');
+        toggle.appendChild(treeBtn);
 
         const unused = document.createElement('button');
         unused.className = 'installed-toggle-btn';

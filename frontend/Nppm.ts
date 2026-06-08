@@ -12,6 +12,7 @@ import {Matrix} from './Pages/Matrix.js';
 import {PackageDetailPanel} from './Modals/PackageDetailPanel.js';
 import {PackageList} from './Pages/PackageList.js';
 import {ProjectMatrixView} from './Pages/ProjectMatrixView.js';
+import {ProjectNav} from './Widgets/ProjectNav.js';
 import {Resizer} from './Widgets/Resizer.js';
 import {SourceGraphView} from './Pages/SourceGraphView.js';
 import {TemplatesView} from './Pages/TemplatesView.js';
@@ -196,109 +197,43 @@ export class Nppm {
         const findProject = (unid: string): ApiProject|undefined =>
             this._projects.find((p) => p.unid === unid);
 
-        const wireDeclared = (unid: string): void => {
+        /*
+         * One nav shared by every per-project sub-view. Each handler
+         * resolves the project from the active list and routes to
+         * the matching `_loadProject*` method. Adding a new tab is
+         * now a one-line edit in `ProjectNav.TABS` + one `.on(...)`
+         * line here — instead of touching every Page class.
+         */
+        const wireTo = (loader: (p: ApiProject) => void): ((unid: string) => void) => (unid) => {
             const p = findProject(unid);
             if (p) {
-                void this._loadProject(p);
+                loader(p);
             }
         };
-        const wireInstalled = (unid: string): void => {
-            const p = findProject(unid);
-            if (p) {
-                void this._loadProjectInstalled(p);
-            }
-        };
-        const wireHistory = (unid: string): void => {
-            const p = findProject(unid);
-            if (p) {
-                void this._loadProjectHistory(p);
-            }
-        };
-        const wireMatrix = (unid: string): void => {
-            const p = findProject(unid);
-            if (p) {
-                void this._loadProjectMatrix(p);
-            }
-        };
-        const wireTree = (unid: string): void => {
-            const p = findProject(unid);
-            if (p) {
-                void this._loadProjectTree(p);
-            }
-        };
-        const wireUnused = (unid: string): void => {
-            const p = findProject(unid);
-            if (p) {
-                void this._loadProjectUnused(p);
-            }
-        };
-        const wireVulns = (unid: string): void => {
-            const p = findProject(unid);
-            if (p) {
-                void this._loadProjectVulns(p);
-            }
-        };
-        const wirePr = (unid: string): void => {
-            const p = findProject(unid);
-            if (p) {
-                void this._loadProjectPr(p);
-            }
-        };
-        const wireTemplate = (unid: string): void => {
-            const p = findProject(unid);
-            if (p) {
-                void this._loadProjectTemplate(p);
-            }
-        };
-        const wireSource = (unid: string): void => {
-            const p = findProject(unid);
-            if (p) {
-                void this._loadProjectSource(p);
-            }
-        };
+        const nav = new ProjectNav()
+        .on('declared', wireTo((p) => { void this._loadProject(p); }))
+        .on('installed', wireTo((p) => { void this._loadProjectInstalled(p); }))
+        .on('history', wireTo((p) => { void this._loadProjectHistory(p); }))
+        .on('matrix', wireTo((p) => { void this._loadProjectMatrix(p); }))
+        .on('tree', wireTo((p) => { void this._loadProjectTree(p); }))
+        .on('unused', wireTo((p) => { void this._loadProjectUnused(p); }))
+        .on('vulns', wireTo((p) => { void this._loadProjectVulns(p); }))
+        .on('pr', wireTo((p) => { void this._loadProjectPr(p); }))
+        .on('template', wireTo((p) => { void this._loadProjectTemplate(p); }))
+        .on('source', wireTo((p) => { void this._loadProjectSource(p); }));
 
-        this._packageList.onShowInstalled(wireInstalled);
-        this._packageList.onShowHistory(wireHistory);
-        this._packageList.onShowMatrix(wireMatrix);
-        this._packageList.onShowTree(wireTree);
-        this._packageList.onShowUnused(wireUnused);
-        this._packageList.onShowVulns(wireVulns);
-        this._packageList.onShowPr(wirePr);
-        this._packageList.onShowTemplate(wireTemplate);
-        this._packageList.onShowSource(wireSource);
+        for (const v of [
+            this._packageList, this._installedView, this._historyView,
+            this._projectMatrixView, this._depTreeView, this._unusedView,
+            this._vulnerabilityTimelineView, this._prReviewView,
+            this._templateView, this._sourceGraphView
+        ]) {
+            v.setNav(nav);
+        }
 
-        this._installedView.onShowDeclared(wireDeclared);
-        this._installedView.onShowHistory(wireHistory);
-        this._installedView.onShowMatrix(wireMatrix);
-        this._installedView.onShowTree(wireTree);
-        this._installedView.onShowUnused(wireUnused);
-        this._installedView.onShowVulns(wireVulns);
-        this._installedView.onShowPr(wirePr);
-        this._installedView.onShowTemplate(wireTemplate);
-        this._installedView.onShowSource(wireSource);
         this._installedView.onWhy((unid, name, version) => {
             void this._whyModal.open(unid, name, version);
         });
-
-        this._historyView.onShowDeclared(wireDeclared);
-        this._historyView.onShowInstalled(wireInstalled);
-        this._historyView.onShowMatrix(wireMatrix);
-        this._historyView.onShowTree(wireTree);
-        this._historyView.onShowUnused(wireUnused);
-        this._historyView.onShowVulns(wireVulns);
-        this._historyView.onShowPr(wirePr);
-        this._historyView.onShowTemplate(wireTemplate);
-        this._historyView.onShowSource(wireSource);
-
-        this._projectMatrixView.onShowDeclared(wireDeclared);
-        this._projectMatrixView.onShowInstalled(wireInstalled);
-        this._projectMatrixView.onShowHistory(wireHistory);
-        this._projectMatrixView.onShowTree(wireTree);
-        this._projectMatrixView.onShowUnused(wireUnused);
-        this._projectMatrixView.onShowVulns(wireVulns);
-        this._projectMatrixView.onShowPr(wirePr);
-        this._projectMatrixView.onShowTemplate(wireTemplate);
-        this._projectMatrixView.onShowSource(wireSource);
         this._projectMatrixView.onCellClick((pkg, version, latest) => {
             void this._detailPanel.open(pkg, version, latest);
         });
@@ -318,72 +253,12 @@ export class Nppm {
                 toRange: seed.toRange
             });
         });
-
-        this._depTreeView.onShowDeclared(wireDeclared);
-        this._depTreeView.onShowInstalled(wireInstalled);
-        this._depTreeView.onShowHistory(wireHistory);
-        this._depTreeView.onShowMatrix(wireMatrix);
-        this._depTreeView.onShowUnused(wireUnused);
-        this._depTreeView.onShowVulns(wireVulns);
-        this._depTreeView.onShowPr(wirePr);
-        this._depTreeView.onShowTemplate(wireTemplate);
-        this._depTreeView.onShowSource(wireSource);
-
-        this._unusedView.onShowDeclared(wireDeclared);
-        this._unusedView.onShowInstalled(wireInstalled);
-        this._unusedView.onShowHistory(wireHistory);
-        this._unusedView.onShowMatrix(wireMatrix);
-        this._unusedView.onShowTree(wireTree);
-        this._unusedView.onShowVulns(wireVulns);
-        this._unusedView.onShowPr(wirePr);
-        this._unusedView.onShowTemplate(wireTemplate);
-        this._unusedView.onShowSource(wireSource);
-
-        this._vulnerabilityTimelineView.onShowDeclared(wireDeclared);
-        this._vulnerabilityTimelineView.onShowInstalled(wireInstalled);
-        this._vulnerabilityTimelineView.onShowHistory(wireHistory);
-        this._vulnerabilityTimelineView.onShowMatrix(wireMatrix);
-        this._vulnerabilityTimelineView.onShowTree(wireTree);
-        this._vulnerabilityTimelineView.onShowUnused(wireUnused);
-        this._vulnerabilityTimelineView.onShowPr(wirePr);
-        this._vulnerabilityTimelineView.onShowTemplate(wireTemplate);
-        this._vulnerabilityTimelineView.onShowSource(wireSource);
         this._vulnerabilityTimelineView.onExposureClick((pkg, version) => {
             void this._detailPanel.openOnSecurity(pkg, version, version);
         });
-
-        this._templateView.onShowDeclared(wireDeclared);
-        this._templateView.onShowInstalled(wireInstalled);
-        this._templateView.onShowHistory(wireHistory);
-        this._templateView.onShowMatrix(wireMatrix);
-        this._templateView.onShowTree(wireTree);
-        this._templateView.onShowUnused(wireUnused);
-        this._templateView.onShowVulns(wireVulns);
-        this._templateView.onShowPr(wirePr);
-        this._templateView.onShowSource(wireSource);
-
-        this._prReviewView.onShowDeclared(wireDeclared);
-        this._prReviewView.onShowInstalled(wireInstalled);
-        this._prReviewView.onShowHistory(wireHistory);
-        this._prReviewView.onShowMatrix(wireMatrix);
-        this._prReviewView.onShowTree(wireTree);
-        this._prReviewView.onShowUnused(wireUnused);
-        this._prReviewView.onShowVulns(wireVulns);
-        this._prReviewView.onShowTemplate(wireTemplate);
-        this._prReviewView.onShowSource(wireSource);
         this._prReviewView.onDepClick((pkg, version) => {
             void this._detailPanel.openOnSecurity(pkg, version, version);
         });
-
-        this._sourceGraphView.onShowDeclared(wireDeclared);
-        this._sourceGraphView.onShowInstalled(wireInstalled);
-        this._sourceGraphView.onShowHistory(wireHistory);
-        this._sourceGraphView.onShowMatrix(wireMatrix);
-        this._sourceGraphView.onShowTree(wireTree);
-        this._sourceGraphView.onShowUnused(wireUnused);
-        this._sourceGraphView.onShowVulns(wireVulns);
-        this._sourceGraphView.onShowPr(wirePr);
-        this._sourceGraphView.onShowTemplate(wireTemplate);
 
         this._treeview.onSelect((project) => {
             if (project.unid === '__dashboard__') {

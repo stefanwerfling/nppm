@@ -2,6 +2,7 @@ import {ApiComplianceFinding, ApiComplianceResponse} from '../../shared/Api/ApiT
 import {ConfigProjectType} from '../../backend/Config/Config.js';
 import {I18n} from '../Util/I18n.js';
 import {TemplateApplyModal} from '../Modals/TemplateApplyModal.js';
+import {ProjectNav} from '../Widgets/ProjectNav.js';
 
 /**
  * Per-project right-pane tab showing the compliance diff against the
@@ -15,46 +16,14 @@ export class TemplateView {
     private _projectUnid: string|null = null;
     private _projectName: string|null = null;
     private _projectType: ConfigProjectType = ConfigProjectType.local;
-    private _onShowDeclared: ((unid: string) => void)|null = null;
-    private _onShowInstalled: ((unid: string) => void)|null = null;
-    private _onShowHistory: ((unid: string) => void)|null = null;
-    private _onShowMatrix: ((unid: string) => void)|null = null;
-    private _onShowTree: ((unid: string) => void)|null = null;
-    private _onShowUnused: ((unid: string) => void)|null = null;
-    private _onShowVulns: ((unid: string) => void)|null = null;
-    private _onShowPr: ((unid: string) => void)|null = null;
-    private _onShowSource: ((unid: string) => void)|null = null;
+    private _nav: ProjectNav|null = null;
 
     public constructor(root: HTMLElement) {
         this._root = root;
     }
 
-    public onShowDeclared(handler: (unid: string) => void): void {
-        this._onShowDeclared = handler;
-    }
-    public onShowInstalled(handler: (unid: string) => void): void {
-        this._onShowInstalled = handler;
-    }
-    public onShowHistory(handler: (unid: string) => void): void {
-        this._onShowHistory = handler;
-    }
-    public onShowMatrix(handler: (unid: string) => void): void {
-        this._onShowMatrix = handler;
-    }
-    public onShowTree(handler: (unid: string) => void): void {
-        this._onShowTree = handler;
-    }
-    public onShowUnused(handler: (unid: string) => void): void {
-        this._onShowUnused = handler;
-    }
-    public onShowVulns(handler: (unid: string) => void): void {
-        this._onShowVulns = handler;
-    }
-    public onShowPr(handler: (unid: string) => void): void {
-        this._onShowPr = handler;
-    }
-    public onShowSource(handler: (unid: string) => void): void {
-        this._onShowSource = handler;
+    public setNav(nav: ProjectNav): void {
+        this._nav = nav;
     }
 
     public async show(unid: string, projectName: string, projectType: ConfigProjectType): Promise<void> {
@@ -219,44 +188,10 @@ export class TemplateView {
         title.textContent = projectName;
         header.appendChild(title);
 
-        const toggle = document.createElement('div');
-        toggle.className = 'installed-toggle';
+        if (this._nav) {
+            header.appendChild(this._nav.renderToggle(this._projectUnid, 'template'));
+        }
 
-        const mk = (label: string, handler: (() => void)|null, active = false): HTMLButtonElement => {
-            const b = document.createElement('button');
-            b.className = active
-                ? 'installed-toggle-btn installed-toggle-btn-active'
-                : 'installed-toggle-btn';
-            b.textContent = label;
-            if (handler) {
-                b.addEventListener('click', handler);
-            }
-            return b;
-        };
-
-        const wrap = (cb: ((unid: string) => void)|null): (() => void)|null => {
-            if (!cb) {
-                return null;
-            }
-            return () => {
-                if (this._projectUnid) {
-                    cb(this._projectUnid);
-                }
-            };
-        };
-
-        toggle.appendChild(mk(I18n.t('Declared'), wrap(this._onShowDeclared)));
-        toggle.appendChild(mk(I18n.t('Installed'), wrap(this._onShowInstalled)));
-        toggle.appendChild(mk(I18n.t('History'), wrap(this._onShowHistory)));
-        toggle.appendChild(mk(I18n.t('Matrix'), wrap(this._onShowMatrix)));
-        toggle.appendChild(mk(I18n.t('Tree'), wrap(this._onShowTree)));
-        toggle.appendChild(mk(I18n.t('Unused'), wrap(this._onShowUnused)));
-        toggle.appendChild(mk(I18n.t('Vulns'), wrap(this._onShowVulns)));
-        toggle.appendChild(mk(I18n.t('PR'), wrap(this._onShowPr)));
-        toggle.appendChild(mk(I18n.t('Template'), null, true));
-        toggle.appendChild(mk(I18n.t('Graph'), wrap(this._onShowSource)));
-
-        header.appendChild(toggle);
         return header;
     }
 

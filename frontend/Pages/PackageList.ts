@@ -1,6 +1,7 @@
 import {ApiPackagesResponse} from '../../shared/Api/ApiTypes.js';
 import {DependencyType} from '../../backend/Project/PackageManifest.js';
 import {I18n} from '../Util/I18n.js';
+import {ProjectNav} from '../Widgets/ProjectNav.js';
 
 /**
  * Right-panel package list for one selected project: a flat table of
@@ -12,54 +13,14 @@ export class PackageList {
 
     private readonly _root: HTMLElement;
     private _projectUnid: string|null = null;
-    private _onShowInstalled: ((unid: string) => void)|null = null;
-    private _onShowHistory: ((unid: string) => void)|null = null;
-    private _onShowMatrix: ((unid: string) => void)|null = null;
-    private _onShowTree: ((unid: string) => void)|null = null;
-    private _onShowUnused: ((unid: string) => void)|null = null;
-    private _onShowVulns: ((unid: string) => void)|null = null;
-    private _onShowPr: ((unid: string) => void)|null = null;
-    private _onShowTemplate: ((unid: string) => void)|null = null;
-    private _onShowSource: ((unid: string) => void)|null = null;
+    private _nav: ProjectNav|null = null;
 
     public constructor(root: HTMLElement) {
         this._root = root;
     }
 
-    public onShowInstalled(handler: (unid: string) => void): void {
-        this._onShowInstalled = handler;
-    }
-
-    public onShowHistory(handler: (unid: string) => void): void {
-        this._onShowHistory = handler;
-    }
-
-    public onShowMatrix(handler: (unid: string) => void): void {
-        this._onShowMatrix = handler;
-    }
-
-    public onShowTree(handler: (unid: string) => void): void {
-        this._onShowTree = handler;
-    }
-
-    public onShowUnused(handler: (unid: string) => void): void {
-        this._onShowUnused = handler;
-    }
-
-    public onShowVulns(handler: (unid: string) => void): void {
-        this._onShowVulns = handler;
-    }
-
-    public onShowPr(handler: (unid: string) => void): void {
-        this._onShowPr = handler;
-    }
-
-    public onShowTemplate(handler: (unid: string) => void): void {
-        this._onShowTemplate = handler;
-    }
-
-    public onShowSource(handler: (unid: string) => void): void {
-        this._onShowSource = handler;
+    public setNav(nav: ProjectNav): void {
+        this._nav = nav;
     }
 
     public clear(): void {
@@ -134,11 +95,6 @@ export class PackageList {
         this._root.appendChild(table);
     }
 
-    /**
-     * Build the sticky header with the declared/installed toggle.
-     * Toggling to "Installiert" hands control back to the orchestrator
-     * (Nppm) — this view doesn't know how the other one is mounted.
-     */
     private _renderHeader(projectName: string): HTMLElement {
         const header = document.createElement('div');
         header.className = 'list-header installed-header';
@@ -148,105 +104,9 @@ export class PackageList {
         title.textContent = projectName;
         header.appendChild(title);
 
-        const toggle = document.createElement('div');
-        toggle.className = 'installed-toggle';
-
-        const declared = document.createElement('button');
-        declared.className = 'installed-toggle-btn installed-toggle-btn-active';
-        declared.textContent = I18n.t('Declared');
-
-        const installed = document.createElement('button');
-        installed.className = 'installed-toggle-btn';
-        installed.textContent = I18n.t('Installed');
-        installed.addEventListener('click', () => {
-            if (this._projectUnid && this._onShowInstalled) {
-                this._onShowInstalled(this._projectUnid);
-            }
-        });
-
-        const history = document.createElement('button');
-        history.className = 'installed-toggle-btn';
-        history.textContent = I18n.t('History');
-        history.addEventListener('click', () => {
-            if (this._projectUnid && this._onShowHistory) {
-                this._onShowHistory(this._projectUnid);
-            }
-        });
-
-        const matrix = document.createElement('button');
-        matrix.className = 'installed-toggle-btn';
-        matrix.textContent = I18n.t('Matrix');
-        matrix.addEventListener('click', () => {
-            if (this._projectUnid && this._onShowMatrix) {
-                this._onShowMatrix(this._projectUnid);
-            }
-        });
-
-        const tree = document.createElement('button');
-        tree.className = 'installed-toggle-btn';
-        tree.textContent = I18n.t('Tree');
-        tree.addEventListener('click', () => {
-            if (this._projectUnid && this._onShowTree) {
-                this._onShowTree(this._projectUnid);
-            }
-        });
-
-        const unused = document.createElement('button');
-        unused.className = 'installed-toggle-btn';
-        unused.textContent = I18n.t('Unused');
-        unused.addEventListener('click', () => {
-            if (this._projectUnid && this._onShowUnused) {
-                this._onShowUnused(this._projectUnid);
-            }
-        });
-
-        const vulns = document.createElement('button');
-        vulns.className = 'installed-toggle-btn';
-        vulns.textContent = I18n.t('Vulns');
-        vulns.addEventListener('click', () => {
-            if (this._projectUnid && this._onShowVulns) {
-                this._onShowVulns(this._projectUnid);
-            }
-        });
-
-        const pr = document.createElement('button');
-        pr.className = 'installed-toggle-btn';
-        pr.textContent = I18n.t('PR');
-        pr.addEventListener('click', () => {
-            if (this._projectUnid && this._onShowPr) {
-                this._onShowPr(this._projectUnid);
-            }
-        });
-
-        const template = document.createElement('button');
-        template.className = 'installed-toggle-btn';
-        template.textContent = I18n.t('Template');
-        template.addEventListener('click', () => {
-            if (this._projectUnid && this._onShowTemplate) {
-                this._onShowTemplate(this._projectUnid);
-            }
-        });
-
-        const source = document.createElement('button');
-        source.className = 'installed-toggle-btn';
-        source.textContent = I18n.t('Graph');
-        source.addEventListener('click', () => {
-            if (this._projectUnid && this._onShowSource) {
-                this._onShowSource(this._projectUnid);
-            }
-        });
-
-        toggle.appendChild(declared);
-        toggle.appendChild(installed);
-        toggle.appendChild(history);
-        toggle.appendChild(matrix);
-        toggle.appendChild(tree);
-        toggle.appendChild(unused);
-        toggle.appendChild(vulns);
-        toggle.appendChild(pr);
-        toggle.appendChild(template);
-        toggle.appendChild(source);
-        header.appendChild(toggle);
+        if (this._nav) {
+            header.appendChild(this._nav.renderToggle(this._projectUnid, 'declared'));
+        }
 
         return header;
     }

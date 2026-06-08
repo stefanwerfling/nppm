@@ -771,6 +771,8 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     'Copy failed': 'Copy failed',
     'Self-code': 'Self-code',
     'No findings — file is clean.': 'No findings — file is clean.',
+    'Blast radius': 'Blast radius',
+    '{n} files': '{n} files',
     '{n} import specifiers could not be resolved (dynamic specs or missing targets).': '{n} import specifiers could not be resolved (dynamic specs or missing targets).',
     'No source files found.': 'No source files found.',
     'Entry': 'Entry',

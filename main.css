@@ -1581,6 +1581,37 @@ html, body {
     50% { stroke-opacity: 0.45; }
 }
 
+/*
+ * Blast radius highlight: when the user selects a node, every file
+ * that transitively imports it (= would break if it changed) lights
+ * up; everything else fades out. The seed file gets the strongest
+ * outline so the eye lands on the origin.
+ */
+.sourcegraph-node-seed circle {
+    stroke: var(--c-accent) !important;
+    stroke-width: 4 !important;
+}
+
+.sourcegraph-node-blast circle {
+    stroke: var(--c-accent) !important;
+    stroke-width: 2.5 !important;
+    stroke-opacity: 0.8;
+}
+
+.sourcegraph-node-fade {
+    opacity: 0.25;
+}
+
+.sourcegraph-link-blast {
+    stroke: var(--c-accent) !important;
+    stroke-width: 1.5 !important;
+    opacity: 0.85 !important;
+}
+
+.sourcegraph-link-fade {
+    opacity: 0.05 !important;
+}
+
 .sourcegraph-hulls {
     pointer-events: none;
 }

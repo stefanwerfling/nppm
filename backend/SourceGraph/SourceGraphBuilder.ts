@@ -56,7 +56,7 @@ const RESOLVE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
  * Bump when the cached shape changes so old entries are invalidated
  * the next time the builder runs.
  */
-const CACHE_KEY_PREFIX = 'sg_v2_';
+const CACHE_KEY_PREFIX = 'sg_v3_';
 
 /**
  * Walks a local project's source files, regex-extracts every relative
@@ -161,58 +161,114 @@ export class SourceGraphBuilder {
             absToId.set(abs, id);
         }
 
-        const edges: SourceEdge[] = [];
-        const edgeSeen = new Set<string>();
-        let unresolved = 0;
-
-        for (const {abs, rel} of collected) {
-            const id = rel.split(path.sep).join('/');
-            const kind = SourceGraphBuilder._kindOf(id);
+        /*
+         * Pre-pass: read each file once and record both its content
+         * (so the main pass doesn't need a second readFileSync) and
+         * its re-export table. The re-export table is what lets the
+         * workspace bridge route `import {X} from '@scope/pkg'`
+         * straight to the file that defines X, instead of dumping
+         * every cross-workspace import on the barrel `index.ts`.
+         */
+        const contentByAbs = new Map<string, string>();
+        const reExportsByAbs = new Map<string, Map<string, string[]>>();
+        for (const {abs} of collected) {
             let content: string;
             try {
                 content = this._fs.readFileSync(abs, 'utf-8');
             } catch {
                 continue;
             }
+            contentByAbs.set(abs, content);
+            const re = SourceGraphBuilder._scanReExports(content);
+            if (re.size > 0) {
+                reExportsByAbs.set(abs, re);
+            }
+        }
+
+        const edges: SourceEdge[] = [];
+        const edgeSeen = new Set<string>();
+        let unresolved = 0;
+
+        const addEdge = (fromId: string, toId: string): void => {
+            if (fromId === toId) {
+                return;
+            }
+            const key = `${fromId}${toId}`;
+            if (edgeSeen.has(key)) {
+                return;
+            }
+            edgeSeen.add(key);
+            edges.push({from: fromId, to: toId});
+        };
+
+        for (const {abs, rel} of collected) {
+            const id = rel.split(path.sep).join('/');
+            const kind = SourceGraphBuilder._kindOf(id);
+            const content = contentByAbs.get(abs);
+            if (content === undefined) {
+                continue;
+            }
 
             const loc = SourceGraphBuilder._countLines(content);
             files.push({id: id, kind: kind, loc: loc});
 
-            const {specs, dynamicHits} = SourceGraphBuilder._scanImports(content);
+            const {imports, dynamicHits} = SourceGraphBuilder._scanImportsDetailed(content);
             unresolved += dynamicHits;
 
             const here = path.dirname(abs);
-            for (const spec of specs) {
-                let targetAbs: string|null = null;
-                if (SourceGraphBuilder._isRelative(spec)) {
-                    targetAbs = this._resolve(here, spec);
+            for (const imp of imports) {
+                let entryAbs: string|null = null;
+                let isWorkspaceBare = false;
+                if (SourceGraphBuilder._isRelative(imp.spec)) {
+                    entryAbs = this._resolve(here, imp.spec);
                 } else {
-                    targetAbs = this._resolveWorkspace(spec, workspaceRoots);
-                    /*
-                     * Bare specifier that doesn't match a known
-                     * workspace — that's an external npm dep,
-                     * handled by the dep-graph view, not this one.
-                     * Quietly skip without counting it as unresolved.
-                     */
-                    if (!targetAbs) {
+                    entryAbs = this._resolveWorkspace(imp.spec, workspaceRoots);
+                    if (!entryAbs) {
+                        /*
+                         * Bare specifier that doesn't match a known
+                         * workspace — external npm dep, handled by
+                         * the dep-graph view, not this one.
+                         */
+                        continue;
+                    }
+                    isWorkspaceBare = true;
+                }
+                if (!entryAbs) {
+                    unresolved++;
+                    continue;
+                }
+
+                /*
+                 * Workspace bridge + named imports: walk the barrel's
+                 * re-export chain so the edge lands on the file that
+                 * actually defines each imported symbol. Fall back to
+                 * the entry file for default / namespace imports
+                 * (where we can't tell which symbols got pulled in).
+                 */
+                if (isWorkspaceBare && imp.named.length > 0) {
+                    let routedAny = false;
+                    for (const symbol of imp.named) {
+                        const definingAbs = this._traceSymbol(
+                            entryAbs, symbol, reExportsByAbs, new Set()
+                        );
+                        const target = definingAbs ?? entryAbs;
+                        const targetId = absToId.get(target);
+                        if (targetId) {
+                            addEdge(id, targetId);
+                            routedAny = true;
+                        }
+                    }
+                    if (routedAny) {
                         continue;
                     }
                 }
-                if (!targetAbs) {
+
+                const entryId = absToId.get(entryAbs);
+                if (!entryId) {
                     unresolved++;
                     continue;
                 }
-                const targetId = absToId.get(targetAbs);
-                if (!targetId) {
-                    unresolved++;
-                    continue;
-                }
-                const edgeKey = `${id}${targetId}`;
-                if (edgeSeen.has(edgeKey)) {
-                    continue;
-                }
-                edgeSeen.add(edgeKey);
-                edges.push({from: id, to: targetId});
+                addEdge(id, entryId);
             }
         }
 
@@ -279,6 +335,167 @@ export class SourceGraphBuilder {
             }
         };
         walk(root);
+    }
+
+    /**
+     * Strip JS comments so the import / re-export regexes don't
+     * match the inside of a comment block.
+     */
+    private static _stripComments(content: string): string {
+        return content
+        .replace(/\/\*[\s\S]*?\*\//gu, '')
+        .replace(/(^|[^:])\/\/[^\n]*/gu, '$1');
+    }
+
+    /**
+     * Detailed import-statement parser. Beyond `_scanImports`'s flat
+     * spec list, this records *which symbols* each import pulls in —
+     * so the workspace bridge can route the edge straight to the
+     * file where the imported class actually lives instead of
+     * stopping at the barrel `index.ts`.
+     *
+     * Recognises five shapes:
+     *  - `import 'spec'`                 (side-effect only)
+     *  - `import D from 'spec'`          (default)
+     *  - `import {A, B as C} from 'spec'`(named — A and B, not C)
+     *  - `import * as N from 'spec'`     (namespace)
+     *  - `import D, {A} from 'spec'`     (default + named)
+     */
+    private static _scanImportsDetailed(content: string): {
+        imports: {spec: string; named: string[]; hasDefault: boolean; isNamespace: boolean;}[];
+        dynamicHits: number;
+    } {
+        const out: {spec: string; named: string[]; hasDefault: boolean; isNamespace: boolean;}[] = [];
+        const stripped = SourceGraphBuilder._stripComments(content);
+
+        /*
+         * Match `import <clause> from '<spec>'` where the clause
+         * captures everything except the `from` keyword. We then
+         * post-process the clause text to figure out what it is.
+         */
+        const reImport = /(?:^|[\s;])import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/gu;
+        let m: RegExpExecArray|null;
+        while ((m = reImport.exec(stripped)) !== null) {
+            const parsed = SourceGraphBuilder._parseImportClause(m[1]);
+            out.push({spec: m[2], ...parsed});
+        }
+
+        // Bare side-effect import: `import 'spec';`
+        const reBare = /(?:^|[\s;])import\s+['"]([^'"]+)['"]/gu;
+        while ((m = reBare.exec(stripped)) !== null) {
+            out.push({spec: m[1], named: [], hasDefault: false, isNamespace: false});
+        }
+
+        // Dynamic / require / re-exports: spec-only, no symbol info.
+        const reDyn = /(?:^|[\s({,=])import\s*\(\s*['"]([^'"]+)['"]\s*\)/gu;
+        while ((m = reDyn.exec(stripped)) !== null) {
+            out.push({spec: m[1], named: [], hasDefault: false, isNamespace: false});
+        }
+        const reReq = /(?:^|[\s({,=])require\s*\(\s*['"]([^'"]+)['"]\s*\)/gu;
+        while ((m = reReq.exec(stripped)) !== null) {
+            out.push({spec: m[1], named: [], hasDefault: false, isNamespace: false});
+        }
+        const reReExport = /(?:^|[\s;])export\s+(?:\*|\{[^}]*\})\s+from\s*['"]([^'"]+)['"]/gu;
+        while ((m = reReExport.exec(stripped)) !== null) {
+            out.push({spec: m[1], named: [], hasDefault: false, isNamespace: false});
+        }
+
+        const reDynVar = /(?:^|[\s({,=])(?:import|require)\s*\(\s*[A-Za-z_$]/gu;
+        let dynamicHits = 0;
+        while (reDynVar.exec(stripped) !== null) {
+            dynamicHits++;
+        }
+
+        return {imports: out, dynamicHits: dynamicHits};
+    }
+
+    /**
+     * Parse the clause portion of `import <clause> from '...'`:
+     *
+     *   "X"                  → default
+     *   "{A, B as C}"        → named [A, B]    (A and B are the *exported* names)
+     *   "* as N"             → namespace
+     *   "D, {A}"             → default + named [A]
+     *   "type X" / "type {A}"→ same shapes, leading `type` stripped
+     *
+     * For "B as C": we only keep `B` because that's what the *source
+     * module* exports under — the symbol the re-export map is keyed
+     * on. `C` is just the local alias in the importing file.
+     */
+    private static _parseImportClause(raw: string): {
+        named: string[]; hasDefault: boolean; isNamespace: boolean;
+    } {
+        let clause = raw.replace(/^type\s+/u, '').trim();
+        const named: string[] = [];
+        const namedMatch = clause.match(/\{([^}]+)\}/u);
+        if (namedMatch) {
+            for (const part of namedMatch[1].split(',')) {
+                const idMatch = part.trim().match(/^([A-Za-z_$][A-Za-z0-9_$]*)/u);
+                if (idMatch) {
+                    named.push(idMatch[1]);
+                }
+            }
+            clause = clause.replace(/\{[^}]+\}/u, '').replace(/,\s*$/u, '').replace(/^\s*,/u, '').trim();
+        }
+        let isNamespace = false;
+        let hasDefault = false;
+        if (/\*\s+as\s+[A-Za-z_$]/u.test(clause)) {
+            isNamespace = true;
+        } else if (/^[A-Za-z_$][A-Za-z0-9_$]*\s*,?\s*$/u.test(clause)) {
+            hasDefault = true;
+        }
+        return {named: named, hasDefault: hasDefault, isNamespace: isNamespace};
+    }
+
+    /**
+     * Build the re-export map for one file: every `export {X} from
+     * './sub';` adds an entry `X → './sub'`. `export * from './sub';`
+     * adds the sentinel `'*' → './sub'` so the resolver knows to
+     * recurse into wildcards. The map lets the workspace bridge
+     * route an `import {X} from '@scope/pkg'` straight to the file
+     * that actually defines `X`, not just the barrel that re-exports
+     * it.
+     */
+    private static _scanReExports(content: string): Map<string, string[]> {
+        const out = new Map<string, string[]>();
+        const add = (sym: string, spec: string): void => {
+            let arr = out.get(sym);
+            if (!arr) {
+                arr = [];
+                out.set(sym, arr);
+            }
+            if (!arr.includes(spec)) {
+                arr.push(spec);
+            }
+        };
+        const stripped = SourceGraphBuilder._stripComments(content);
+
+        // `export {A, B as C} from 'spec'` — re-exports A as A and B as C
+        const reNamed = /(?:^|[\s;])export\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/gu;
+        let m: RegExpExecArray|null;
+        while ((m = reNamed.exec(stripped)) !== null) {
+            const spec = m[2];
+            for (const part of m[1].split(',')) {
+                const t = part.trim();
+                const aliasMatch = t.match(/^([A-Za-z_$][A-Za-z0-9_$]*)\s+as\s+([A-Za-z_$][A-Za-z0-9_$]*)/u);
+                if (aliasMatch) {
+                    add(aliasMatch[2], spec);
+                    continue;
+                }
+                const idMatch = t.match(/^([A-Za-z_$][A-Za-z0-9_$]*)/u);
+                if (idMatch) {
+                    add(idMatch[1], spec);
+                }
+            }
+        }
+
+        // `export * from 'spec'` — sentinel for "anything exported by spec"
+        const reStar = /(?:^|[\s;])export\s+\*\s+from\s+['"]([^'"]+)['"]/gu;
+        while ((m = reStar.exec(stripped)) !== null) {
+            add('*', m[1]);
+        }
+
+        return out;
     }
 
     /**
@@ -372,6 +589,56 @@ export class SourceGraphBuilder {
         }
 
         return null;
+    }
+
+    /**
+     * Walk a barrel file's re-export table for the file that
+     * actually defines `symbol`. The barrel only re-routes — it
+     * doesn't store the implementation — so we keep following
+     * `export {X} from './sub'` chains until we hit a file that
+     * doesn't re-export `symbol` (= the definition lives there) or
+     * we run out of leads. `visited` carries the cycle guard.
+     */
+    private _traceSymbol(
+        fileAbs: string,
+        symbol: string,
+        reExportsByAbs: Map<string, Map<string, string[]>>,
+        visited: Set<string>
+    ): string|null {
+        if (visited.has(fileAbs)) {
+            return null;
+        }
+        visited.add(fileAbs);
+        const here = path.dirname(fileAbs);
+        const table = reExportsByAbs.get(fileAbs);
+        if (!table) {
+            return fileAbs;
+        }
+        for (const spec of table.get(symbol) ?? []) {
+            const targetAbs = SourceGraphBuilder._isRelative(spec)
+                ? this._resolve(here, spec)
+                : null;
+            if (!targetAbs) {
+                continue;
+            }
+            const deeper = this._traceSymbol(targetAbs, symbol, reExportsByAbs, visited);
+            if (deeper) {
+                return deeper;
+            }
+        }
+        for (const spec of table.get('*') ?? []) {
+            const targetAbs = SourceGraphBuilder._isRelative(spec)
+                ? this._resolve(here, spec)
+                : null;
+            if (!targetAbs) {
+                continue;
+            }
+            const deeper = this._traceSymbol(targetAbs, symbol, reExportsByAbs, visited);
+            if (deeper) {
+                return deeper;
+            }
+        }
+        return fileAbs;
     }
 
     /**

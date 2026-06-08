@@ -46,9 +46,15 @@ const HULL_PADDING = 30;
  * highest-degree nodes (the structurally most-connected files) and
  * tell the user how many we dropped.
  */
-const MAX_NODES = 350;
+const MAX_NODES = 250;
 /** Threshold above which the simulation switches to "fast cool" tuning. */
-const LARGE_GRAPH_NODES = 200;
+const LARGE_GRAPH_NODES = 150;
+/**
+ * Hard wall-clock cap on the simulation. Whatever alpha says, we
+ * stop after this many seconds so the browser can't be locked into
+ * a perpetual force run by a pathological graph.
+ */
+const MAX_SIM_MS = 6000;
 
 type SimNode = {
     file: SourceFile;
@@ -525,6 +531,85 @@ export class SourceGraphView {
     }
 
     /**
+     * Reverse-BFS over the import graph: starting from `seed`, walk
+     * every node that *imports* it (directly or transitively). The
+     * result is the seed's blast radius — every file that would be
+     * forced to change if the seed's exports break. Capped at the
+     * full node set so cycles don't loop forever (the visited set
+     * does that anyway, but defence-in-depth).
+     */
+    private static _blastRadius(seed: SimNode, sim: ActiveSim): Set<SimNode> {
+        const callers = new Map<SimNode, SimNode[]>();
+        for (const e of sim.edges) {
+            let arr = callers.get(e.to);
+            if (!arr) {
+                arr = [];
+                callers.set(e.to, arr);
+            }
+            arr.push(e.from);
+        }
+        const visited = new Set<SimNode>();
+        const queue: SimNode[] = [seed];
+        while (queue.length > 0) {
+            const cur = queue.shift()!;
+            for (const parent of callers.get(cur) ?? []) {
+                if (visited.has(parent)) {
+                    continue;
+                }
+                visited.add(parent);
+                queue.push(parent);
+            }
+        }
+        return visited;
+    }
+
+    /**
+     * Paint (or clear) the blast-radius highlight. The seed gets a
+     * thick accent ring; every reachable caller pulses faintly; all
+     * other nodes dim out so the radius stands out. Edges along the
+     * blast path light up; the rest dim. `seed === null` resets the
+     * styling.
+     */
+    private static _paintBlastRadius(sim: ActiveSim, seed: SimNode|null): void {
+        if (seed === null) {
+            for (const group of sim.nodeGroups.values()) {
+                group.classList.remove('sourcegraph-node-seed');
+                group.classList.remove('sourcegraph-node-blast');
+                group.classList.remove('sourcegraph-node-fade');
+            }
+            for (const path of sim.edgePaths.values()) {
+                path.classList.remove('sourcegraph-link-blast');
+                path.classList.remove('sourcegraph-link-fade');
+            }
+            return;
+        }
+        const blast = SourceGraphView._blastRadius(seed, sim);
+        for (const [node, group] of sim.nodeGroups) {
+            group.classList.remove('sourcegraph-node-seed');
+            group.classList.remove('sourcegraph-node-blast');
+            group.classList.remove('sourcegraph-node-fade');
+            if (node === seed) {
+                group.classList.add('sourcegraph-node-seed');
+            } else if (blast.has(node)) {
+                group.classList.add('sourcegraph-node-blast');
+            } else {
+                group.classList.add('sourcegraph-node-fade');
+            }
+        }
+        for (const [edge, path] of sim.edgePaths) {
+            path.classList.remove('sourcegraph-link-blast');
+            path.classList.remove('sourcegraph-link-fade');
+            const fromHot = edge.from === seed || blast.has(edge.from);
+            const toHot = edge.to === seed || blast.has(edge.to);
+            if (fromHot && toHot) {
+                path.classList.add('sourcegraph-link-blast');
+            } else {
+                path.classList.add('sourcegraph-link-fade');
+            }
+        }
+    }
+
+    /**
      * Render the per-node info side-panel. Lists the node's metadata
      * plus its direct neighbours (imports + importers) so the user
      * can navigate the graph as a directed call-tree. Clicking a
@@ -566,6 +651,8 @@ export class SourceGraphView {
         meta.className = 'sourcegraph-panel-meta';
         const inEdges = sim.edges.filter((e) => e.to === node);
         const outEdges = sim.edges.filter((e) => e.from === node);
+        const blast = SourceGraphView._blastRadius(node, sim);
+        SourceGraphView._paintBlastRadius(sim, node);
         meta.appendChild(SourceGraphView._metaRow(I18n.t('Lines'), String(node.file.loc)));
         meta.appendChild(SourceGraphView._metaRow(
             I18n.t('Folder'),
@@ -573,6 +660,10 @@ export class SourceGraphView {
         ));
         meta.appendChild(SourceGraphView._metaRow(I18n.t('Imports'), String(outEdges.length)));
         meta.appendChild(SourceGraphView._metaRow(I18n.t('Imported by'), String(inEdges.length)));
+        meta.appendChild(SourceGraphView._metaRow(
+            I18n.t('Blast radius'),
+            I18n.t('{n} files', {n: blast.size})
+        ));
         panel.appendChild(meta);
 
         if (this._projectRoot) {
@@ -651,6 +742,9 @@ export class SourceGraphView {
         if (this._panelEl) {
             this._panelEl.remove();
             this._panelEl = null;
+        }
+        if (this._sim) {
+            SourceGraphView._paintBlastRadius(this._sim, null);
         }
     }
 
@@ -918,6 +1012,7 @@ export class SourceGraphView {
             return;
         }
         const sim = this._sim;
+        const startedAt = performance.now();
         const step = (): void => {
             if (sim.cancelled) {
                 return;
@@ -929,9 +1024,14 @@ export class SourceGraphView {
              * cycles, so we want fewer frames. Codeflow uses the
              * same isLargeGraph trick for its D3 sim.
              */
-            const decay = sim.nodes.length > LARGE_GRAPH_NODES ? 0.97 : 0.992;
+            const decay = sim.nodes.length > LARGE_GRAPH_NODES ? 0.94 : 0.992;
             sim.alpha *= decay;
-            if (sim.alpha < 0.005) {
+            /*
+             * Two stop conditions: alpha decayed to noise floor, or
+             * we hit the wall-clock cap (defensive — keeps a
+             * pathological graph from running forever).
+             */
+            if (sim.alpha < 0.005 || performance.now() - startedAt > MAX_SIM_MS) {
                 sim.rafHandle = null;
                 return;
             }
@@ -1072,6 +1172,16 @@ export class SourceGraphView {
      * don't need to be per-frame).
      */
     private static _paint(sim: ActiveSim): void {
+        /*
+         * For large graphs, only repaint the DOM on every second
+         * tick — the sim still runs every frame (so the layout
+         * converges at the same pace) but the user can't tell the
+         * difference between 60fps and 30fps motion, and the
+         * setAttribute storm is the actual cost driver.
+         */
+        if (sim.nodes.length > LARGE_GRAPH_NODES && sim.tickCount % 2 !== 0) {
+            return;
+        }
         for (const [edge, path] of sim.edgePaths) {
             const dx = edge.to.x - edge.from.x;
             const dy = edge.to.y - edge.from.y;
@@ -1100,7 +1210,7 @@ export class SourceGraphView {
          * + DOM element churn). Throttle harder for large graphs so
          * the frame budget stays interactive.
          */
-        const hullEvery = sim.nodes.length > LARGE_GRAPH_NODES ? 10 : 4;
+        const hullEvery = sim.nodes.length > LARGE_GRAPH_NODES ? 20 : 4;
         if (sim.tickCount % hullEvery === 0) {
             SourceGraphView._repaintHulls(sim);
         }

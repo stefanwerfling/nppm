@@ -221,6 +221,69 @@ describe('SourceGraphBuilder.build', () => {
         });
     });
 
+    it('traces a named import through a barrel re-export to the defining file', async() => {
+        const builder = new SourceGraphBuilder(null, makeFs({
+            [ROOT]: '<dir>',
+            [`${ROOT}/packages`]: '<dir>',
+            [`${ROOT}/packages/api`]: '<dir>',
+            [`${ROOT}/packages/api/src`]: '<dir>',
+            [`${ROOT}/packages/api/src/main.ts`]:
+                'import {Appointment} from \'@swipe/schemas\';\nexport {Appointment};\n',
+            [`${ROOT}/packages/schemas`]: '<dir>',
+            [`${ROOT}/packages/schemas/src`]: '<dir>',
+            [`${ROOT}/packages/schemas/src/index.ts`]:
+                'export {Appointment} from \'./Models/Appointment.js\';\nexport {User} from \'./Models/User.js\';\n',
+            [`${ROOT}/packages/schemas/src/Models`]: '<dir>',
+            [`${ROOT}/packages/schemas/src/Models/Appointment.ts`]: 'export class Appointment {}\n',
+            [`${ROOT}/packages/schemas/src/Models/User.ts`]: 'export class User {}\n'
+        }));
+
+        const project = new TestLocalProject(ROOT, [
+            workspaceManifest('@swipe/api', 'packages/api'),
+            workspaceManifest('@swipe/schemas', 'packages/schemas')
+        ]);
+
+        const data = await builder.build(project);
+
+        // Edge goes to Appointment.ts, NOT to schemas/src/index.ts.
+        expect(data.edges).toContainEqual({
+            from: 'packages/api/src/main.ts',
+            to: 'packages/schemas/src/Models/Appointment.ts'
+        });
+        // The barrel itself is not the named-import target.
+        expect(data.edges).not.toContainEqual({
+            from: 'packages/api/src/main.ts',
+            to: 'packages/schemas/src/index.ts'
+        });
+    });
+
+    it('falls back to the entry file for a default import (no symbol info)', async() => {
+        const builder = new SourceGraphBuilder(null, makeFs({
+            [ROOT]: '<dir>',
+            [`${ROOT}/packages`]: '<dir>',
+            [`${ROOT}/packages/api`]: '<dir>',
+            [`${ROOT}/packages/api/main.ts`]:
+                'import App from \'@swipe/schemas\';\nexport {App};\n',
+            [`${ROOT}/packages/schemas`]: '<dir>',
+            [`${ROOT}/packages/schemas/src`]: '<dir>',
+            [`${ROOT}/packages/schemas/src/index.ts`]:
+                'export {default} from \'./Default.js\';\n',
+            [`${ROOT}/packages/schemas/src/Default.ts`]: 'export default class App {}\n'
+        }));
+
+        const project = new TestLocalProject(ROOT, [
+            workspaceManifest('@swipe/api', 'packages/api'),
+            workspaceManifest('@swipe/schemas', 'packages/schemas')
+        ]);
+
+        const data = await builder.build(project);
+
+        expect(data.edges).toContainEqual({
+            from: 'packages/api/main.ts',
+            to: 'packages/schemas/src/index.ts'
+        });
+    });
+
     it('still ignores bare specifiers that do not match a workspace', async() => {
         const builder = new SourceGraphBuilder(null, makeFs({
             [ROOT]: '<dir>',

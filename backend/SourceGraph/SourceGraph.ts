@@ -13,6 +13,36 @@ export type SourceFile = {
     id: string;
     kind: SourceFileKind;
     loc: number;
+    /** Top-level function declarations (`function X` + `const X = (…) =>`). */
+    functions: number;
+    /** Top-level `class X` / `export class X` declarations. */
+    classes: number;
+    /** Count of TODO / FIXME / XXX / HACK markers (anywhere in the file). */
+    todos: number;
+    /**
+     * Cyclomatic-complexity *proxy*: McCabe-style branch count. Each
+     * `if` / `for` / `while` / `case` / `catch` / `&&` / `||` / `?:`
+     * adds one — same recipe as eslint's `complexity` rule, just
+     * regex-cheap instead of AST-precise.
+     */
+    complexity: number;
+    /**
+     * Whether a sibling test file exists in the same project (e.g.
+     * `Foo.test.ts` next to `Foo.ts`, or `__tests__/Foo.ts`). Test
+     * files themselves report `false`.
+     */
+    hasTest: boolean;
+    /**
+     * npm package names this file imports directly (bare specifiers
+     * that don't match any workspace). Deduplicated, sorted.
+     */
+    externalDeps: string[];
+    /**
+     * Symbols this file re-exports via `export {X} from './sub'` or
+     * `export * from './sub'` (latter reported as the sentinel `*`).
+     * Deduplicated, sorted.
+     */
+    reExports: string[];
 };
 
 export type SourceFileKind = 'entry'|'source'|'test'|'config';

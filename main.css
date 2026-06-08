@@ -1855,6 +1855,44 @@ html, body {
     word-break: break-all;
 }
 
+.sourcegraph-panel-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.sourcegraph-tag {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.sourcegraph-tag-ok    { background: #4caf50; }
+.sourcegraph-tag-info  { background: #3574f0; }
+.sourcegraph-tag-warn  { background: #ff8a65; }
+.sourcegraph-tag-risk  { background: #e85a5a; }
+
+.sourcegraph-panel-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.sourcegraph-chip {
+    display: inline-block;
+    padding: 2px 6px;
+    background: var(--c-row-hover);
+    border: 1px solid var(--c-border);
+    border-radius: 3px;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 10px;
+    color: var(--c-text);
+}
+
 .pkg-table {
     width: 100%;
     border-collapse: collapse;
@@ -3872,7 +3910,7 @@ html, body {
      * centre on the cross-axis in a flex container, so we use
      * `align-self: center` explicitly. */
     align-self: center;
-    background-image: url('/Frontend/background.jpg');
+    background-image: url('/frontend/background.jpg');
     background-size: cover;
     background-position: center;
     border-radius: var(--radius-md, 8px);

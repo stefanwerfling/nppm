@@ -26,7 +26,7 @@ const TABS: readonly Tab[] = [
     {key: 'vulns', label: 'Vulns'},
     {key: 'pr', label: 'PR'},
     {key: 'template', label: 'Template'},
-    {key: 'source', label: 'Graph'}
+    {key: 'source', label: 'Code-Map'}
 ];
 
 /**

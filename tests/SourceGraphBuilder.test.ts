@@ -301,6 +301,109 @@ describe('SourceGraphBuilder.build', () => {
         expect(data.unresolved).toBe(0);
     });
 
+    it('counts functions, classes, todos and complexity per file', async() => {
+        const builder = new SourceGraphBuilder(null, makeFs({
+            [ROOT]: '<dir>',
+            [`${ROOT}/src`]: '<dir>',
+            [`${ROOT}/src/a.ts`]: [
+                '// TODO: revisit later',
+                'export class Foo {}',
+                'export class Bar {}',
+                'export function baz() {',
+                '    if (x) return 1;',
+                '    for (let i = 0; i < 10; i++) {}',
+                '    return x && y || z;',
+                '}',
+                'export const fn = () => x ? 1 : 2;'
+            ].join('\n')
+        }));
+
+        const data = await builder.build(new TestLocalProject(ROOT));
+
+        const a = data.files[0];
+        expect(a.classes).toBe(2);
+        expect(a.functions).toBeGreaterThanOrEqual(2); // baz + fn arrow
+        expect(a.todos).toBe(1);
+        // 1 base + if + for + && + || + ?: = 6
+        expect(a.complexity).toBeGreaterThanOrEqual(5);
+    });
+
+    it('flags hasTest when a sibling .test file exists', async() => {
+        const builder = new SourceGraphBuilder(null, makeFs({
+            [ROOT]: '<dir>',
+            [`${ROOT}/src`]: '<dir>',
+            [`${ROOT}/src/Foo.ts`]: 'export class Foo {}',
+            [`${ROOT}/src/Foo.test.ts`]: 'import {Foo} from \'./Foo.js\';\n',
+            [`${ROOT}/src/Bar.ts`]: 'export class Bar {}'
+        }));
+
+        const data = await builder.build(new TestLocalProject(ROOT));
+
+        const foo = data.files.find((f) => f.id === 'src/Foo.ts')!;
+        const bar = data.files.find((f) => f.id === 'src/Bar.ts')!;
+        const fooTest = data.files.find((f) => f.id === 'src/Foo.test.ts')!;
+        expect(foo.hasTest).toBe(true);
+        expect(bar.hasTest).toBe(false);
+        // Test files themselves report false.
+        expect(fooTest.hasTest).toBe(false);
+    });
+
+    it('hasTest also catches the parallel src/ ↔ test/ layout', async() => {
+        const builder = new SourceGraphBuilder(null, makeFs({
+            [ROOT]: '<dir>',
+            [`${ROOT}/backend`]: '<dir>',
+            [`${ROOT}/backend/src`]: '<dir>',
+            [`${ROOT}/backend/src/Application`]: '<dir>',
+            [`${ROOT}/backend/src/Application/OAuth`]: '<dir>',
+            [`${ROOT}/backend/src/Application/OAuth/OAuthState.ts`]: 'export class OAuthState {}',
+            [`${ROOT}/backend/test`]: '<dir>',
+            [`${ROOT}/backend/test/Application`]: '<dir>',
+            [`${ROOT}/backend/test/Application/OAuth`]: '<dir>',
+            [`${ROOT}/backend/test/Application/OAuth/OAuthState.test.ts`]: 'import {} from \'../../../src/Application/OAuth/OAuthState.js\';\n'
+        }));
+
+        const data = await builder.build(new TestLocalProject(ROOT));
+
+        const src = data.files.find((f) => f.id === 'backend/src/Application/OAuth/OAuthState.ts')!;
+        expect(src.hasTest).toBe(true);
+    });
+
+    it('records external npm packages a file imports', async() => {
+        const builder = new SourceGraphBuilder(null, makeFs({
+            [ROOT]: '<dir>',
+            [`${ROOT}/src`]: '<dir>',
+            [`${ROOT}/src/a.ts`]: [
+                'import {x} from \'lodash\';',
+                'import * as ax from \'axios\';',
+                'import {Foo} from \'@scope/pkg/sub\';',
+                'import fs from \'node:fs\';',
+                'import \'./local.js\';'
+            ].join('\n'),
+            [`${ROOT}/src/local.ts`]: 'export const x = 1;'
+        }));
+
+        const data = await builder.build(new TestLocalProject(ROOT));
+
+        const a = data.files.find((f) => f.id === 'src/a.ts')!;
+        expect(a.externalDeps).toEqual(['@scope/pkg', 'axios', 'lodash']);
+    });
+
+    it('exposes per-file re-exports', async() => {
+        const builder = new SourceGraphBuilder(null, makeFs({
+            [ROOT]: '<dir>',
+            [`${ROOT}/src`]: '<dir>',
+            [`${ROOT}/src/index.ts`]:
+                'export {Foo} from \'./Foo.js\';\nexport * from \'./Bar.js\';\n',
+            [`${ROOT}/src/Foo.ts`]: 'export class Foo {}',
+            [`${ROOT}/src/Bar.ts`]: 'export class Bar {}'
+        }));
+
+        const data = await builder.build(new TestLocalProject(ROOT));
+
+        const idx = data.files.find((f) => f.id === 'src/index.ts')!;
+        expect(idx.reExports.sort()).toEqual(['*', 'Foo']);
+    });
+
     it('skips node_modules and other build directories', async() => {
         const builder = new SourceGraphBuilder(null, makeFs({
             [ROOT]: '<dir>',

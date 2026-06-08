@@ -645,6 +645,15 @@ export class SourceGraphView {
             I18n.t('Folder'),
             node.folder === '' ? I18n.t('(root)') : node.folder
         ));
+        meta.appendChild(SourceGraphView._metaRow(
+            I18n.t('Functions / Classes'),
+            `${node.file.functions} / ${node.file.classes}`
+        ));
+        const complexityTier = SourceGraphView._complexityTier(node.file.complexity);
+        meta.appendChild(SourceGraphView._metaRow(
+            I18n.t('Complexity'),
+            `${node.file.complexity} (${I18n.t(complexityTier)})`
+        ));
         meta.appendChild(SourceGraphView._metaRow(I18n.t('Imports'), String(outEdges.length)));
         meta.appendChild(SourceGraphView._metaRow(I18n.t('Imported by'), String(inEdges.length)));
         meta.appendChild(SourceGraphView._metaRow(
@@ -652,6 +661,22 @@ export class SourceGraphView {
             I18n.t('{n} files', {n: blast.size})
         ));
         panel.appendChild(meta);
+
+        panel.appendChild(SourceGraphView._renderTagRow(node.file));
+
+        if (node.file.externalDeps.length > 0) {
+            panel.appendChild(SourceGraphView._renderChipList(
+                I18n.t('External deps ({n})', {n: node.file.externalDeps.length}),
+                node.file.externalDeps
+            ));
+        }
+
+        if (node.file.reExports.length > 0) {
+            panel.appendChild(SourceGraphView._renderChipList(
+                I18n.t('Re-exports ({n})', {n: node.file.reExports.length}),
+                node.file.reExports
+            ));
+        }
 
         if (this._projectRoot) {
             const rootNorm = this._projectRoot.endsWith('/')
@@ -733,6 +758,83 @@ export class SourceGraphView {
         if (this._sim) {
             SourceGraphView._paintBlastRadius(this._sim, null);
         }
+    }
+
+    /**
+     * Bucket the raw McCabe-style branch count into a three-tier
+     * label. Thresholds match the typical eslint/sonarqube ranges:
+     * up to 10 is fine, 11–25 wants a second look, above 25 is hot.
+     */
+    private static _complexityTier(c: number): 'low'|'medium'|'high' {
+        if (c <= 10) {
+            return 'low';
+        }
+        if (c <= 25) {
+            return 'medium';
+        }
+        return 'high';
+    }
+
+    /**
+     * Render the at-a-glance status tags row: test coverage, TODOs,
+     * high complexity. Mirrors the codeflow "quick badges" idea —
+     * the user shouldn't have to read numbers to spot trouble.
+     */
+    private static _renderTagRow(file: SourceFile): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'sourcegraph-panel-tags';
+
+        if (file.hasTest) {
+            const t = document.createElement('span');
+            t.className = 'sourcegraph-tag sourcegraph-tag-ok';
+            t.textContent = I18n.t('✓ tested');
+            wrap.appendChild(t);
+        } else {
+            const t = document.createElement('span');
+            t.className = 'sourcegraph-tag sourcegraph-tag-warn';
+            t.textContent = I18n.t('no test');
+            wrap.appendChild(t);
+        }
+
+        if (file.todos > 0) {
+            const t = document.createElement('span');
+            t.className = 'sourcegraph-tag sourcegraph-tag-info';
+            t.textContent = I18n.t('{n} TODO', {n: file.todos});
+            wrap.appendChild(t);
+        }
+
+        const tier = SourceGraphView._complexityTier(file.complexity);
+        if (tier !== 'low') {
+            const t = document.createElement('span');
+            t.className = `sourcegraph-tag sourcegraph-tag-${tier === 'high' ? 'risk' : 'warn'}`;
+            t.textContent = I18n.t('complexity: {tier}', {tier: I18n.t(tier)});
+            wrap.appendChild(t);
+        }
+        return wrap;
+    }
+
+    /**
+     * Render a small section with a header + inline chip list (one
+     * chip per item). Used for the external-dep list and the
+     * re-export list — both are short, ordered, browse-only.
+     */
+    private static _renderChipList(title: string, items: string[]): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.className = 'sourcegraph-panel-section';
+        const head = document.createElement('div');
+        head.className = 'sourcegraph-panel-section-head';
+        head.textContent = title;
+        wrap.appendChild(head);
+        const chips = document.createElement('div');
+        chips.className = 'sourcegraph-panel-chips';
+        for (const item of items) {
+            const c = document.createElement('span');
+            c.className = 'sourcegraph-chip';
+            c.textContent = item;
+            chips.appendChild(c);
+        }
+        wrap.appendChild(chips);
+        return wrap;
     }
 
     private static _metaRow(label: string, value: string): HTMLElement {

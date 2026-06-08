@@ -56,7 +56,7 @@ const RESOLVE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
  * Bump when the cached shape changes so old entries are invalidated
  * the next time the builder runs.
  */
-const CACHE_KEY_PREFIX = 'sg_v3_';
+const CACHE_KEY_PREFIX = 'sg_v4_';
 
 /**
  * Walks a local project's source files, regex-extracts every relative
@@ -210,7 +210,8 @@ export class SourceGraphBuilder {
             }
 
             const loc = SourceGraphBuilder._countLines(content);
-            files.push({id: id, kind: kind, loc: loc});
+            const metrics = SourceGraphBuilder._measureMetrics(content);
+            const externalDeps = new Set<string>();
 
             const {imports, dynamicHits} = SourceGraphBuilder._scanImportsDetailed(content);
             unresolved += dynamicHits;
@@ -227,8 +228,14 @@ export class SourceGraphBuilder {
                         /*
                          * Bare specifier that doesn't match a known
                          * workspace — external npm dep, handled by
-                         * the dep-graph view, not this one.
+                         * the dep-graph view, not this one. Record
+                         * the package name so the click-panel can
+                         * list it under the file's metadata.
                          */
+                        const pkgName = SourceGraphBuilder._bareSpecToPackage(imp.spec);
+                        if (pkgName) {
+                            externalDeps.add(pkgName);
+                        }
                         continue;
                     }
                     isWorkspaceBare = true;
@@ -270,6 +277,34 @@ export class SourceGraphBuilder {
                 }
                 addEdge(id, entryId);
             }
+
+            const reTable = reExportsByAbs.get(abs);
+            const reExports = reTable ? [...reTable.keys()].sort() : [];
+
+            files.push({
+                id: id,
+                kind: kind,
+                loc: loc,
+                functions: metrics.functions,
+                classes: metrics.classes,
+                todos: metrics.todos,
+                complexity: metrics.complexity,
+                // Filled in by the post-pass once the full id set is known.
+                hasTest: false,
+                externalDeps: [...externalDeps].sort(),
+                reExports: reExports
+            });
+        }
+
+        /*
+         * Post-pass for `hasTest`: a file qualifies as tested when a
+         * sibling test file exists in the collected set. Done now
+         * (after the main loop) because we need the complete id set
+         * to look up sibling paths cheaply.
+         */
+        const ids = new Set(files.map((f) => f.id));
+        for (const f of files) {
+            f.hasTest = SourceGraphBuilder._hasTest(f.id, ids);
         }
 
         files.sort((a, b) => a.id.localeCompare(b.id));
@@ -496,6 +531,139 @@ export class SourceGraphBuilder {
         }
 
         return out;
+    }
+
+    /**
+     * Per-file complexity / hygiene metrics. Cheap regex passes,
+     * deliberately no AST parser:
+     *  - functions: `function X(` and `const X = (…) =>` declarations
+     *  - classes:   top-level `class X` / `export class X`
+     *  - todos:     TODO / FIXME / XXX / HACK markers (raw text, so
+     *               comments aren't stripped here)
+     *  - complexity: McCabe-style branch count over `if` / `for` /
+     *               `while` / `case` / `catch` / `&&` / `||` / `?:`
+     */
+    private static _measureMetrics(content: string): {
+        functions: number; classes: number; todos: number; complexity: number;
+    } {
+        const stripped = SourceGraphBuilder._stripComments(content);
+
+        const countMatches = (re: RegExp): number => {
+            let n = 0;
+            re.lastIndex = 0;
+            while (re.exec(stripped) !== null) {
+                n++;
+            }
+            return n;
+        };
+
+        const functions =
+            countMatches(/\bfunction\s+[A-Za-z_$][A-Za-z0-9_$]*\s*\(/gu)
+            + countMatches(/(?:^|[\s;])(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*\s*(?::\s*[^=]+)?=\s*(?:async\s+)?\([^)]*\)\s*=>/gu)
+            + countMatches(/(?:^|[\s;])(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*\s*(?::\s*[^=]+)?=\s*(?:async\s+)?function\b/gu);
+
+        const classes = countMatches(/\bclass\s+[A-Za-z_$][A-Za-z0-9_$]*\b/gu);
+
+        let complexity = 1;
+        complexity += countMatches(/\bif\s*\(/gu);
+        complexity += countMatches(/\bfor\s*\(/gu);
+        complexity += countMatches(/\bwhile\s*\(/gu);
+        complexity += countMatches(/\bcase\s+/gu);
+        complexity += countMatches(/\bcatch\s*\(/gu);
+        complexity += countMatches(/&&/gu);
+        complexity += countMatches(/\|\|/gu);
+        complexity += countMatches(/\?[^?:]+:/gu);
+
+        /*
+         * TODOs scan the RAW content, not the comment-stripped one,
+         * because the whole point is to count markers that live
+         * inside comments.
+         */
+        const reTodo = /\b(?:TODO|FIXME|XXX|HACK)\b/gu;
+        let todos = 0;
+        while (reTodo.exec(content) !== null) {
+            todos++;
+        }
+
+        return {functions: functions, classes: classes, todos: todos, complexity: complexity};
+    }
+
+    /**
+     * Map a bare import specifier (`lodash`, `@scope/foo/sub`) to
+     * the npm package name: bare → `lodash`, scoped →
+     * `@scope/foo`. Returns `null` for empty / weird strings.
+     * Used to populate the per-file `externalDeps` list.
+     */
+    private static _bareSpecToPackage(spec: string): string|null {
+        if (spec.length === 0 || spec.startsWith('.') || spec.startsWith('/')) {
+            return null;
+        }
+        if (spec.startsWith('node:')) {
+            return null;
+        }
+        const parts = spec.split('/');
+        if (spec.startsWith('@')) {
+            return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : null;
+        }
+        return parts[0];
+    }
+
+    /**
+     * Heuristic test-existence check. A source file is "tested" if
+     * any of these sibling paths exist in the project:
+     *  - `<file>.test.<ext>` / `<file>.spec.<ext>` next to it
+     *  - `__tests__/<file>.<ext>` next to it
+     *  - same name under a sibling `tests/` directory
+     * Test files themselves always report `false` (they're the
+     * tests, not the units under test).
+     */
+    private static _hasTest(id: string, allIds: Set<string>): boolean {
+        if (/\.(test|spec)\.[^/]+$/u.test(id)) {
+            return false;
+        }
+        if (id.startsWith('tests/') || /(^|\/)__tests__\//u.test(id)) {
+            return false;
+        }
+        const dot = id.lastIndexOf('.');
+        if (dot < 0) {
+            return false;
+        }
+        const slash = id.lastIndexOf('/');
+        const dir = slash >= 0 ? id.slice(0, slash) : '';
+        const fileName = slash >= 0 ? id.slice(slash + 1) : id;
+        const base = fileName.slice(0, fileName.lastIndexOf('.'));
+        const ext = fileName.slice(fileName.lastIndexOf('.'));
+        const dirPrefix = dir === '' ? '' : `${dir}/`;
+
+        const candidates = [
+            `${dirPrefix}${base}.test${ext}`,
+            `${dirPrefix}${base}.spec${ext}`,
+            `${dirPrefix}__tests__/${fileName}`,
+            `${dirPrefix}__tests__/${base}.test${ext}`,
+            `${dirPrefix}tests/${fileName}`,
+            `${dirPrefix}tests/${base}.test${ext}`
+        ];
+
+        /*
+         * Parallel src/ ↔ test(s)/ layout (common in monorepos):
+         * map the first `src/` segment to `test/`, `tests/`, or
+         * `__tests__/` and append the standard suffixes.
+         */
+        const srcIdx = id.indexOf('src/');
+        if (srcIdx >= 0) {
+            const before = id.slice(0, srcIdx);
+            const after = id.slice(srcIdx + 4);
+            const afterDot = after.lastIndexOf('.');
+            const afterBase = afterDot >= 0 ? after.slice(0, afterDot) : after;
+            const afterExt = afterDot >= 0 ? after.slice(afterDot) : '';
+            for (const testRoot of ['test/', 'tests/', '__tests__/']) {
+                candidates.push(`${before}${testRoot}${after}`);
+                candidates.push(`${before}${testRoot}${afterBase}.test${afterExt}`);
+                candidates.push(`${before}${testRoot}${afterBase}.spec${afterExt}`);
+            }
+        }
+
+        return candidates.some((c) => allIds.has(c));
     }
 
     /**

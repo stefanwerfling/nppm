@@ -13,6 +13,7 @@ import {PackageDetailPanel} from './Modals/PackageDetailPanel.js';
 import {PackageList} from './Pages/PackageList.js';
 import {ProjectMatrixView} from './Pages/ProjectMatrixView.js';
 import {Resizer} from './Widgets/Resizer.js';
+import {SourceGraphView} from './Pages/SourceGraphView.js';
 import {TemplatesView} from './Pages/TemplatesView.js';
 import {TemplateView} from './Pages/TemplateView.js';
 import {Treeview} from './Widgets/Treeview.js';
@@ -43,6 +44,7 @@ enum View {
     pr = 'pr',
     templates = 'templates',
     template = 'template',
+    sourceGraph = 'sourceGraph',
     dashboard = 'dashboard',
     global = 'global'
 }
@@ -65,6 +67,7 @@ export class Nppm {
     private readonly _prReviewView: PrReviewView;
     private readonly _templatesView: TemplatesView;
     private readonly _templateView: TemplateView;
+    private readonly _sourceGraphView: SourceGraphView;
     private readonly _dashboardView: DashboardView;
     private readonly _findingsModal: FindingsModal;
     private readonly _globalScanView: GlobalScanView;
@@ -87,6 +90,7 @@ export class Nppm {
     private _prHost: HTMLElement|null = null;
     private _templatesHost: HTMLElement|null = null;
     private _templateHost: HTMLElement|null = null;
+    private _sourceGraphHost: HTMLElement|null = null;
     private _dashboardHost: HTMLElement|null = null;
     private _globalHost: HTMLElement|null = null;
     private _view: View = View.matrix;
@@ -132,6 +136,7 @@ export class Nppm {
         this._prReviewView = new PrReviewView(this._prHost!);
         this._templatesView = new TemplatesView(this._templatesHost!);
         this._templateView = new TemplateView(this._templateHost!);
+        this._sourceGraphView = new SourceGraphView(this._sourceGraphHost!);
         this._dashboardView = new DashboardView(this._dashboardHost!);
         this._findingsModal = new FindingsModal();
 
@@ -245,6 +250,12 @@ export class Nppm {
                 void this._loadProjectTemplate(p);
             }
         };
+        const wireSource = (unid: string): void => {
+            const p = findProject(unid);
+            if (p) {
+                void this._loadProjectSource(p);
+            }
+        };
 
         this._packageList.onShowInstalled(wireInstalled);
         this._packageList.onShowHistory(wireHistory);
@@ -254,6 +265,7 @@ export class Nppm {
         this._packageList.onShowVulns(wireVulns);
         this._packageList.onShowPr(wirePr);
         this._packageList.onShowTemplate(wireTemplate);
+        this._packageList.onShowSource(wireSource);
 
         this._installedView.onShowDeclared(wireDeclared);
         this._installedView.onShowHistory(wireHistory);
@@ -263,6 +275,7 @@ export class Nppm {
         this._installedView.onShowVulns(wireVulns);
         this._installedView.onShowPr(wirePr);
         this._installedView.onShowTemplate(wireTemplate);
+        this._installedView.onShowSource(wireSource);
         this._installedView.onWhy((unid, name, version) => {
             void this._whyModal.open(unid, name, version);
         });
@@ -275,6 +288,7 @@ export class Nppm {
         this._historyView.onShowVulns(wireVulns);
         this._historyView.onShowPr(wirePr);
         this._historyView.onShowTemplate(wireTemplate);
+        this._historyView.onShowSource(wireSource);
 
         this._projectMatrixView.onShowDeclared(wireDeclared);
         this._projectMatrixView.onShowInstalled(wireInstalled);
@@ -284,6 +298,7 @@ export class Nppm {
         this._projectMatrixView.onShowVulns(wireVulns);
         this._projectMatrixView.onShowPr(wirePr);
         this._projectMatrixView.onShowTemplate(wireTemplate);
+        this._projectMatrixView.onShowSource(wireSource);
         this._projectMatrixView.onCellClick((pkg, version, latest) => {
             void this._detailPanel.open(pkg, version, latest);
         });
@@ -312,6 +327,7 @@ export class Nppm {
         this._depTreeView.onShowVulns(wireVulns);
         this._depTreeView.onShowPr(wirePr);
         this._depTreeView.onShowTemplate(wireTemplate);
+        this._depTreeView.onShowSource(wireSource);
 
         this._unusedView.onShowDeclared(wireDeclared);
         this._unusedView.onShowInstalled(wireInstalled);
@@ -321,6 +337,7 @@ export class Nppm {
         this._unusedView.onShowVulns(wireVulns);
         this._unusedView.onShowPr(wirePr);
         this._unusedView.onShowTemplate(wireTemplate);
+        this._unusedView.onShowSource(wireSource);
 
         this._vulnerabilityTimelineView.onShowDeclared(wireDeclared);
         this._vulnerabilityTimelineView.onShowInstalled(wireInstalled);
@@ -330,6 +347,7 @@ export class Nppm {
         this._vulnerabilityTimelineView.onShowUnused(wireUnused);
         this._vulnerabilityTimelineView.onShowPr(wirePr);
         this._vulnerabilityTimelineView.onShowTemplate(wireTemplate);
+        this._vulnerabilityTimelineView.onShowSource(wireSource);
         this._vulnerabilityTimelineView.onExposureClick((pkg, version) => {
             void this._detailPanel.openOnSecurity(pkg, version, version);
         });
@@ -342,6 +360,7 @@ export class Nppm {
         this._templateView.onShowUnused(wireUnused);
         this._templateView.onShowVulns(wireVulns);
         this._templateView.onShowPr(wirePr);
+        this._templateView.onShowSource(wireSource);
 
         this._prReviewView.onShowDeclared(wireDeclared);
         this._prReviewView.onShowInstalled(wireInstalled);
@@ -351,9 +370,20 @@ export class Nppm {
         this._prReviewView.onShowUnused(wireUnused);
         this._prReviewView.onShowVulns(wireVulns);
         this._prReviewView.onShowTemplate(wireTemplate);
+        this._prReviewView.onShowSource(wireSource);
         this._prReviewView.onDepClick((pkg, version) => {
             void this._detailPanel.openOnSecurity(pkg, version, version);
         });
+
+        this._sourceGraphView.onShowDeclared(wireDeclared);
+        this._sourceGraphView.onShowInstalled(wireInstalled);
+        this._sourceGraphView.onShowHistory(wireHistory);
+        this._sourceGraphView.onShowMatrix(wireMatrix);
+        this._sourceGraphView.onShowTree(wireTree);
+        this._sourceGraphView.onShowUnused(wireUnused);
+        this._sourceGraphView.onShowVulns(wireVulns);
+        this._sourceGraphView.onShowPr(wirePr);
+        this._sourceGraphView.onShowTemplate(wireTemplate);
 
         this._treeview.onSelect((project) => {
             if (project.unid === '__dashboard__') {
@@ -567,6 +597,7 @@ export class Nppm {
             const response = await Api.listProjects();
             this._projects = response.projects;
             this._installedView.setEditor(response.editor);
+            this._sourceGraphView.setEditor(response.editor);
             this._treeview.render(response.projects);
 
             /*
@@ -617,6 +648,7 @@ export class Nppm {
             const response = await Api.listProjects();
             this._projects = response.projects;
             this._installedView.setEditor(response.editor);
+            this._sourceGraphView.setEditor(response.editor);
             this._treeview.render(response.projects);
             if (this._view === View.matrix) {
                 void this._loadMatrix();
@@ -718,6 +750,12 @@ export class Nppm {
         await this._templateView.show(project.unid, project.name, project.type);
     }
 
+    private async _loadProjectSource(project: ApiProject): Promise<void> {
+        this._switchTo(View.sourceGraph);
+        this._currentProjectUnid = project.unid;
+        await this._sourceGraphView.show(project.unid, project.name, project.root);
+    }
+
     /**
      * Carve the existing #list element into four stacked panes — matrix,
      * declared package list, installed (lockfile) view, and the global
@@ -771,6 +809,10 @@ export class Nppm {
         this._templateHost.className = 'pane pane-template';
         this._listRoot.appendChild(this._templateHost);
 
+        this._sourceGraphHost = document.createElement('div');
+        this._sourceGraphHost.className = 'pane pane-source-graph';
+        this._listRoot.appendChild(this._sourceGraphHost);
+
         this._dashboardHost = document.createElement('div');
         this._dashboardHost.className = 'pane pane-dashboard';
         this._listRoot.appendChild(this._dashboardHost);
@@ -787,6 +829,7 @@ export class Nppm {
             || !this._historyHost || !this._projectMatrixHost
             || !this._depTreeHost || !this._unusedHost || !this._vulnsHost
             || !this._prHost || !this._templatesHost || !this._templateHost
+            || !this._sourceGraphHost
             || !this._dashboardHost || !this._globalHost) {
             return;
         }
@@ -802,6 +845,7 @@ export class Nppm {
         this._prHost.style.display = view === View.pr ? '' : 'none';
         this._templatesHost.style.display = view === View.templates ? '' : 'none';
         this._templateHost.style.display = view === View.template ? '' : 'none';
+        this._sourceGraphHost.style.display = view === View.sourceGraph ? '' : 'none';
         this._dashboardHost.style.display = view === View.dashboard ? '' : 'none';
         this._globalHost.style.display = view === View.global ? '' : 'none';
 

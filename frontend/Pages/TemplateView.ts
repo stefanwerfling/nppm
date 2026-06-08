@@ -23,6 +23,7 @@ export class TemplateView {
     private _onShowUnused: ((unid: string) => void)|null = null;
     private _onShowVulns: ((unid: string) => void)|null = null;
     private _onShowPr: ((unid: string) => void)|null = null;
+    private _onShowSource: ((unid: string) => void)|null = null;
 
     public constructor(root: HTMLElement) {
         this._root = root;
@@ -51,6 +52,9 @@ export class TemplateView {
     }
     public onShowPr(handler: (unid: string) => void): void {
         this._onShowPr = handler;
+    }
+    public onShowSource(handler: (unid: string) => void): void {
+        this._onShowSource = handler;
     }
 
     public async show(unid: string, projectName: string, projectType: ConfigProjectType): Promise<void> {
@@ -250,6 +254,7 @@ export class TemplateView {
         toggle.appendChild(mk(I18n.t('Vulns'), wrap(this._onShowVulns)));
         toggle.appendChild(mk(I18n.t('PR'), wrap(this._onShowPr)));
         toggle.appendChild(mk(I18n.t('Template'), null, true));
+        toggle.appendChild(mk(I18n.t('Graph'), wrap(this._onShowSource)));
 
         header.appendChild(toggle);
         return header;

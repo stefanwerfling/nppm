@@ -28,6 +28,7 @@ export class ProjectMatrixView {
     private _onShowVulns: ((unid: string) => void)|null = null;
     private _onShowPr: ((unid: string) => void)|null = null;
     private _onShowTemplate: ((unid: string) => void)|null = null;
+    private _onShowSource: ((unid: string) => void)|null = null;
     private _onCellClick: ((pkg: string, version: string, latest: string|null) => void)|null = null;
     private _onUpgradeClick: ((seed: {
         workspace: string;
@@ -65,6 +66,9 @@ export class ProjectMatrixView {
 
     public onShowTemplate(h: (unid: string) => void): void {
         this._onShowTemplate = h;
+    }
+    public onShowSource(h: (unid: string) => void): void {
+        this._onShowSource = h;
     }
     public onCellClick(h: (pkg: string, version: string, latest: string|null) => void): void {
         this._onCellClick = h;
@@ -414,6 +418,16 @@ export class ProjectMatrixView {
             }
         });
         toggle.appendChild(template);
+
+        const source = document.createElement('button');
+        source.className = 'installed-toggle-btn';
+        source.textContent = I18n.t('Graph');
+        source.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowSource) {
+                this._onShowSource(this._projectUnid);
+            }
+        });
+        toggle.appendChild(source);
 
         header.appendChild(toggle);
         return header;

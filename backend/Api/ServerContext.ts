@@ -14,6 +14,8 @@ import {GitCommitsFetcher} from '../Releases/GitCommitsFetcher.js';
 import {GitHeadFetcher} from '../Releases/GitHeadFetcher.js';
 import {ReleasesFetcher} from '../Releases/ReleasesFetcher.js';
 import {IntegrityScanner} from '../Security/IntegrityScanner.js';
+import {SelfCodeScanner} from '../SelfCode/SelfCodeScanner.js';
+import {SourceGraphBuilder} from '../SourceGraph/SourceGraphBuilder.js';
 import {TemplateComplianceChecker} from '../Templates/TemplateComplianceChecker.js';
 import {TemplateLoader} from '../Templates/TemplateLoader.js';
 import {Template} from '../Templates/Template.js';
@@ -59,6 +61,8 @@ export type ServerContextOpts = {
     dashboardSnapshotPath: string;
     dashboardHistoryStore: DashboardHistoryStore;
     downloadsFetcher: NpmDownloadsFetcher;
+    sourceGraphBuilder: SourceGraphBuilder;
+    selfCodeScanner: SelfCodeScanner;
 };
 
 /**
@@ -96,6 +100,8 @@ export class ServerContext {
     public readonly dashboardSnapshotPath: string;
     public readonly dashboardHistoryStore: DashboardHistoryStore;
     public readonly downloadsFetcher: NpmDownloadsFetcher;
+    public readonly sourceGraphBuilder: SourceGraphBuilder;
+    public readonly selfCodeScanner: SelfCodeScanner;
     private _templates: Map<string, Template>;
 
     public constructor(opts: ServerContextOpts) {
@@ -120,6 +126,8 @@ export class ServerContext {
         this.dashboardSnapshotPath = opts.dashboardSnapshotPath;
         this.dashboardHistoryStore = opts.dashboardHistoryStore;
         this.downloadsFetcher = opts.downloadsFetcher;
+        this.sourceGraphBuilder = opts.sourceGraphBuilder;
+        this.selfCodeScanner = opts.selfCodeScanner;
         this._templates = opts.initialTemplates;
     }
 

@@ -32,6 +32,7 @@ export class UnusedView {
     private _onShowVulns: ((unid: string) => void)|null = null;
     private _onShowPr: ((unid: string) => void)|null = null;
     private _onShowTemplate: ((unid: string) => void)|null = null;
+    private _onShowSource: ((unid: string) => void)|null = null;
 
     public constructor(root: HTMLElement) {
         this._root = root;
@@ -67,6 +68,10 @@ export class UnusedView {
 
     public onShowTemplate(handler: (unid: string) => void): void {
         this._onShowTemplate = handler;
+    }
+
+    public onShowSource(handler: (unid: string) => void): void {
+        this._onShowSource = handler;
     }
 
     public async show(unid: string, name: string): Promise<void> {
@@ -427,6 +432,16 @@ export class UnusedView {
             }
         });
         toggle.appendChild(template);
+
+        const source = document.createElement('button');
+        source.className = 'installed-toggle-btn';
+        source.textContent = I18n.t('Graph');
+        source.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowSource) {
+                this._onShowSource(this._projectUnid);
+            }
+        });
+        toggle.appendChild(source);
 
         header.appendChild(toggle);
         return header;

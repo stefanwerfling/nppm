@@ -28,6 +28,8 @@ import {
     ApiPackageTrendsResponse,
     ApiSecurityResponse,
     ApiUnusedResponse,
+    ApiSelfCodeResponse,
+    ApiSourceGraphResponse,
     ApiUpgradePreviewResponse,
     ApiUpgradeRequest,
     ApiVulnerabilityTimelineResponse,
@@ -141,6 +143,14 @@ export class Api {
 
     public static async unused(projectUnid: string): Promise<ApiUnusedResponse> {
         return Api._json<ApiUnusedResponse>(`/api/projects/${projectUnid}/unused`);
+    }
+
+    public static async sourceGraph(projectUnid: string): Promise<ApiSourceGraphResponse> {
+        return Api._json<ApiSourceGraphResponse>(`/api/projects/${projectUnid}/source-graph`);
+    }
+
+    public static async selfCode(projectUnid: string): Promise<ApiSelfCodeResponse> {
+        return Api._json<ApiSelfCodeResponse>(`/api/projects/${projectUnid}/self-code`);
     }
 
     public static async vulnerabilityTimeline(projectUnid: string): Promise<ApiVulnerabilityTimelineResponse> {

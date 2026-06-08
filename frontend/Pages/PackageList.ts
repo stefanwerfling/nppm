@@ -20,6 +20,7 @@ export class PackageList {
     private _onShowVulns: ((unid: string) => void)|null = null;
     private _onShowPr: ((unid: string) => void)|null = null;
     private _onShowTemplate: ((unid: string) => void)|null = null;
+    private _onShowSource: ((unid: string) => void)|null = null;
 
     public constructor(root: HTMLElement) {
         this._root = root;
@@ -55,6 +56,10 @@ export class PackageList {
 
     public onShowTemplate(handler: (unid: string) => void): void {
         this._onShowTemplate = handler;
+    }
+
+    public onShowSource(handler: (unid: string) => void): void {
+        this._onShowSource = handler;
     }
 
     public clear(): void {
@@ -222,6 +227,15 @@ export class PackageList {
             }
         });
 
+        const source = document.createElement('button');
+        source.className = 'installed-toggle-btn';
+        source.textContent = I18n.t('Graph');
+        source.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowSource) {
+                this._onShowSource(this._projectUnid);
+            }
+        });
+
         toggle.appendChild(declared);
         toggle.appendChild(installed);
         toggle.appendChild(history);
@@ -231,6 +245,7 @@ export class PackageList {
         toggle.appendChild(vulns);
         toggle.appendChild(pr);
         toggle.appendChild(template);
+        toggle.appendChild(source);
         header.appendChild(toggle);
 
         return header;

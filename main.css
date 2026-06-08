@@ -1503,6 +1503,327 @@ html, body {
     stroke-width: 2;
 }
 
+.sourcegraph-host {
+    width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--c-border);
+    border-radius: 4px;
+    background: var(--c-bg);
+}
+
+.sourcegraph-svg {
+    display: block;
+    cursor: grab;
+    touch-action: none;
+}
+
+.sourcegraph-svg-dragging {
+    cursor: grabbing;
+}
+
+.sourcegraph-link {
+    stroke: var(--c-border);
+    stroke-width: 1;
+    opacity: 0.45;
+    fill: none;
+    transition: opacity 0.15s linear, stroke 0.15s linear;
+}
+
+.sourcegraph-link-active {
+    stroke: var(--c-accent);
+    stroke-width: 1.5;
+    opacity: 1;
+}
+
+.sourcegraph-link-dim {
+    opacity: 0.08;
+}
+
+.sourcegraph-node {
+    cursor: grab;
+}
+
+.sourcegraph-node circle {
+    stroke: var(--c-bg);
+    stroke-width: 1;
+    transition: stroke 0.1s linear;
+}
+
+.sourcegraph-node:hover circle {
+    stroke: var(--c-accent);
+    stroke-width: 2;
+}
+
+.sourcegraph-node-dragging {
+    cursor: grabbing;
+}
+
+.sourcegraph-node-dragging circle {
+    stroke: var(--c-accent);
+    stroke-width: 2.5;
+}
+
+/*
+ * Self-code findings: a coloured ring around any node whose source
+ * pattern-scan turned up findings. Risk gets a subtle pulse so the
+ * eye lands on it even in a 350-node graph.
+ */
+.sourcegraph-node-flagged circle {
+    stroke-width: 3 !important;
+}
+
+.sourcegraph-node-risk circle {
+    animation: sourcegraph-pulse 2s ease-in-out infinite;
+}
+
+@keyframes sourcegraph-pulse {
+    0%, 100% { stroke-opacity: 1; }
+    50% { stroke-opacity: 0.45; }
+}
+
+.sourcegraph-hulls {
+    pointer-events: none;
+}
+
+.sourcegraph-hull-label {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    pointer-events: none;
+    user-select: none;
+}
+
+.sourcegraph-panel {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 320px;
+    min-width: 240px;
+    max-width: 90%;
+    height: auto;
+    min-height: 200px;
+    max-height: calc(100% - 24px);
+    overflow: auto;
+    resize: both;
+    background: var(--c-bg);
+    border: 1px solid var(--c-border);
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+    z-index: 10;
+    padding: 10px 12px 12px;
+    font-size: 12px;
+}
+
+.sourcegraph-panel-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--c-border);
+}
+
+.sourcegraph-panel-title {
+    flex: 1 1 auto;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    word-break: break-all;
+}
+
+.sourcegraph-panel-close {
+    background: transparent;
+    border: none;
+    color: var(--c-muted);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 4px;
+}
+
+.sourcegraph-panel-close:hover {
+    color: var(--c-text);
+}
+
+.sourcegraph-panel-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+.sourcegraph-panel-meta-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.sourcegraph-panel-meta-key {
+    color: var(--c-muted);
+}
+
+.sourcegraph-panel-meta-val {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.sourcegraph-panel-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.sourcegraph-panel-ide,
+.sourcegraph-panel-copy {
+    padding: 4px 10px;
+    background: var(--c-accent);
+    color: var(--c-bg);
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 600;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.sourcegraph-panel-copy {
+    background: var(--c-row-hover);
+    color: var(--c-text);
+    border: 1px solid var(--c-border);
+}
+
+.sourcegraph-panel-copy:hover {
+    background: var(--c-border);
+}
+
+.sourcegraph-panel-section {
+    margin-top: 8px;
+}
+
+.sourcegraph-panel-section-head {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--c-muted);
+    margin-bottom: 4px;
+}
+
+.sourcegraph-panel-empty {
+    color: var(--c-muted);
+    font-style: italic;
+    padding: 2px 0;
+}
+
+.sourcegraph-panel-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.sourcegraph-panel-list-row {
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--c-text);
+    cursor: pointer;
+    padding: 3px 4px;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px;
+    border-radius: 3px;
+    word-break: break-all;
+}
+
+.sourcegraph-panel-list-row:hover {
+    background: var(--c-row-hover);
+    color: var(--c-accent);
+}
+
+.sourcegraph-panel-selfcode-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.sourcegraph-panel-score-pill {
+    display: inline-block;
+    min-width: 28px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #fff;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.sourcegraph-panel-findings {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.sourcegraph-panel-finding {
+    padding: 6px 8px;
+    background: var(--c-row-hover);
+    border-radius: 4px;
+    border-left: 3px solid var(--c-border);
+    font-size: 11px;
+}
+
+.sourcegraph-panel-finding-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 2px;
+}
+
+.sourcegraph-panel-sev {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #fff;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.sourcegraph-panel-sev-info {
+    background: #f0b400;
+}
+
+.sourcegraph-panel-sev-warn {
+    background: #ff8a65;
+}
+
+.sourcegraph-panel-sev-risk {
+    background: #e85a5a;
+}
+
+.sourcegraph-panel-finding-name {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-weight: 600;
+    flex: 1 1 auto;
+}
+
+.sourcegraph-panel-finding-line {
+    color: var(--c-muted);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.sourcegraph-panel-finding-snippet {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 10px;
+    color: var(--c-muted);
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
 .pkg-table {
     width: 100%;
     border-collapse: collapse;

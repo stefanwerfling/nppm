@@ -7,6 +7,8 @@ import {Lockfile} from '../../backend/Project/Lockfile.js';
 import {PackageDependency} from '../../backend/Project/PackageManifest.js';
 import {ReleasesResponse} from '../../backend/Releases/Releases.js';
 import {IntegrityFinding, IntegritySeverity, IntegritySummary} from '../../backend/Security/IntegrityScanner.js';
+import {SelfCodeData} from '../../backend/SelfCode/SelfCode.js';
+import {SourceGraphData} from '../../backend/SourceGraph/SourceGraph.js';
 import {DashboardCell, DashboardColumn, DashboardResponse, ScannerId} from '../../backend/Dashboard/DashboardBuilder.js';
 import {DashboardHistoryEntry} from '../../backend/Dashboard/DashboardHistoryStore.js';
 import {DashboardGrowth} from '../../backend/Dashboard/DashboardGrowthBuilder.js';
@@ -666,6 +668,22 @@ export type ApiBundlesResponse = {
  * remote (GitHub/Gitea) projects which the v1 detector doesn't scan.
  */
 export type ApiUnusedResponse = UnusedReport;
+
+/**
+ * Response shape of `GET /api/projects/:id/source-graph`. Mirrors
+ * `SourceGraphData` 1:1 — directed file-level import graph for the
+ * project's own sources. `supported: false` is the sentinel for
+ * remote projects.
+ */
+export type ApiSourceGraphResponse = SourceGraphData;
+
+/**
+ * Response shape of `GET /api/projects/:id/self-code`. Per-file
+ * pattern-scan score + raw findings so the UI can colour each
+ * source-graph node by its self-code risk and drill into the
+ * actual matched lines in the click-panel.
+ */
+export type ApiSelfCodeResponse = SelfCodeData;
 
 /**
  * Response shape of `GET /api/projects/:id/vulnerability-timeline`.

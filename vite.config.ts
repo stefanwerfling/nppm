@@ -21,6 +21,8 @@ import {ReleasesController} from './backend/Api/ReleasesController.js';
 import {SbomController} from './backend/Api/SbomController.js';
 import {SecurityController} from './backend/Api/SecurityController.js';
 import {ServerContext} from './backend/Api/ServerContext.js';
+import {SelfCodeController} from './backend/Api/SelfCodeController.js';
+import {SourceGraphController} from './backend/Api/SourceGraphController.js';
 import {TemplatesController} from './backend/Api/TemplatesController.js';
 import {UnusedController} from './backend/Api/UnusedController.js';
 import {UpgradeController} from './backend/Api/UpgradeController.js';
@@ -42,6 +44,8 @@ import {ReleasesFetcher} from './backend/Releases/ReleasesFetcher.js';
 import {IntegrityScanner} from './backend/Security/IntegrityScanner.js';
 import {PrReviewBuilder} from './backend/PrReview/PrReviewBuilder.js';
 import {ProjectGitea} from './backend/Project/ProjectGitea.js';
+import {SelfCodeScanner} from './backend/SelfCode/SelfCodeScanner.js';
+import {SourceGraphBuilder} from './backend/SourceGraph/SourceGraphBuilder.js';
 import {Template} from './backend/Templates/Template.js';
 import {TemplateComplianceChecker} from './backend/Templates/TemplateComplianceChecker.js';
 import {TemplateLoader} from './backend/Templates/TemplateLoader.js';
@@ -221,6 +225,31 @@ class Server {
                 const downloadsFetcher = new NpmDownloadsFetcher(downloadsCache);
 
                 /*
+                 * Source-graph cache pocket. Pure FS walk + regex, so
+                 * a TTL of `cacheTtlMinutes` is plenty — the
+                 * fingerprint key already includes file-count and
+                 * max(mtime), so cache hits only survive when the
+                 * project actually hasn't changed.
+                 */
+                const sourceGraphCache = new JsonCache(
+                    path.join(cacheDir, 'source-graph'),
+                    cacheTtlMinutes
+                );
+                const sourceGraphBuilder = new SourceGraphBuilder(sourceGraphCache);
+
+                /*
+                 * Self-code pattern scan over the project's own
+                 * source. Caching is keyed on (file count, max mtime)
+                 * so an edit invalidates the cache without re-scanning
+                 * untouched files.
+                 */
+                const selfCodeCache = new JsonCache(
+                    path.join(cacheDir, 'self-code'),
+                    cacheTtlMinutes
+                );
+                const selfCodeScanner = new SelfCodeScanner(selfCodeCache);
+
+                /*
                  * Templates catalogue. Lives next to nppm.json in
                  * `nppm-templates/<id>/template.json` (one folder per
                  * template). CRUD routes refresh on every read so user
@@ -272,7 +301,9 @@ class Server {
                     gitCommitsFetcher: gitCommitsFetcher,
                     dashboardSnapshotPath: dashboardSnapshotPath,
                     dashboardHistoryStore: dashboardHistoryStore,
-                    downloadsFetcher: downloadsFetcher
+                    downloadsFetcher: downloadsFetcher,
+                    sourceGraphBuilder: sourceGraphBuilder,
+                    selfCodeScanner: selfCodeScanner
                 });
                 ConfigController.register(ctx);
                 FsController.register(ctx);
@@ -294,6 +325,8 @@ class Server {
                 MatrixController.register(ctx);
                 DashboardController.register(ctx);
                 GithubController.register(ctx);
+                SourceGraphController.register(ctx);
+                SelfCodeController.register(ctx);
 
                 server.middlewares.use(app);
             }

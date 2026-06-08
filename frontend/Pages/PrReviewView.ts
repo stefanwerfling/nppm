@@ -35,6 +35,7 @@ export class PrReviewView {
     private _onShowUnused: ((unid: string) => void)|null = null;
     private _onShowVulns: ((unid: string) => void)|null = null;
     private _onShowTemplate: ((unid: string) => void)|null = null;
+    private _onShowSource: ((unid: string) => void)|null = null;
     private _onDepClick: ((name: string, version: string) => void)|null = null;
 
     public constructor(root: HTMLElement) {
@@ -49,6 +50,7 @@ export class PrReviewView {
     public onShowUnused(handler: (unid: string) => void): void { this._onShowUnused = handler; }
     public onShowVulns(handler: (unid: string) => void): void { this._onShowVulns = handler; }
     public onShowTemplate(handler: (unid: string) => void): void { this._onShowTemplate = handler; }
+    public onShowSource(handler: (unid: string) => void): void { this._onShowSource = handler; }
 
     /**
      * Click handler for a dep change row — opens the package detail
@@ -501,6 +503,16 @@ export class PrReviewView {
             }
         });
         toggle.appendChild(template);
+
+        const source = document.createElement('button');
+        source.className = 'installed-toggle-btn';
+        source.textContent = I18n.t('Graph');
+        source.addEventListener('click', () => {
+            if (this._projectUnid && this._onShowSource) {
+                this._onShowSource(this._projectUnid);
+            }
+        });
+        toggle.appendChild(source);
 
         header.appendChild(toggle);
         return header;

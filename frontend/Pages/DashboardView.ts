@@ -53,7 +53,6 @@ export class DashboardView {
     private _progressText: HTMLElement|null = null;
     private _tabBarHost: HTMLElement|null = null;
     private _tableHost: HTMLElement|null = null;
-    private _rescanBtn: HTMLButtonElement|null = null;
     private _snapshotTimestamp: string|null = null;
     private _onCellClick: DashboardCellClickHandler|null = null;
     private _onProjectClick: DashboardProjectClickHandler|null = null;
@@ -173,17 +172,17 @@ export class DashboardView {
         try {
             const res = await fetch('/api/dashboard/snapshot');
             if (!res.ok) {
-                this._startScan();
+                this.startScan();
                 return;
             }
             const payload = (await res.json()) as ApiDashboardSnapshotResponse;
             if (payload.snapshot) {
                 this._renderSnapshot(payload.snapshot, payload.timestamp);
             } else {
-                this._startScan();
+                this.startScan();
             }
         } catch {
-            this._startScan();
+            this.startScan();
         }
     }
 
@@ -244,10 +243,6 @@ export class DashboardView {
         this._snapshotTimestamp = timestamp;
         this._renderTable();
         this.emitScores();
-        if (this._rescanBtn) {
-            this._rescanBtn.disabled = false;
-            this._rescanBtn.textContent = I18n.t('Re-scan');
-        }
         if (this._progressBar) {
             this._progressBar.style.width = '100%';
         }
@@ -274,15 +269,6 @@ export class DashboardView {
         title.className = 'dash-title';
         title.textContent = I18n.t('Dashboard');
         header.appendChild(title);
-
-        const rescanBtn = document.createElement('button');
-        rescanBtn.className = 'dash-rescan';
-        rescanBtn.type = 'button';
-        rescanBtn.textContent = I18n.t('Re-scan');
-        rescanBtn.disabled = true;
-        rescanBtn.addEventListener('click', () => this._startScan());
-        this._rescanBtn = rescanBtn;
-        header.appendChild(rescanBtn);
 
         this._root.appendChild(header);
 
@@ -379,16 +365,23 @@ export class DashboardView {
         }
     }
 
-    private _startScan(): void {
+    /**
+     * Kick off a fresh `/api/dashboard/scan` SSE stream. Called from
+     * the topbar's "Scan all" button via `Nppm` (the only entry point
+     * — the in-view Re-scan button was retired in favour of a single
+     * topbar action). Idempotent for re-clicks: any prior stream is
+     * closed first and the table reset.
+     *
+     * Public so the parent can drive scans without reaching into the
+     * view's internals.
+     */
+    public startScan(): void {
+        this._scaffold();
         this.stop();
         this._columns.clear();
         this._columnOrder = [];
         this._scanners = [];
 
-        if (this._rescanBtn) {
-            this._rescanBtn.disabled = true;
-            this._rescanBtn.textContent = I18n.t('Scanning …');
-        }
         this._updateProgress(0, 1, I18n.t('Please wait — preparing scan …'));
         this._renderTable();
 
@@ -498,10 +491,6 @@ export class DashboardView {
         if (this._stream) {
             this._stream.close();
             this._stream = null;
-        }
-        if (this._rescanBtn) {
-            this._rescanBtn.disabled = false;
-            this._rescanBtn.textContent = I18n.t('Re-scan');
         }
         if (this._progressText) {
             this._progressText.textContent = message;

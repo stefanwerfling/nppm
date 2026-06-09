@@ -105,11 +105,13 @@ export class Nppm {
      */
     private _currentProjectUnid: string|null = null;
     /**
-     * Last score map emitted by the cross-project Matrix view. Stored
-     * separately from the Dashboard map so we can merge with
-     * dashboard-wins precedence in {@link _pushScoresToTreeview}.
+     * Latest Dashboard-derived per-project score map (average of all
+     * scanner cells). This is now the *only* source for the treeview
+     * health rings — the Matrix-derived fallback was retired so the
+     * left-pane number always reflects the same value the Dashboard
+     * Score-Tab shows. When the map has no entry for a project, the
+     * Treeview paints the empty hourglass state.
      */
-    private _matrixScores: Map<string, number> = new Map();
     private _dashboardScores: Map<string, number> = new Map();
 
     public constructor() {
@@ -141,27 +143,24 @@ export class Nppm {
         this._dashboardView = new DashboardView(this._dashboardHost!);
         this._findingsModal = new FindingsModal();
 
+        this._globalScanView = new GlobalScanView(this._globalHost!);
+
         /*
-         * Topbar wiring for the global scan. These elements live in
-         * index.html so non-pane components can drive them.
+         * Topbar "Scan all" — single entry point for the Dashboard
+         * sweep. Switches to the Dashboard pane, highlights its
+         * sentinel row, and kicks off `/api/dashboard/scan`. The
+         * in-Dashboard "Re-scan" button was removed so this is the
+         * only place to trigger a fresh scan.
          */
         const globalBtn = document.getElementById('global-scan-btn') as HTMLButtonElement|null;
-        const globalProgress = document.getElementById('global-scan-progress');
-        const globalProgressFill = document.getElementById('global-scan-progress-fill');
-        const globalProgressText = document.getElementById('global-scan-progress-text');
-
-        if (!globalBtn || !globalProgress || !globalProgressFill || !globalProgressText) {
-            throw new Error('nppm: global-scan DOM nodes missing in index.html');
+        if (!globalBtn) {
+            throw new Error('nppm: global-scan-btn missing in index.html');
         }
-
-        this._globalScanView = new GlobalScanView(
-            this._globalHost!,
-            globalBtn,
-            globalProgress,
-            globalProgressFill,
-            globalProgressText
-        );
-        this._globalScanView.onAnalysisStart(() => this._switchTo(View.global));
+        globalBtn.addEventListener('click', () => {
+            this._switchTo(View.dashboard);
+            this._treeview.setSelected('__dashboard__');
+            this._dashboardView.startScan();
+        });
 
         this._detailPanel = new PackageDetailPanel();
         this._upgradeModal = new UpgradeModal();
@@ -275,6 +274,8 @@ export class Nppm {
                 void this._loadMatrix();
             } else if (project.unid === '__templates__') {
                 void this._loadTemplates();
+            } else if (project.unid === '__cvescan__') {
+                this._loadGlobalScan();
             } else {
                 void this._loadProject(project);
             }
@@ -405,18 +406,13 @@ export class Nppm {
         });
 
         /*
-         * Two score sources race into the treeview rings: the
-         * cross-project Matrix (per-package severity rollup) and the
-         * Dashboard (per-scanner cell averages). Dashboard is the
-         * more comprehensive measurement, so its values win when both
-         * know a project. Matrix is the fallback for projects the
-         * Dashboard hasn't scored yet (e.g. before the first dashboard
-         * visit) so the ring isn't empty.
+         * Single score source for the treeview rings: the Dashboard.
+         * Until the Dashboard has produced a score for a project the
+         * ring stays in its hourglass-0% empty state (see
+         * `Treeview._renderScoreRing`). Matrix used to feed a fallback
+         * here but that double-source caused per-view drift — the
+         * Dashboard is the canonical measurement now.
          */
-        this._matrix.onScoresChanged((scores) => {
-            this._matrixScores = scores;
-            this._pushScoresToTreeview();
-        });
         this._dashboardView.onScoresChanged((scores) => {
             this._dashboardScores = scores;
             this._pushScoresToTreeview();
@@ -485,14 +481,6 @@ export class Nppm {
             this._treeview.setSelected(startView === 'dashboard' ? '__dashboard__' : '__matrix__');
             if (startView === 'dashboard') {
                 this._dashboardView.show();
-                /*
-                 * Pull the matrix in the background even though we're
-                 * not showing it — the treeview health-ring scores
-                 * are only emitted by `Matrix.setData()`, so without
-                 * this fetch a Dashboard-first landing would leave
-                 * the sidebar rings at "…" forever.
-                 */
-                void this._loadMatrix();
             } else {
                 await this._loadMatrix();
             }
@@ -534,18 +522,13 @@ export class Nppm {
     }
 
     /**
-     * Combine the two score sources with Dashboard-wins precedence
-     * and push the result to the treeview. Called whenever either
-     * source emits — both maps are kept around so a later Matrix
-     * update doesn't accidentally erase Dashboard data and vice
-     * versa.
+     * Push the Dashboard score map to the treeview. Called whenever
+     * the Dashboard emits a fresh batch (snapshot load, scan column
+     * complete, scan finish). Projects not in the map paint the empty
+     * hourglass state.
      */
     private _pushScoresToTreeview(): void {
-        const merged = new Map<string, number>(this._matrixScores);
-        for (const [unid, score] of this._dashboardScores) {
-            merged.set(unid, score);
-        }
-        this._treeview.setProjectScores(merged);
+        this._treeview.setProjectScores(this._dashboardScores);
     }
 
     private async _loadMatrix(): Promise<void> {
@@ -617,6 +600,11 @@ export class Nppm {
     private _loadDashboard(): void {
         this._switchTo(View.dashboard);
         this._dashboardView.show();
+    }
+
+    private _loadGlobalScan(): void {
+        this._switchTo(View.global);
+        this._globalScanView.show();
     }
 
     private async _loadProjectTemplate(project: ApiProject): Promise<void> {

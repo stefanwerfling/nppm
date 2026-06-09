@@ -144,6 +144,15 @@ export class Treeview {
         };
         matrixGroup.appendChild(this._renderItem(templatesItem, true));
 
+        const cveScanItem: ApiProject = {
+            unid: '__cvescan__',
+            name: I18n.t('CVE-Sweep'),
+            type: ConfigProjectType.local,
+            packageCount: 0,
+            workspaceCount: 0
+        };
+        matrixGroup.appendChild(this._renderItem(cveScanItem, true));
+
         this._root.appendChild(matrixGroup);
 
         if (projects.length === 0) {
@@ -335,15 +344,20 @@ export class Treeview {
         if (unid === '__templates__') {
             return '◈';
         }
+        if (unid === '__cvescan__') {
+            return '◎';
+        }
         return null;
     }
 
     /**
      * SVG progress-ring with the health percentage in the centre.
-     * `health` may be `undefined` while the matrix data is still
-     * loading — in that case the ring renders neutral grey with a
-     * dash placeholder so the layout doesn't jump when the real
-     * score arrives.
+     * `health` may be `undefined` when the Dashboard hasn't produced
+     * a score for this project yet (first launch, never scanned, or
+     * project edited so the cached snapshot was invalidated). In that
+     * case the ring renders neutral grey with an hourglass glyph
+     * inside and "0%" below — the user sees both the number Stefan
+     * asked for and the visual cue that a scan is needed.
      *
      * Tiers: ≥80 green, ≥60 amber, <60 red.
      */
@@ -383,13 +397,31 @@ export class Treeview {
             svg.appendChild(fg);
         }
 
-        const text = document.createElementNS(svgNs, 'text');
-        text.setAttribute('class', 'tree-score-text');
-        text.setAttribute('x', '18');
-        text.setAttribute('y', '22');
-        text.setAttribute('text-anchor', 'middle');
-        text.textContent = health === undefined ? '…' : String(health);
-        svg.appendChild(text);
+        if (health === undefined) {
+            const icon = document.createElementNS(svgNs, 'text');
+            icon.setAttribute('class', 'tree-score-hourglass');
+            icon.setAttribute('x', '18');
+            icon.setAttribute('y', '17');
+            icon.setAttribute('text-anchor', 'middle');
+            icon.textContent = '⌛';
+            svg.appendChild(icon);
+
+            const label = document.createElementNS(svgNs, 'text');
+            label.setAttribute('class', 'tree-score-text');
+            label.setAttribute('x', '18');
+            label.setAttribute('y', '28');
+            label.setAttribute('text-anchor', 'middle');
+            label.textContent = '0%';
+            svg.appendChild(label);
+        } else {
+            const text = document.createElementNS(svgNs, 'text');
+            text.setAttribute('class', 'tree-score-text');
+            text.setAttribute('x', '18');
+            text.setAttribute('y', '22');
+            text.setAttribute('text-anchor', 'middle');
+            text.textContent = String(health);
+            svg.appendChild(text);
+        }
 
         return svg;
     }

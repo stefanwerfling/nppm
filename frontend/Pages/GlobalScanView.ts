@@ -20,66 +20,59 @@ type GlobalRow = {
 };
 
 /**
- * Cross-project CVE scan view, mounted into the right-pane. Triggered
- * by the topbar "Alle scannen" button. Lists every unique
+ * Cross-project CVE scan view, mounted into the right-pane. Reached
+ * via the treeview's `◎ CVE-Sweep` sentinel. Lists every unique
  * `name@version` across all configured projects, with vulnerability
- * counts and the set of source projects.
+ * counts and the set of source projects — the one place where you
+ * can ask "where everywhere is lodash@4.17.21 installed?".
  *
+ * Self-contained: owns its scan button, progress bar, and table.
  * Connection model: one EventSource lives here at a time. Repeated
- * `start()` calls close the previous stream. Switching away from this
- * view does *not* close it — the scan can keep running in the
- * background and the user can come back to it.
+ * `start()` calls close the previous stream. Switching away does *not*
+ * close it — the scan can keep running in the background and the
+ * user can come back to it.
  */
 export class GlobalScanView {
 
     private readonly _root: HTMLElement;
     private _stream: EventSource|null = null;
     private _rows: Map<string, GlobalRow> = new Map();
-    private _topbarBtn: HTMLButtonElement|null = null;
-    private _topbarProgress: HTMLElement|null = null;
-    private _topbarProgressFill: HTMLElement|null = null;
-    private _topbarProgressText: HTMLElement|null = null;
+    private _scanBtn: HTMLButtonElement|null = null;
+    private _progressBar: HTMLElement|null = null;
+    private _progressFill: HTMLElement|null = null;
+    private _progressText: HTMLElement|null = null;
     private _filterIssuesOnly: boolean = false;
-    private _onAnalysisStart: (() => void)|null = null;
+    private _scaffolded: boolean = false;
 
-    public constructor(
-        root: HTMLElement,
-        topbarBtn: HTMLButtonElement,
-        topbarProgress: HTMLElement,
-        topbarProgressFill: HTMLElement,
-        topbarProgressText: HTMLElement
-    ) {
+    public constructor(root: HTMLElement) {
         this._root = root;
-        this._topbarBtn = topbarBtn;
-        this._topbarProgress = topbarProgress;
-        this._topbarProgressFill = topbarProgressFill;
-        this._topbarProgressText = topbarProgressText;
-
-        this._topbarBtn.addEventListener('click', () => {
-            this._onAnalysisStart?.();
-            this.start();
-        });
     }
 
     /**
-     * Called by Nppm when the button is clicked — gives the host a
-     * chance to switch to the global pane before results flood in.
+     * Build (idempotently) the view scaffold. Called by the parent
+     * when navigating to the CVE-Sweep sentinel — the scan itself is
+     * user-triggered via the in-view "Scan" button so opening the
+     * view doesn't burn an OSV batch every time.
      */
-    public onAnalysisStart(handler: () => void): void {
-        this._onAnalysisStart = handler;
+    public show(): void {
+        if (!this._scaffolded) {
+            this._renderInitial();
+            this._scaffolded = true;
+        }
     }
 
     public start(): void {
+        this.show();
         this._stopStream();
         this._rows = new Map();
-        this._renderInitial();
+        this._renderTable();
 
-        if (this._topbarBtn) {
-            this._topbarBtn.disabled = true;
-            this._topbarBtn.textContent = I18n.t('Scanning …');
+        if (this._scanBtn) {
+            this._scanBtn.disabled = true;
+            this._scanBtn.textContent = I18n.t('Scanning …');
         }
-        if (this._topbarProgress) {
-            this._topbarProgress.style.display = '';
+        if (this._progressBar) {
+            this._progressBar.style.display = '';
         }
         this._updateProgress(0, 0, I18n.t('Starting …'));
 
@@ -141,22 +134,22 @@ export class GlobalScanView {
     private _finishScan(message: string): void {
         this._stopStream();
 
-        if (this._topbarBtn) {
-            this._topbarBtn.disabled = false;
-            this._topbarBtn.textContent = I18n.t('Re-scan');
+        if (this._scanBtn) {
+            this._scanBtn.disabled = false;
+            this._scanBtn.textContent = I18n.t('Re-scan');
         }
-        if (this._topbarProgressText) {
-            this._topbarProgressText.textContent = message;
+        if (this._progressText) {
+            this._progressText.textContent = message;
         }
     }
 
     private _updateProgress(current: number, total: number, phase?: string): void {
-        if (!this._topbarProgressFill || !this._topbarProgressText) {
+        if (!this._progressFill || !this._progressText) {
             return;
         }
         const pct = total > 0 ? Math.min(100, (current / total) * 100) : 0;
-        this._topbarProgressFill.style.width = `${pct.toFixed(1)}%`;
-        this._topbarProgressText.textContent = total > 0
+        this._progressFill.style.width = `${pct.toFixed(1)}%`;
+        this._progressText.textContent = total > 0
             ? `${phase ?? ''} ${current}/${total}`.trim()
             : phase ?? '';
     }
@@ -190,7 +183,29 @@ export class GlobalScanView {
         filterWrap.appendChild(text);
         header.appendChild(filterWrap);
 
+        const scanBtn = document.createElement('button');
+        scanBtn.type = 'button';
+        scanBtn.className = 'global-scan-btn';
+        scanBtn.textContent = I18n.t('Scan all');
+        scanBtn.addEventListener('click', () => this.start());
+        this._scanBtn = scanBtn;
+        header.appendChild(scanBtn);
+
         this._root.appendChild(header);
+
+        const progressBar = document.createElement('div');
+        progressBar.className = 'global-progress';
+        progressBar.style.display = 'none';
+        const progressFill = document.createElement('div');
+        progressFill.className = 'global-progress-fill';
+        const progressText = document.createElement('div');
+        progressText.className = 'global-progress-text';
+        progressBar.appendChild(progressFill);
+        progressBar.appendChild(progressText);
+        this._progressBar = progressBar;
+        this._progressFill = progressFill;
+        this._progressText = progressText;
+        this._root.appendChild(progressBar);
 
         const tableHost = document.createElement('div');
         tableHost.className = 'global-table-host';

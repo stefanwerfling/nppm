@@ -29,6 +29,7 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'Generated from node_modules (no dev/peer flags)': 'Aus node_modules synthetisiert (ohne dev/peer-Flags)',
     'Git package: OSV.dev only indexes registry-installed versions. Script + code-pattern heuristics still ran.': 'Git-Paket: OSV.dev indiziert nur registry-installierte Versionen. Skript- und Code-Pattern-Heuristiken laufen trotzdem.',
     'Global CVE scan': 'Globaler CVE-Scan',
+    'CVE-Sweep': 'CVE-Sweep',
     'History': 'History',
     'Dashboard': 'Dashboard',
     'Scanner': 'Scanner',

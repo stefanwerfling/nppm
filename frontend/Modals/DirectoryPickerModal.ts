@@ -16,6 +16,15 @@ import {I18n} from '../Util/I18n.js';
  */
 export class DirectoryPickerModal {
 
+    /**
+     * Last directory successfully loaded by *any* picker instance in
+     * this browser tab. When the next picker opens without an explicit
+     * `seedPath()`, we resume here instead of jumping the user back to
+     * the OS default — saves clicking through the same parent chain on
+     * every Browse-button press. Cleared on full reload.
+     */
+    private static _lastVisitedPath: string|null = null;
+
     private _backdrop: HTMLElement|null = null;
     private _panel: HTMLElement|null = null;
     private _currentPath: string|null = null;
@@ -35,7 +44,7 @@ export class DirectoryPickerModal {
 
     public open(): void {
         this._mount();
-        void this._load(this._initial);
+        void this._load(this._initial ?? DirectoryPickerModal._lastVisitedPath ?? undefined);
     }
 
     public close(): void {
@@ -102,6 +111,7 @@ export class DirectoryPickerModal {
             this._currentPath = data.path;
             this._parent = data.parent;
             this._entries = data.entries;
+            DirectoryPickerModal._lastVisitedPath = data.path;
         } catch (e) {
             this._renderError((e as Error).message);
             return;

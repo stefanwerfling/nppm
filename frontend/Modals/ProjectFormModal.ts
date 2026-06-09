@@ -366,7 +366,7 @@ export class ProjectFormModal {
         const {project, extras} = this._mode;
         return {
             type: project.type,
-            name: extras.name ?? project.name,
+            name: extras.name,
             path: extras.path,
             repo: extras.repo,
             url: extras.url,

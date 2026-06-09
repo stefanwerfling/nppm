@@ -138,4 +138,42 @@ describe('DashboardHistoryStore', () => {
         expect(range.length).toBe(1);
         expect(range[0].overall).toBe(80);
     });
+
+    it('dropProject strips a unid from every daily file', () => {
+        const store = new DashboardHistoryStore(dir);
+        store.recordScan(mkDashboard([
+            {unid: 'a', name: 'projA', cells: {cve: 80}},
+            {unid: 'b', name: 'projB', cells: {cve: 60}}
+        ]), '2026-06-01T10:00:00Z');
+        store.recordScan(mkDashboard([
+            {unid: 'a', name: 'projA', cells: {cve: 70}},
+            {unid: 'b', name: 'projB', cells: {cve: 50}}
+        ]), '2026-06-02T10:00:00Z');
+
+        store.dropProject('a');
+
+        const day1 = JSON.parse(fs.readFileSync(path.join(dir, '2026-06-01.json'), 'utf-8'));
+        const day2 = JSON.parse(fs.readFileSync(path.join(dir, '2026-06-02.json'), 'utf-8'));
+        expect(day1.perProject.map((p: {unid: string;}) => p.unid)).toEqual(['b']);
+        expect(day2.perProject.map((p: {unid: string;}) => p.unid)).toEqual(['b']);
+        // Ecosystem-wide fields stay frozen — the snapshot was true at the time.
+        expect(day1.overall).toBe(70);
+        expect(day2.overall).toBe(60);
+    });
+
+    it('dropProject is a no-op when the dir is empty', () => {
+        const store = new DashboardHistoryStore(dir);
+        expect(() => store.dropProject('anything')).not.toThrow();
+    });
+
+    it('dropProject leaves files untouched when the unid is absent', () => {
+        const store = new DashboardHistoryStore(dir);
+        store.recordScan(mkDashboard([
+            {unid: 'a', name: 'projA', cells: {cve: 80}}
+        ]), '2026-06-01T10:00:00Z');
+        const before = fs.readFileSync(path.join(dir, '2026-06-01.json'), 'utf-8');
+        store.dropProject('z');
+        const after = fs.readFileSync(path.join(dir, '2026-06-01.json'), 'utf-8');
+        expect(after).toBe(before);
+    });
 });

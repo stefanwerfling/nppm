@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import {SchemaErrors} from 'vts';
 import {
+    ApiDashboardSnapshotResponse,
     ApiProject,
     ApiProjectConfigResponse,
     ApiProjectMutationRequest,
@@ -142,6 +143,9 @@ export class ProjectsController {
                 const project = ProjectsController._instantiateProject(
                     body, ctx.projectRoot, ctx.loaded.remoteCache, idx
                 );
+                if (existing.getKey() !== project.getKey()) {
+                    ProjectsController._invalidateUnidCaches(ctx, req.params.id);
+                }
                 ctx.projects.set(req.params.id, project);
                 const response: ApiProjectMutationResponse = {
                     success: true,
@@ -186,6 +190,45 @@ export class ProjectsController {
                 res.status(500).json({success: false, msg: (e as Error).message});
             }
         });
+    }
+
+    /**
+     * Wipe the two persistent unid-keyed caches when a PUT changes
+     * the project's identity (path / repo / url / ref / type). The
+     * caches survived because they're keyed by the stable `unid`,
+     * not by `getKey()` — without this hook the user would still see
+     * the *old* project's dashboard score in the snapshot panel and
+     * its old data points in the Trend tab.
+     *
+     * Quiet on failure: a missing snapshot file is normal pre-first-
+     * scan, and we'd rather lose stale data invisibly than fail the
+     * PUT outright. Other `.nppm/cache/*` pockets are keyed by name
+     * (registry/OSV) or by `getKey()` (source-graph/self-code) so
+     * they self-invalidate the moment the new identity is queried.
+     */
+    private static _invalidateUnidCaches(ctx: ServerContext, unid: string): void {
+        try {
+            if (fs.existsSync(ctx.dashboardSnapshotPath)) {
+                const raw = fs.readFileSync(ctx.dashboardSnapshotPath, 'utf-8');
+                const payload = JSON.parse(raw) as ApiDashboardSnapshotResponse;
+                if (payload.snapshot) {
+                    const before = payload.snapshot.columns.length;
+                    payload.snapshot.columns = payload.snapshot.columns.filter(
+                        (c) => c.project.unid !== unid
+                    );
+                    if (payload.snapshot.columns.length !== before) {
+                        fs.writeFileSync(ctx.dashboardSnapshotPath, JSON.stringify(payload));
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn(`nppm: dashboard snapshot prune failed: ${(e as Error).message}`);
+        }
+        try {
+            ctx.dashboardHistoryStore.dropProject(unid);
+        } catch (e) {
+            console.warn(`nppm: dashboard history prune failed: ${(e as Error).message}`);
+        }
     }
 
     /**

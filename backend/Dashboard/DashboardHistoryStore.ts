@@ -164,6 +164,48 @@ export class DashboardHistoryStore {
     }
 
     /**
+     * Strip every persisted entry for one project unid. Called when the
+     * user repoints a project (path/repo/url changed → different
+     * `getKey()`), so the trend chart doesn't keep showing the *old*
+     * project's history under what is now a different project.
+     *
+     * Walks every daily file, filters the `perProject[]` array, and
+     * rewrites the file when something changed. Ecosystem-wide fields
+     * (`overall`, `totalSizeBytes`, `totalDownloadsLastWeek`,
+     * `perScanner`) are left untouched — they were correct snapshots
+     * of the ecosystem *at the time*, and recomputing them is
+     * impossible from the compacted data (per-scanner needs the raw
+     * cell scores per project, which we don't persist). The trade-off:
+     * the macro line keeps the historical reality, the per-project
+     * line correctly starts from zero for the new project.
+     */
+    public dropProject(unid: string): void {
+        if (!fs.existsSync(this._dir)) {
+            return;
+        }
+        for (const name of fs.readdirSync(this._dir)) {
+            if (!name.endsWith('.json')) {
+                continue;
+            }
+            const file = path.join(this._dir, name);
+            let parsed: DashboardHistoryEntry;
+            try {
+                parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as DashboardHistoryEntry;
+            } catch {
+                continue;
+            }
+            const filtered = parsed.perProject.filter((p) => p.unid !== unid);
+            if (filtered.length === parsed.perProject.length) {
+                continue;
+            }
+            parsed.perProject = filtered;
+            const tmp = `${file}.tmp`;
+            fs.writeFileSync(tmp, JSON.stringify(parsed));
+            fs.renameSync(tmp, file);
+        }
+    }
+
+    /**
      * Reduce a full dashboard response to the compact entry shape.
      * Public so tests can stay self-contained without writing to
      * disk — and so the route handler can build the in-memory entry

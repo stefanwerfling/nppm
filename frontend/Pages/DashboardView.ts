@@ -143,6 +143,36 @@ export class DashboardView {
     }
 
     /**
+     * Pull the cached snapshot once at app-start so the treeview
+     * rings reflect the last scan regardless of which view the
+     * user lands on. No DOM work — `_renderTable()` is a no-op
+     * until `_scaffold()` has run, which keeps the later `show()`
+     * path unchanged.
+     */
+    public async prefetchSnapshotScores(): Promise<void> {
+        try {
+            const res = await fetch('/api/dashboard/snapshot');
+            if (!res.ok) {
+                return;
+            }
+            const payload = (await res.json()) as ApiDashboardSnapshotResponse;
+            if (!payload.snapshot) {
+                return;
+            }
+            this._scanners = payload.snapshot.scanners;
+            this._columnOrder = payload.snapshot.columns.map((c) => c.project.unid);
+            this._columns.clear();
+            for (const col of payload.snapshot.columns) {
+                this._columns.set(col.project.unid, col);
+            }
+            this._snapshotTimestamp = payload.timestamp;
+            this.emitScores();
+        } catch {
+            // non-fatal — rings just stay in the hourglass state
+        }
+    }
+
+    /**
      * Open the view. Loads the cached snapshot (if any) for an
      * immediate first-paint and then sits idle — the user controls
      * fresh scans via the Re-scan button. On a fresh installation

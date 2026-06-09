@@ -479,6 +479,20 @@ export class Nppm {
              * half-loaded state.
              */
             this._treeview.setSelected(startView === 'dashboard' ? '__dashboard__' : '__matrix__');
+
+            /*
+             * Pull the cached dashboard snapshot up-front so the
+             * treeview rings reflect the last scan even when the
+             * user lands on Matrix and never opens Dashboard this
+             * session. Fires-and-forgets — `onScoresChanged` pushes
+             * the result to the treeview whenever it arrives. Runs
+             * for both startViews (when Dashboard is the landing
+             * view `show()` will hit `/api/dashboard/snapshot` too,
+             * but the second response just re-emits the same scores
+             * — a duplicate HTTP hit is cheaper than a missing ring).
+             */
+            void this._dashboardView.prefetchSnapshotScores();
+
             if (startView === 'dashboard') {
                 this._dashboardView.show();
             } else {

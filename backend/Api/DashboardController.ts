@@ -64,11 +64,47 @@ export class DashboardController {
                 }
                 const raw = fs.readFileSync(ctx.dashboardSnapshotPath, 'utf-8');
                 const payload = JSON.parse(raw) as ApiDashboardSnapshotResponse;
+                DashboardController._remapSnapshotUnids(ctx, payload);
                 res.status(200).json(payload);
             } catch (e) {
                 res.status(500).json({success: false, msg: (e as Error).message});
             }
         });
+    }
+
+    /**
+     * Project `unid`s are minted by `crypto.randomUUID()` on every
+     * server start (vite.config.ts), so the unids embedded in a
+     * persisted snapshot won't match the live `ctx.projects` map
+     * after a restart. Without a remap the snapshot still renders
+     * the Dashboard table (everything is self-contained inside the
+     * payload) but the treeview rings stay empty because the
+     * frontend keys them by unid.
+     *
+     * Remap strategy: build `name+type → unid` from the live
+     * projects map, walk every column, and rewrite each column's
+     * `project.unid` to the current value. Columns whose project
+     * no longer exists are dropped — a stale snapshot for a removed
+     * project shouldn't haunt the UI.
+     */
+    private static _remapSnapshotUnids(ctx: ServerContext, payload: ApiDashboardSnapshotResponse): void {
+        if (!payload.snapshot) {
+            return;
+        }
+        const liveByKey = new Map<string, string>();
+        for (const [unid, project] of ctx.projects) {
+            liveByKey.set(`${project.getType()}::${project.getName()}`, unid);
+        }
+        const kept: DashboardColumn[] = [];
+        for (const col of payload.snapshot.columns) {
+            const liveUnid = liveByKey.get(`${col.project.type}::${col.project.name}`);
+            if (!liveUnid) {
+                continue;
+            }
+            col.project.unid = liveUnid;
+            kept.push(col);
+        }
+        payload.snapshot.columns = kept;
     }
 
     private static _registerHistory(ctx: ServerContext): void {

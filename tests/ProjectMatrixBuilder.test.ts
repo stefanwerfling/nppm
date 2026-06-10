@@ -9,6 +9,7 @@ import {ProjectMatrixBuilder} from '../backend/Matrix/ProjectMatrixBuilder.js';
 import {DependencyType, PackageManifest} from '../backend/Project/PackageManifest.js';
 import {Project} from '../backend/Project/Project.js';
 import {Registry, RegistryPackage} from '../backend/Registry/Registry.js';
+import {Template} from '../backend/Templates/Template.js';
 
 function manifest(name: string, deps: Record<string, string>, workspace?: string): PackageManifest {
     return {
@@ -27,7 +28,11 @@ function manifest(name: string, deps: Record<string, string>, workspace?: string
 
 class FakeProject implements Project {
 
-    constructor(private readonly _name: string, private readonly _manifests: PackageManifest[]) {}
+    constructor(
+        private readonly _name: string,
+        private readonly _manifests: PackageManifest[],
+        private readonly _templateIds: string[] = []
+    ) {}
 
     public getName(): string {
         return this._name;
@@ -47,7 +52,7 @@ class FakeProject implements Project {
     public isHidden() { return false; }
     public setHidden(_v: boolean) { /* no-op: stub satisfies Project interface */ }
     public getConfigIndex() { return -1; }
-    public getTemplates() { return []; }
+    public getTemplates() { return this._templateIds; }
 
 }
 
@@ -171,5 +176,38 @@ describe('ProjectMatrixBuilder.build', () => {
         const row = matrix.rows.find((r) => r.name === 'figtree')!;
         expect(row.gitLatest?.version).toBe('1.0.28');
         expect(row.gitLatest?.shortSha).toBe('aaaaaaa');
+    });
+
+    it('stamps templatePin on rows the project\'s template chain pins', async() => {
+        const tpl: Template = {
+            id: 'base',
+            packages: {
+                runtime: {foo: {version: '^1.0.0'}},
+                dev: {},
+                peer: {},
+                optional: {}
+            }
+        };
+        const catalogue = new Map<string, Template>([['base', tpl]]);
+
+        const project = new FakeProject('p', [
+            manifest('root', {foo: '^1.0.0', bar: '^2.0.0'})
+        ], ['base']);
+
+        const matrix = await ProjectMatrixBuilder.build(
+            'UNID', project, new FakeRegistry({}), null,
+            {catalogue: catalogue, filesDirFor: (id) => `/tmp/${id}`}
+        );
+
+        const foo = matrix.rows.find((r) => r.name === 'foo')!;
+        const bar = matrix.rows.find((r) => r.name === 'bar')!;
+        expect(foo.templatePin).toBe('^1.0.0');
+        expect(bar.templatePin).toBeUndefined();
+    });
+
+    it('leaves templatePin absent when the templates context is omitted', async() => {
+        const project = new FakeProject('p', [manifest('root', {foo: '^1.0.0'})], ['anything']);
+        const matrix = await ProjectMatrixBuilder.build('UNID', project, new FakeRegistry({}));
+        expect(matrix.rows[0].templatePin).toBeUndefined();
     });
 });

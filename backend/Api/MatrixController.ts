@@ -67,7 +67,14 @@ export class MatrixController {
             }
             try {
                 const matrix = await ProjectMatrixBuilder.build(
-                    req.params.id, project, ctx.loaded.registry, ctx.gitHeadFetcher
+                    req.params.id,
+                    project,
+                    ctx.loaded.registry,
+                    ctx.gitHeadFetcher,
+                    {
+                        catalogue: ctx.refreshTemplates(),
+                        filesDirFor: (id): string => ctx.templateLoader.getFilesDir(id)
+                    }
                 );
                 res.status(200).json(matrix);
             } catch (e) {

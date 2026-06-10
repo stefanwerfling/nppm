@@ -5,7 +5,9 @@ import {DependencyType, PackageManifest} from '../Project/PackageManifest.js';
 import {Project} from '../Project/Project.js';
 import {Registry} from '../Registry/Registry.js';
 import {GitHeadFetcher, GitHeadInfo} from '../Releases/GitHeadFetcher.js';
-import {MatrixBuilder, MatrixGitLatest, MatrixRowStatus} from './MatrixBuilder.js';
+import {ResolvedTemplate} from '../Templates/Template.js';
+import {TemplateResolver} from '../Templates/TemplateResolver.js';
+import {MatrixBuilder, MatrixGitLatest, MatrixRowStatus, MatrixTemplatesContext} from './MatrixBuilder.js';
 
 /**
  * One column header in the per-project matrix. `label` is what gets
@@ -43,6 +45,14 @@ export type ProjectMatrixRow = {
      * registry-anchored rows.
      */
     gitLatest?: MatrixGitLatest;
+    /**
+     * Version pin from the project's resolved template chain. Single
+     * value (unlike the cross-project matrix's per-project map): the
+     * per-project view only ever runs against one template chain, so
+     * every workspace shares the same expected version. Absent when
+     * no template pins this package.
+     */
+    templatePin?: string;
 };
 
 export type ProjectMatrixResponse = {
@@ -75,9 +85,18 @@ export class ProjectMatrixBuilder {
         projectUnid: string,
         project: Project,
         registry: Registry,
-        headFetcher: GitHeadFetcher|null = null
+        headFetcher: GitHeadFetcher|null = null,
+        templates: MatrixTemplatesContext|null = null
     ): Promise<ProjectMatrixResponse> {
         const manifests = await project.loadManifests();
+
+        /*
+         * Resolve the project's template chain once and flatten its
+         * package buckets into a `name → version` map. Same pattern
+         * as `MatrixBuilder` — we silently drop unknown template ids
+         * (the Templates view surfaces those via its own banner).
+         */
+        const templatePins = ProjectMatrixBuilder._resolvePins(project, templates);
 
         // Lockfile lookup for git-pinned cells — same approach as the
         // global matrix.
@@ -194,6 +213,10 @@ export class ProjectMatrixBuilder {
                     sourceUrl: versionsForStatus[0].replace(/#.*$/, '')
                 };
             }
+            const pin = templatePins?.get(name);
+            if (pin !== undefined) {
+                row.templatePin = pin;
+            }
             rows.push(row);
         }
 
@@ -237,6 +260,48 @@ export class ProjectMatrixBuilder {
             workspaces: workspaceLabels.map((label) => ({label: label})),
             rows: rows
         };
+    }
+
+    /**
+     * Flatten the project's resolved template chain into a single
+     * `name → version` map. Walks the four buckets (runtime → dev →
+     * peer → optional, last wins) so behaviour matches what
+     * `TemplateComplianceChecker` reports as the expected version.
+     * Returns `null` when no templates context was supplied or the
+     * project lists no resolvable templates.
+     */
+    private static _resolvePins(
+        project: Project,
+        templates: MatrixTemplatesContext|null
+    ): Map<string, string>|null {
+        if (!templates) {
+            return null;
+        }
+        try {
+            const requested = project.getTemplates();
+            const known = requested.filter((id) => templates.catalogue.has(id));
+            if (known.length === 0) {
+                return null;
+            }
+            const resolver = new TemplateResolver(templates.catalogue, templates.filesDirFor);
+            const resolved = resolver.resolve(known);
+            return ProjectMatrixBuilder._flattenPins(resolved);
+        } catch {
+            return null;
+        }
+    }
+
+    private static _flattenPins(resolved: ResolvedTemplate): Map<string, string> {
+        const out = new Map<string, string>();
+        const buckets: (keyof ResolvedTemplate['packages'])[] = ['runtime', 'dev', 'peer', 'optional'];
+        for (const bucket of buckets) {
+            for (const [name, req] of Object.entries(resolved.packages[bucket])) {
+                if (req.version !== undefined) {
+                    out.set(name, req.version);
+                }
+            }
+        }
+        return out;
     }
 
 }

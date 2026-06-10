@@ -4,6 +4,7 @@ import {ProjectMatrixResponse, ProjectMatrixRow} from '../../backend/Matrix/Proj
 import {DependencyType} from '../../backend/Project/PackageManifest.js';
 import {Api} from '../Util/Api.js';
 import {I18n} from '../Util/I18n.js';
+import {Version} from '../Util/Version.js';
 import {ProjectNav} from '../Widgets/ProjectNav.js';
 
 /**
@@ -132,6 +133,9 @@ export class ProjectMatrixView {
         for (const ws of this._data!.workspaces) {
             trHead.appendChild(ProjectMatrixView._th(ws.label, 'matrix-th-project'));
         }
+        const templateTh = ProjectMatrixView._th(I18n.t('Template'), 'matrix-th-template');
+        templateTh.title = I18n.t('Version pinned by the project\'s templates (— = not pinned, varies = different per project)');
+        trHead.appendChild(templateTh);
         trHead.appendChild(ProjectMatrixView._th(I18n.t('Latest'), 'matrix-th-latest'));
         thead.appendChild(trHead);
         table.appendChild(thead);
@@ -141,7 +145,7 @@ export class ProjectMatrixView {
         if (this._data!.rows.length === 0) {
             const tr = document.createElement('tr');
             const td = document.createElement('td');
-            td.colSpan = this._data!.workspaces.length + 2;
+            td.colSpan = this._data!.workspaces.length + 3;
             td.className = 'matrix-empty';
             td.textContent = I18n.t('No dependencies found.');
             tr.appendChild(td);
@@ -209,6 +213,23 @@ export class ProjectMatrixView {
                 }
 
                 /*
+                 * Template-pin mismatch badge — appears only when the
+                 * project's templates pin a version for this package
+                 * *and* the workspace's declared range doesn't satisfy
+                 * it (overlap semantics via `Version.satisfiesRange`).
+                 */
+                if (row.templatePin && !Version.satisfiesRange(cellData.version, row.templatePin)) {
+                    const pinBadge = document.createElement('span');
+                    pinBadge.className = 'matrix-cell-pin-mismatch';
+                    pinBadge.textContent = '📌';
+                    pinBadge.title = I18n.t('Template pins {pin} — installed {installed}', {
+                        pin: row.templatePin,
+                        installed: cellData.version
+                    });
+                    td.appendChild(pinBadge);
+                }
+
+                /*
                  * Outdated cells get an Upgrade affordance. Skip git
                  * installs — the upgrader operates on registry ranges
                  * and a git URL has no `latest` to bump to. Skip
@@ -243,6 +264,8 @@ export class ProjectMatrixView {
 
             tr.appendChild(td);
         }
+
+        tr.appendChild(this._renderTemplateCell(row));
 
         const latestTd = document.createElement('td');
         latestTd.className = 'matrix-cell-latest';
@@ -283,6 +306,40 @@ export class ProjectMatrixView {
         tr.appendChild(latestTd);
 
         return tr;
+    }
+
+    /**
+     * Render the "Template" column for one row. Per-project view: the
+     * project resolves to *one* template chain, so the pin is a single
+     * version string. Cell is green when every workspace satisfies it
+     * (overlap semantics via `Version.satisfiesRange`), red when at
+     * least one diverges, muted `—` when no template pins the row.
+     */
+    private _renderTemplateCell(row: ProjectMatrixRow): HTMLElement {
+        const td = document.createElement('td');
+        td.className = 'matrix-cell-template';
+
+        const pin = row.templatePin;
+        if (!pin) {
+            td.classList.add('matrix-cell-template-none');
+            td.textContent = '—';
+            td.title = I18n.t('No template pins this package');
+            return td;
+        }
+
+        td.textContent = pin;
+
+        const anyMismatch = Object.values(row.cells).some(
+            (c) => !Version.satisfiesRange(c.version, pin)
+        );
+        td.classList.add(anyMismatch
+            ? 'matrix-cell-template-mismatch'
+            : 'matrix-cell-template-aligned');
+        td.title = anyMismatch
+            ? I18n.t('At least one project installed a version that differs from the template pin')
+            : I18n.t('All projects satisfy the template pin');
+
+        return td;
     }
 
     /**

@@ -105,11 +105,18 @@ export class MatrixController {
             const packages = (req.body as ApiMatrixSecurityRequest).packages;
             try {
                 const map = await ctx.loaded.osvClient.queryBatch(packages);
-                const results = packages.map((p) => ({
-                    name: p.name,
-                    version: p.version,
-                    vulnIds: map.get(`${p.name}@${p.version}`) ?? null
-                }));
+                const ignoredFindings = ctx.getIgnoredFindings();
+                const results = packages.map((p) => {
+                    const ids = map.get(`${p.name}@${p.version}`) ?? null;
+                    const kept = ids === null
+                        ? null
+                        : ids.filter((id) => !ignoredFindings.matches(p.name, p.version, 'cve', id));
+                    return {
+                        name: p.name,
+                        version: p.version,
+                        vulnIds: kept
+                    };
+                });
                 const response: ApiMatrixSecurityResponse = {results: results};
                 res.status(200).json(response);
             } catch (e) {
@@ -127,7 +134,9 @@ export class MatrixController {
             }
             const packages = (req.body as ApiMatrixHeuristicsRequest).packages;
             try {
-                const results = await ctx.loaded.securityScanner.scanHeuristicsBatch(packages);
+                const raw = await ctx.loaded.securityScanner.scanHeuristicsBatch(packages);
+                const ignoredFindings = ctx.getIgnoredFindings();
+                const results = raw.map((e) => ignoredFindings.applyToBatchEntry(e));
                 const response: ApiMatrixHeuristicsResponse = {results: results};
                 res.status(200).json(response);
             } catch (e) {

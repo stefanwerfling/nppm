@@ -13,6 +13,7 @@ import {Project} from '../Project/Project.js';
 import {GitCommitsFetcher} from '../Releases/GitCommitsFetcher.js';
 import {GitHeadFetcher} from '../Releases/GitHeadFetcher.js';
 import {ReleasesFetcher} from '../Releases/ReleasesFetcher.js';
+import {IgnoredFinding, IgnoredFindings} from '../Security/IgnoredFindings.js';
 import {IntegrityScanner} from '../Security/IntegrityScanner.js';
 import {SelfCodeScanner} from '../SelfCode/SelfCodeScanner.js';
 import {SourceGraphBuilder} from '../SourceGraph/SourceGraphBuilder.js';
@@ -63,6 +64,7 @@ export type ServerContextOpts = {
     downloadsFetcher: NpmDownloadsFetcher;
     sourceGraphBuilder: SourceGraphBuilder;
     selfCodeScanner: SelfCodeScanner;
+    initialIgnoredFindings: IgnoredFinding[];
 };
 
 /**
@@ -103,6 +105,7 @@ export class ServerContext {
     public readonly sourceGraphBuilder: SourceGraphBuilder;
     public readonly selfCodeScanner: SelfCodeScanner;
     private _templates: Map<string, Template>;
+    private _ignoredFindings: IgnoredFindings;
 
     public constructor(opts: ServerContextOpts) {
         this.app = opts.app;
@@ -129,6 +132,22 @@ export class ServerContext {
         this.sourceGraphBuilder = opts.sourceGraphBuilder;
         this.selfCodeScanner = opts.selfCodeScanner;
         this._templates = opts.initialTemplates;
+        this._ignoredFindings = new IgnoredFindings(opts.initialIgnoredFindings);
+    }
+
+    public getIgnoredFindings(): IgnoredFindings {
+        return this._ignoredFindings;
+    }
+
+    /**
+     * Swap the in-memory snapshot after `mutateConfig` writes a new
+     * `security.ignored` list to `nppm.json`. Cheap — only the
+     * controllers that read the list (Security / Matrix heuristics /
+     * Dashboard scan) pay attention; cached scanner results stay valid
+     * because the underlying tarball/manifest data hasn't changed.
+     */
+    public setIgnoredFindings(entries: IgnoredFinding[]): void {
+        this._ignoredFindings = IgnoredFindings.fromEntries(entries);
     }
 
     /**

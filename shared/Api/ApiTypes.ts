@@ -161,6 +161,15 @@ export type ApiConfigSettings = {
             openssf?: {enabled?: boolean;};
             depsDev?: {enabled?: boolean;};
         };
+        /**
+         * Per-(pkg, version, kind) findings the user has dismissed
+         * via the PackageDetailPanel Security tab. Read-only here —
+         * mutations go through the dedicated `POST /api/security/
+         * ignored` + `POST /api/security/ignored/remove` endpoints
+         * so the dev-server doesn't have to round-trip the full
+         * settings block to flip one entry.
+         */
+        ignored?: ApiSecurityIgnoredEntry[];
     };
 };
 
@@ -582,7 +591,48 @@ export type ApiFingerprintDiffResponse = {
  * — kept as its own type so the API surface stays explicit in
  * `ApiTypes.ts` rather than hiding inside the scanner module.
  */
-export type ApiSecurityResponse = SecurityReport;
+export type ApiSecurityResponse = SecurityReport & {
+    /**
+     * Dismissal entries that match this `(name, version)`. The
+     * SecurityReport itself stays raw — the PackageDetailPanel uses
+     * this list to render ignored cards as muted/struck-through with
+     * a "re-enable" button. Other consumers (Matrix badges, Dashboard
+     * score) receive an already-filtered batch entry from the
+     * heuristics / dashboard endpoints instead.
+     */
+    ignored: ApiSecurityIgnoredEntry[];
+};
+
+/**
+ * Wire shape of one `security.ignored` entry. 1:1 mirror of the
+ * backend `IgnoredFinding` type (kept here so the frontend doesn't
+ * need to import from `backend/Security/...`).
+ */
+export type ApiSecurityIgnoredEntry = {
+    name: string;
+    version: string;
+    kind: string;
+    identifier?: string;
+    reason?: string;
+    addedAt: number;
+};
+
+export type ApiSecurityIgnoredListResponse = {
+    entries: ApiSecurityIgnoredEntry[];
+};
+
+export type ApiSecurityIgnoredMutationRequest = {
+    name: string;
+    version: string;
+    kind: string;
+    identifier?: string;
+    reason?: string;
+};
+
+export type ApiSecurityIgnoredMutationResponse = {
+    success: true;
+    entries: ApiSecurityIgnoredEntry[];
+};
 
 /**
  * Batched lightweight vuln lookup used by the matrix badge. `vulnIds`

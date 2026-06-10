@@ -78,7 +78,8 @@ function makeEnvironment(projects: Project[], cacheDir: string): LoadedConfig {
         githubToken: undefined,
         editor: undefined,
         projects: projects,
-        externalScanner: externalScanner
+        externalScanner: externalScanner,
+        ignoredFindings: []
     };
 }
 

@@ -303,7 +303,8 @@ class Server {
                     dashboardHistoryStore: dashboardHistoryStore,
                     downloadsFetcher: downloadsFetcher,
                     sourceGraphBuilder: sourceGraphBuilder,
-                    selfCodeScanner: selfCodeScanner
+                    selfCodeScanner: selfCodeScanner,
+                    initialIgnoredFindings: loaded.ignoredFindings
                 });
                 ConfigController.register(ctx);
                 FsController.register(ctx);

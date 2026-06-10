@@ -178,11 +178,30 @@ export const SchemaConfigSecurityExternal = Vts.object({
     depsDev: Vts.optional(SchemaConfigSecurityExternalDepsDev)
 });
 
+/**
+ * One per-(package, version, kind) finding dismissal. `version === '*'`
+ * matches every version. `identifier` is the OSV vuln id when the
+ * `kind` is `cve` — for other scanners it stays absent, meaning the
+ * whole finding for that version is suppressed. The Settings → Ignored
+ * tab and the per-card Ignore button both round-trip through this
+ * shape, persisted as part of `nppm.json` so the dismissal travels
+ * with the repository.
+ */
+export const SchemaConfigSecurityIgnored = Vts.object({
+    name: Vts.string(),
+    version: Vts.string(),
+    kind: Vts.string(),
+    identifier: Vts.optional(Vts.string()),
+    reason: Vts.optional(Vts.string()),
+    addedAt: Vts.number()
+});
+
 export const SchemaConfigSecurity = Vts.object({
     maintainer: Vts.optional(SchemaConfigSecurityMaintainer),
     license: Vts.optional(SchemaConfigSecurityLicense),
     unused: Vts.optional(SchemaConfigSecurityUnused),
-    external: Vts.optional(SchemaConfigSecurityExternal)
+    external: Vts.optional(SchemaConfigSecurityExternal),
+    ignored: Vts.optional(Vts.array(SchemaConfigSecurityIgnored))
 });
 
 /**

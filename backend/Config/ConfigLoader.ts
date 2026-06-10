@@ -11,6 +11,7 @@ import {DepsDevFetcher} from '../Security/External/DepsDevFetcher.js';
 import {OpenSsfFetcher} from '../Security/External/OpenSsfFetcher.js';
 import {SocketDevFetcher} from '../Security/External/SocketDevFetcher.js';
 import {ExternalSourcesScanner} from '../Security/ExternalSourcesScanner.js';
+import {IgnoredFinding, IgnoredKind} from '../Security/IgnoredFindings.js';
 import {LicenseSeverity} from '../Security/LicenseScanner.js';
 import {NpmUserFetcher} from '../Security/NpmUserFetcher.js';
 import {OsvClient} from '../Security/OsvClient.js';
@@ -81,6 +82,14 @@ export type LoadedConfig = {
      * when empty. `undefined` means anonymous (60/h limit).
      */
     githubToken: string|undefined;
+    /**
+     * Initial value of `security.ignored` parsed from `nppm.json`.
+     * Passed through to `ServerContext` so the in-memory
+     * `IgnoredFindings` snapshot reflects the on-disk state on boot;
+     * subsequent additions/removals via the dedicated endpoints
+     * round-trip through `mutateConfig` + `setIgnoredFindings`.
+     */
+    ignoredFindings: IgnoredFinding[];
     /**
      * Projects in *config order*. The Vite plugin re-keys them by UUID
      * for its API surface; the CLI iterates the array directly. Order
@@ -153,6 +162,7 @@ export class ConfigLoader {
                     openssf?: {enabled?: boolean;};
                     depsDev?: {enabled?: boolean;};
                 };
+                ignored?: unknown;
             };
             actions?: {
                 allowInstall?: boolean;
@@ -339,6 +349,8 @@ export class ConfigLoader {
             }
         }
 
+        const ignoredFindings = ConfigLoader._coerceIgnoredFindings(cfg.security?.ignored);
+
         return {
             projectRoot: projectRoot,
             cacheDir: cacheDir,
@@ -356,9 +368,54 @@ export class ConfigLoader {
             allowInstall: allowInstall,
             editor: editor,
             githubToken: githubToken,
+            ignoredFindings: ignoredFindings,
             projects: projects,
             externalScanner: externalScanner
         };
+    }
+
+    /**
+     * Validate raw `security.ignored` entries (each one a permissive
+     * `unknown` after Vts schema validation). Drops entries whose
+     * `kind` isn't in the known taxonomy so a typo doesn't surface as
+     * an actual suppression — the Settings tab then offers the user a
+     * fresh slate without confusing ghost rows.
+     */
+    private static _coerceIgnoredFindings(raw: unknown): IgnoredFinding[] {
+        if (!Array.isArray(raw)) {
+            return [];
+        }
+        const known: ReadonlySet<IgnoredKind> = new Set<IgnoredKind>([
+            'cve', 'script', 'pattern', 'binary', 'obfuscation',
+            'maintainer', 'license', 'provenance', 'cadence', 'freshness',
+            'churn', 'typosquat', 'capability', 'deprecation',
+            'manifest-red-flag', 'ignore-scripts', 'external', 'integrity'
+        ]);
+        const out: IgnoredFinding[] = [];
+        for (const e of raw) {
+            if (typeof e !== 'object' || e === null) {
+                continue;
+            }
+            const o = e as Record<string, unknown>;
+            const kind = typeof o.kind === 'string' ? o.kind : null;
+            if (!kind || !known.has(kind as IgnoredKind)) {
+                continue;
+            }
+            const name = typeof o.name === 'string' ? o.name : null;
+            const version = typeof o.version === 'string' ? o.version : null;
+            if (!name || !version) {
+                continue;
+            }
+            out.push({
+                name: name,
+                version: version,
+                kind: kind as IgnoredKind,
+                identifier: typeof o.identifier === 'string' ? o.identifier : undefined,
+                reason: typeof o.reason === 'string' ? o.reason : undefined,
+                addedAt: typeof o.addedAt === 'number' ? o.addedAt : Date.now()
+            });
+        }
+        return out;
     }
 
 }

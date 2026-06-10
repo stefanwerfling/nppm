@@ -114,7 +114,8 @@ function makeEnvironment(opts: {
         githubToken: undefined,
         editor: undefined,
         projects: opts.projects,
-        externalScanner: externalScanner
+        externalScanner: externalScanner,
+        ignoredFindings: []
     };
 }
 

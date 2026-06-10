@@ -563,8 +563,18 @@ export class DashboardController {
             perFindings[scanner].push({label: label, severity: sev, detail: detail});
         };
 
+        const ignoredFindings = ctx.getIgnoredFindings();
+
         for (let i = 0; i < packages.length; i++) {
-            const h = heuristics[i];
+            /*
+             * Apply the per-(pkg, kind) suppression list before scoring
+             * so an ignored finding stops contributing to the column
+             * average. The raw OSV list is filtered down by `cve`
+             * identifier; the heuristic batch entry is rewritten via
+             * `applyToBatchEntry` so each kind's severity collapses to
+             * null when an entry suppresses it.
+             */
+            const h = ignoredFindings.applyToBatchEntry(heuristics[i]);
             /*
              * Label uses the human-readable semver (e.g.
              * `figtree@1.0.21`); the OSV map is keyed by the
@@ -573,7 +583,11 @@ export class DashboardController {
              */
             const label = `${packages[i].name}@${packages[i].displayVersion}`;
             const pkgKey = `${packages[i].name}@${packages[i].version}`;
-            const osvIds = osvMap.get(pkgKey) ?? null;
+            const rawOsv = osvMap.get(pkgKey) ?? null;
+            const osvIds = rawOsv === null
+                ? null
+                : rawOsv.filter((id) =>
+                    !ignoredFindings.matches(packages[i].name, packages[i].version, 'cve', id));
 
             const cve = DashboardBuilder.cveSeverity(osvIds);
             perScanner.cve.push(cve);
@@ -615,11 +629,15 @@ export class DashboardController {
             perScanner.maintainer.push(main);
             pushFinding('maintainer', label, main, h.maintainer.publisher ?? undefined);
 
-            const ch = DashboardBuilder.churnSeverity(churns[i]);
+            const churnFinding = ignoredFindings.matches(packages[i].name, packages[i].version, 'churn')
+                ? null
+                : churns[i];
+            const ch = DashboardBuilder.churnSeverity(churnFinding);
             perScanner.churn.push(ch);
-            if (ch !== null && churns[i]) {
-                const f = churns[i]!;
-                pushFinding('churn', label, ch, `${f.bumpType} bump · ${f.added + f.removed + f.modified} files`);
+            if (ch !== null && churnFinding) {
+                pushFinding('churn', label, ch,
+                    `${churnFinding.bumpType} bump · `
+                    + `${churnFinding.added + churnFinding.removed + churnFinding.modified} files`);
             }
 
             const cad = DashboardBuilder.cadenceSeverity(h.cadence);

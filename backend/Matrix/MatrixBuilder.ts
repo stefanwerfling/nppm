@@ -5,6 +5,8 @@ import {PackageManifest, DependencyType} from '../Project/PackageManifest.js';
 import {Project} from '../Project/Project.js';
 import {Registry} from '../Registry/Registry.js';
 import {GitHeadFetcher, GitHeadInfo} from '../Releases/GitHeadFetcher.js';
+import {ResolvedTemplate, Template} from '../Templates/Template.js';
+import {TemplateResolver, TemplateSourceResolver} from '../Templates/TemplateResolver.js';
 
 /**
  * Row-level status the frontend colours on.
@@ -85,6 +87,27 @@ export type MatrixRow = {
     status: MatrixRowStatus;
     /** HEAD-info for git-only rows. `undefined` on registry rows. */
     gitLatest?: MatrixGitLatest;
+    /**
+     * Per-project version pin coming from the project's resolved
+     * template chain. Only present for projects whose templates
+     * actually pin this package — projects without templates, or
+     * templates that don't mention this name, are absent from the
+     * map. Surfaces as the "Template" column in the cross-project
+     * matrix; per-cell mismatches paint a small pin badge in the
+     * project column.
+     */
+    templatePins?: Record<string, string>;
+};
+
+/**
+ * Optional templates context for `MatrixBuilder.build`. When supplied,
+ * the builder resolves each project's template chain and stamps
+ * `MatrixRow.templatePins` with the per-project pinned version of
+ * each package the templates demand.
+ */
+export type MatrixTemplatesContext = {
+    catalogue: Map<string, Template>;
+    filesDirFor: TemplateSourceResolver;
 };
 
 export type MatrixProject = {
@@ -162,11 +185,16 @@ export class MatrixBuilder {
     public static async build(
         registeredProjects: Map<string, Project>,
         registry: Registry,
-        headFetcher: GitHeadFetcher|null = null
+        headFetcher: GitHeadFetcher|null = null,
+        templates: MatrixTemplatesContext|null = null
     ): Promise<MatrixResponse> {
         const projects: MatrixProject[] = [];
         const perProjectCells = new Map<string, Map<string, MatrixCell>>();
+        const perProjectPins = new Map<string, Map<string, string>>();
         const allPackageNames = new Set<string>();
+        const resolver = templates
+            ? new TemplateResolver(templates.catalogue, templates.filesDirFor)
+            : null;
 
         for (const [unid, project] of registeredProjects.entries()) {
             /*
@@ -217,6 +245,30 @@ export class MatrixBuilder {
 
                 for (const name of cells.keys()) {
                     allPackageNames.add(name);
+                }
+
+                if (resolver && templates) {
+                    /*
+                     * Best-effort template-pin resolution. A typo in
+                     * `project.templates` (unknown id) raises inside the
+                     * resolver — we silently drop those here; the
+                     * Templates view already surfaces `unresolvedIds`
+                     * with a dedicated error banner, no need to break
+                     * the matrix endpoint over it.
+                     */
+                    try {
+                        const requested = project.getTemplates();
+                        const known = requested.filter((id) => templates.catalogue.has(id));
+                        if (known.length > 0) {
+                            const resolved = resolver.resolve(known);
+                            const pins = MatrixBuilder._flattenTemplatePins(resolved);
+                            if (pins.size > 0) {
+                                perProjectPins.set(unid, pins);
+                            }
+                        }
+                    } catch {
+                        // ignore — pin column degrades to "—" for this project
+                    }
                 }
             } catch (e) {
                 meta.error = (e as Error).message;
@@ -272,6 +324,16 @@ export class MatrixBuilder {
             if (allCellsGit) {
                 row.gitLatest = MatrixBuilder._pickRowGitOrigin(rowCells);
             }
+            const pins: Record<string, string> = {};
+            for (const [unid, pinMap] of perProjectPins.entries()) {
+                const pin = pinMap.get(pkgName);
+                if (pin !== undefined) {
+                    pins[unid] = pin;
+                }
+            }
+            if (Object.keys(pins).length > 0) {
+                row.templatePins = pins;
+            }
             rows.push(row);
         }
 
@@ -314,6 +376,28 @@ export class MatrixBuilder {
         }
 
         return {projects: projects, rows: rows};
+    }
+
+    /**
+     * Flatten the four template package buckets (runtime → dev → peer
+     * → optional) into a single `name → version` map. Later buckets
+     * win on collisions — matches `TemplateResolver._merge`'s overlay
+     * order so behaviour is consistent with what compliance reports
+     * call "the expected version". Entries without a `version` field
+     * are skipped (a template that only forbids or only mentions
+     * `required:true` has no pin to surface here).
+     */
+    private static _flattenTemplatePins(resolved: ResolvedTemplate): Map<string, string> {
+        const out = new Map<string, string>();
+        const buckets: (keyof ResolvedTemplate['packages'])[] = ['runtime', 'dev', 'peer', 'optional'];
+        for (const bucket of buckets) {
+            for (const [name, req] of Object.entries(resolved.packages[bucket])) {
+                if (req.version !== undefined) {
+                    out.set(name, req.version);
+                }
+            }
+        }
+        return out;
     }
 
     /**

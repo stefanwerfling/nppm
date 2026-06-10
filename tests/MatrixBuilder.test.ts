@@ -5,6 +5,7 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {JsonCache} from '../backend/Cache/JsonCache.js';
 import {ConfigProjectType} from '../backend/Config/Config.js';
 import {MatrixBuilder, MatrixRowStatus} from '../backend/Matrix/MatrixBuilder.js';
+import {Template} from '../backend/Templates/Template.js';
 import {DependencyType, PackageManifest} from '../backend/Project/PackageManifest.js';
 import {Project} from '../backend/Project/Project.js';
 import {Registry, RegistryPackage} from '../backend/Registry/Registry.js';
@@ -19,7 +20,8 @@ class FakeProject implements Project {
 
     constructor(
         private readonly _name: string,
-        private readonly _manifests: PackageManifest[]
+        private readonly _manifests: PackageManifest[],
+        private readonly _templateIds: string[] = []
     ) {}
 
     public getName(): string {
@@ -45,7 +47,7 @@ class FakeProject implements Project {
     public isHidden() { return this._hidden; }
     public setHidden(v: boolean) { this._hidden = v; }
     public getConfigIndex() { return -1; }
-    public getTemplates() { return []; }
+    public getTemplates() { return this._templateIds; }
 
 }
 
@@ -334,5 +336,102 @@ describe('MatrixBuilder.build', () => {
         const brokenMeta = matrix.projects.find((p) => p.unid === '1')!;
         expect(brokenMeta.error).toMatch(/boom/u);
         expect(matrix.rows.map((r) => r.name)).toEqual(['x']);
+    });
+
+    it('stamps templatePins per project when the template pins a version', async() => {
+        const tpl: Template = {
+            id: 'base',
+            packages: {
+                runtime: {foo: {version: '^1.0.0'}},
+                dev: {},
+                peer: {},
+                optional: {}
+            }
+        };
+        const catalogue = new Map<string, Template>([['base', tpl]]);
+
+        const a = new FakeProject('a', [manifest('a', {foo: '^1.0.0'})], ['base']);
+        const b = new FakeProject('b', [manifest('b', {foo: '^1.0.0'})], ['base']);
+        const projects = new Map<string, Project>([['1', a], ['2', b]]);
+
+        const matrix = await MatrixBuilder.build(
+            projects,
+            new FakeRegistry({foo: {name: 'foo', latest: '1.0.0', versions: ['1.0.0']}}),
+            null,
+            {catalogue: catalogue, filesDirFor: (id) => `/tmp/${id}`}
+        );
+
+        const row = matrix.rows.find((r) => r.name === 'foo')!;
+        expect(row.templatePins).toEqual({'1': '^1.0.0', '2': '^1.0.0'});
+    });
+
+    it('leaves templatePins absent on rows no template mentions', async() => {
+        const tpl: Template = {
+            id: 'base',
+            packages: {
+                runtime: {foo: {version: '^1.0.0'}},
+                dev: {},
+                peer: {},
+                optional: {}
+            }
+        };
+        const catalogue = new Map<string, Template>([['base', tpl]]);
+
+        const a = new FakeProject('a', [manifest('a', {foo: '^1.0.0', bar: '^2.0.0'})], ['base']);
+        const projects = new Map<string, Project>([['1', a]]);
+
+        const matrix = await MatrixBuilder.build(
+            projects,
+            new FakeRegistry({}),
+            null,
+            {catalogue: catalogue, filesDirFor: (id) => `/tmp/${id}`}
+        );
+
+        const foo = matrix.rows.find((r) => r.name === 'foo')!;
+        const bar = matrix.rows.find((r) => r.name === 'bar')!;
+        expect(foo.templatePins).toEqual({'1': '^1.0.0'});
+        expect(bar.templatePins).toBeUndefined();
+    });
+
+    it('records divergent pins when two projects use different templates', async() => {
+        const old: Template = {
+            id: 'old',
+            packages: {runtime: {foo: {version: '^1.0.0'}}, dev: {}, peer: {}, optional: {}}
+        };
+        const modern: Template = {
+            id: 'modern',
+            packages: {runtime: {foo: {version: '^2.0.0'}}, dev: {}, peer: {}, optional: {}}
+        };
+        const catalogue = new Map<string, Template>([['old', old], ['modern', modern]]);
+
+        const a = new FakeProject('a', [manifest('a', {foo: '^1.0.0'})], ['old']);
+        const b = new FakeProject('b', [manifest('b', {foo: '^1.0.0'})], ['modern']);
+        const projects = new Map<string, Project>([['1', a], ['2', b]]);
+
+        const matrix = await MatrixBuilder.build(
+            projects,
+            new FakeRegistry({}),
+            null,
+            {catalogue: catalogue, filesDirFor: (id) => `/tmp/${id}`}
+        );
+
+        const row = matrix.rows.find((r) => r.name === 'foo')!;
+        expect(row.templatePins).toEqual({'1': '^1.0.0', '2': '^2.0.0'});
+    });
+
+    it('silently drops unknown template ids without failing the row', async() => {
+        const a = new FakeProject('a', [manifest('a', {foo: '^1.0.0'})], ['ghost']);
+        const projects = new Map<string, Project>([['1', a]]);
+
+        const matrix = await MatrixBuilder.build(
+            projects,
+            new FakeRegistry({}),
+            null,
+            {catalogue: new Map(), filesDirFor: (id) => `/tmp/${id}`}
+        );
+
+        const row = matrix.rows.find((r) => r.name === 'foo')!;
+        expect(row.templatePins).toBeUndefined();
+        expect(matrix.projects[0].error).toBeUndefined();
     });
 });

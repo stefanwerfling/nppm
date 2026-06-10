@@ -1028,6 +1028,9 @@ export class Matrix {
             trHead.appendChild(th);
         }
 
+        const templateTh = Matrix._th(I18n.t('Template'), 'matrix-th-template');
+        templateTh.title = I18n.t('Version pinned by the project\'s templates (— = not pinned, varies = different per project)');
+        trHead.appendChild(templateTh);
         trHead.appendChild(Matrix._th(I18n.t('Latest'), 'matrix-th-latest'));
         thead.appendChild(trHead);
         table.appendChild(thead);
@@ -1039,7 +1042,7 @@ export class Matrix {
         if (visibleRows.length === 0) {
             const tr = document.createElement('tr');
             const td = document.createElement('td');
-            td.colSpan = this._data!.projects.length + 2;
+            td.colSpan = this._data!.projects.length + 3;
             td.className = 'matrix-empty';
             td.textContent = I18n.t('No matches for this filter.');
             tr.appendChild(td);
@@ -1542,10 +1545,35 @@ export class Matrix {
                     tag.textContent = types;
                     td.appendChild(tag);
                 }
+
+                /*
+                 * Template-pin mismatch badge — small pin glyph that
+                 * appears only when this project's templates pin a
+                 * version *and* the installed range differs from it.
+                 * Click navigates the project so the compliance view
+                 * can surface the underlying finding.
+                 */
+                const pin = row.templatePins?.[project.unid];
+                if (pin && !Matrix._versionsMatch(cellData.version, pin)) {
+                    const pinBadge = document.createElement('span');
+                    pinBadge.className = 'matrix-cell-pin-mismatch';
+                    pinBadge.textContent = '📌';
+                    pinBadge.title = I18n.t('Template pins {pin} — installed {installed}', {
+                        pin: pin,
+                        installed: cellData.version
+                    });
+                    pinBadge.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this._onProjectClick?.(project.unid);
+                    });
+                    td.appendChild(pinBadge);
+                }
             }
 
             tr.appendChild(td);
         }
+
+        tr.appendChild(this._renderTemplateCell(row));
 
         const latestTd = document.createElement('td');
         latestTd.className = 'matrix-cell-latest';
@@ -1608,6 +1636,84 @@ export class Matrix {
         tr.appendChild(latestTd);
 
         return tr;
+    }
+
+    /**
+     * Render the cross-project "Template" column for one row.
+     *  - no project pins this package → `—` (muted)
+     *  - all pinning projects agree on the same pin string (after
+     *    range-cleaning) → show that single version, coloured by
+     *    whether every project that uses the package actually
+     *    satisfies the pin
+     *  - projects pin different versions → `varies` with a tooltip
+     *    enumerating "<project>: <pin>" so the user can spot which
+     *    template is the outlier
+     */
+    private _renderTemplateCell(row: MatrixRow): HTMLElement {
+        const td = document.createElement('td');
+        td.className = 'matrix-cell-template';
+
+        const pins = row.templatePins;
+        if (!pins || Object.keys(pins).length === 0) {
+            td.classList.add('matrix-cell-template-none');
+            td.textContent = '—';
+            td.title = I18n.t('No template pins this package');
+            return td;
+        }
+
+        const cleanedPins = new Set<string>();
+        for (const v of Object.values(pins)) {
+            cleanedPins.add(Version.cleanRange(v));
+        }
+
+        if (cleanedPins.size > 1) {
+            td.classList.add('matrix-cell-template-varies');
+            td.textContent = I18n.t('varies');
+            const lines: string[] = [];
+            const projectsByUnid = new Map(this._data!.projects.map((p) => [p.unid, p.name]));
+            for (const [unid, pin] of Object.entries(pins)) {
+                lines.push(`${projectsByUnid.get(unid) ?? unid}: ${pin}`);
+            }
+            td.title = lines.join('\n');
+            return td;
+        }
+
+        const consensusPin = Object.values(pins)[0];
+        td.textContent = consensusPin;
+
+        /*
+         * Colour the cell green when every project that *uses* the
+         * package satisfies the pin, red otherwise. Projects without
+         * the package are ignored — the pin doesn't apply there.
+         */
+        let anyMismatch = false;
+        for (const [unid, cell] of Object.entries(row.cells)) {
+            const projectPin = pins[unid];
+            if (projectPin && !Matrix._versionsMatch(cell.version, projectPin)) {
+                anyMismatch = true;
+                break;
+            }
+        }
+        td.classList.add(anyMismatch
+            ? 'matrix-cell-template-mismatch'
+            : 'matrix-cell-template-aligned');
+        td.title = anyMismatch
+            ? I18n.t('At least one project installed a version that differs from the template pin')
+            : I18n.t('All projects satisfy the template pin');
+
+        return td;
+    }
+
+    /**
+     * Does the declared range (e.g. `^1.2.0` or `5.1.2`) overlap with
+     * the template pin range? Delegates to {@link Version.satisfiesRange},
+     * which probes both ranges' minima — so `^5` is reported as
+     * compatible with the exact pin `5.1.2` (because `5.1.2` falls
+     * inside `^5`), while `^4` is rejected against `^5.0.0`. Unparseable
+     * inputs (git URLs etc.) fall back to lossy `cleanRange` identity.
+     */
+    private static _versionsMatch(declared: string, pin: string): boolean {
+        return Version.satisfiesRange(declared, pin);
     }
 
     private _scoreFor(row: MatrixRow): number {

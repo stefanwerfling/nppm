@@ -79,7 +79,15 @@ export class MatrixController {
     private static _registerGlobalMatrix(ctx: ServerContext): void {
         ctx.app.get('/api/matrix', async(_req, res): Promise<void> => {
             try {
-                const matrix = await MatrixBuilder.build(ctx.projects, ctx.loaded.registry, ctx.gitHeadFetcher);
+                const matrix = await MatrixBuilder.build(
+                    ctx.projects,
+                    ctx.loaded.registry,
+                    ctx.gitHeadFetcher,
+                    {
+                        catalogue: ctx.refreshTemplates(),
+                        filesDirFor: (id): string => ctx.templateLoader.getFilesDir(id)
+                    }
+                );
                 res.status(200).json(matrix);
             } catch (e) {
                 res.status(500).json({success: false, msg: (e as Error).message});

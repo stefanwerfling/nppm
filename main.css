@@ -2246,6 +2246,47 @@ html, body {
 .matrix-cell-drift     { color: #e85a5a; }
 .matrix-cell-unknown   { color: var(--c-text); }
 
+/*
+ * "Template" column — sits between the per-project cells and "Latest".
+ * Carries the template pin string (or `varies` / `—`), coloured by
+ * whether every project that uses the package satisfies the pin.
+ */
+.matrix-cell-template {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 12px;
+    text-align: right;
+    cursor: help;
+}
+.matrix-cell-template-none {
+    color: var(--c-muted);
+    text-align: center;
+    cursor: default;
+}
+.matrix-cell-template-aligned { color: #4caf50; }
+.matrix-cell-template-mismatch { color: #e85a5a; font-weight: 600; }
+.matrix-cell-template-varies {
+    color: #e8a64a;
+    font-style: italic;
+    font-family: inherit;
+}
+.matrix-th-template { text-align: right; }
+
+/*
+ * Per-cell pin-mismatch glyph — appears in a project's matrix cell
+ * when that project's template demands a different version than the
+ * one actually declared in its manifest.
+ */
+.matrix-cell-pin-mismatch {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    filter: saturate(0.7);
+}
+.matrix-cell-pin-mismatch:hover {
+    filter: none;
+}
+
 .matrix-cell-version {
     margin-right: 6px;
 }
@@ -3012,6 +3053,88 @@ html, body {
 
 .pdp-pane {
     min-height: 80px;
+}
+
+/* Overview tab ------------------------------------------------------ */
+
+.pdp-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.pdp-overview-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pdp-overview-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--c-muted);
+}
+
+.pdp-overview-desc {
+    margin: 0;
+    line-height: 1.5;
+    color: var(--c-text);
+    white-space: pre-wrap;
+}
+
+.pdp-overview-muted {
+    color: var(--c-muted);
+    font-style: italic;
+}
+
+.pdp-overview-links {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pdp-overview-link {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+}
+
+.pdp-overview-link-label {
+    min-width: 90px;
+    color: var(--c-muted);
+    font-size: 12px;
+}
+
+.pdp-overview-link a {
+    color: var(--c-accent);
+    text-decoration: none;
+    word-break: break-all;
+}
+
+.pdp-overview-link a:hover {
+    text-decoration: underline;
+}
+
+.pdp-overview-facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 16px;
+    font-size: 12px;
+}
+
+.pdp-overview-fact {
+    display: contents;
+}
+
+.pdp-overview-fact-label {
+    color: var(--c-muted);
+}
+
+.pdp-overview-fact-value {
+    color: var(--c-text);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 .pdp-summary {

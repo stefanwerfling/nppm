@@ -28,6 +28,7 @@ import {I18n} from '../Util/I18n.js';
 import {Version} from '../Util/Version.js';
 
 enum Tab {
+    overview = 'overview',
     files = 'files',
     deps = 'deps',
     diff = 'diff',
@@ -54,7 +55,7 @@ export class PackageDetailPanel {
     private _tabBar: HTMLElement|null = null;
     private _tabPane: HTMLElement|null = null;
     private _keyHandler: ((e: KeyboardEvent) => void)|null = null;
-    private _activeTab: Tab = Tab.files;
+    private _activeTab: Tab = Tab.overview;
     private _fingerprint: PackageFingerprint|null = null;
     private _diffTarget: string|null = null;
     private _diffCache: FingerprintDiff|null = null;
@@ -78,7 +79,7 @@ export class PackageDetailPanel {
     private _trendsInflight: boolean = false;
 
     public async open(name: string, rawVersion: string, latest: string|null): Promise<void> {
-        return this._open(name, rawVersion, latest, Tab.files);
+        return this._open(name, rawVersion, latest, Tab.overview);
     }
 
     /**
@@ -227,6 +228,7 @@ export class PackageDetailPanel {
         this._body.innerHTML = '';
 
         const tabs: {value: Tab; label: string;}[] = [
+            {value: Tab.overview, label: I18n.t('Overview')},
             {value: Tab.files, label: I18n.t('Files')},
             {value: Tab.deps, label: I18n.t('Dependencies')},
             {value: Tab.diff, label: PackageDetailPanel._diffTabLabel(this._diffTarget)},
@@ -278,6 +280,9 @@ export class PackageDetailPanel {
         this._tabPane.innerHTML = '';
 
         switch (this._activeTab) {
+            case Tab.overview:
+                this._renderOverviewTab();
+                return;
             case Tab.files:
                 this._tabPane.appendChild(this._renderFilesTab(this._fingerprint));
                 return;
@@ -300,6 +305,225 @@ export class PackageDetailPanel {
                 this._renderTrendsTab();
                 
         }
+    }
+
+    /**
+     * Overview tab — the default landing surface for a package. Pulls
+     * description / license / engines / bin / files-shipped from the
+     * already-loaded fingerprint, and lazy-fetches repository +
+     * homepage URLs via the releases endpoint (cached, so this is
+     * usually a single registry hit).
+     */
+    private _renderOverviewTab(): void {
+        if (!this._tabPane || !this._fingerprint) {
+            return;
+        }
+
+        const fp = this._fingerprint;
+        const m = fp.manifest;
+
+        const wrap = document.createElement('div');
+        wrap.className = 'pdp-overview';
+
+        // Description ------------------------------------------------
+        const descSection = document.createElement('section');
+        descSection.className = 'pdp-overview-section';
+        const descLabel = document.createElement('div');
+        descLabel.className = 'pdp-overview-label';
+        descLabel.textContent = I18n.t('Description');
+        descSection.appendChild(descLabel);
+        const desc = document.createElement('p');
+        desc.className = 'pdp-overview-desc';
+        const descText = m?.description ?? this._releases?.description ?? '';
+        if (descText.trim().length > 0) {
+            desc.textContent = descText;
+        } else {
+            desc.classList.add('pdp-overview-muted');
+            desc.textContent = I18n.t('This package ships without a description.');
+        }
+        descSection.appendChild(desc);
+        wrap.appendChild(descSection);
+
+        // Links: repository + homepage --------------------------------
+        const linksSection = document.createElement('section');
+        linksSection.className = 'pdp-overview-section';
+        const linksLabel = document.createElement('div');
+        linksLabel.className = 'pdp-overview-label';
+        linksLabel.textContent = I18n.t('Links');
+        linksSection.appendChild(linksLabel);
+
+        if (this._releases) {
+            const list = document.createElement('div');
+            list.className = 'pdp-overview-links';
+            const repoUrl = PackageDetailPanel._normalizeUrl(this._releases.repository);
+            const homeUrl = PackageDetailPanel._normalizeUrl(this._releases.homepage);
+            if (repoUrl) {
+                list.appendChild(PackageDetailPanel._linkRow(I18n.t('Repository'), repoUrl));
+            }
+            if (homeUrl && homeUrl !== repoUrl) {
+                list.appendChild(PackageDetailPanel._linkRow(I18n.t('Homepage'), homeUrl));
+            }
+            if (!repoUrl && !homeUrl) {
+                const none = document.createElement('div');
+                none.className = 'pdp-overview-muted';
+                none.textContent = I18n.t('No upstream links declared.');
+                list.appendChild(none);
+            }
+            linksSection.appendChild(list);
+        } else if (this._releasesError) {
+            const err = document.createElement('div');
+            err.className = 'pdp-overview-muted';
+            err.textContent = this._releasesError;
+            linksSection.appendChild(err);
+        } else {
+            const loading = document.createElement('div');
+            loading.className = 'pdp-overview-muted';
+            loading.textContent = I18n.t('Loading upstream links …');
+            linksSection.appendChild(loading);
+            this._kickReleasesFetch();
+        }
+        wrap.appendChild(linksSection);
+
+        // Quick facts grid -------------------------------------------
+        const factsSection = document.createElement('section');
+        factsSection.className = 'pdp-overview-section';
+        const factsLabel = document.createElement('div');
+        factsLabel.className = 'pdp-overview-label';
+        factsLabel.textContent = I18n.t('Quick facts');
+        factsSection.appendChild(factsLabel);
+
+        const grid = document.createElement('div');
+        grid.className = 'pdp-overview-facts';
+
+        grid.appendChild(PackageDetailPanel._factRow(I18n.t('Version'), fp.version));
+        grid.appendChild(PackageDetailPanel._factRow(
+            I18n.t('License'),
+            m?.license ?? '—'
+        ));
+        grid.appendChild(PackageDetailPanel._factRow(
+            I18n.t('Tarball files'),
+            String(fp.files.length)
+        ));
+        grid.appendChild(PackageDetailPanel._factRow(
+            I18n.t('README in tarball'),
+            m?.hasReadme ? I18n.t('yes') : I18n.t('no')
+        ));
+
+        if (m?.engines && Object.keys(m.engines).length > 0) {
+            const enginesStr = Object.entries(m.engines)
+            .map(([k, v]) => `${k} ${v}`)
+            .join(', ');
+            grid.appendChild(PackageDetailPanel._factRow(I18n.t('Engines'), enginesStr));
+        }
+
+        if (m?.bin && Object.keys(m.bin).length > 0) {
+            const bins = Object.keys(m.bin);
+            const binStr = bins.length <= 4
+                ? bins.join(', ')
+                : `${bins.slice(0, 4).join(', ')} (+${bins.length - 4})`;
+            grid.appendChild(PackageDetailPanel._factRow(I18n.t('Bin commands'), binStr));
+        }
+
+        if (m?.files && m.files.length > 0) {
+            grid.appendChild(PackageDetailPanel._factRow(
+                I18n.t('Publish files[]'),
+                String(m.files.length)
+            ));
+        }
+
+        factsSection.appendChild(grid);
+        wrap.appendChild(factsSection);
+
+        this._tabPane.appendChild(wrap);
+    }
+
+    /**
+     * Kick the releases fetch from a non-Releases tab. Same wiring as
+     * `_renderReleasesTab` minus the loading placeholder branch — the
+     * caller already painted its own.
+     */
+    private _kickReleasesFetch(): void {
+        if (!this._fingerprint || this._releasesInflight || this._releases) {
+            return;
+        }
+        this._releasesInflight = true;
+        const name = this._fingerprint.name;
+        const version = this._fingerprint.version;
+        void Api.releases(name, version).then((response) => {
+            this._releasesInflight = false;
+            this._releases = response;
+            if (this._activeTab === Tab.overview || this._activeTab === Tab.releases) {
+                this._renderActiveTab();
+            }
+        }).catch((e: Error) => {
+            this._releasesInflight = false;
+            this._releasesError = e.message;
+            if (this._activeTab === Tab.overview || this._activeTab === Tab.releases) {
+                this._renderActiveTab();
+            }
+        });
+    }
+
+    /**
+     * Coerce npm's `repository` shapes into a single HTTP URL the
+     * browser can follow. Handles `git+https://…`, `git://…`,
+     * `github:owner/repo`, and `ssh@github.com:owner/repo.git`.
+     */
+    private static _normalizeUrl(raw: string|undefined): string|null {
+        if (!raw) {
+            return null;
+        }
+        const trimmed = raw.trim();
+        if (trimmed.length === 0) {
+            return null;
+        }
+        let s = trimmed.replace(/^git\+/u, '').replace(/\.git$/u, '');
+        if (s.startsWith('github:')) {
+            return `https://github.com/${s.slice('github:'.length)}`;
+        }
+        if (s.startsWith('git@')) {
+            const m = s.match(/^git@([^:]+):(.+)$/u);
+            if (m) {
+                return `https://${m[1]}/${m[2]}`;
+            }
+        }
+        if (s.startsWith('git://')) {
+            s = s.replace(/^git:\/\//u, 'https://');
+        }
+        if (!/^https?:\/\//u.test(s)) {
+            return null;
+        }
+        return s;
+    }
+
+    private static _linkRow(label: string, href: string): HTMLElement {
+        const row = document.createElement('div');
+        row.className = 'pdp-overview-link';
+        const k = document.createElement('span');
+        k.className = 'pdp-overview-link-label';
+        k.textContent = label;
+        row.appendChild(k);
+        const a = document.createElement('a');
+        a.href = href;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = href;
+        row.appendChild(a);
+        return row;
+    }
+
+    private static _factRow(label: string, value: string): HTMLElement {
+        const row = document.createElement('div');
+        row.className = 'pdp-overview-fact';
+        const k = document.createElement('span');
+        k.className = 'pdp-overview-fact-label';
+        k.textContent = label;
+        row.appendChild(k);
+        const v = document.createElement('span');
+        v.className = 'pdp-overview-fact-value';
+        v.textContent = value;
+        row.appendChild(v);
+        return row;
     }
 
     private _licenseTabLabel(): string {

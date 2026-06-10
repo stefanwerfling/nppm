@@ -2145,6 +2145,35 @@ html, body {
     border-radius: var(--radius-md);
 }
 
+/*
+ * Matrix panes become flex columns: the wrap fills the remaining
+ * vertical space and owns the scroll, so sticky header rows + sticky
+ * name column scroll *inside* the table instead of the page.
+ */
+.pane-matrix,
+.pane-project-matrix {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.pane-matrix > .matrix-ratelimit-banner,
+.pane-matrix > .matrix-header,
+.pane-matrix > .matrix-footer {
+    flex-shrink: 0;
+}
+
+.pane-matrix > .matrix-wrap,
+.pane-project-matrix > .matrix-wrap {
+    flex: 1;
+    min-height: 0;
+}
+
+.pane-project-matrix > .list-header,
+.pane-project-matrix > .installed-meta {
+    flex-shrink: 0;
+}
+
 .matrix-table {
     border-collapse: collapse;
     width: max-content;

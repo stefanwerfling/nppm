@@ -3197,6 +3197,7 @@ html, body {
     font-weight: 600;
     color: var(--c-text);
     letter-spacing: 0.02em;
+    flex: 1;
 }
 
 .pdp-card-chevron {
@@ -3217,6 +3218,105 @@ html, body {
 
 .pdp-card-collapsed .pdp-card-body {
     display: none;
+}
+
+/* Per-card Ignore / Re-enable affordance ----------------------------- */
+
+.pdp-card-ignore {
+    background: transparent;
+    color: var(--c-muted);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    padding: 1px 8px;
+    margin-right: 8px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.pdp-card-ignore:hover {
+    color: var(--c-text);
+    border-color: var(--c-accent);
+}
+
+.pdp-card-ignore-on {
+    color: var(--c-accent);
+    border-color: var(--c-accent);
+}
+
+.pdp-card-ignored {
+    opacity: 0.55;
+}
+
+.pdp-card-ignored .pdp-card-title {
+    text-decoration: line-through;
+}
+
+.pdp-card-ignored .pdp-card-body {
+    filter: grayscale(0.6);
+}
+
+/* Per-CVE Ignore button --------------------------------------------- */
+
+.pdp-vuln-ignore {
+    margin-left: auto;
+    background: transparent;
+    color: var(--c-muted);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-sm);
+    padding: 1px 8px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.pdp-vuln-ignore:hover {
+    color: var(--c-text);
+    border-color: var(--c-accent);
+}
+
+.pdp-vuln-ignore-on {
+    color: var(--c-accent);
+    border-color: var(--c-accent);
+}
+
+.pdp-vuln-ignored {
+    opacity: 0.5;
+}
+
+.pdp-vuln-ignored .pdp-vuln-id {
+    text-decoration: line-through;
+}
+
+/* Settings → Ignored findings tab ---------------------------------- */
+
+.sm-ignored-list {
+    margin-top: 8px;
+}
+
+.sm-ignored-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.sm-ignored-table th,
+.sm-ignored-table td {
+    border-bottom: 1px solid var(--c-border);
+    text-align: left;
+    padding: 6px 8px;
+}
+
+.sm-ignored-table th {
+    font-weight: 600;
+    color: var(--c-muted);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+.sm-ignored-remove {
+    padding: 1px 8px !important;
+    font-size: 13px !important;
+    line-height: 1 !important;
 }
 
 .pdp-list {

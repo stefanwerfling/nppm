@@ -26,6 +26,9 @@ import {
     ApiLifecycleScriptsResponse,
     ApiReleasesResponse,
     ApiPackageTrendsResponse,
+    ApiSecurityIgnoredListResponse,
+    ApiSecurityIgnoredMutationRequest,
+    ApiSecurityIgnoredMutationResponse,
     ApiSecurityResponse,
     ApiUnusedResponse,
     ApiSelfCodeResponse,
@@ -274,6 +277,38 @@ export class Api {
     public static async security(name: string, version: string): Promise<ApiSecurityResponse> {
         const qs = new URLSearchParams({name: name, version: version});
         return Api._json<ApiSecurityResponse>(`/api/security?${qs.toString()}`);
+    }
+
+    public static async securityIgnoredList(): Promise<ApiSecurityIgnoredListResponse> {
+        return Api._json<ApiSecurityIgnoredListResponse>('/api/security/ignored');
+    }
+
+    public static async securityIgnoredAdd(
+        req: ApiSecurityIgnoredMutationRequest
+    ): Promise<ApiSecurityIgnoredMutationResponse> {
+        const res = await fetch('/api/security/ignored', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(req)
+        });
+        if (!res.ok) {
+            throw new Error(`/api/security/ignored → ${res.status} ${res.statusText}`);
+        }
+        return (await res.json()) as ApiSecurityIgnoredMutationResponse;
+    }
+
+    public static async securityIgnoredRemove(
+        req: ApiSecurityIgnoredMutationRequest
+    ): Promise<ApiSecurityIgnoredMutationResponse> {
+        const res = await fetch('/api/security/ignored/remove', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(req)
+        });
+        if (!res.ok) {
+            throw new Error(`/api/security/ignored/remove → ${res.status} ${res.statusText}`);
+        }
+        return (await res.json()) as ApiSecurityIgnoredMutationResponse;
     }
 
     public static async matrixSecurity(

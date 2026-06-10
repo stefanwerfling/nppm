@@ -23,6 +23,7 @@ import {OsvVulnerability} from '../../backend/Security/OsvClient.js';
 import {PatternFinding, PatternSeverity} from '../../backend/Security/PatternScanner.js';
 import {ScriptFinding, ScriptSeverity} from '../../backend/Security/ScriptScanner.js';
 import {SecurityReport} from '../../backend/Security/SecurityScanner.js';
+import {ApiSecurityIgnoredEntry, ApiSecurityResponse} from '../../shared/Api/ApiTypes.js';
 import {Api} from '../Util/Api.js';
 import {I18n} from '../Util/I18n.js';
 import {Version} from '../Util/Version.js';
@@ -60,7 +61,7 @@ export class PackageDetailPanel {
     private _diffTarget: string|null = null;
     private _diffCache: FingerprintDiff|null = null;
     private _diffError: string|null = null;
-    private _securityReport: SecurityReport|null = null;
+    private _securityReport: ApiSecurityResponse|null = null;
     private _securityError: string|null = null;
     private _securityInflight: boolean = false;
     private _releases: ReleasesResponse|null = null;
@@ -1685,59 +1686,148 @@ export class PackageDetailPanel {
             opts: {hasIssue?: boolean;} = {}
         ): HTMLElement => PackageDetailPanel._makeCollapsibleCard(node, opts);
 
+        /*
+         * `cardIgn` wraps a section with the same collapse logic as
+         * `card` but also injects the per-kind Ignore/Re-enable button
+         * into the head. The CVE section gets no top-level button —
+         * users dismiss specific vuln ids inside the list instead.
+         */
+        const cardIgn = (
+            node: HTMLElement,
+            kind: string,
+            opts: {hasIssue?: boolean;} = {}
+        ): HTMLElement => {
+            const ignored = this._isKindIgnored(kind);
+            return PackageDetailPanel._makeCollapsibleCard(node, {
+                hasIssue: ignored ? false : opts.hasIssue,
+                ignored: ignored,
+                ignoreButton: {
+                    label: ignored ? `↻ ${I18n.t('Re-enable')}` : `🚫 ${I18n.t('Ignore')}`,
+                    title: ignored
+                        ? I18n.t('Re-enable this finding for {pkg}', {pkg: report.name + '@' + report.version})
+                        : I18n.t('Ignore this finding for {pkg}', {pkg: report.name + '@' + report.version}),
+                    onClick: () => { void this._toggleIgnore(kind); }
+                }
+            });
+        };
+
         wrap.appendChild(card(
             this._renderVulnsSection(report.vulns),
             {hasIssue: vulnCount > 0}
         ));
-        wrap.appendChild(card(
+        wrap.appendChild(cardIgn(
             this._renderScriptsSection(report.scriptFindings),
+            'script',
             {hasIssue: scriptCount > 0}
         ));
         wrap.appendChild(this._renderIgnoreScriptsBanner(report.ignoreScripts));
-        wrap.appendChild(card(
+        wrap.appendChild(cardIgn(
             this._renderPatternsSection(report.patternFindings),
+            'pattern',
             {hasIssue: patternCount > 0}
         ));
-        wrap.appendChild(card(
+        wrap.appendChild(cardIgn(
             this._renderBinariesSection(report.binaryFindings),
+            'binary',
             {hasIssue: binaryCount > 0}
         ));
-        wrap.appendChild(card(
+        wrap.appendChild(cardIgn(
             this._renderObfuscationSection(report.obfuscation),
+            'obfuscation',
             {hasIssue: obfuscationInteresting}
         ));
-        wrap.appendChild(card(
+        wrap.appendChild(cardIgn(
             this._renderManifestRedFlagsSection(report.manifestRedFlags),
+            'manifest-red-flag',
             {hasIssue: manifestRedFlagsInteresting}
         ));
-        wrap.appendChild(card(
+        wrap.appendChild(cardIgn(
             this._renderCapabilitySection(report.capability),
+            'capability',
             {hasIssue: capabilityInteresting}
         ));
-        wrap.appendChild(card(
+        wrap.appendChild(cardIgn(
             this._renderChurnSection(report.churn),
+            'churn',
             {hasIssue: Boolean(interestingChurn)}
         ));
-        wrap.appendChild(card(
+        wrap.appendChild(cardIgn(
             this._renderMaintainerSection(report.maintainer),
+            'maintainer',
             {hasIssue: Boolean(interestingMaintainer)}
         ));
-        wrap.appendChild(card(this._renderProvenanceSection(report.provenance)));
-        wrap.appendChild(card(this._renderFreshnessSection(report.freshness)));
-        wrap.appendChild(card(this._renderCadenceSection(report.cadence)));
-        wrap.appendChild(card(this._renderTyposquatSection(report.typosquat)));
-        wrap.appendChild(card(
+        wrap.appendChild(cardIgn(this._renderProvenanceSection(report.provenance), 'provenance'));
+        wrap.appendChild(cardIgn(this._renderFreshnessSection(report.freshness), 'freshness'));
+        wrap.appendChild(cardIgn(this._renderCadenceSection(report.cadence), 'cadence'));
+        wrap.appendChild(cardIgn(this._renderTyposquatSection(report.typosquat), 'typosquat'));
+        wrap.appendChild(cardIgn(
             this._renderExternalSection(report.external),
+            'external',
             {hasIssue: report.external.level === ExternalSeverity.warn
                     || report.external.level === ExternalSeverity.risk}
         ));
-        wrap.appendChild(card(
+        wrap.appendChild(cardIgn(
             this._renderDeprecationSection(report.deprecation),
+            'deprecation',
             {hasIssue: report.deprecation !== null
                     && (report.deprecation.level === DeprecationLevel.warn
                         || report.deprecation.level === DeprecationLevel.risk)}
         ));
         return wrap;
+    }
+
+    /**
+     * Is this kind (with optional sub-identifier) currently in the
+     * user's ignored list for the package the panel is showing? The
+     * answer drives both the muted card-styling and the
+     * Ignore-vs-Re-enable button label.
+     */
+    private _isKindIgnored(kind: string, identifier?: string): boolean {
+        const report = this._securityReport;
+        if (!report) {
+            return false;
+        }
+        return report.ignored.some((e) => {
+            if (e.kind !== kind) {
+                return false;
+            }
+            if (e.identifier === undefined) {
+                return true;
+            }
+            return e.identifier === identifier;
+        });
+    }
+
+    /**
+     * Flip the ignore state for one (kind, identifier) on the active
+     * package. Re-fetches the security report so the new list (and any
+     * downstream label changes) are reflected; re-paints the Security
+     * tab if it's still active.
+     */
+    private async _toggleIgnore(kind: string, identifier?: string): Promise<void> {
+        if (!this._fingerprint) {
+            return;
+        }
+        const name = this._fingerprint.name;
+        const version = this._fingerprint.version;
+        const isIgnored = this._isKindIgnored(kind, identifier);
+        const req = {name: name, version: version, kind: kind, identifier: identifier};
+        try {
+            if (isIgnored) {
+                await Api.securityIgnoredRemove(req);
+            } else {
+                await Api.securityIgnoredAdd(req);
+            }
+            const fresh = await Api.security(name, version);
+            this._securityReport = fresh;
+            this._renderTabs();
+            if (this._activeTab === Tab.security || this._activeTab === Tab.license) {
+                this._renderActiveTab();
+            }
+        } catch (e) {
+            // best-effort surface — the panel has no toast layer
+            window.alert((e as Error).message);
+        }
     }
 
     /**
@@ -1897,7 +1987,11 @@ export class PackageDetailPanel {
      */
     private static _makeCollapsibleCard(
         section: HTMLElement,
-        opts: {hasIssue?: boolean;} = {}
+        opts: {
+            hasIssue?: boolean;
+            ignored?: boolean;
+            ignoreButton?: {label: string; title?: string; onClick: () => void;};
+        } = {}
     ): HTMLElement {
         if (!section.classList.contains('pdp-section')) {
             return section;
@@ -1907,6 +2001,9 @@ export class PackageDetailPanel {
             return section;
         }
         section.classList.add('pdp-card');
+        if (opts.ignored) {
+            section.classList.add('pdp-card-ignored');
+        }
 
         const hasIssue = opts.hasIssue === undefined
             ? Boolean(section.querySelector(
@@ -1929,6 +2026,22 @@ export class PackageDetailPanel {
         title.className = 'pdp-card-title';
         title.textContent = head.textContent ?? '';
         newHead.appendChild(title);
+
+        if (opts.ignoreButton) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = opts.ignored ? 'pdp-card-ignore pdp-card-ignore-on' : 'pdp-card-ignore';
+            btn.textContent = opts.ignoreButton.label;
+            if (opts.ignoreButton.title) {
+                btn.title = opts.ignoreButton.title;
+            }
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                opts.ignoreButton!.onClick();
+            });
+            newHead.appendChild(btn);
+        }
+
         const chevron = document.createElement('span');
         chevron.className = 'pdp-card-chevron';
         chevron.textContent = '▾';
@@ -2774,9 +2887,12 @@ export class PackageDetailPanel {
 
         const heading = document.createElement('div');
         heading.className = 'pdp-section-head';
+        const activeCount = vulns === null
+            ? null
+            : vulns.filter((v) => !this._isKindIgnored('cve', v.id)).length;
         heading.textContent = vulns === null
             ? 'CVEs — OSV.dev nicht erreichbar'
-            : `CVEs (${vulns.length})`;
+            : `CVEs (${activeCount})`;
         wrap.appendChild(heading);
 
         if (vulns === null || vulns.length === 0) {
@@ -2797,6 +2913,10 @@ export class PackageDetailPanel {
     private _renderVuln(v: OsvVulnerability): HTMLElement {
         const card = document.createElement('div');
         card.className = 'pdp-vuln';
+        const ignored = this._isKindIgnored('cve', v.id);
+        if (ignored) {
+            card.classList.add('pdp-vuln-ignored');
+        }
 
         const head = document.createElement('div');
         head.className = 'pdp-vuln-head';
@@ -2805,6 +2925,19 @@ export class PackageDetailPanel {
         id.className = 'pdp-vuln-id';
         id.textContent = v.id;
         head.appendChild(id);
+
+        const ignBtn = document.createElement('button');
+        ignBtn.type = 'button';
+        ignBtn.className = ignored ? 'pdp-vuln-ignore pdp-vuln-ignore-on' : 'pdp-vuln-ignore';
+        ignBtn.textContent = ignored ? `↻ ${I18n.t('Re-enable')}` : `🚫 ${I18n.t('Ignore')}`;
+        ignBtn.title = ignored
+            ? I18n.t('Re-enable this CVE')
+            : I18n.t('Ignore this CVE');
+        ignBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            void this._toggleIgnore('cve', v.id);
+        });
+        head.appendChild(ignBtn);
 
         /*
          * First severity score wins for the badge — OSV often lists

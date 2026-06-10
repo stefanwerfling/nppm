@@ -7,7 +7,7 @@ import {
 import {Api} from '../Util/Api.js';
 import {I18n} from '../Util/I18n.js';
 
-type TabId = 'general'|'registry'|'actions'|'security';
+type TabId = 'general'|'registry'|'actions'|'security'|'ignored';
 
 const EDITOR_KEYS: readonly string[] = [
     'vscode',
@@ -162,7 +162,8 @@ export class SettingsModal {
             {id: 'general', label: I18n.t('General')},
             {id: 'registry', label: I18n.t('Registry')},
             {id: 'actions', label: I18n.t('Actions')},
-            {id: 'security', label: I18n.t('Security')}
+            {id: 'security', label: I18n.t('Security')},
+            {id: 'ignored', label: I18n.t('Ignored findings')}
         ];
         for (const tab of tabs) {
             const btn = document.createElement('button');
@@ -195,7 +196,10 @@ export class SettingsModal {
                 return;
             case 'security':
                 this._renderSecurity(body);
-                
+                return;
+            case 'ignored':
+                this._renderIgnored(body);
+
         }
     }
 
@@ -404,6 +408,118 @@ export class SettingsModal {
         body.appendChild(this._textField('sm-ext-socket-key', I18n.t('socket.dev API key ($ENV ok)'), e.socket?.apiKey, '$SOCKET_DEV_API_KEY'));
         body.appendChild(this._checkboxField('sm-ext-openssf-en', I18n.t('OpenSSF Scorecard'), e.openssf?.enabled !== false));
         body.appendChild(this._checkboxField('sm-ext-depsdev-en', I18n.t('deps.dev (info only)'), e.depsDev?.enabled !== false));
+    }
+
+    /**
+     * Settings → "Ignored findings" tab. Lists every per-(pkg, version,
+     * kind) suppression the user added via the PackageDetailPanel
+     * Security tab. Each row has a remove button so the entry can be
+     * lifted without re-opening the package. The list is loaded
+     * separately (POST/DELETE endpoints write through to nppm.json,
+     * not via the Save button) so this tab needs no `_collect` step.
+     */
+    private _renderIgnored(body: HTMLElement): void {
+        body.appendChild(this._sectionHead(I18n.t('Ignored findings')));
+
+        const note = document.createElement('div');
+        note.className = 'umd-note';
+        note.style.marginBottom = '12px';
+        note.textContent = I18n.t(
+            'Suppressed via the Ignore button on the PackageDetailPanel Security tab. '
+            + 'Removing an entry here re-enables the finding everywhere — badges, scoring, and the per-package card.'
+        );
+        body.appendChild(note);
+
+        const host = document.createElement('div');
+        host.className = 'sm-ignored-list';
+        body.appendChild(host);
+
+        void this._reloadIgnored(host);
+    }
+
+    private async _reloadIgnored(host: HTMLElement): Promise<void> {
+        host.innerHTML = '';
+        const loading = document.createElement('div');
+        loading.className = 'umd-loading';
+        loading.textContent = I18n.t('Loading ignored findings …');
+        host.appendChild(loading);
+        try {
+            const res = await Api.securityIgnoredList();
+            host.innerHTML = '';
+            if (res.entries.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'umd-note';
+                empty.textContent = I18n.t('No findings are currently ignored.');
+                host.appendChild(empty);
+                return;
+            }
+            const table = document.createElement('table');
+            table.className = 'sm-ignored-table';
+            const thead = document.createElement('thead');
+            const trh = document.createElement('tr');
+            for (const label of [
+                I18n.t('Package'), I18n.t('Version'), I18n.t('Kind'),
+                I18n.t('Identifier'), I18n.t('Added'), ''
+            ]) {
+                const th = document.createElement('th');
+                th.textContent = label;
+                trh.appendChild(th);
+            }
+            thead.appendChild(trh);
+            table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            const sorted = [...res.entries].sort((a, b) => b.addedAt - a.addedAt);
+            for (const e of sorted) {
+                const tr = document.createElement('tr');
+                const tdN = document.createElement('td');
+                tdN.textContent = e.name;
+                tr.appendChild(tdN);
+                const tdV = document.createElement('td');
+                tdV.textContent = e.version;
+                tr.appendChild(tdV);
+                const tdK = document.createElement('td');
+                tdK.textContent = e.kind;
+                tr.appendChild(tdK);
+                const tdI = document.createElement('td');
+                tdI.textContent = e.identifier ?? '—';
+                tr.appendChild(tdI);
+                const tdA = document.createElement('td');
+                tdA.textContent = new Date(e.addedAt).toLocaleString();
+                tr.appendChild(tdA);
+                const tdX = document.createElement('td');
+                const rm = document.createElement('button');
+                rm.type = 'button';
+                rm.className = 'umd-btn sm-ignored-remove';
+                rm.textContent = '✗';
+                rm.title = I18n.t('Remove this entry — re-enables the finding');
+                rm.addEventListener('click', () => {
+                    void (async(): Promise<void> => {
+                        try {
+                            await Api.securityIgnoredRemove({
+                                name: e.name,
+                                version: e.version,
+                                kind: e.kind,
+                                identifier: e.identifier
+                            });
+                            await this._reloadIgnored(host);
+                        } catch (err) {
+                            window.alert((err as Error).message);
+                        }
+                    })();
+                });
+                tdX.appendChild(rm);
+                tr.appendChild(tdX);
+                tbody.appendChild(tr);
+            }
+            table.appendChild(tbody);
+            host.appendChild(table);
+        } catch (e) {
+            host.innerHTML = '';
+            const err = document.createElement('div');
+            err.className = 'umd-note';
+            err.textContent = (e as Error).message;
+            host.appendChild(err);
+        }
     }
 
     private _sectionHead(label: string): HTMLElement {

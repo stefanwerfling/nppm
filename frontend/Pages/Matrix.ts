@@ -29,14 +29,12 @@ import {Version} from '../Util/Version.js';
  *  - all: every row
  *  - drift: only rows where projects disagree
  *  - outdated: only rows behind registry latest
- *  - issues: drift ∪ outdated (everything that needs attention)
  *  - insecure: any row with CVE or risky install script
  */
 export enum MatrixFilter {
     all = 'all',
     drift = 'drift',
     outdated = 'outdated',
-    issues = 'issues',
     insecure = 'insecure',
     /**
      * Compliance filter: shows rows whose latest version's license is
@@ -352,7 +350,14 @@ export class Matrix {
         this._root = root;
 
         const state = Matrix._loadState();
-        if (state.filter) {
+        /*
+         * Guard against stale enum values from previous releases — the
+         * "Issues" filter was removed once we realised it conflated
+         * version-drift with Unsafe and License findings, and any
+         * persisted `issues` value would otherwise sit unselectable in
+         * the toolbar.
+         */
+        if (state.filter && Object.values(MatrixFilter).includes(state.filter)) {
             this._filter = state.filter;
         }
         if (state.sort) {
@@ -872,7 +877,6 @@ export class Matrix {
 
         const opts: {value: MatrixFilter; label: string;}[] = [
             {value: MatrixFilter.all, label: I18n.t('All')},
-            {value: MatrixFilter.issues, label: I18n.t('Issues')},
             {value: MatrixFilter.drift, label: I18n.t('Drift')},
             {value: MatrixFilter.outdated, label: I18n.t('Outdated')},
             {value: MatrixFilter.insecure, label: I18n.t('Unsafe')},
@@ -1748,9 +1752,6 @@ export class Matrix {
                 return row.status === MatrixRowStatus.drift;
             case MatrixFilter.outdated:
                 return row.status === MatrixRowStatus.outdated;
-            case MatrixFilter.issues:
-                return row.status === MatrixRowStatus.drift
-                    || row.status === MatrixRowStatus.outdated;
             case MatrixFilter.insecure:
                 return this._scoreFor(row) > 0;
             case MatrixFilter.licenseIssue: {

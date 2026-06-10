@@ -143,7 +143,6 @@ export const TRANSLATIONS_EN: Record<string, string> = {
     'Install hook runs code during `npm install`': 'Install hook runs code during `npm install`',
     'Installed': 'Installed',
     'Install-scripts': 'Install-scripts',
-    'Issues': 'Issues',
     'Latest': 'Latest',
     'Version pinned by the project\'s templates (— = not pinned, varies = different per project)':
         'Version pinned by the project\'s templates (— = not pinned, varies = different per project)',

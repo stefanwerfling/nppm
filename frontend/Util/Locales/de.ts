@@ -134,7 +134,6 @@ export const TRANSLATIONS_DE: Record<string, string> = {
     'Install hook runs code during `npm install`': 'Install-Hook führt Code beim `npm install` aus',
     'Installed': 'Installiert',
     'Install-scripts': 'Install-Scripts',
-    'Issues': 'Probleme',
     'Latest': 'Latest',
     'Version pinned by the project\'s templates (— = not pinned, varies = different per project)':
         'Vom Template festgelegte Version (— = nicht gepinnt, varies = je Projekt unterschiedlich)',

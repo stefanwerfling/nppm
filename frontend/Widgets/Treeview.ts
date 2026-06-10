@@ -111,9 +111,12 @@ export class Treeview {
 
         /*
          * Always-present sentinel rows on top — Dashboard / Matrix /
-         * Templates. Their UUIDs are sentinels the parent component
-         * routes specially.
+         * Templates / CVE-Sweep. Pinned in their own container so they
+         * stay visible while the user project list below scrolls.
          */
+        const pinned = document.createElement('div');
+        pinned.className = 'tree-pinned';
+
         const matrixGroup = document.createElement('div');
         matrixGroup.className = 'tree-group';
 
@@ -153,13 +156,38 @@ export class Treeview {
         };
         matrixGroup.appendChild(this._renderItem(cveScanItem, true));
 
-        this._root.appendChild(matrixGroup);
+        pinned.appendChild(matrixGroup);
+        this._root.appendChild(pinned);
+
+        /*
+         * Scrollable user-project list. Wrapped so the fade/arrow
+         * indicators can be positioned over its top + bottom edges.
+         */
+        const scrollWrap = document.createElement('div');
+        scrollWrap.className = 'tree-scroll-wrap';
+
+        const scrollArea = document.createElement('div');
+        scrollArea.className = 'tree-scroll';
+        scrollWrap.appendChild(scrollArea);
+
+        const fadeTop = document.createElement('div');
+        fadeTop.className = 'tree-scroll-fade tree-scroll-fade-top';
+        fadeTop.innerHTML = '<span class="tree-scroll-arrow">▲</span>';
+        scrollWrap.appendChild(fadeTop);
+
+        const fadeBottom = document.createElement('div');
+        fadeBottom.className = 'tree-scroll-fade tree-scroll-fade-bottom';
+        fadeBottom.innerHTML = '<span class="tree-scroll-arrow">▼</span>';
+        scrollWrap.appendChild(fadeBottom);
+
+        this._root.appendChild(scrollWrap);
 
         if (projects.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'tree-empty';
             empty.textContent = I18n.t('No projects configured in nppm.json.');
-            this._root.appendChild(empty);
+            scrollArea.appendChild(empty);
+            Treeview._wireScrollIndicators(scrollWrap, scrollArea);
             return;
         }
 
@@ -184,7 +212,31 @@ export class Treeview {
                 group.appendChild(this._renderItem(project, false));
             }
 
-            this._root.appendChild(group);
+            scrollArea.appendChild(group);
+        }
+
+        Treeview._wireScrollIndicators(scrollWrap, scrollArea);
+    }
+
+    /**
+     * Toggles `can-up` / `can-down` classes on the wrap based on the
+     * scroll area's position so the top/bottom fade arrows only show
+     * when there's content offscreen in that direction. Re-evaluates
+     * on scroll and on size changes (window resize, sidebar resize,
+     * score-ring late-arrival reflows).
+     */
+    private static _wireScrollIndicators(wrap: HTMLElement, area: HTMLElement): void {
+        const update = (): void => {
+            const canUp = area.scrollTop > 0;
+            const canDown = area.scrollHeight - area.scrollTop - area.clientHeight > 1;
+            wrap.classList.toggle('can-up', canUp);
+            wrap.classList.toggle('can-down', canDown);
+        };
+        area.addEventListener('scroll', update, {passive: true});
+        requestAnimationFrame(update);
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(update);
+            ro.observe(area);
         }
     }
 

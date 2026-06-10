@@ -252,8 +252,10 @@ html, body {
     min-width: 160px;
     background: var(--c-panel);
     border-right: 1px solid var(--c-border);
-    overflow: auto;
+    overflow: hidden;
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 #list {
@@ -276,7 +278,66 @@ html, body {
 /* Treeview ---------------------------------------------------------- */
 
 .treeview {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.tree-pinned {
+    flex-shrink: 0;
+    padding-top: 8px;
+}
+
+.tree-scroll-wrap {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.tree-scroll {
+    height: 100%;
+    overflow-y: auto;
     padding: 8px 0;
+}
+
+.tree-scroll-fade {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 22px;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.tree-scroll-fade-top {
+    top: 0;
+    background: linear-gradient(to bottom, var(--c-panel) 35%, transparent);
+}
+
+.tree-scroll-fade-bottom {
+    bottom: 0;
+    background: linear-gradient(to top, var(--c-panel) 35%, transparent);
+}
+
+.tree-scroll-wrap.can-up .tree-scroll-fade-top {
+    opacity: 1;
+}
+
+.tree-scroll-wrap.can-down .tree-scroll-fade-bottom {
+    opacity: 1;
+}
+
+.tree-scroll-arrow {
+    color: var(--c-accent);
+    font-size: 10px;
+    line-height: 1;
+    text-shadow: 0 0 4px var(--c-panel);
 }
 
 .tree-empty {

@@ -55,6 +55,7 @@ time the UI changes.
 16. [Cross-project Dashboard](#16-cross-project-dashboard)
 17. [Impact analysis](#17-impact-analysis)
 18. [Badge filter](#18-badge-filter)
+19. [Health card badge](#19-health-card-badge)
 
 ---
 
@@ -1202,3 +1203,87 @@ filtered matrix is visually obvious.
 
 Selection persists in `localStorage` alongside the matrix's filter
 / sort / search state. Reload-safe; no server round-trip.
+
+---
+
+## 19. Health card badge
+
+`nppm card` produces a static SVG that summarises the entire scan
+result as a single embeddable badge — same scanner pipeline as
+`nppm scan`, just rendered to an SVG instead of a text/JSON/SARIF
+report.
+
+```sh
+nppm card                                    # writes ./nppm-card.svg
+nppm card --title=my-repo --output=badge.svg # custom title + path
+nppm card --stdout                           # SVG to stdout instead of a file
+nppm card --project=kavula                   # one configured project only
+nppm card --no-osv --no-external             # offline / fast variant
+nppm card --concurrency=4                    # cap parallel tarball fetches
+nppm card --help                             # full flag list
+```
+
+Drop it into the project's README:
+
+```md
+![nppm scan](nppm-card.svg)
+```
+
+The badge is 480×120 px, fixed dimensions — works as
+`<img src="…">` *and* inline `<svg>` without responsive layout work.
+A dark coloured **grade pill** on the left, the project title plus
+three metric rows on the right, a thin timestamp footer.
+
+**Grade ladder** (aggregate across every configured project):
+
+| Grade | Trigger                          | Pill colour |
+|-------|----------------------------------|-------------|
+| `A+`  | clean — zero findings            | green       |
+| `A`   | info-only findings               | blue        |
+| `B`   | any warn, no risk                | amber       |
+| `C`   | ≥5 warn OR 1–2 risk              | red         |
+| `D`   | 3–9 risk                         | red         |
+| `F`   | ≥10 risk                         | red         |
+
+`info` findings — e.g. weak-copyleft licenses or deps.dev "older
+version deprecated" notes — never bump a project off `A`. The
+ladder biases towards "any risk = D, lots of risk = F" so a repo
+with a single known CVE is visually distinct from a clean one.
+
+**Pill colour** mirrors the worst severity in the report, not the
+letter grade — green for clean, blue for info-only, amber for warn,
+red for any risk. Dark-mode-friendly hex values keep contrast on
+both white and dark GitHub README backgrounds.
+
+**Metric rows** on the right:
+
+1. `<title>` — defaults to the basename of the working directory;
+   override with `--title=<label>`.
+2. `<N> project(s) · <M> pkg` — total project and package counts.
+3. `<K> findings (X risk · Y warn · Z info)` — aggregated severity
+   breakdown.
+4. `Worst: <severity|clean>` — single-word summary of the worst
+   severity present.
+
+A `nppm scan · YYYY-MM-DD` footer pins the scan date.
+
+**Reuse with `nppm scan`.** Both commands share `ScanRunner.scanProject`
+under the hood, so a warm `.nppm/cache/` from one re-runs the other
+instantly. The `--no-osv` / `--no-heuristics` / `--no-unused` /
+`--no-external` flags work the same way as in `nppm scan` for
+offline or fast-run scenarios.
+
+**Exit codes:**
+
+- `0` — card written
+- `2` — usage error (bad flag, missing `nppm.json`, no project
+  matched `--project=…`)
+
+The card doesn't gate on findings — it always writes a card. Use
+`nppm scan --fail-on=…` if you want a CI gate; the card is a
+read-out of project health, not a guard.
+
+> 💡 **Tip:** commit `nppm-card.svg` alongside the repo and add a
+> CI step that re-runs `nppm card` on every push — the README badge
+> then always reflects the current state of `main` without an
+> external badge service.

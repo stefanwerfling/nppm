@@ -143,7 +143,7 @@ export class ScanRunner {
                 io.stderr(`  → ${project.getName()}\n`);
             }
             // eslint-disable-next-line no-await-in-loop
-            const report = await ScanRunner._scanProject(
+            const report = await ScanRunner.scanProject(
                 project,
                 args,
                 loaded.osvClient,
@@ -169,9 +169,10 @@ export class ScanRunner {
     /**
      * Inner per-project pipeline. Pulled out of `run()` so each project
      * sits in its own try/catch — one broken project shouldn't abort the
-     * whole CI run.
+     * whole CI run. Public so sibling runners (`Card.ts`) can reuse it
+     * without going through the formatter ladder.
      */
-    private static async _scanProject(
+    public static async scanProject(
         project: Project,
         args: CliArgs,
         osvClient: OsvClient,

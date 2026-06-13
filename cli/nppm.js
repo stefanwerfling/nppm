@@ -5,6 +5,7 @@
  *  - `nppm`              → starts the dev server (`cli/dev.js`)
  *  - `nppm dev`          → same, explicit
  *  - `nppm scan [...]`   → headless CI scan (`cli/scan.js`)
+ *  - `nppm card [...]`   → render an SVG health badge (`cli/card.js`)
  *  - `nppm -h | --help`  → top-level usage
  *
  * The router keeps argv0/argv1 alone and rewrites argv from position 2
@@ -24,6 +25,7 @@ if (sub === '-h' || sub === '--help') {
         + '  nppm              Start the dev server (default)\n'
         + '  nppm dev          Start the dev server\n'
         + '  nppm scan [...]   Headless CI scan (see `nppm scan --help`)\n'
+        + '  nppm card [...]   Render an SVG health badge (see `nppm card --help`)\n'
         + '  nppm sbom [...]   Emit CycloneDX / SPDX SBOM (see `nppm sbom --help`)\n'
         + '  nppm action       GitHub-Actions entry: scan + SARIF + sticky PR comment\n'
         + '  nppm --help       Show this help\n'
@@ -35,6 +37,9 @@ if (sub === 'scan') {
     // Drop the `scan` keyword so the scan module sees just its flags.
     process.argv.splice(2, 1);
     await import(path.resolve(__dirname, 'scan.js'));
+} else if (sub === 'card') {
+    process.argv.splice(2, 1);
+    await import(path.resolve(__dirname, 'card.js'));
 } else if (sub === 'sbom') {
     process.argv.splice(2, 1);
     await import(path.resolve(__dirname, 'sbom.js'));

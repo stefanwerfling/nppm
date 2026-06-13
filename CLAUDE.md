@@ -130,16 +130,19 @@ nppm/
 ├── vite.config.ts          Express middleware + every API route
 │
 ├── cli/                    user-facing CLI (shims + TS runners co-located)
-│   ├── nppm.js             top-level subcommand router (dev | scan | sbom | action | --help)
+│   ├── nppm.js             top-level subcommand router (dev | scan | card | sbom | action | --help)
 │   ├── dev.js              shim: writes default config, starts Vite
 │   ├── scan.js             shim: Vite.ssrLoadModule('./cli/Scan.ts')
+│   ├── card.js             shim: Vite.ssrLoadModule('./cli/Card.ts')
 │   ├── sbom.js             shim: Vite.ssrLoadModule('./cli/Sbom.ts')
 │   ├── action.js           shim: GitHub Actions entry (Vite.ssrLoadModule('./cli/Action.ts'))
 │   ├── CliArgs.ts          CliArgsParser + FailOnLevel ladder + HELP_TEXT
 │   ├── ScanReport.ts       ScanReportBuilder — per-scanner→unified severity
 │   ├── ScanFormat.ts       ScanFormatter — text + JSON + SARIF + shouldFail
 │   ├── ScanSarif.ts        SarifBuilder — SARIF 2.1.0 (rules + results + partialFingerprints)
-│   ├── Scan.ts             runScan() orchestrator (OSV / heuristics / unused)
+│   ├── Scan.ts             runScan() orchestrator (OSV / heuristics / unused); exposes `ScanRunner.scanProject` for sibling runners
+│   ├── Card.ts             CardRunner — codeflow-inspired SVG health badge; reuses ScanRunner.scanProject + emits via SvgCardBuilder
+│   ├── CardSvg.ts          SvgCardBuilder — ScanReport → SVG (grade A+/A/B/C/D/F + colored pill + metric rows)
 │   ├── Sbom.ts             SbomRunner + SbomCliArgsParser — CycloneDX/SPDX CLI
 │   ├── Action.ts           runAction() — GitHub Actions PR-comment + SARIF flow
 │   ├── ActionFormat.ts     ActionFormatter — sticky PR-comment markdown body

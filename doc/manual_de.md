@@ -57,6 +57,7 @@ Beispielprojekte.
 16. [Projektübergreifendes Dashboard](#16-projektübergreifendes-dashboard)
 17. [Impact-Analyse](#17-impact-analyse)
 18. [Badge-Filter](#18-badge-filter)
+19. [Health-Card-Badge](#19-health-card-badge)
 
 ---
 
@@ -1258,3 +1259,86 @@ erkennbar ist.
 Die Auswahl persistiert in `localStorage` zusammen mit den anderen
 Matrix-States (Filter / Sortierung / Suche). Reload-sicher, kein
 Server-Roundtrip.
+
+---
+
+## 19. Health-Card-Badge
+
+`nppm card` baut aus dem kompletten Scan-Ergebnis ein statisches
+SVG-Badge zum Einbetten. Dieselbe Scanner-Pipeline wie `nppm scan`,
+nur als SVG gerendert statt als Text/JSON/SARIF-Report.
+
+```sh
+nppm card                                    # schreibt ./nppm-card.svg
+nppm card --title=mein-repo --output=badge.svg # eigener Titel + Pfad
+nppm card --stdout                           # SVG auf stdout statt Datei
+nppm card --project=kavula                   # nur ein konfiguriertes Projekt
+nppm card --no-osv --no-external             # offline-Variante
+nppm card --concurrency=4                    # parallele Tarball-Fetches begrenzen
+nppm card --help                             # volle Flag-Liste
+```
+
+In der Projekt-README einbinden:
+
+```md
+![nppm scan](nppm-card.svg)
+```
+
+Das Badge ist fix 480×120 px — funktioniert als
+`<img src="…">` *und* als inline-`<svg>` ohne responsives Layout.
+Links eine farbige **Grade-Pille**, rechts der Titel plus drei
+Metrik-Zeilen, unten dünne Zeitstempel-Zeile.
+
+**Grade-Leiter** (aggregiert über alle konfigurierten Projekte):
+
+| Grade | Auslöser                          | Pillen-Farbe |
+|-------|-----------------------------------|--------------|
+| `A+`  | sauber — null Findings            | grün         |
+| `A`   | nur Info-Findings                 | blau         |
+| `B`   | mindestens ein Warn, kein Risk    | gelb         |
+| `C`   | ≥5 Warn ODER 1–2 Risk             | rot          |
+| `D`   | 3–9 Risk                          | rot          |
+| `F`   | ≥10 Risk                          | rot          |
+
+Info-Findings — z.B. Weak-Copyleft-Lizenzen oder deps.dev "ältere
+Version deprecated" — werfen ein Projekt nie aus `A`. Die Leiter
+ist absichtlich risk-lastig: ein Repo mit einem einzigen bekannten
+CVE ist visuell von einem sauberen unterscheidbar.
+
+**Pillen-Farbe** spiegelt die schlimmste Severity im Report wider,
+nicht den Buchstaben — grün für sauber, blau für Info-only, gelb
+für Warn, rot für jedes Risk. Die Hex-Werte sind dark-mode-tauglich
+und behalten Kontrast auf weißem und dunklem GitHub-README-Hintergrund.
+
+**Metrik-Zeilen rechts:**
+
+1. `<title>` — Default ist der Basename des Arbeitsverzeichnisses;
+   überschreibbar mit `--title=<label>`.
+2. `<N> project(s) · <M> pkg` — Projekt- und Paket-Gesamtzahl.
+3. `<K> findings (X risk · Y warn · Z info)` — aggregierte
+   Severity-Aufschlüsselung.
+4. `Worst: <severity|clean>` — einwortige Zusammenfassung der
+   schlimmsten Severity.
+
+Ein `nppm scan · YYYY-MM-DD`-Footer pinnt das Scan-Datum.
+
+**Wiederverwendung mit `nppm scan`.** Beide Kommandos teilen
+intern `ScanRunner.scanProject`, ein warmer `.nppm/cache/` aus
+einem Lauf macht den anderen sofort schnell. Die Flags
+`--no-osv` / `--no-heuristics` / `--no-unused` / `--no-external`
+funktionieren wie bei `nppm scan` für Offline- oder Fast-Run-Szenarien.
+
+**Exit-Codes:**
+
+- `0` — Karte geschrieben
+- `2` — Nutzungsfehler (falsches Flag, fehlende `nppm.json`, kein
+  Projekt matched `--project=…`)
+
+Die Karte gated nicht auf Findings — sie schreibt immer eine
+Karte. Wenn du ein CI-Gate willst, nutze `nppm scan --fail-on=…`;
+die Karte ist ein Read-out, kein Guard.
+
+> 💡 **Tipp:** `nppm-card.svg` ins Repo committen und einen
+> CI-Schritt anhängen, der `nppm card` bei jedem Push neu rendert —
+> dann spiegelt das README-Badge immer den aktuellen Stand von
+> `main` ohne externen Badge-Service.

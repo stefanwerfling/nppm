@@ -239,6 +239,12 @@ server, frontend is plain TypeScript + DOM (no framework).
   for pipelines, and exits non-zero when any finding meets the
   `--fail-on=info|warn|risk` threshold. Same caches as the dev server,
   so a warm second run is fast.
+- **Health card badge** — `nppm card` renders a static SVG badge of the
+  full scan result (codeflow-inspired): coloured grade pill on the
+  left (`A+` clean → `F` ≥10 risk findings), title + project/package
+  count + finding breakdown + worst severity on the right. Drops into
+  a README via `<img src="nppm-card.svg">`. Same scanner pipeline as
+  `nppm scan` — re-uses the warm cache.
 - **Unused-deps detector** — depcheck-style per-project hygiene scan.
   Three buckets: unused (declared but never imported), misplaced
   (imported only from dev paths but listed as a regular dep), missing
@@ -482,6 +488,39 @@ Same data via REST:
 Content-Type is set to `application/vnd.cyclonedx+json` /
 `application/spdx+json` so MIME-aware tooling can route the payload.
 
+## Health card badge
+
+```sh
+nppm card                                        # writes ./nppm-card.svg
+nppm card --title=my-repo --output=badge.svg     # custom title + path
+nppm card --stdout                               # emit SVG to stdout
+nppm card --project=kavula                       # one project only
+nppm card --no-osv --no-external                 # offline-friendly fast run
+nppm card --help                                 # full flag list
+```
+
+Codeflow-inspired static SVG showing the project health at a glance.
+Embed it in your README:
+
+```md
+![nppm scan](nppm-card.svg)
+```
+
+Grade ladder (aggregate of all findings across all configured projects):
+
+| Grade | Trigger |
+|-------|---------|
+| `A+`  | clean — zero findings |
+| `A`   | info-only findings |
+| `B`   | any warn, no risk |
+| `C`   | ≥5 warn or 1–2 risk |
+| `D`   | 3–9 risk |
+| `F`   | ≥10 risk |
+
+The pill colour follows the worst severity in the report
+(green / blue / amber / red). Dimensions are fixed at 480×120 so the
+badge drops into any README without responsive layout work.
+
 `nppm scan` reuses the same `nppm.json` and `.nppm/cache/` as the dev
 server, so a warm CI run skips network calls that have already been
 made locally. Exit codes: `0` clean (or below threshold), `1` threshold
@@ -506,6 +545,7 @@ linked at the top of this README. Quick chapter pointers:
 - [Cross-project Dashboard](doc/manual_en.md#16-cross-project-dashboard)
 - [Impact analysis](doc/manual_en.md#17-impact-analysis)
 - [Badge filter](doc/manual_en.md#18-badge-filter)
+- [Health card badge](doc/manual_en.md#19-health-card-badge)
 
 ## Caches
 

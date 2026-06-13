@@ -4,6 +4,108 @@ This file orients a fresh Claude Code session (or a human) to the nppm
 codebase. It is *not* user-facing documentation — that lives in
 `README.md` and `doc/manual_*.md`.
 
+## Available MCP Servers
+
+### synaipse
+
+Synaipse is the persistent long-term memory system for this project.
+
+Synaipse contains:
+
+- Architecture decisions
+- Project knowledge
+- Technical documentation
+- Coding standards
+- Known issues and solutions
+- Research notes
+- TODOs
+- Lessons learned
+- API knowledge
+- Development history
+
+### Memory First Policy
+
+For every non-trivial task, Claude must follow this workflow:
+
+SEARCH MEMORY
+→ ANALYZE
+→ IMPLEMENT
+→ STORE KNOWLEDGE
+
+Before starting work:
+
+1. Search Synaipse for relevant knowledge.
+2. Check existing architecture decisions.
+3. Check known solutions.
+4. Check known issues and workarounds.
+5. Review related project documentation.
+
+After completing work:
+
+1. Store newly discovered knowledge.
+2. Store important implementation details.
+3. Store architecture decisions.
+4. Store lessons learned.
+5. Update outdated information.
+6. Link related knowledge entries.
+
+Knowledge stored in Synaipse takes precedence over assumptions.
+
+If required information cannot be found:
+
+1. Identify the knowledge gap.
+2. Continue with best effort.
+3. Suggest creating a new memory entry.
+
+### Knowledge Categories
+
+When storing information, classify it into one of the following categories:
+
+- architecture
+- decisions
+- implementation
+- bugs
+- solutions
+- infrastructure
+- development
+- documentation
+- research
+- api
+- standards
+- todos
+
+### Architecture Decision Records
+
+Important technical decisions must be documented.
+
+Store:
+
+- Problem
+- Context
+- Alternatives considered
+- Final decision
+- Consequences
+
+### Lessons Learned
+
+When solving a difficult problem, store:
+
+- Root cause
+- Investigation process
+- Final solution
+- Future recommendations
+
+### Code Reuse
+
+Before generating new implementations:
+
+- Search for existing patterns.
+- Search for similar implementations.
+- Follow established project conventions.
+
+Avoid creating duplicate solutions when an existing pattern already exists.
+
+
 ## What nppm is
 
 A Vite-hosted dev tool. Backend = Express middleware mounted inside

@@ -1,4 +1,5 @@
 .idea/
+.mcp.json
 .nppm/
 .nppm-backups
 .nppm-cache

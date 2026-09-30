@@ -5862,7 +5862,17 @@ button.vuln-summary-pill {
 
 .pane-registry {
     padding: 16px 18px;
-    overflow: auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+/* Head / status / connect / tabbar stay a fixed block at the top; the
+   active tab panel below flexes to fill the rest of the pane height. */
+.pane-registry > .reg-head,
+.pane-registry > .reg-status,
+.pane-registry > .reg-connect,
+.pane-registry > .reg-tabbar {
+    flex: none;
 }
 .reg-head {
     display: flex;
@@ -6025,8 +6035,6 @@ button.vuln-summary-pill {
 .reg-log {
     font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
     font-size: 11.5px;
-    max-height: 200px;
-    overflow-y: auto;
     padding: 6px 0;
 }
 .reg-log-line {
@@ -6098,6 +6106,11 @@ button.vuln-summary-pill {
 }
 .reg-panel-active {
     display: block;
+    /* Fill the remaining pane height and scroll internally so the list
+       reaches the foot of the page instead of a fixed cap. */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
 }
 .reg-num-zero {
     color: var(--c-muted);

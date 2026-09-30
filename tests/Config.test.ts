@@ -110,4 +110,26 @@ describe('Config schema', () => {
         };
         expect(SchemaConfig.validate(cfg, [])).toBe(false);
     });
+
+    it('accepts an optional proxy section', () => {
+        const cfg = {
+            projects: [],
+            proxy: {
+                enabled: true,
+                upstream: 'https://registry.npmjs.org',
+                mountPath: '/registry',
+                token: '$NPM_TOKEN'
+            }
+        };
+        expect(SchemaConfig.validate(cfg, [])).toBe(true);
+    });
+
+    it('accepts an empty proxy section', () => {
+        expect(SchemaConfig.validate({projects: [], proxy: {}}, [])).toBe(true);
+    });
+
+    it('rejects a non-boolean proxy.enabled', () => {
+        const cfg = {projects: [], proxy: {enabled: 'yes'}};
+        expect(SchemaConfig.validate(cfg, [])).toBe(false);
+    });
 });

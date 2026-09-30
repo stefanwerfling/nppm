@@ -110,6 +110,13 @@ function makeEnvironment(opts: {
         securityScanner: securityScanner,
         unusedDetector: unusedDetector,
         bundlephobiaFetcher: bundlephobiaFetcher,
+        proxy: {
+            enabled: false,
+            upstream: 'https://registry.npmjs.org',
+            mountPath: '/registry',
+            token: undefined,
+            storeDir: path.join(opts.cacheDir, '.nppm', 'register')
+        },
         allowInstall: false,
         githubToken: undefined,
         editor: undefined,

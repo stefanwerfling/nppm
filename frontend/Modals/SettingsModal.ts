@@ -342,6 +342,35 @@ export class SettingsModal {
         body.appendChild(this._sectionHead(I18n.t('Registry')));
         body.appendChild(this._textField('sm-rurl', I18n.t('Registry URL'), r.url, 'https://registry.npmjs.org'));
         body.appendChild(this._textField('sm-rauth', I18n.t('Bearer token ($ENV_VAR supported)'), r.auth, '$NPM_TOKEN'));
+
+        /*
+         * Package proxy — the inverse direction: nppm serving packages
+         * to npm, rather than querying a registry for its own data. Off
+         * by default. The mount-path hint spells out the resulting
+         * `npm config set registry` URL on the dev-server port.
+         */
+        const p = this._current.proxy ?? {};
+        body.appendChild(this._sectionHead(I18n.t('Package proxy (serve packages to npm)')));
+        body.appendChild(this._checkboxField('sm-px-en', I18n.t('Enable package proxy'), p.enabled === true));
+        body.appendChild(this._textField(
+            'sm-px-up',
+            I18n.t('Upstream registry (empty = use Registry URL above)'),
+            p.upstream,
+            'https://registry.npmjs.org'
+        ));
+        body.appendChild(this._textField('sm-px-mp', I18n.t('Mount path'), p.mountPath, '/registry'));
+        body.appendChild(this._textField(
+            'sm-px-tok',
+            I18n.t('Upstream token ($ENV_VAR supported)'),
+            p.token,
+            '$NPM_TOKEN'
+        ));
+        const hint = document.createElement('div');
+        hint.className = 'umd-note';
+        hint.textContent = I18n.t(
+            'Then point npm at nppm: npm config set registry http://localhost:<port><mountPath>'
+        );
+        body.appendChild(hint);
     }
 
     private _renderActions(body: HTMLElement): void {
@@ -698,6 +727,31 @@ export class SettingsModal {
             reg.auth = auth;
         }
         this._current.registry = Object.keys(reg).length > 0 ? reg : undefined;
+
+        /*
+         * Package proxy: persist `enabled: true` only when checked (a
+         * false leaves the flag off disk, so an absent section reads as
+         * "disabled"). Upstream / mountPath / token are omitted when
+         * empty so the loader's defaults apply.
+         */
+        const pxEnabled = this._boolVal('.sm-px-en');
+        const pxUpstream = this._strVal('.sm-px-up');
+        const pxMount = this._strVal('.sm-px-mp');
+        const pxToken = this._strVal('.sm-px-tok');
+        const px: NonNullable<ApiConfigSettings['proxy']> = {};
+        if (pxEnabled) {
+            px.enabled = true;
+        }
+        if (pxUpstream !== undefined) {
+            px.upstream = pxUpstream;
+        }
+        if (pxMount !== undefined) {
+            px.mountPath = pxMount;
+        }
+        if (pxToken !== undefined) {
+            px.token = pxToken;
+        }
+        this._current.proxy = Object.keys(px).length > 0 ? px : undefined;
     }
 
     private _collectActions(): void {
@@ -842,6 +896,7 @@ export class SettingsModal {
             server: this._current.server,
             browser: this._current.browser,
             registry: this._current.registry,
+            proxy: this._current.proxy,
             cache: this._current.cache,
             actions: this._current.actions,
             security: this._current.security,

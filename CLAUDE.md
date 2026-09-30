@@ -173,6 +173,7 @@ nppm/
 │   │   ├── IntegrityController.ts      per-project lockfile integrity cross-check
 │   │   ├── UnusedController.ts         per-project depcheck-style report
 │   │   ├── SbomController.ts           per-project SBOM emit (CycloneDX / SPDX)
+│   │   ├── RegistryProxyController.ts  npm-compatible registry mounted under `proxy.mountPath` (default /registry) when `proxy.enabled`; GET packument + tarball, hand-parses the `/-/` split so scoped names work. Only registers when enabled.
 │   │   └── Schemas/                    VTS body/query schemas used by the Controllers
 │   │       ├── SchemaApiConfig.ts
 │   │       ├── SchemaApiFsBrowse.ts
@@ -196,7 +197,13 @@ nppm/
 │   │   ├── Lockfile.ts             parsePackageLock v2/v3, scanNodeModules fallback
 │   │   └── SafePath.ts             join() containment helper — resolves a candidate against a root, refuses anything that isn't the root itself or a strict descendant of `${root}${sep}`. Used by Upgrader.resolvePackageJson + TemplateApplier._packageJsonFor/_fileAbs.
 │   │
-│   ├── Registry/Registry.ts        npm-registry client with batched concurrency
+│   ├── Registry/
+│   │   ├── Registry.ts             npm-registry client with batched concurrency
+│   │   ├── RegistryProxy.ts        nppm-as-registry read side: upstream packument fetch + dist.tarball rewrite (integrity untouched) + tarball resolve; TarballStore hook serves hits offline / writes misses back
+│   │   ├── HttpUpstreamFetcher.ts  default UpstreamFetcher over global fetch (auth + scope-encoding); DI seam for tests
+│   │   ├── DiskTarballStore.ts     .nppm/register/<name>/<unscoped>-<version>.zip mirror (SafePath-gated, atomic write); stores the original .tgz so served bytes stay SRI-identical
+│   │   ├── ZipArchive.ts           hand-rolled single-entry ZIP (store mode, no deflate) — no zip dep, like TarballParser's hand-rolled tar
+│   │   └── Crc32.ts                CRC-32 for the ZIP headers
 │   │
 │   ├── Matrix/                     two matrix variants
 │   │   ├── MatrixBuilder.ts        cross-project (rows = pkgs, cols = projects)
@@ -440,6 +447,12 @@ migrations leave both sides alone rather than merging.
 - `.nppm/backups/` — pre-write snapshots from Upgrade / Template-Apply
   flows. Lives next to history for the same reason: it's audit trail,
   not throwaway state.
+- `.nppm/register/` — package-registry / proxy tarball mirror
+  (`<name>/<unscoped>-<version>.zip`, the original `.tgz` stored
+  uncompressed inside). Lives outside `cache/` (not the overridable
+  `cache.dir`) because it's a mirror the user may keep and serve
+  offline; deleting it just forces a re-fetch from the upstream. Only
+  written when `proxy.enabled`.
 
 ## Conventions Claude should not break
 
@@ -522,6 +535,20 @@ migrations leave both sides alone rather than merging.
   `/srv/project-evil` squeak past on a sibling project called
   `/srv/project`. Tests cover trailing `..`, deep `../..` chains,
   absolute segments, sibling-with-shared-prefix.
+
+- **Registry proxy must preserve tarball bytes (SRI invariant).**
+  When `proxy.enabled`, nppm serves packages to npm. The bytes returned
+  for a tarball — whether fetched live (`RegistryProxy` upstream) or read
+  from the `.nppm/register/` mirror (`DiskTarballStore`) — must be
+  **byte-identical** to the upstream `.tgz`, because npm verifies each
+  tarball's SRI against `dist.integrity` in the lockfile. So: the store
+  keeps the original `.tgz` *uncompressed* inside its `.zip`
+  (`ZipArchive` store-mode), and only `dist.tarball` is rewritten in the
+  packument — never `dist.integrity` / `dist.shasum`.
+  `ZipArchive.unpackSingle` CRC-checks on read so a corrupt store entry
+  reads back as a miss and `getTarball` self-heals by re-fetching. Don't
+  "optimise" the store to deflate the tarball or strip metadata — it
+  breaks `npm install`'s integrity check.
 
 ## Tests
 

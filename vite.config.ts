@@ -17,6 +17,7 @@ import {MatrixController} from './backend/Api/MatrixController.js';
 import {PackagesController} from './backend/Api/PackagesController.js';
 import {PrReviewController} from './backend/Api/PrReviewController.js';
 import {ProjectsController} from './backend/Api/ProjectsController.js';
+import {RegistryProxyController} from './backend/Api/RegistryProxyController.js';
 import {ReleasesController} from './backend/Api/ReleasesController.js';
 import {SbomController} from './backend/Api/SbomController.js';
 import {SecurityController} from './backend/Api/SecurityController.js';
@@ -328,6 +329,7 @@ class Server {
                 GithubController.register(ctx);
                 SourceGraphController.register(ctx);
                 SelfCodeController.register(ctx);
+                RegistryProxyController.register(ctx);
 
                 server.middlewares.use(app);
             }

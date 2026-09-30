@@ -15,6 +15,7 @@ import {ProjectMatrixView} from './Pages/ProjectMatrixView.js';
 import {ProjectNav} from './Widgets/ProjectNav.js';
 import {Resizer} from './Widgets/Resizer.js';
 import {SourceGraphView} from './Pages/SourceGraphView.js';
+import {RegistryView} from './Pages/RegistryView.js';
 import {TemplatesView} from './Pages/TemplatesView.js';
 import {TemplateView} from './Pages/TemplateView.js';
 import {Treeview} from './Widgets/Treeview.js';
@@ -47,7 +48,8 @@ enum View {
     template = 'template',
     sourceGraph = 'sourceGraph',
     dashboard = 'dashboard',
-    global = 'global'
+    global = 'global',
+    registry = 'registry'
 }
 
 /**
@@ -72,6 +74,7 @@ export class Nppm {
     private readonly _dashboardView: DashboardView;
     private readonly _findingsModal: FindingsModal;
     private readonly _globalScanView: GlobalScanView;
+    private readonly _registryView: RegistryView;
     private readonly _detailPanel: PackageDetailPanel;
     private readonly _upgradeModal: UpgradeModal;
     private readonly _bulkUpgradeModal: BulkUpgradeModal;
@@ -94,6 +97,7 @@ export class Nppm {
     private _sourceGraphHost: HTMLElement|null = null;
     private _dashboardHost: HTMLElement|null = null;
     private _globalHost: HTMLElement|null = null;
+    private _registryHost: HTMLElement|null = null;
     private _view: View = View.matrix;
     private _projects: ApiProject[] = [];
     /**
@@ -144,6 +148,7 @@ export class Nppm {
         this._findingsModal = new FindingsModal();
 
         this._globalScanView = new GlobalScanView(this._globalHost!);
+        this._registryView = new RegistryView(this._registryHost!);
 
         /*
          * Topbar "Scan all" — single entry point for the Dashboard
@@ -276,9 +281,21 @@ export class Nppm {
                 void this._loadTemplates();
             } else if (project.unid === '__cvescan__') {
                 this._loadGlobalScan();
+            } else if (project.unid === '__registry__') {
+                this._loadRegistry();
             } else {
                 void this._loadProject(project);
             }
+        });
+
+        /*
+         * Topbar registry pill → open the RegistryView. The pill lives
+         * outside Nppm (mounted in main.ts), so it signals via a custom
+         * event instead of a direct call.
+         */
+        document.addEventListener('nppm:open-registry', () => {
+            this._treeview.setSelected('__registry__');
+            this._loadRegistry();
         });
 
         /*
@@ -620,6 +637,10 @@ export class Nppm {
         this._switchTo(View.global);
         this._globalScanView.show();
     }
+    private _loadRegistry(): void {
+        this._switchTo(View.registry);
+        this._registryView.show();
+    }
 
     private async _loadProjectTemplate(project: ApiProject): Promise<void> {
         this._switchTo(View.template);
@@ -697,6 +718,10 @@ export class Nppm {
         this._globalHost = document.createElement('div');
         this._globalHost.className = 'pane pane-global';
         this._listRoot.appendChild(this._globalHost);
+
+        this._registryHost = document.createElement('div');
+        this._registryHost.className = 'pane pane-registry';
+        this._listRoot.appendChild(this._registryHost);
     }
 
     private _switchTo(view: View): void {
@@ -707,7 +732,7 @@ export class Nppm {
             || !this._depTreeHost || !this._unusedHost || !this._vulnsHost
             || !this._prHost || !this._templatesHost || !this._templateHost
             || !this._sourceGraphHost
-            || !this._dashboardHost || !this._globalHost) {
+            || !this._dashboardHost || !this._globalHost || !this._registryHost) {
             return;
         }
 
@@ -725,6 +750,7 @@ export class Nppm {
         this._sourceGraphHost.style.display = view === View.sourceGraph ? '' : 'none';
         this._dashboardHost.style.display = view === View.dashboard ? '' : 'none';
         this._globalHost.style.display = view === View.global ? '' : 'none';
+        this._registryHost.style.display = view === View.registry ? '' : 'none';
 
         /*
          * Intentionally do NOT stop the dashboard SSE when leaving —

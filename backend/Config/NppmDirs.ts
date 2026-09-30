@@ -45,6 +45,19 @@ export class NppmDirs {
     }
 
     /**
+     * Store for the package-registry / proxy feature: cached tarballs
+     * live under `.nppm/register/<name>/<name>-<version>.zip`. Sits next
+     * to history/backups (not under `cache/`) because a self-hosted
+     * registry mirror is state the user may want to keep and serve
+     * offline — deleting it forces a re-fetch from the upstream. Has no
+     * legacy predecessor, so `migrate()` only ensures the parent exists.
+     */
+    public static register(projectRoot: string): string {
+        NppmDirs.migrate(projectRoot);
+        return path.join(projectRoot, NppmDirs._BASE, 'register');
+    }
+
+    /**
      * Move `.nppm-cache/`, `.nppm-history/`, `.nppm-backups/` (if
      * present) under a single `.nppm/<bucket>/` parent. Idempotent and
      * skips any bucket whose new target already exists — manual partial

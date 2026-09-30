@@ -116,6 +116,19 @@ export type ApiConfigSettings = {
         url?: string;
         auth?: string;
     };
+    /**
+     * Package-registry / proxy — turns nppm into an npm-compatible
+     * registry served under `mountPath` on the dev-server port.
+     * `upstream` is where missing packages are fetched (omit to reuse
+     * `registry.url`); `token` accepts a literal or `$VARNAME`
+     * placeholder for a private upstream.
+     */
+    proxy?: {
+        enabled?: boolean;
+        upstream?: string;
+        mountPath?: string;
+        token?: string;
+    };
     cache?: {
         dir?: string;
         ttlMinutes?: number;
@@ -191,6 +204,64 @@ export type ApiConfigMutationResponse = {
 export type ApiCacheClearResponse = {
     success: boolean;
     /** Number of files removed across all cache pockets. */
+    removed: number;
+    msg?: string;
+};
+
+/**
+ * `GET /api/registry/status` — current package-registry / proxy state,
+ * plus store totals so the RegistryView status strip + topbar pill can
+ * render without a second call. `enabled: false` means the proxy is
+ * off in `nppm.json`; the store totals still reflect whatever is
+ * already mirrored on disk.
+ */
+export type ApiRegistryStatusResponse = {
+    enabled: boolean;
+    upstream: string;
+    mountPath: string;
+    /** Distinct package names in the store. */
+    packages: number;
+    /** Distinct name@version archives in the store. */
+    versions: number;
+    /** Total on-disk size of the mirror in bytes. */
+    totalBytes: number;
+    /** Tarball requests served from the store since server start. */
+    hits: number;
+    /** Tarball requests that fell through to the upstream. */
+    misses: number;
+};
+
+/** One mirrored package (with its cached versions) in the store. */
+export type ApiRegistryPackage = {
+    name: string;
+    versions: {version: string; bytes: number; mtime: number;}[];
+    totalBytes: number;
+};
+
+/** `GET /api/registry/packages` — the full store listing. */
+export type ApiRegistryPackagesResponse = {
+    packages: ApiRegistryPackage[];
+};
+
+/**
+ * One live proxy request, streamed over the `GET /api/registry/log`
+ * SSE endpoint (event name `entry`) and replayed as a recent-history
+ * snapshot on connect.
+ */
+export type ApiRegistryLogEntry = {
+    time: number;
+    method: string;
+    name: string;
+    version?: string;
+    kind: 'packument'|'tarball'|'ping';
+    result: 'hit'|'miss'|'not-found'|'error';
+    bytes?: number;
+};
+
+/** `POST /api/registry/clear` — wipes `.nppm/register/`. */
+export type ApiRegistryClearResponse = {
+    success: boolean;
+    /** Number of mirrored archives removed. */
     removed: number;
     msg?: string;
 };

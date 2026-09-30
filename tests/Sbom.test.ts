@@ -74,6 +74,13 @@ function makeEnvironment(projects: Project[], cacheDir: string): LoadedConfig {
         securityScanner: securityScanner,
         unusedDetector: unusedDetector,
         bundlephobiaFetcher: bundlephobiaFetcher,
+        proxy: {
+            enabled: false,
+            upstream: 'https://registry.npmjs.org',
+            mountPath: '/registry',
+            token: undefined,
+            storeDir: path.join(cacheDir, '.nppm', 'register')
+        },
         allowInstall: false,
         githubToken: undefined,
         editor: undefined,

@@ -5,6 +5,9 @@ import {
     ApiBulkUpgradePreviewResponse,
     ApiTemplatesResponse,
     ApiCacheClearResponse,
+    ApiRegistryClearResponse,
+    ApiRegistryPackagesResponse,
+    ApiRegistryStatusResponse,
     ApiDepGraphResponse,
     ApiFingerprintDiffResponse,
     ApiFingerprintResponse,
@@ -246,6 +249,26 @@ export class Api {
 
     public static async matrix(): Promise<MatrixResponse> {
         return Api._json<MatrixResponse>('/api/matrix');
+    }
+
+    public static async registryStatus(): Promise<ApiRegistryStatusResponse> {
+        return Api._json<ApiRegistryStatusResponse>('/api/registry/status');
+    }
+
+    public static async registryPackages(): Promise<ApiRegistryPackagesResponse> {
+        return Api._json<ApiRegistryPackagesResponse>('/api/registry/packages');
+    }
+
+    public static registryLogUrl(): string {
+        return '/api/registry/log';
+    }
+
+    public static async registryClear(): Promise<ApiRegistryClearResponse> {
+        const res = await fetch('/api/registry/clear', {method: 'POST'});
+        if (!res.ok) {
+            throw new Error(`/api/registry/clear → ${res.status} ${res.statusText}`);
+        }
+        return (await res.json()) as ApiRegistryClearResponse;
     }
 
     public static async impact(name: string, version?: string): Promise<ApiImpactResponse> {

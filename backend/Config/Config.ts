@@ -82,6 +82,37 @@ export const SchemaConfigRegistry = Vts.object({
 });
 
 /**
+ * Package-registry / proxy section — the *inverse* direction of the
+ * `registry` section above. Where `registry` says "which registry does
+ * nppm query for its own packument/scanning data", `proxy` turns nppm
+ * *into* an npm-compatible registry that other tooling installs from.
+ *
+ * When `enabled`, nppm serves the registry protocol under `mountPath`
+ * (default `/registry`) on the *same* port as the dev server — so
+ * `npm config set registry http://localhost:<port>/registry` just
+ * works, no second listener. A package/version nppm doesn't have yet is
+ * fetched from `upstream` (falls back to `registry.url`, then the public
+ * npmjs.org) and cached on disk under `.nppm/register/<name>/` so the
+ * next install is served offline.
+ *
+ *  - `enabled`   → master switch; off by default (opt-in feature).
+ *  - `upstream`  → where missing packages are pulled from. Omit to
+ *                  reuse the `registry.url` upstream.
+ *  - `mountPath` → URL prefix the registry is served under; normalised
+ *                  to a leading-slash / no-trailing-slash form at load.
+ *  - `token`     → Bearer token for a private upstream. Accepts a
+ *                  literal or a `$VARNAME` placeholder resolved by
+ *                  `ConfigLoader.expandEnv()` so the config stays safe
+ *                  to commit.
+ */
+export const SchemaConfigProxy = Vts.object({
+    enabled: Vts.optional(Vts.boolean()),
+    upstream: Vts.optional(Vts.string()),
+    mountPath: Vts.optional(Vts.string()),
+    token: Vts.optional(Vts.string())
+});
+
+/**
  * Disk cache settings. `dir` is resolved against the nppm process
  * root; missing TTL falls back to 60 minutes.
  */
@@ -252,6 +283,7 @@ export const SchemaConfig = Vts.object({
     server: Vts.optional(SchemaConfigServer),
     browser: Vts.optional(SchemaConfigBrowser),
     registry: Vts.optional(SchemaConfigRegistry),
+    proxy: Vts.optional(SchemaConfigProxy),
     cache: Vts.optional(SchemaConfigCache),
     security: Vts.optional(SchemaConfigSecurity),
     actions: Vts.optional(SchemaConfigActions),

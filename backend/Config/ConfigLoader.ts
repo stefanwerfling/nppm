@@ -91,6 +91,25 @@ export type LoadedConfig = {
      */
     ignoredFindings: IgnoredFinding[];
     /**
+     * Resolved package-registry / proxy config. `enabled` is the
+     * opt-in master switch; the rest is pre-resolved so callers never
+     * re-derive defaults:
+     *  - `upstream`  — where missing packages are fetched (config
+     *    `proxy.upstream` → `registry.url` → npmjs.org).
+     *  - `mountPath` — normalised URL prefix (leading slash, no
+     *    trailing slash), default `/registry`.
+     *  - `token`     — `$VARNAME`-expanded Bearer token or undefined.
+     *  - `storeDir`  — absolute `.nppm/register/` path the on-disk
+     *    tarball mirror lives under.
+     */
+    proxy: {
+        enabled: boolean;
+        upstream: string;
+        mountPath: string;
+        token: string|undefined;
+        storeDir: string;
+    };
+    /**
      * Projects in *config order*. The Vite plugin re-keys them by UUID
      * for its API surface; the CLI iterates the array directly. Order
      * is preserved so both surfaces agree on `--project=<name>`
@@ -117,7 +136,7 @@ export class ConfigLoader {
         if (!value) {
             return value;
         }
-        const match = /^\$([A-Z_][A-Z0-9_]*)$/i.exec(value);
+        const match = /^\$([A-Z_][A-Z0-9_]*)$/iu.exec(value);
         if (!match) {
             return value;
         }
@@ -139,6 +158,7 @@ export class ConfigLoader {
         const cfg = raw as {
             projects?: unknown[];
             registry?: {url?: string; auth?: string;};
+            proxy?: {enabled?: boolean; upstream?: string; mountPath?: string; token?: string;};
             cache?: {dir?: string; ttlMinutes?: number;};
             security?: {
                 maintainer?: {
@@ -187,6 +207,26 @@ export class ConfigLoader {
 
         const registryUrl = cfg.registry?.url ?? 'https://registry.npmjs.org';
         const registryAuth = cfg.registry?.auth;
+
+        /*
+         * Package-registry / proxy — opt-in (off by default). Upstream
+         * defaults to the same registry nppm queries for scanning; the
+         * mount path is normalised to a leading-slash / no-trailing-
+         * slash form so downstream route registration and the UI's copy
+         * snippet agree. The token is `$VARNAME`-expanded like every
+         * other secret field. The tarball store always lives under
+         * `.nppm/register/` (not the overridable cache dir) — it's a
+         * mirror the user may keep and serve offline.
+         */
+        const proxy = {
+            enabled: cfg.proxy?.enabled === true,
+            upstream: cfg.proxy?.upstream && cfg.proxy.upstream.length > 0
+                ? cfg.proxy.upstream
+                : registryUrl,
+            mountPath: ConfigLoader._normalizeMountPath(cfg.proxy?.mountPath),
+            token: ConfigLoader.expandEnv(cfg.proxy?.token),
+            storeDir: NppmDirs.register(projectRoot)
+        };
         const cacheDir = cfg.cache?.dir
             ? path.resolve(projectRoot, cfg.cache.dir)
             : NppmDirs.cache(projectRoot);
@@ -369,9 +409,26 @@ export class ConfigLoader {
             editor: editor,
             githubToken: githubToken,
             ignoredFindings: ignoredFindings,
+            proxy: proxy,
             projects: projects,
             externalScanner: externalScanner
         };
+    }
+
+    /**
+     * Normalise a user-supplied registry mount path to a leading-slash,
+     * no-trailing-slash form (`registry` / `/registry/` → `/registry`).
+     * Empty / missing input defaults to `/registry`; a bare `/` (root
+     * mount) is preserved as-is.
+     */
+    private static _normalizeMountPath(raw: string|undefined): string {
+        const trimmed = (raw ?? '').trim();
+        if (trimmed.length === 0) {
+            return '/registry';
+        }
+        const withLead = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+        const noTrail = withLead.replace(/\/+$/u, '');
+        return noTrail.length > 0 ? noTrail : '/';
     }
 
     /**

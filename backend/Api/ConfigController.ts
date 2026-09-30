@@ -20,7 +20,7 @@ import {ServerContext} from './ServerContext.js';
 export class ConfigController {
 
     private static readonly _SECTIONS: readonly string[] = [
-        'server', 'browser', 'registry', 'cache', 'actions', 'security', 'ui'
+        'server', 'browser', 'registry', 'proxy', 'cache', 'actions', 'security', 'ui'
     ];
 
     public static register(ctx: ServerContext): void {

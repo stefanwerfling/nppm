@@ -156,6 +156,15 @@ export class Treeview {
         };
         matrixGroup.appendChild(this._renderItem(cveScanItem, true));
 
+        const registryItem: ApiProject = {
+            unid: '__registry__',
+            name: I18n.t('Registry'),
+            type: ConfigProjectType.local,
+            packageCount: 0,
+            workspaceCount: 0
+        };
+        matrixGroup.appendChild(this._renderItem(registryItem, true));
+
         pinned.appendChild(matrixGroup);
         this._root.appendChild(pinned);
 
@@ -398,6 +407,9 @@ export class Treeview {
         }
         if (unid === '__cvescan__') {
             return '◎';
+        }
+        if (unid === '__registry__') {
+            return '⬢';
         }
         return null;
     }

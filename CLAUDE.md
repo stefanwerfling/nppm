@@ -173,7 +173,7 @@ nppm/
 │   │   ├── IntegrityController.ts      per-project lockfile integrity cross-check
 │   │   ├── UnusedController.ts         per-project depcheck-style report
 │   │   ├── SbomController.ts           per-project SBOM emit (CycloneDX / SPDX)
-│   │   ├── RegistryProxyController.ts  npm-compatible registry mounted under `proxy.mountPath` (default /registry) when `proxy.enabled`; GET packument + tarball, hand-parses the `/-/` split so scoped names work. Only registers when enabled.
+│   │   ├── RegistryProxyController.ts  npm-compatible registry mounted under `proxy.mountPath` (default /registry) when `proxy.enabled`; GET packument + tarball, hand-parses the `/-/` split so scoped names work. Mount only registers when enabled; the `/api/registry/{status,packages,log,history,clear}` management API registers always. An optional leading `/registry/<project>/…` segment (matched against configured project names via `resolveProject`) buckets requests per project; the rewritten dist.tarball keeps the segment so the tarball fetch stays in the same bucket.
 │   │   └── Schemas/                    VTS body/query schemas used by the Controllers
 │   │       ├── SchemaApiConfig.ts
 │   │       ├── SchemaApiFsBrowse.ts
@@ -203,7 +203,9 @@ nppm/
 │   │   ├── HttpUpstreamFetcher.ts  default UpstreamFetcher over global fetch (auth + scope-encoding); DI seam for tests
 │   │   ├── DiskTarballStore.ts     .nppm/register/<name>/<unscoped>-<version>.zip mirror (SafePath-gated, atomic write); stores the original .tgz so served bytes stay SRI-identical
 │   │   ├── ZipArchive.ts           hand-rolled single-entry ZIP (store mode, no deflate) — no zip dep, like TarballParser's hand-rolled tar
-│   │   └── Crc32.ts                CRC-32 for the ZIP headers
+│   │   ├── Crc32.ts                CRC-32 for the ZIP headers
+│   │   ├── RegistryActivity.ts     live request feed (ring buffer + SSE fan-out) + per-project/per-package tallies for the current UTC day; seeds from + throttled-flushes to RegistryHistoryStore so counters survive a restart. Omit the store for a pure in-memory instance (tests).
+│   │   └── RegistryHistoryStore.ts per-day per-project request tallies in `.nppm/history/registry/YYYY-MM-DD.json` (accumulating, not last-wins; atomic write). readRange(days) drives the RegistryView Projects tab / `/api/registry/history`.
 │   │
 │   ├── Matrix/                     two matrix variants
 │   │   ├── MatrixBuilder.ts        cross-project (rows = pkgs, cols = projects)
@@ -549,6 +551,21 @@ migrations leave both sides alone rather than merging.
   reads back as a miss and `getTarball` self-heals by re-fetching. Don't
   "optimise" the store to deflate the tarball or strip metadata — it
   breaks `npm install`'s integrity check.
+
+- **Per-project registry buckets are label-validated, not free-form.**
+  `RegistryProxyController.resolveProject` treats the first
+  `/registry/<seg>/…` path segment as a project **only** when `<seg>`
+  (case-insensitively) matches a configured project's `getName()` /
+  `getKey()`; otherwise the whole path is the package (legacy bare-mount
+  path stays fully backward-compatible, and a scoped packument
+  `@scope%2fpkg` never matches so it never mis-buckets). When a segment
+  matches, `_servePackument` keeps that **original** segment in every
+  rewritten `dist.tarball` URL so the follow-up tarball fetch routes
+  back through the *same* bucket and is counted under the same project.
+  Tallies persist per UTC day via `RegistryHistoryStore`; the `default`
+  bucket collects bare-mount requests. Don't switch this to accept any
+  first segment as a project — a bare `/registry/lodash` would then read
+  `lodash` as a project and 404 the install.
 
 ## Tests
 

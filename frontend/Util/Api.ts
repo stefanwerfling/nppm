@@ -6,6 +6,7 @@ import {
     ApiTemplatesResponse,
     ApiCacheClearResponse,
     ApiRegistryClearResponse,
+    ApiRegistryHistoryResponse,
     ApiRegistryPackagesResponse,
     ApiRegistryStatusResponse,
     ApiDepGraphResponse,
@@ -261,6 +262,10 @@ export class Api {
 
     public static registryLogUrl(): string {
         return '/api/registry/log';
+    }
+
+    public static async registryHistory(days = 90): Promise<ApiRegistryHistoryResponse> {
+        return Api._json<ApiRegistryHistoryResponse>(`/api/registry/history?days=${days}`);
     }
 
     public static async registryClear(): Promise<ApiRegistryClearResponse> {

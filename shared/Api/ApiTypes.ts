@@ -225,10 +225,45 @@ export type ApiRegistryStatusResponse = {
     versions: number;
     /** Total on-disk size of the mirror in bytes. */
     totalBytes: number;
-    /** Tarball requests served from the store since server start. */
+    /** Tarball requests served from the store today (persisted). */
     hits: number;
-    /** Tarball requests that fell through to the upstream. */
+    /** Tarball requests that fell through to the upstream today. */
     misses: number;
+    /**
+     * Per-project request tallies for the current day, seeded from disk
+     * so they survive a server restart. The bare-mount bucket (no
+     * project segment in the URL) reports under the `default` project.
+     */
+    projects: ApiRegistryProjectStat[];
+};
+
+/**
+ * One project's request tally. `project` is the canonical configured
+ * project name the `/registry/<project>/…` segment resolved to, or
+ * `default` for requests that hit the bare mount without a segment.
+ * `hits`/`misses` count tarball requests (store vs upstream); the other
+ * fields count every served request of that kind.
+ */
+export type ApiRegistryProjectStat = {
+    project: string;
+    hits: number;
+    misses: number;
+    packuments: number;
+    tarballs: number;
+    notFound: number;
+    errors: number;
+};
+
+/** One day of per-project registry activity (from the history store). */
+export type ApiRegistryHistoryDay = {
+    /** UTC calendar day, `YYYY-MM-DD`. */
+    date: string;
+    projects: ApiRegistryProjectStat[];
+};
+
+/** `GET /api/registry/history?days=` — rolling per-day activity. */
+export type ApiRegistryHistoryResponse = {
+    days: ApiRegistryHistoryDay[];
 };
 
 /** One mirrored package (with its cached versions) in the store. */
@@ -236,6 +271,8 @@ export type ApiRegistryPackage = {
     name: string;
     versions: {version: string; bytes: number; mtime: number;}[];
     totalBytes: number;
+    /** Store hits served for this package today (summed across projects). */
+    hits: number;
 };
 
 /** `GET /api/registry/packages` — the full store listing. */
@@ -251,6 +288,12 @@ export type ApiRegistryPackagesResponse = {
 export type ApiRegistryLogEntry = {
     time: number;
     method: string;
+    /**
+     * Canonical project the request routed to (`/registry/<project>/…`),
+     * or `default` for a bare-mount request. Present on every recorded
+     * entry.
+     */
+    project: string;
     name: string;
     version?: string;
     kind: 'packument'|'tarball'|'ping';

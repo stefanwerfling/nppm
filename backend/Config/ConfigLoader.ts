@@ -101,6 +101,8 @@ export type LoadedConfig = {
      *  - `token`     — `$VARNAME`-expanded Bearer token or undefined.
      *  - `storeDir`  — absolute `.nppm/register/` path the on-disk
      *    tarball mirror lives under.
+     *  - `historyDir` — absolute `.nppm/history/registry/` path the
+     *    per-day per-project request tallies are persisted under.
      */
     proxy: {
         enabled: boolean;
@@ -108,6 +110,7 @@ export type LoadedConfig = {
         mountPath: string;
         token: string|undefined;
         storeDir: string;
+        historyDir: string;
     };
     /**
      * Projects in *config order*. The Vite plugin re-keys them by UUID
@@ -225,7 +228,8 @@ export class ConfigLoader {
                 : registryUrl,
             mountPath: ConfigLoader._normalizeMountPath(cfg.proxy?.mountPath),
             token: ConfigLoader.expandEnv(cfg.proxy?.token),
-            storeDir: NppmDirs.register(projectRoot)
+            storeDir: NppmDirs.register(projectRoot),
+            historyDir: path.join(NppmDirs.history(projectRoot), 'registry')
         };
         const cacheDir = cfg.cache?.dir
             ? path.resolve(projectRoot, cfg.cache.dir)

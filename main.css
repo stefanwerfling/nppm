@@ -6030,19 +6030,33 @@ button.vuln-summary-pill {
     padding: 6px 0;
 }
 .reg-log-line {
-    display: grid;
-    grid-template-columns: 80px 1fr 130px;
+    display: flex;
+    align-items: center;
     gap: 10px;
     padding: 2px 12px;
     white-space: nowrap;
 }
 .reg-log-t {
     color: var(--c-muted);
+    flex: 0 0 72px;
+}
+.reg-log-proj {
+    flex: 0 0 auto;
+    color: var(--c-accent, #6ea8fe);
+    background: rgba(110, 168, 254, 0.12);
+    border-radius: 4px;
+    padding: 0 6px;
+    font-size: 10.5px;
 }
 .reg-log-name {
     color: var(--c-text);
+    flex: 1 1 auto;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+.reg-log-result {
+    flex: 0 0 130px;
+    text-align: right;
 }
 .reg-log-hit {
     color: #4caf50;
@@ -6053,4 +6067,113 @@ button.vuln-summary-pill {
 .reg-log-not-found,
 .reg-log-error {
     color: #e85a5a;
+}
+
+/* ---- registry tabs + panels ---- */
+.reg-tabbar {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--c-border);
+    margin-bottom: 14px;
+}
+.reg-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--c-muted);
+    padding: 8px 14px;
+    font-size: 12.5px;
+    cursor: pointer;
+    margin-bottom: -1px;
+}
+.reg-tab:hover {
+    color: var(--c-text);
+}
+.reg-tab-active {
+    color: var(--c-text);
+    border-bottom-color: var(--c-accent, #6ea8fe);
+}
+.reg-panel {
+    display: none;
+}
+.reg-panel-active {
+    display: block;
+}
+.reg-num-zero {
+    color: var(--c-muted);
+    opacity: 0.5;
+}
+
+/* ---- projects tab ---- */
+.reg-sub-head {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--c-muted);
+    margin: 4px 0 8px;
+}
+.reg-proj-history {
+    margin-top: 22px;
+}
+.reg-proj-name {
+    font-weight: 500;
+}
+.reg-proj-summary table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+}
+.reg-proj-summary th {
+    text-align: right;
+    font-weight: 500;
+    color: var(--c-muted);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--c-border);
+}
+.reg-proj-summary th:first-child {
+    text-align: left;
+}
+.reg-proj-summary td {
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(60, 63, 65, 0.5);
+}
+.reg-hist-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.reg-hist-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 2px;
+}
+.reg-hist-name {
+    flex: 0 0 160px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.reg-spark {
+    flex: 0 0 auto;
+}
+.reg-spark-line {
+    fill: none;
+    stroke: var(--c-accent, #6ea8fe);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+.reg-spark-dot {
+    fill: var(--c-accent, #6ea8fe);
+}
+.reg-hist-totals {
+    flex: 0 0 auto;
+    color: var(--c-muted);
+    font-variant-numeric: tabular-nums;
+    font-size: 11.5px;
 }

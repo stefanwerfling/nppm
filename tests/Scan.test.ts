@@ -115,7 +115,8 @@ function makeEnvironment(opts: {
             upstream: 'https://registry.npmjs.org',
             mountPath: '/registry',
             token: undefined,
-            storeDir: path.join(opts.cacheDir, '.nppm', 'register')
+            storeDir: path.join(opts.cacheDir, '.nppm', 'register'),
+            historyDir: path.join(opts.cacheDir, '.nppm', 'history', 'registry')
         },
         allowInstall: false,
         githubToken: undefined,

@@ -1,6 +1,7 @@
 import {NextFunction, Request, Response} from 'express';
 import {
     ApiRegistryClearResponse,
+    ApiRegistryHistoryResponse,
     ApiRegistryLogEntry,
     ApiRegistryPackage,
     ApiRegistryPackagesResponse,
@@ -9,13 +10,27 @@ import {
 import {DiskTarballStore} from '../Registry/DiskTarballStore.js';
 import {HttpUpstreamFetcher} from '../Registry/HttpUpstreamFetcher.js';
 import {RegistryActivity} from '../Registry/RegistryActivity.js';
+import {RegistryHistoryStore} from '../Registry/RegistryHistoryStore.js';
 import {RegistryProxy} from '../Registry/RegistryProxy.js';
 import {ServerContext} from './ServerContext.js';
 
 /**
+ * Resolution of the optional `/registry/<project>/…` leading segment.
+ * `project` is the canonical configured project name a matched segment
+ * resolved to (or `default` when the first segment isn't a known
+ * project — the legacy bare-mount path). `segment` is the *original*
+ * matched segment, reused verbatim when rewriting `dist.tarball` so the
+ * tarball request routes back through the same project bucket; `null`
+ * on the default path. `rest` is the package path with the project
+ * segment stripped.
+ */
+type ProjectRoute = {project: string; segment: string|null; rest: string;};
+
+/**
  * npm-compatible registry surface + its management API (steps 18.2/18.3
  * for serving, 18.6 for the UI-facing status / packages / live-log /
- * clear routes).
+ * clear routes; per-project extension adds the `/registry/<project>/…`
+ * bucket, persisted tallies, and the history route).
  *
  * The `/api/registry/*` management routes register **always** so the
  * RegistryView can render an "off" state and show whatever is already
@@ -25,21 +40,28 @@ import {ServerContext} from './ServerContext.js';
  * installs through nppm.
  *
  * Request shapes on the mount, distinguished by the `/-/` tarball
- * separator (hand-parsed, not `:param`, so scoped names work):
+ * separator (hand-parsed, not `:param`, so scoped names work). An
+ * optional leading segment matching a configured project name buckets
+ * the request under that project (and is stripped before the package
+ * split):
  *
- *   GET <mount>/<name>                       → packument metadata
- *   GET <mount>/<name>/-/<unscoped>-<v>.tgz  → tarball bytes
+ *   GET <mount>/<name>                       → packument (default bucket)
+ *   GET <mount>/<name>/-/<unscoped>-<v>.tgz  → tarball   (default bucket)
+ *   GET <mount>/<project>/<name>             → packument (project bucket)
+ *   GET <mount>/<project>/<name>/-/<u>-<v>.tgz → tarball (project bucket)
  */
 export class RegistryProxyController {
 
     public static register(ctx: ServerContext): void {
         const proxyCfg = ctx.loaded.proxy;
         const store = new DiskTarballStore(proxyCfg.storeDir);
-        const activity = new RegistryActivity();
+        const history = new RegistryHistoryStore(proxyCfg.historyDir);
+        const activity = new RegistryActivity(history);
 
         RegistryProxyController._registerStatus(ctx, store, activity);
-        RegistryProxyController._registerPackages(ctx, store);
+        RegistryProxyController._registerPackages(ctx, store, activity);
         RegistryProxyController._registerLog(ctx, activity);
+        RegistryProxyController._registerHistory(ctx, activity, history);
         RegistryProxyController._registerClear(ctx, store);
 
         if (!proxyCfg.enabled) {
@@ -47,14 +69,31 @@ export class RegistryProxyController {
         }
         const proxy = new RegistryProxy(new HttpUpstreamFetcher(proxyCfg.upstream, proxyCfg.token), store);
         const mountPath = proxyCfg.mountPath;
+        const labels = RegistryProxyController._projectLabels(ctx);
 
         ctx.app.use(mountPath, (req: Request, res: Response, next: NextFunction): void => {
             if (req.method !== 'GET' && req.method !== 'HEAD') {
                 next();
                 return;
             }
-            void RegistryProxyController._handle(proxy, activity, mountPath, req, res);
+            void RegistryProxyController._handle(proxy, activity, labels, mountPath, req, res);
         });
+    }
+
+    /**
+     * Lowercased-label → canonical-project-name lookup, built from every
+     * configured project's display name and stable key. Lets a user
+     * point a project's `.npmrc` at `/registry/<name>` (or `/registry/
+     * <key>`) and have the request counted under that project.
+     */
+    private static _projectLabels(ctx: ServerContext): Map<string, string> {
+        const labels = new Map<string, string>();
+        for (const project of ctx.projects.values()) {
+            const name = project.getName();
+            labels.set(name.toLowerCase(), name);
+            labels.set(project.getKey().toLowerCase(), name);
+        }
+        return labels;
     }
 
     // ---- management API (always registered) ----------------------------
@@ -73,20 +112,22 @@ export class RegistryProxyController {
                 versions: entries.length,
                 totalBytes: entries.reduce((sum, e) => sum + e.bytes, 0),
                 hits: hits,
-                misses: misses
+                misses: misses,
+                projects: activity.perProject()
             };
             res.status(200).json(response);
         });
     }
 
-    private static _registerPackages(ctx: ServerContext, store: DiskTarballStore): void {
+    private static _registerPackages(ctx: ServerContext, store: DiskTarballStore, activity: RegistryActivity): void {
         ctx.app.get('/api/registry/packages', async(_req, res): Promise<void> => {
             const entries = await store.list();
+            const pkgHits = activity.pkgHits();
             const byName = new Map<string, ApiRegistryPackage>();
             for (const e of entries) {
                 let pkg = byName.get(e.name);
                 if (!pkg) {
-                    pkg = {name: e.name, versions: [], totalBytes: 0};
+                    pkg = {name: e.name, versions: [], totalBytes: 0, hits: pkgHits.get(e.name) ?? 0};
                     byName.set(e.name, pkg);
                 }
                 pkg.versions.push({version: e.version, bytes: e.bytes, mtime: e.mtime});
@@ -126,6 +167,25 @@ export class RegistryProxyController {
         });
     }
 
+    private static _registerHistory(
+        ctx: ServerContext,
+        activity: RegistryActivity,
+        history: RegistryHistoryStore
+    ): void {
+        ctx.app.get('/api/registry/history', (req, res): void => {
+            /*
+             * Flush today's in-memory tallies first so the freshest day
+             * is on disk before we read the range back — otherwise the
+             * current (throttled) day would read stale.
+             */
+            activity.flush();
+            const daysRaw = Number.parseInt(String(req.query.days ?? ''), 10);
+            const days = Number.isFinite(daysRaw) ? Math.min(Math.max(daysRaw, 1), 3650) : 90;
+            const response: ApiRegistryHistoryResponse = {days: history.readRange(days, Date.now())};
+            res.status(200).json(response);
+        });
+    }
+
     private static _registerClear(ctx: ServerContext, store: DiskTarballStore): void {
         ctx.app.post('/api/registry/clear', async(_req, res): Promise<void> => {
             try {
@@ -143,6 +203,7 @@ export class RegistryProxyController {
     private static async _handle(
         proxy: RegistryProxy,
         activity: RegistryActivity,
+        labels: Map<string, string>,
         mountPath: string,
         req: Request,
         res: Response
@@ -155,54 +216,94 @@ export class RegistryProxyController {
          * endpoint sees a live JSON registry.
          */
         if (rel.length === 0) {
-            activity.record({time: Date.now(), method: req.method, name: '/', kind: 'ping', result: 'hit'});
+            activity.record({time: Date.now(), method: req.method, project: 'default', name: '/', kind: 'ping', result: 'hit'});
             res.status(200).json({});
             return;
         }
 
-        const tarIdx = rel.indexOf('/-/');
+        const route = RegistryProxyController.resolveProject(labels, rel);
+
+        /*
+         * `/registry/<project>` with nothing after it is that project's
+         * registry ping (npm probes the configured registry root).
+         */
+        if (route.rest.length === 0) {
+            activity.record({time: Date.now(), method: req.method, project: route.project, name: '/', kind: 'ping', result: 'hit'});
+            res.status(200).json({});
+            return;
+        }
+
+        const tarIdx = route.rest.indexOf('/-/');
         try {
             if (tarIdx >= 0) {
-                await RegistryProxyController._serveTarball(proxy, activity, rel, tarIdx, req, res);
+                await RegistryProxyController._serveTarball(proxy, activity, route, tarIdx, req, res);
             } else {
-                await RegistryProxyController._servePackument(proxy, activity, mountPath, rel, req, res);
+                await RegistryProxyController._servePackument(proxy, activity, mountPath, route, req, res);
             }
         } catch (e) {
-            activity.record({time: Date.now(), method: req.method, name: rel, kind: 'tarball', result: 'error'});
+            activity.record({time: Date.now(), method: req.method, project: route.project, name: route.rest, kind: 'tarball', result: 'error'});
             res.status(500).json({error: (e as Error).message});
         }
+    }
+
+    /**
+     * Split an optional leading project segment off `rel`. The first
+     * path segment is treated as a project only when it (case-
+     * insensitively) matches a configured project name / key — so a
+     * bare `/registry/lodash` still resolves `lodash` as a package
+     * (default bucket) and only an intentional `/registry/<project>/…`
+     * gets bucketed. A scoped packument (`@scope%2fpkg`) never matches
+     * a project label, so it stays in the default bucket too.
+     *
+     * Public for unit testing — the routing decision is the tricky part
+     * (scoped names, legacy bare paths) and deserves direct coverage.
+     */
+    public static resolveProject(labels: Map<string, string>, rel: string): ProjectRoute {
+        const slash = rel.indexOf('/');
+        const firstRaw = slash >= 0 ? rel.slice(0, slash) : rel;
+        const canonical = labels.get(decodeURIComponent(firstRaw).toLowerCase());
+        if (canonical) {
+            return {project: canonical, segment: firstRaw, rest: slash >= 0 ? rel.slice(slash + 1) : ''};
+        }
+        return {project: 'default', segment: null, rest: rel};
     }
 
     private static async _servePackument(
         proxy: RegistryProxy,
         activity: RegistryActivity,
         mountPath: string,
-        rel: string,
+        route: ProjectRoute,
         req: Request,
         res: Response
     ): Promise<void> {
-        const name = decodeURIComponent(rel);
-        const publicBase = `${req.protocol}://${req.get('host') ?? 'localhost'}${mountPath}`;
+        const name = decodeURIComponent(route.rest);
+        /*
+         * Keep the project segment in the rewritten tarball URLs so the
+         * follow-up tarball fetch routes back through the same bucket
+         * and is counted under the same project.
+         */
+        const seg = route.segment ? `/${route.segment}` : '';
+        const publicBase = `${req.protocol}://${req.get('host') ?? 'localhost'}${mountPath}${seg}`;
         const {status, body} = await proxy.getPackument(name, publicBase);
         if (!body) {
-            activity.record({time: Date.now(), method: req.method, name: name, kind: 'packument', result: 'not-found'});
+            activity.record({time: Date.now(), method: req.method, project: route.project, name: name, kind: 'packument', result: 'not-found'});
             res.status(status).json({error: `package not found: ${name}`});
             return;
         }
-        activity.record({time: Date.now(), method: req.method, name: name, kind: 'packument', result: 'hit'});
+        activity.record({time: Date.now(), method: req.method, project: route.project, name: name, kind: 'packument', result: 'hit'});
         res.status(200).json(body);
     }
 
     private static async _serveTarball(
         proxy: RegistryProxy,
         activity: RegistryActivity,
-        rel: string,
+        route: ProjectRoute,
         tarIdx: number,
         req: Request,
         res: Response
     ): Promise<void> {
-        const name = decodeURIComponent(rel.slice(0, tarIdx));
-        const file = rel.slice(tarIdx + 3);
+        const name = decodeURIComponent(route.rest.slice(0, tarIdx));
+        const file = route.rest.slice(tarIdx + 3);
         const version = RegistryProxy.versionFromTarballFile(name, file);
         if (!version) {
             res.status(400).json({error: `malformed tarball path: ${file}`});
@@ -210,13 +311,14 @@ export class RegistryProxyController {
         }
         const {status, body, source} = await proxy.getTarball(name, version);
         if (!body) {
-            activity.record({time: Date.now(), method: req.method, name: name, version: version, kind: 'tarball', result: 'not-found'});
+            activity.record({time: Date.now(), method: req.method, project: route.project, name: name, version: version, kind: 'tarball', result: 'not-found'});
             res.status(status).json({error: `tarball not found: ${name}@${version}`});
             return;
         }
         activity.record({
             time: Date.now(),
             method: req.method,
+            project: route.project,
             name: name,
             version: version,
             kind: 'tarball',

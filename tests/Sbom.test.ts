@@ -79,7 +79,8 @@ function makeEnvironment(projects: Project[], cacheDir: string): LoadedConfig {
             upstream: 'https://registry.npmjs.org',
             mountPath: '/registry',
             token: undefined,
-            storeDir: path.join(cacheDir, '.nppm', 'register')
+            storeDir: path.join(cacheDir, '.nppm', 'register'),
+            historyDir: path.join(cacheDir, '.nppm', 'history', 'registry')
         },
         allowInstall: false,
         githubToken: undefined,

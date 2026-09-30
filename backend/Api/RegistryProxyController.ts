@@ -70,13 +70,14 @@ export class RegistryProxyController {
         const proxy = new RegistryProxy(new HttpUpstreamFetcher(proxyCfg.upstream, proxyCfg.token), store);
         const mountPath = proxyCfg.mountPath;
         const labels = RegistryProxyController._projectLabels(ctx);
+        const allowAny = proxyCfg.allowAnyProject;
 
         ctx.app.use(mountPath, (req: Request, res: Response, next: NextFunction): void => {
             if (req.method !== 'GET' && req.method !== 'HEAD') {
                 next();
                 return;
             }
-            void RegistryProxyController._handle(proxy, activity, labels, mountPath, req, res);
+            void RegistryProxyController._handle(proxy, activity, labels, allowAny, mountPath, req, res);
         });
     }
 
@@ -113,6 +114,7 @@ export class RegistryProxyController {
                 totalBytes: entries.reduce((sum, e) => sum + e.bytes, 0),
                 hits: hits,
                 misses: misses,
+                allowAnyProject: proxyCfg.allowAnyProject,
                 projects: activity.perProject()
             };
             res.status(200).json(response);
@@ -204,6 +206,7 @@ export class RegistryProxyController {
         proxy: RegistryProxy,
         activity: RegistryActivity,
         labels: Map<string, string>,
+        allowAny: boolean,
         mountPath: string,
         req: Request,
         res: Response
@@ -221,7 +224,7 @@ export class RegistryProxyController {
             return;
         }
 
-        const route = RegistryProxyController.resolveProject(labels, rel);
+        const route = RegistryProxyController.resolveProject(labels, rel, allowAny);
 
         /*
          * `/registry/<project>` with nothing after it is that project's
@@ -247,23 +250,41 @@ export class RegistryProxyController {
     }
 
     /**
-     * Split an optional leading project segment off `rel`. The first
-     * path segment is treated as a project only when it (case-
-     * insensitively) matches a configured project name / key — so a
-     * bare `/registry/lodash` still resolves `lodash` as a package
-     * (default bucket) and only an intentional `/registry/<project>/…`
-     * gets bucketed. A scoped packument (`@scope%2fpkg`) never matches
-     * a project label, so it stays in the default bucket too.
+     * Split an optional leading project segment off `rel`.
+     *
+     * A configured project name / key (case-insensitive) always
+     * buckets and resolves to its *canonical* name. Beyond that, the
+     * behaviour depends on `allowAny` (config `proxy.allowAnyProject`):
+     *
+     *  - `allowAny === false` (default) — only configured names bucket.
+     *    A bare `/registry/lodash` resolves `lodash` as a package
+     *    (default bucket), and an unknown `/registry/<x>/…` segment is
+     *    left glued to the package path (typically 404s).
+     *  - `allowAny === true` — any first segment buckets as an ad-hoc
+     *    project, detected heuristically so bare package/tarball URLs
+     *    still work: a single-segment path (bare packument), an
+     *    `@scope` first segment (scoped packument / scoped tarball),
+     *    and a remainder that begins with `-/` (bare unscoped tarball
+     *    `lodash/-/…`) all stay in the default bucket. Everything else
+     *    (2+ segments, non-`@` first, package path following) buckets
+     *    under the literal first segment.
      *
      * Public for unit testing — the routing decision is the tricky part
-     * (scoped names, legacy bare paths) and deserves direct coverage.
+     * (scoped names, legacy bare paths, the heuristic) and deserves
+     * direct coverage.
      */
-    public static resolveProject(labels: Map<string, string>, rel: string): ProjectRoute {
+    public static resolveProject(labels: Map<string, string>, rel: string, allowAny = false): ProjectRoute {
         const slash = rel.indexOf('/');
         const firstRaw = slash >= 0 ? rel.slice(0, slash) : rel;
         const canonical = labels.get(decodeURIComponent(firstRaw).toLowerCase());
         if (canonical) {
             return {project: canonical, segment: firstRaw, rest: slash >= 0 ? rel.slice(slash + 1) : ''};
+        }
+        if (allowAny && slash >= 0 && !firstRaw.startsWith('@')) {
+            const rest = rel.slice(slash + 1);
+            if (!rest.startsWith('-/')) {
+                return {project: decodeURIComponent(firstRaw), segment: firstRaw, rest: rest};
+            }
         }
         return {project: 'default', segment: null, rest: rel};
     }

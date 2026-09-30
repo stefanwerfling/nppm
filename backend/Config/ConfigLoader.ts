@@ -103,6 +103,8 @@ export type LoadedConfig = {
      *    tarball mirror lives under.
      *  - `historyDir` — absolute `.nppm/history/registry/` path the
      *    per-day per-project request tallies are persisted under.
+     *  - `allowAnyProject` — when true, any URL segment buckets as a
+     *    project (heuristic); when false only configured names do.
      */
     proxy: {
         enabled: boolean;
@@ -111,6 +113,7 @@ export type LoadedConfig = {
         token: string|undefined;
         storeDir: string;
         historyDir: string;
+        allowAnyProject: boolean;
     };
     /**
      * Projects in *config order*. The Vite plugin re-keys them by UUID
@@ -161,7 +164,7 @@ export class ConfigLoader {
         const cfg = raw as {
             projects?: unknown[];
             registry?: {url?: string; auth?: string;};
-            proxy?: {enabled?: boolean; upstream?: string; mountPath?: string; token?: string;};
+            proxy?: {enabled?: boolean; upstream?: string; mountPath?: string; token?: string; allowAnyProject?: boolean;};
             cache?: {dir?: string; ttlMinutes?: number;};
             security?: {
                 maintainer?: {
@@ -229,7 +232,8 @@ export class ConfigLoader {
             mountPath: ConfigLoader._normalizeMountPath(cfg.proxy?.mountPath),
             token: ConfigLoader.expandEnv(cfg.proxy?.token),
             storeDir: NppmDirs.register(projectRoot),
-            historyDir: path.join(NppmDirs.history(projectRoot), 'registry')
+            historyDir: path.join(NppmDirs.history(projectRoot), 'registry'),
+            allowAnyProject: cfg.proxy?.allowAnyProject === true
         };
         const cacheDir = cfg.cache?.dir
             ? path.resolve(projectRoot, cfg.cache.dir)

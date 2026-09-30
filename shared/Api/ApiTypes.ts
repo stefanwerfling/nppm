@@ -128,6 +128,7 @@ export type ApiConfigSettings = {
         upstream?: string;
         mountPath?: string;
         token?: string;
+        allowAnyProject?: boolean;
     };
     cache?: {
         dir?: string;
@@ -229,6 +230,12 @@ export type ApiRegistryStatusResponse = {
     hits: number;
     /** Tarball requests that fell through to the upstream today. */
     misses: number;
+    /**
+     * Whether any URL segment may bucket as a project (config
+     * `proxy.allowAnyProject`). When false only configured project
+     * names bucket; the UI tailors its connect hint accordingly.
+     */
+    allowAnyProject: boolean;
     /**
      * Per-project request tallies for the current day, seeded from disk
      * so they survive a server restart. The bare-mount bucket (no

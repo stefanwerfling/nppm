@@ -151,4 +151,46 @@ describe('RegistryProxyController.resolveProject', () => {
     it('resolves a project ping (segment only, no package)', () => {
         expect(RegistryProxyController.resolveProject(labels, 'swipemeister')).toEqual({project: 'swipemeister', segment: 'swipemeister', rest: ''});
     });
+
+    it('does NOT bucket an unknown segment when allowAny is off', () => {
+        expect(RegistryProxyController.resolveProject(labels, 'foobar/lodash', false))
+        .toEqual({project: 'default', segment: null, rest: 'foobar/lodash'});
+    });
+
+    describe('allowAny (free-form buckets)', () => {
+        it('buckets any unknown first segment', () => {
+            expect(RegistryProxyController.resolveProject(labels, 'foobar/lodash', true))
+            .toEqual({project: 'foobar', segment: 'foobar', rest: 'lodash'});
+        });
+
+        it('still resolves configured names to their canonical form', () => {
+            expect(RegistryProxyController.resolveProject(labels, 'SwipeMeister/lodash', true).project).toBe('swipemeister');
+        });
+
+        it('keeps a single-segment bare packument in the default bucket', () => {
+            expect(RegistryProxyController.resolveProject(labels, 'lodash', true))
+            .toEqual({project: 'default', segment: null, rest: 'lodash'});
+        });
+
+        it('keeps a bare unscoped tarball (rest starts with -/) in the default bucket', () => {
+            expect(RegistryProxyController.resolveProject(labels, 'lodash/-/lodash-1.0.0.tgz', true))
+            .toEqual({project: 'default', segment: null, rest: 'lodash/-/lodash-1.0.0.tgz'});
+        });
+
+        it('keeps a scoped (@) first segment in the default bucket', () => {
+            expect(RegistryProxyController.resolveProject(labels, '@babel/core/-/core-1.0.0.tgz', true).project).toBe('default');
+        });
+
+        it('buckets an ad-hoc project in front of a scoped package', () => {
+            const r = RegistryProxyController.resolveProject(labels, 'foobar/@babel%2fcore', true);
+            expect(r.project).toBe('foobar');
+            expect(r.rest).toBe('@babel%2fcore');
+        });
+
+        it('buckets an ad-hoc project in front of an unscoped tarball', () => {
+            const r = RegistryProxyController.resolveProject(labels, 'foobar/lodash/-/lodash-1.0.0.tgz', true);
+            expect(r.project).toBe('foobar');
+            expect(r.rest).toBe('lodash/-/lodash-1.0.0.tgz');
+        });
+    });
 });

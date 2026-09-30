@@ -365,6 +365,11 @@ export class SettingsModal {
             p.token,
             '$NPM_TOKEN'
         ));
+        body.appendChild(this._checkboxField(
+            'sm-px-any',
+            I18n.t('Allow any project name in the URL (no config needed)'),
+            p.allowAnyProject === true
+        ));
         const hint = document.createElement('div');
         hint.className = 'umd-note';
         hint.textContent = I18n.t(
@@ -738,6 +743,7 @@ export class SettingsModal {
         const pxUpstream = this._strVal('.sm-px-up');
         const pxMount = this._strVal('.sm-px-mp');
         const pxToken = this._strVal('.sm-px-tok');
+        const pxAny = this._boolVal('.sm-px-any');
         const px: NonNullable<ApiConfigSettings['proxy']> = {};
         if (pxEnabled) {
             px.enabled = true;
@@ -750,6 +756,9 @@ export class SettingsModal {
         }
         if (pxToken !== undefined) {
             px.token = pxToken;
+        }
+        if (pxAny) {
+            px.allowAnyProject = true;
         }
         this._current.proxy = Object.keys(px).length > 0 ? px : undefined;
     }

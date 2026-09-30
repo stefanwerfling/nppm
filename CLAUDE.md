@@ -552,20 +552,24 @@ migrations leave both sides alone rather than merging.
   "optimise" the store to deflate the tarball or strip metadata — it
   breaks `npm install`'s integrity check.
 
-- **Per-project registry buckets are label-validated, not free-form.**
-  `RegistryProxyController.resolveProject` treats the first
-  `/registry/<seg>/…` path segment as a project **only** when `<seg>`
+- **Per-project registry buckets: configured names always, free-form
+  opt-in.** `RegistryProxyController.resolveProject(labels, rel,
+  allowAny)` always buckets a first `/registry/<seg>/…` segment that
   (case-insensitively) matches a configured project's `getName()` /
-  `getKey()`; otherwise the whole path is the package (legacy bare-mount
-  path stays fully backward-compatible, and a scoped packument
-  `@scope%2fpkg` never matches so it never mis-buckets). When a segment
-  matches, `_servePackument` keeps that **original** segment in every
-  rewritten `dist.tarball` URL so the follow-up tarball fetch routes
-  back through the *same* bucket and is counted under the same project.
-  Tallies persist per UTC day via `RegistryHistoryStore`; the `default`
-  bucket collects bare-mount requests. Don't switch this to accept any
-  first segment as a project — a bare `/registry/lodash` would then read
-  `lodash` as a project and 404 the install.
+  `getKey()`, resolving it to the *canonical* name. Beyond that, when
+  `allowAny` (config `proxy.allowAnyProject`) is **false** (default)
+  only configured names bucket — an unknown segment stays glued to the
+  package path and typically 404s. When `allowAny` is **true**, any
+  first segment buckets as an ad-hoc project, detected heuristically so
+  bare URLs keep working: a single-segment path (bare packument), an
+  `@scope` first segment, and a remainder beginning with `-/` (bare
+  unscoped tarball `lodash/-/…`) all stay in the `default` bucket. In
+  every bucketed case `_servePackument` keeps the **original** segment
+  in each rewritten `dist.tarball` URL so the follow-up tarball fetch
+  routes back through the *same* bucket. Tallies persist per UTC day via
+  `RegistryHistoryStore`. The proxy config (including `allowAnyProject`)
+  is read once at `register()` time, so toggling it in Settings needs a
+  dev-server restart to take effect — same as `enabled` / `mountPath`.
 
 ## Tests
 

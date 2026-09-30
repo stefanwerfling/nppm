@@ -104,12 +104,19 @@ export const SchemaConfigRegistry = Vts.object({
  *                  literal or a `$VARNAME` placeholder resolved by
  *                  `ConfigLoader.expandEnv()` so the config stays safe
  *                  to commit.
+ *  - `allowAnyProject` → when true, any `/registry/<segment>/…` segment
+ *                  becomes a per-project bucket even if `<segment>` is
+ *                  not a configured project (heuristic detection). When
+ *                  false (default) only configured project names bucket;
+ *                  an unknown segment is treated as part of the package
+ *                  name (and typically 404s).
  */
 export const SchemaConfigProxy = Vts.object({
     enabled: Vts.optional(Vts.boolean()),
     upstream: Vts.optional(Vts.string()),
     mountPath: Vts.optional(Vts.string()),
-    token: Vts.optional(Vts.string())
+    token: Vts.optional(Vts.string()),
+    allowAnyProject: Vts.optional(Vts.boolean())
 });
 
 /**

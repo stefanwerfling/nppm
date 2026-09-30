@@ -116,7 +116,8 @@ function makeEnvironment(opts: {
             mountPath: '/registry',
             token: undefined,
             storeDir: path.join(opts.cacheDir, '.nppm', 'register'),
-            historyDir: path.join(opts.cacheDir, '.nppm', 'history', 'registry')
+            historyDir: path.join(opts.cacheDir, '.nppm', 'history', 'registry'),
+            allowAnyProject: false
         },
         allowInstall: false,
         githubToken: undefined,

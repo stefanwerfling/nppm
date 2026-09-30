@@ -217,7 +217,9 @@ export class RegistryView {
         this._connectEl.appendChild(RegistryView._cmdRow(`npm config set registry ${url}`));
         this._connectEl.appendChild(RegistryView._cmdRow(
             `registry=${url}/<project>`,
-            I18n.t('# per-project in .npmrc — buckets requests under <project>')
+            status.allowAnyProject
+                ? I18n.t('# per-project in .npmrc — any <project> name works')
+                : I18n.t('# per-project in .npmrc — <project> must be a configured project')
         ));
 
         if (!status.enabled) {

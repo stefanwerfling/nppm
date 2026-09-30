@@ -80,7 +80,8 @@ function makeEnvironment(projects: Project[], cacheDir: string): LoadedConfig {
             mountPath: '/registry',
             token: undefined,
             storeDir: path.join(cacheDir, '.nppm', 'register'),
-            historyDir: path.join(cacheDir, '.nppm', 'history', 'registry')
+            historyDir: path.join(cacheDir, '.nppm', 'history', 'registry'),
+            allowAnyProject: false
         },
         allowInstall: false,
         githubToken: undefined,

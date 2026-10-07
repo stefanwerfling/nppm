@@ -51,6 +51,23 @@ import {MatrixResponse} from '../../backend/Matrix/MatrixBuilder.js';
  */
 export class Api {
 
+    /**
+     * Base URL prefix for every API call. Empty when nppm runs
+     * standalone (so paths stay `/api/...`); a host such as pkgstudio
+     * sets it to e.g. `/mod/nppm` so the same calls resolve to
+     * `/mod/nppm/api/...`. Set once before mounting the frontend.
+     */
+    private static _base = '';
+
+    public static setBaseUrl(base: string): void {
+        Api._base = base.replace(/\/$/, '');
+    }
+
+    private static _u(path: string): string {
+        return Api._base + path;
+    }
+
+
     public static async listProjects(): Promise<ApiProjectsResponse> {
         return Api._json<ApiProjectsResponse>('/api/projects');
     }
@@ -60,7 +77,7 @@ export class Api {
     }
 
     public static async addTemplateSource(url: string): Promise<ApiAddTemplateSourceResponse> {
-        const res = await fetch('/api/templates/sources', {
+        const res = await fetch(Api._u('/api/templates/sources'), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({url: url})
@@ -73,7 +90,7 @@ export class Api {
     }
 
     public static async clearCache(): Promise<ApiCacheClearResponse> {
-        const res = await fetch('/api/cache/clear', {method: 'POST'});
+        const res = await fetch(Api._u('/api/cache/clear'), {method: 'POST'});
         if (!res.ok) {
             throw new Error(`/api/cache/clear → ${res.status} ${res.statusText}`);
         }
@@ -90,7 +107,7 @@ export class Api {
     }
 
     public static async addProject(body: ApiProjectMutationRequest): Promise<ApiProjectMutationResponse> {
-        const res = await fetch('/api/projects', {
+        const res = await fetch(Api._u('/api/projects'), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(body)
@@ -102,7 +119,7 @@ export class Api {
     }
 
     public static async editProject(unid: string, body: ApiProjectMutationRequest): Promise<ApiProjectMutationResponse> {
-        const res = await fetch(`/api/projects/${unid}`, {
+        const res = await fetch(Api._u(`/api/projects/${unid}`), {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(body)
@@ -114,7 +131,7 @@ export class Api {
     }
 
     public static async setProjectVisibility(unid: string, hidden: boolean): Promise<void> {
-        const res = await fetch(`/api/projects/${unid}/visibility`, {
+        const res = await fetch(Api._u(`/api/projects/${unid}/visibility`), {
             method: 'PATCH',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({hidden: hidden})
@@ -137,7 +154,7 @@ export class Api {
     }
 
     public static historyBackfillUrl(projectUnid: string): string {
-        return `/api/projects/${projectUnid}/history/backfill`;
+        return Api._u(`/api/projects/${projectUnid}/history/backfill`);
     }
 
     public static async projectMatrix(projectUnid: string): Promise<ApiProjectMatrixResponse> {
@@ -165,7 +182,7 @@ export class Api {
     }
 
     public static vulnerabilityTimelineScanUrl(projectUnid: string): string {
-        return `/api/projects/${projectUnid}/vulnerability-timeline/scan`;
+        return Api._u(`/api/projects/${projectUnid}/vulnerability-timeline/scan`);
     }
 
     public static async integrity(projectUnid: string): Promise<ApiIntegrityResponse> {
@@ -193,7 +210,7 @@ export class Api {
         projectUnid: string,
         request: ApiUpgradeRequest
     ): Promise<ApiUpgradePreviewResponse> {
-        const res = await fetch(`/api/projects/${projectUnid}/upgrade/preview`, {
+        const res = await fetch(Api._u(`/api/projects/${projectUnid}/upgrade/preview`), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(request)
@@ -214,18 +231,18 @@ export class Api {
      * keeps the URL shape in one place.
      */
     public static upgradeApplyUrl(projectUnid: string): string {
-        return `/api/projects/${projectUnid}/upgrade/apply`;
+        return Api._u(`/api/projects/${projectUnid}/upgrade/apply`);
     }
 
     public static lifecycleRunUrl(projectUnid: string): string {
-        return `/api/projects/${projectUnid}/lifecycle-scripts/run`;
+        return Api._u(`/api/projects/${projectUnid}/lifecycle-scripts/run`);
     }
 
     public static async matrixUpgradePreview(
         picks: ApiBulkUpgradePick[]
     ): Promise<ApiBulkUpgradePreviewResponse> {
         const body: ApiBulkUpgradePreviewRequest = {picks: picks};
-        const res = await fetch('/api/matrix/upgrade/preview', {
+        const res = await fetch(Api._u('/api/matrix/upgrade/preview'), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(body)
@@ -237,7 +254,7 @@ export class Api {
     }
 
     public static matrixUpgradeApplyUrl(): string {
-        return '/api/matrix/upgrade/apply';
+        return Api._u('/api/matrix/upgrade/apply');
     }
 
     public static async releases(name: string, version?: string): Promise<ApiReleasesResponse> {
@@ -261,7 +278,7 @@ export class Api {
     }
 
     public static registryLogUrl(): string {
-        return '/api/registry/log';
+        return Api._u('/api/registry/log');
     }
 
     public static async registryHistory(days = 90): Promise<ApiRegistryHistoryResponse> {
@@ -269,7 +286,7 @@ export class Api {
     }
 
     public static async registryClear(): Promise<ApiRegistryClearResponse> {
-        const res = await fetch('/api/registry/clear', {method: 'POST'});
+        const res = await fetch(Api._u('/api/registry/clear'), {method: 'POST'});
         if (!res.ok) {
             throw new Error(`/api/registry/clear → ${res.status} ${res.statusText}`);
         }
@@ -314,7 +331,7 @@ export class Api {
     public static async securityIgnoredAdd(
         req: ApiSecurityIgnoredMutationRequest
     ): Promise<ApiSecurityIgnoredMutationResponse> {
-        const res = await fetch('/api/security/ignored', {
+        const res = await fetch(Api._u('/api/security/ignored'), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(req)
@@ -328,7 +345,7 @@ export class Api {
     public static async securityIgnoredRemove(
         req: ApiSecurityIgnoredMutationRequest
     ): Promise<ApiSecurityIgnoredMutationResponse> {
-        const res = await fetch('/api/security/ignored/remove', {
+        const res = await fetch(Api._u('/api/security/ignored/remove'), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(req)
@@ -343,7 +360,7 @@ export class Api {
         packages: {name: string; version: string;}[]
     ): Promise<ApiMatrixSecurityResponse> {
         const body: ApiMatrixSecurityRequest = {packages: packages};
-        const res = await fetch('/api/matrix/security', {
+        const res = await fetch(Api._u('/api/matrix/security'), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(body)
@@ -364,7 +381,7 @@ export class Api {
         packages: {name: string; version: string;}[]
     ): Promise<ApiBundlesResponse> {
         const body: ApiBundlesRequest = {packages: packages};
-        const res = await fetch('/api/matrix/bundles', {
+        const res = await fetch(Api._u('/api/matrix/bundles'), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(body)
@@ -379,7 +396,7 @@ export class Api {
         packages: {name: string; version: string;}[]
     ): Promise<ApiMatrixHeuristicsResponse> {
         const body: ApiMatrixHeuristicsRequest = {packages: packages};
-        const res = await fetch('/api/matrix/heuristics', {
+        const res = await fetch(Api._u('/api/matrix/heuristics'), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(body)
@@ -393,7 +410,7 @@ export class Api {
     }
 
     private static async _json<T>(url: string): Promise<T> {
-        const res = await fetch(url);
+        const res = await fetch(Api._u(url));
 
         if (!res.ok) {
             /*

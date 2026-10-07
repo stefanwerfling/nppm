@@ -100,7 +100,7 @@ export class RegistryProxyController {
     // ---- management API (always registered) ----------------------------
 
     private static _registerStatus(ctx: ServerContext, store: DiskTarballStore, activity: RegistryActivity): void {
-        ctx.app.get('/api/registry/status', async(_req, res): Promise<void> => {
+        ctx.app.get('/api/registry/status', async(req, res): Promise<void> => {
             const proxyCfg = ctx.loaded.proxy;
             const entries = await store.list();
             const names = new Set(entries.map((e) => e.name));
@@ -108,7 +108,7 @@ export class RegistryProxyController {
             const response: ApiRegistryStatusResponse = {
                 enabled: proxyCfg.enabled,
                 upstream: proxyCfg.upstream,
-                mountPath: proxyCfg.mountPath,
+                mountPath: RegistryProxyController._forwardedPrefix(req) + proxyCfg.mountPath,
                 packages: names.size,
                 versions: entries.length,
                 totalBytes: entries.reduce((sum, e) => sum + e.bytes, 0),
@@ -289,6 +289,24 @@ export class RegistryProxyController {
         return {project: 'default', segment: null, rest: rel};
     }
 
+    /**
+     * External path prefix this nppm instance is served under, read from the
+     * reverse-proxy `X-Forwarded-Prefix` header a host (pkgstudio) sets when it
+     * mounts nppm at `/<id>`. Prepended to `mountPath` for the advertised
+     * `npm config` URL and the rewritten `dist.tarball` URLs so both resolve
+     * through the host. Empty standalone (header absent) → root-relative as
+     * before. Normalised to a leading slash, no trailing slash.
+     */
+    private static _forwardedPrefix(req: Request): string {
+        const raw = req.headers['x-forwarded-prefix'];
+        const val = (Array.isArray(raw) ? raw[0] : raw ?? '').trim();
+        if (val === '' || val === '/') {
+            return '';
+        }
+        const withLead = val.startsWith('/') ? val : `/${val}`;
+        return withLead.replace(/\/+$/u, '');
+    }
+
     private static async _servePackument(
         proxy: RegistryProxy,
         activity: RegistryActivity,
@@ -304,7 +322,8 @@ export class RegistryProxyController {
          * and is counted under the same project.
          */
         const seg = route.segment ? `/${route.segment}` : '';
-        const publicBase = `${req.protocol}://${req.get('host') ?? 'localhost'}${mountPath}${seg}`;
+        const prefix = RegistryProxyController._forwardedPrefix(req);
+        const publicBase = `${req.protocol}://${req.get('host') ?? 'localhost'}${prefix}${mountPath}${seg}`;
         const {status, body} = await proxy.getPackument(name, publicBase);
         if (!body) {
             activity.record({time: Date.now(), method: req.method, project: route.project, name: name, kind: 'packument', result: 'not-found'});
